@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Web", "AdhdTimeOrganizer.Web\AdhdTimeOrganizer.Web.csproj", "{28D04C85-D215-4533-8485-1E9EA590D800}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Common", "AdhdTimeOrganizer.Common\AdhdTimeOrganizer.Common.csproj", "{675B6A9D-D587-4A9C-B3BF-D172F2B0D0BE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Command", "AdhdTimeOrganizer.Command\AdhdTimeOrganizer.Command.csproj", "{E137DC93-C396-4BE1-8CDB-B911587F06F7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Query", "AdhdTimeOrganizer.Query\AdhdTimeOrganizer.Query.csproj", "{4E1BDE05-2EE5-4D28-8020-AA80C74BA06E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{28D04C85-D215-4533-8485-1E9EA590D800}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{28D04C85-D215-4533-8485-1E9EA590D800}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{28D04C85-D215-4533-8485-1E9EA590D800}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{28D04C85-D215-4533-8485-1E9EA590D800}.Release|Any CPU.Build.0 = Release|Any CPU
+		{675B6A9D-D587-4A9C-B3BF-D172F2B0D0BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{675B6A9D-D587-4A9C-B3BF-D172F2B0D0BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{675B6A9D-D587-4A9C-B3BF-D172F2B0D0BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{675B6A9D-D587-4A9C-B3BF-D172F2B0D0BE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E137DC93-C396-4BE1-8CDB-B911587F06F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E137DC93-C396-4BE1-8CDB-B911587F06F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E137DC93-C396-4BE1-8CDB-B911587F06F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E137DC93-C396-4BE1-8CDB-B911587F06F7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E1BDE05-2EE5-4D28-8020-AA80C74BA06E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E1BDE05-2EE5-4D28-8020-AA80C74BA06E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E1BDE05-2EE5-4D28-8020-AA80C74BA06E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E1BDE05-2EE5-4D28-8020-AA80C74BA06E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
