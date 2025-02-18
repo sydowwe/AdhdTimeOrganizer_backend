@@ -2,8 +2,8 @@ using AdhdTimeOrganizer.Common.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.user;
 
-public class UserResponse : IdResponse
+public record UserResponse : IdResponse
 {
-    public string Email { get; set; }
-    public bool TwoFactorEnabled { get; set; }
+    public required string Email { get; init; }
+    public bool TwoFactorEnabled { get; init; }
 }

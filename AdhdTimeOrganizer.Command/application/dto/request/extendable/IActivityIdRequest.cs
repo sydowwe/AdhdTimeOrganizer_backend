@@ -1,6 +1,6 @@
 ﻿using AdhdTimeOrganizer.Common.application.dto.request.@base;
 
-namespace AdhdTimeOrganizer.Command.application.dto.request.activity;
+namespace AdhdTimeOrganizer.Command.application.dto.request.extendable;
 
 public interface IActivityIdRequest : IMyRequest
 {

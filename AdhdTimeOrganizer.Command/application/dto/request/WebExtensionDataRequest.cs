@@ -3,10 +3,17 @@ using AdhdTimeOrganizer.Command.application.dto.request.activity;
 
 namespace AdhdTimeOrganizer.Command.application.dto.request;
 
-public record WebExtensionDataRequest(
-    long ActivityId,
-    [ Required, StringLength(255)]    string Domain,
-    [ Required, StringLength(255)]    string Title,
-    [ Required] int Duration,
-    [ Required] DateTime StartTimestamp
-) : ActivityIdRequest(ActivityId);
+public record WebExtensionDataRequest : ActivityIdRequest
+{
+    [Required, StringLength(255)]
+    public required string Domain { get; init; }
+
+    [Required, StringLength(255)]
+    public required string Title { get; init; }
+
+    [Required]
+    public required int Duration { get; init; }
+
+    [Required]
+    public required DateTime StartTimestamp { get; init; }
+}

@@ -2,9 +2,9 @@ using AdhdTimeOrganizer.Common.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.user;
 
-public class TwoFactorAuthResponse : IMyResponse
+public record TwoFactorAuthResponse : IMyResponse
 {
-    public bool TwoFactorEnabled { get; set; }
-    public string? QrCode { get; set; }
-    public IEnumerable<string>? RecoveryCodes { get; set; }
+    public required bool TwoFactorEnabled { get; init; }
+    public string? QrCode { get; init; }
+    public IEnumerable<string>? RecoveryCodes { get; init; }
 }

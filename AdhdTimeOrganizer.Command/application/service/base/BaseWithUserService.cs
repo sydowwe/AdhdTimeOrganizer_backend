@@ -11,7 +11,7 @@ using AutoMapper;
 
 namespace AdhdTimeOrganizer.Command.application.service.@base;
 
-public abstract class BaseCrudServiceWithUser<TEntity, TRequest, TResponse, TRepository>(
+public abstract class BaseWithUserService<TEntity, TRequest, TResponse, TRepository>(
     TRepository repository,
     ILoggedUserService loggedUserService,
     IMapper mapper

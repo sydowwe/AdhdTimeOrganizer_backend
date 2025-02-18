@@ -6,8 +6,6 @@ using AdhdTimeOrganizer.Command.infrastructure.repository.@base;
 
 namespace AdhdTimeOrganizer.Command.infrastructure.repository.activityHistory;
 
-
-
 public class ActivityHistoryRepository(AppCommandDbContext context) : BaseEntityWithActivityRepository<ActivityHistory>(context), IActivityHistoryRepository
 {
     public IQueryable<ActivityHistory> ApplyFilters(long userId, ActivityHistoryFilterRequest filter)

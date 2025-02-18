@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Command.application.dto.request.activity;
+using AdhdTimeOrganizer.Command.application.dto.request.extendable;
 using AdhdTimeOrganizer.Command.application.dto.response.activity;
 using AdhdTimeOrganizer.Command.application.dto.response.extendable;
 using AdhdTimeOrganizer.Command.application.@interface.@base;
@@ -14,7 +15,7 @@ public class BaseWithActivityController<TEntity, TRequest, TResponse, TService>(
 {
     private TService _service = service;
 
-    [HttpPost("get-all-activity-form-select-options")]
+    [HttpPost]
     public async Task<ActionResult<IEnumerable<ActivityFormSelectOptionsResponse>>> GetAllActivityFormSelectOptions()
     {
         return Ok(await _service.GetAllActivityFormSelectOptions());

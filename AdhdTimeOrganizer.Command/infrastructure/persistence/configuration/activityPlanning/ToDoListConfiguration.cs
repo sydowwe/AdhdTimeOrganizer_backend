@@ -13,7 +13,7 @@ public class ToDoListConfiguration : IEntityTypeConfiguration<ToDoList>
 
         builder.Property(p => p.IsDone).HasDefaultValue(false).IsRequired();
         builder.IsManyWithOneUser(u => u.ToDoListColl);
-        builder.IsManyWithOneActivity(a=>a.ToDoListColl);
+        builder.IsOneWithOneActivity(a=>a.ToDoList);
 
         builder.HasOne(r => r.TaskUrgency)
             .WithMany(t=>t.ToDoListColl)

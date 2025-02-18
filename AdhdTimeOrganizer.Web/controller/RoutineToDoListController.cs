@@ -24,7 +24,7 @@ public class RoutineToDoListController(IRoutineToDoListService service)
     {
         return null;
     }
-    [HttpPost("get-all")]
+    [HttpPost]
     public async Task<ActionResult<IEnumerable<RoutineToDoListGroupedResponse>>> GetAllGrouped()
     {
         return Ok(await _service.GetAllGroupedByTimePeriod());

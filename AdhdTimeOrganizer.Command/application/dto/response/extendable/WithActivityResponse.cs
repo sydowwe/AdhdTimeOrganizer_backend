@@ -3,11 +3,8 @@ using AdhdTimeOrganizer.Common.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.extendable;
 
-public interface IEntityWithActivityResponse : IIdResponse
+
+public record WithActivityResponse : IdResponse, IEntityWithActivityResponse
 {
-    public ActivityResponse Activity { get; set; }
-}
-public class WithActivityResponse : IdResponse, IEntityWithActivityResponse
-{
-    public ActivityResponse Activity { get; set; }
+    public required ActivityResponse Activity { get; init; }
 }

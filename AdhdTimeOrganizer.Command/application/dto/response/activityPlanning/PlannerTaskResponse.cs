@@ -1,10 +1,11 @@
+using AdhdTimeOrganizer.Command.application.dto.response.activity;
 using AdhdTimeOrganizer.Command.application.dto.response.extendable;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.activityPlanning;
 
-public class PlannerTaskResponse : WithIsDoneResponse
+public record PlannerTaskResponse : WithIsDoneResponse
 {
-    public DateTime StartTimestamp { get; set; }
-    public int MinuteLength { get; set; }
-    public string Color { get; set; }
+    public required DateTime StartTimestamp { get; init; }
+    public required int MinuteLength { get; init; }
+    public required string Color { get; init; }
 }

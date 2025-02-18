@@ -1,7 +1,7 @@
 namespace AdhdTimeOrganizer.Command.application.dto.response.user;
 
-public class LockedOutResponse
+public record LockedOutResponse
 {
-    public string Status { get; } = "lockedOut";
-    public int Seconds { get; set; }
+    public required int Seconds { get; init; }
+    public static string Status => "User locked out";
 }

@@ -2,7 +2,7 @@ using AdhdTimeOrganizer.Common.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.Common.application.dto.response.generic;
 
-public class SelectOptionResponse : IdResponse
+public record SelectOptionResponse: IdResponse
 {
-    public required string Label { get; init; }
+    public required string Text { get; init; }
 }

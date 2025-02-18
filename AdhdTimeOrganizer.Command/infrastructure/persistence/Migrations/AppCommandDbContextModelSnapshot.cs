@@ -145,7 +145,6 @@ namespace AdhdTimeOrganizer.Command.infrastructure.persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Icon")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("ModifiedTimestamp")
@@ -457,7 +456,8 @@ namespace AdhdTimeOrganizer.Command.infrastructure.persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActivityId");
+                    b.HasIndex("ActivityId")
+                        .IsUnique();
 
                     b.HasIndex("TimePeriodId");
 
@@ -553,7 +553,8 @@ namespace AdhdTimeOrganizer.Command.infrastructure.persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActivityId");
+                    b.HasIndex("ActivityId")
+                        .IsUnique();
 
                     b.HasIndex("TaskUrgencyId");
 
@@ -913,8 +914,8 @@ namespace AdhdTimeOrganizer.Command.infrastructure.persistence.Migrations
             modelBuilder.Entity("AdhdTimeOrganizer.Command.domain.model.entity.activityPlanning.RoutineToDoList", b =>
                 {
                     b.HasOne("AdhdTimeOrganizer.Command.domain.model.entity.activity.Activity", "Activity")
-                        .WithMany("RoutineToDoListColl")
-                        .HasForeignKey("ActivityId")
+                        .WithOne("RoutineToDoList")
+                        .HasForeignKey("AdhdTimeOrganizer.Command.domain.model.entity.activityPlanning.RoutineToDoList", "ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -951,8 +952,8 @@ namespace AdhdTimeOrganizer.Command.infrastructure.persistence.Migrations
             modelBuilder.Entity("AdhdTimeOrganizer.Command.domain.model.entity.activityPlanning.ToDoList", b =>
                 {
                     b.HasOne("AdhdTimeOrganizer.Command.domain.model.entity.activity.Activity", "Activity")
-                        .WithMany("ToDoListColl")
-                        .HasForeignKey("ActivityId")
+                        .WithOne("ToDoList")
+                        .HasForeignKey("AdhdTimeOrganizer.Command.domain.model.entity.activityPlanning.ToDoList", "ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1034,9 +1035,9 @@ namespace AdhdTimeOrganizer.Command.infrastructure.persistence.Migrations
 
                     b.Navigation("PlannerTaskList");
 
-                    b.Navigation("RoutineToDoListColl");
+                    b.Navigation("RoutineToDoList");
 
-                    b.Navigation("ToDoListColl");
+                    b.Navigation("ToDoList");
 
                     b.Navigation("WebExtensionDataList");
                 });

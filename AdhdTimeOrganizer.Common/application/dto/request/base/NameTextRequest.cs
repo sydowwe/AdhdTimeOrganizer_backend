@@ -2,12 +2,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace AdhdTimeOrganizer.Common.application.dto.request.@base;
 
-public class NameTextRequest : IMyRequest
+public record NameTextRequest : IMyRequest
 {
-    [Required]
-    [StringLength(50)] // Adjust length as needed
-    public required string Name { get; set; }
+    [Required, StringLength(50)]
+    public required string Name { get; init; }
 
-    [StringLength(200)] // Adjust length as needed
-    public string? Text { get; set; }
+    [StringLength(500)]
+    public string? Text { get; init; }
 }

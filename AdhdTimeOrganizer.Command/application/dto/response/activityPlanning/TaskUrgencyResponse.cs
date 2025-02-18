@@ -1,8 +1,7 @@
 using AdhdTimeOrganizer.Common.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.activityPlanning;
-
-public class TaskUrgencyResponse : TextColorResponse
+public record TaskUrgencyResponse : TextColorResponse
 {
-    public int Priority { get; set; }
+    public required int Priority { get; init; }
 }

@@ -10,8 +10,8 @@ namespace AdhdTimeOrganizer.Command.domain.model.entity.activityHistory;
 
 public class ActivityHistory : BaseEntityWithActivity
 {
-    public DateTime StartTimestamp { get; set; }
-    public MyIntTime Length { get; set; }
+    public required DateTime StartTimestamp { get; set; }
+    public required MyIntTime Length { get; set; }
 
     public DateTime EndTimestamp { get; set; }
 }

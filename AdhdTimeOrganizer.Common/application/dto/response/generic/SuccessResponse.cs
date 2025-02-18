@@ -1,12 +1,6 @@
 namespace AdhdTimeOrganizer.Common.application.dto.response.generic;
 
-public class SuccessResponse
+public record SuccessResponse(string Message)
 {
-    public SuccessResponse(string message)
-    {
-        Message = message;
-    }
-
-    public string Message { get; set; }
-    public string Status => "success";
+    public static string Status => "success";
 }

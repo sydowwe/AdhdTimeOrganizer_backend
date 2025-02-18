@@ -1,6 +1,8 @@
 namespace AdhdTimeOrganizer.Common.application.dto.response.@base;
 
-public class NameResponse : IdResponse
+public record NameResponse : IdResponse
 {
-    public string Name { get; set; }
+    public required string Name { get; init; }
+
+
 }

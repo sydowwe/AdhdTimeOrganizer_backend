@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Command.application.dto.request.extendable;
 using AdhdTimeOrganizer.Command.domain.model.entity.activity;
+using AdhdTimeOrganizer.Common.application.dto.request.@base;
 using AdhdTimeOrganizer.Common.application.dto.response.@base;
 using AdhdTimeOrganizer.Common.application.dto.response.generic;
 using AutoMapper;
@@ -12,6 +13,6 @@ public class CategoryProfile : Profile
     {
         CreateMap<NameTextColorIconRequest, Category>();
         CreateMap<Category, NameTextColorIconResponse>();
-        CreateMap<Category, SelectOptionResponse>().ForMember(dest => dest.Label, opt => opt.MapFrom(src => src.Name));
+        CreateMap<Category, SelectOptionResponse>().ForMember(dest => dest.Text, opt => opt.MapFrom(src => src.Name));
     }
 }

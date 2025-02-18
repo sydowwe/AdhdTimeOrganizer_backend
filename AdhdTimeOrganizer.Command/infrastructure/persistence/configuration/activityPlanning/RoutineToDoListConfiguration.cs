@@ -13,7 +13,7 @@ public class RoutineToDoListConfiguration : IEntityTypeConfiguration<RoutineToDo
 
         builder.Property(p => p.IsDone).HasDefaultValue(false).IsRequired();
         builder.IsManyWithOneUser(u => u.RoutineToDoListColl);
-        builder.IsManyWithOneActivity(a=>a.RoutineToDoListColl);
+        builder.IsOneWithOneActivity(a=>a.RoutineToDoList);
 
         builder.HasOne(r => r.TimePeriod)
             .WithMany(t=>t.RoutineToDoListColl)

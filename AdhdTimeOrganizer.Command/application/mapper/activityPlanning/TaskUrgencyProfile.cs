@@ -12,6 +12,6 @@ public class TaskUrgencyProfile : Profile
     {
         CreateMap<TaskUrgencyRequest, TaskUrgency>();
         CreateMap<TaskUrgency, TaskUrgencyResponse>();
-        CreateMap<TaskUrgency, SelectOptionResponse>().ForMember(dest => dest.Label, opt => opt.MapFrom(src => src.Text));
+        CreateMap<TaskUrgency, SelectOptionResponse>();
     }
 }

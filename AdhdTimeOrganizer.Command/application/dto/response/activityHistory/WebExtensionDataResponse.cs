@@ -1,11 +1,12 @@
+using AdhdTimeOrganizer.Command.application.dto.response.activity;
 using AdhdTimeOrganizer.Command.application.dto.response.extendable;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.activityHistory;
 
-public class WebExtensionDataResponse : WithActivityResponse
+public record WebExtensionDataResponse : WithActivityResponse
 {
-    public string Domain { get; set; }
-    public string Title { get; set; }
-    public int Duration { get; set; }
-    public DateTime StartTimestamp { get; set; }
+    public required string Domain { get; init; }
+    public required string Title { get; init; }
+    public required int Duration { get; init; }
+    public required DateTime StartTimestamp { get; init; }
 }

@@ -1,13 +1,9 @@
 namespace AdhdTimeOrganizer.Common.application.dto.response.@base;
 
-public interface IIdResponse : IMyResponse
-{
-    public long Id { get; }
-}
-
-public class IdResponse : IIdResponse
+public record IdResponse : IIdResponse
 {
     public long Id { get; init; }
+
     public IdResponse()
     {
     }

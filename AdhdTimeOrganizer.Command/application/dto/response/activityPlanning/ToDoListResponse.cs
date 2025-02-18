@@ -1,8 +1,9 @@
+using AdhdTimeOrganizer.Command.application.dto.response.activity;
 using AdhdTimeOrganizer.Command.application.dto.response.extendable;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.activityPlanning;
 
-public class ToDoListResponse : WithIsDoneResponse
+public record ToDoListResponse : WithIsDoneResponse
 {
-    public TaskUrgencyResponse taskUrgency { get; set; }
+    public required TaskUrgencyResponse TaskUrgency { get; init; }
 }

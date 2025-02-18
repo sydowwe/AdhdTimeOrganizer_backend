@@ -1,7 +1,6 @@
 using System.Linq.Expressions;
 using AdhdTimeOrganizer.Command.application.dto.request.user;
 using AdhdTimeOrganizer.Command.application.dto.response.user;
-using AdhdTimeOrganizer.Command.application.@interface.activity;
 using AdhdTimeOrganizer.Command.application.@interface.users;
 using AdhdTimeOrganizer.Command.domain.@event;
 using AdhdTimeOrganizer.Command.domain.model.entity.user;
@@ -128,19 +127,20 @@ public class UserService(
             return ServiceResult<GoogleSignInResponse>.Error(emailResult);
         var email = emailResult.Data.ToLower();
         var userResult = await GetByEmailAsync(email);
-        //TODO FIX
         if (userResult.Failed)
-            return ServiceResult<GoogleSignInResponse>.Successful(new GoogleSignInResponse());
+            return ServiceResult<GoogleSignInResponse>.Error(userResult);
 
         var user = userResult.Data;
         await signInManager.SignInAsync(user, googleSignInRequest.StayLoggedIn, "Google");
         // user.Timezone = TimeZoneInfo.FindSystemTimeZoneById(googleSignInRequest.Timezone);
         await userManager.UpdateAsync(user);
-        return ServiceResult<GoogleSignInResponse>.Successful(new GoogleSignInResponse
-        {
-            Email = email,
-            CurrentLocale = user.CurrentLocale
-        });
+        return ServiceResult<GoogleSignInResponse>.Successful(
+            new GoogleSignInResponse
+            {
+                Email = email,
+                CurrentLocale = user.CurrentLocale
+            }
+        );
     }
 
     public async Task<ServiceResult<LoginResponse>> LoginAsync(PasswordLoginRequest loginRequest)
@@ -148,7 +148,7 @@ public class UserService(
         var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(loginRequest.RecaptchaToken, "login");
         if (recaptchaResult.Failed)
             return ServiceResult<LoginResponse>.Error(recaptchaResult);
-        var userResult = await GetUserByEmailWithIncludes(loginRequest.Email.ToLower(), false);
+        var userResult = await GetUserByEmailWithIncludes(loginRequest.Email.ToLower());
         if (userResult.Failed)
             return ServiceResult<LoginResponse>.Error(userResult);
 
@@ -184,7 +184,6 @@ public class UserService(
                 "Failed to update user");
         }
 
-        var cartId = 1;
         userSessionService.UserLogin(user.CurrentLocale, loginRequest.Timezone);
         return ServiceResult<LoginResponse>.Successful(
             new LoginResponse
@@ -192,7 +191,8 @@ public class UserService(
                 Email = user.Email!,
                 RequiresTwoFactor = result.RequiresTwoFactor,
                 CurrentLocale = user.CurrentLocale
-            });
+            }
+        );
     }
 
     public async Task<ServiceResult> ValidateTwoFactorAuthForLoginAsync(TwoFactorAuthLoginRequest request)
@@ -430,10 +430,7 @@ public class UserService(
     {
         if (!user.TwoFactorEnabled)
             return ServiceResult<TwoFactorAuthResponse>.Successful(
-                new TwoFactorAuthResponse
-                {
-                    TwoFactorEnabled = false
-                });
+                new TwoFactorAuthResponse { TwoFactorEnabled = false });
 
         var qrCodeResult = await GenerateNewTwoFactorAuthQrCodeAsync(user);
         if (qrCodeResult.Failed)
@@ -444,12 +441,8 @@ public class UserService(
             return ServiceResult<TwoFactorAuthResponse>.Error(recoveryCodesResult);
 
         return ServiceResult<TwoFactorAuthResponse>.Successful(
-            new TwoFactorAuthResponse
-            {
-                TwoFactorEnabled = user.TwoFactorEnabled,
-                QrCode = qrCodeResult.Data,
-                RecoveryCodes = recoveryCodesResult.Data
-            });
+            new TwoFactorAuthResponse { TwoFactorEnabled = true, QrCode = qrCodeResult.Data, RecoveryCodes = recoveryCodesResult.Data.ToList() }
+        );
     }
 
     private async Task<ServiceResult<string>> GenerateNewTwoFactorAuthQrCodeAsync(UserEntity user)

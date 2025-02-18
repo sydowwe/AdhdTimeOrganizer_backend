@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Command.application.dto.request.activity;
+using AdhdTimeOrganizer.Command.application.dto.request.extendable;
 using AdhdTimeOrganizer.Command.application.dto.response.activity;
 using AdhdTimeOrganizer.Command.application.dto.response.extendable;
 using AdhdTimeOrganizer.Command.application.@interface.activity;
@@ -17,7 +18,7 @@ public abstract class EntityWithActivityService<TEntity, TRequest, TResponse, TR
     IActivityService activityService,
     ILoggedUserService loggedUserService,
     IMapper mapper
-) : BaseCrudServiceWithUser<TEntity, TRequest, TResponse, TRepository>(repository, loggedUserService, mapper),
+) : BaseWithUserService<TEntity, TRequest, TResponse, TRepository>(repository, loggedUserService, mapper),
     IEntityWithActivityService<TEntity, TRequest, TResponse>
     where TEntity : BaseEntityWithActivity
     where TRequest : class, IActivityIdRequest
@@ -28,8 +29,7 @@ public abstract class EntityWithActivityService<TEntity, TRequest, TResponse, TR
 
     public async Task<List<ActivityFormSelectOptionsResponse>> GetAllActivityFormSelectOptions()
     {
-        return await ProjectFromQueryToListAsync<ActivityFormSelectOptionsResponse>(
-            _repository.GetDistinctActivities(LoggedUserId));
+        return await _repository.GetAllActivityFormOptionsCombinations(LoggedUserId);
     }
 
 }

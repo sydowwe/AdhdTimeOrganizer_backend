@@ -1,11 +1,13 @@
 using AdhdTimeOrganizer.Command.application.dto.request.history;
 using AdhdTimeOrganizer.Command.application.dto.response.activityHistory;
+using AdhdTimeOrganizer.Command.application.dto.response.extendable;
 using AdhdTimeOrganizer.Command.application.@interface.activity;
 using AdhdTimeOrganizer.Command.application.@interface.activityHistory;
 using AdhdTimeOrganizer.Command.application.@interface.users;
 using AdhdTimeOrganizer.Command.application.service.@base;
 using AdhdTimeOrganizer.Command.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.Command.domain.repositoryContract.activityHistory;
+using AdhdTimeOrganizer.Common.application.dto.response.@base;
 using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
@@ -19,14 +21,18 @@ public class ActivityHistoryService(IActivityHistoryRepository repository, IActi
 {
        public async Task<List<ActivityHistoryListGroupedByDateResponse>> FilterAsync(ActivityHistoryFilterRequest filterRequest)
     {
-        var query = repository.ApplyFilters(loggedUserService.GetUserId, filterRequest);
+        var query = _repository.ApplyFilters(_loggedUserService.GetUserId, filterRequest);
 
         var historyResponses = await query.OrderBy(h=>h.StartTimestamp)
             .ProjectTo<ActivityHistoryResponse>(mapper.ConfigurationProvider).ToListAsync();
 
         return historyResponses
             .GroupBy(hr => hr.StartTimestamp.ToUniversalTime().Date)
-            .Select(group => new ActivityHistoryListGroupedByDateResponse(group.Key, group.OrderBy(h=>h.StartTimestamp).ToList()))
+            .Select(group => new ActivityHistoryListGroupedByDateResponse
+            {
+                Date = group.Key,
+                HistoryResponseList = group.OrderBy(h=>h.StartTimestamp).ToList()
+            })
             .OrderBy(response => response.Date)
             .ToList();
     }

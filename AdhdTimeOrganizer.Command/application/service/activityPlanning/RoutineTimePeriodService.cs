@@ -10,7 +10,7 @@ using AutoMapper;
 namespace AdhdTimeOrganizer.Command.application.service.activityPlanning;
 
 public class RoutineTimePeriodService(IRoutineTimePeriodRepository repository, ILoggedUserService loggedUserService, IMapper mapper)
-    : BaseCrudServiceWithUser<RoutineTimePeriod, TimePeriodRequest, TimePeriodResponse,IRoutineTimePeriodRepository>(repository, loggedUserService, mapper), IRoutineTimePeriodService
+    : BaseWithUserService<RoutineTimePeriod, TimePeriodRequest, TimePeriodResponse,IRoutineTimePeriodRepository>(repository, loggedUserService, mapper), IRoutineTimePeriodService
 {
     public async Task CreateDefaultItems(long newUserId)
     {

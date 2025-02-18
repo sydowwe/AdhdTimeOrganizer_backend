@@ -1,6 +1,6 @@
 namespace AdhdTimeOrganizer.Command.application.dto.response.extendable;
 
-public class WithIsDoneResponse : WithActivityResponse
+public record WithIsDoneResponse : WithActivityResponse
 {
-    public bool IsDone { get; set; }
+    public bool IsDone { get; init; }
 }

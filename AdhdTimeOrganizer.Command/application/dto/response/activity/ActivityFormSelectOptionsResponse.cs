@@ -2,8 +2,10 @@ using AdhdTimeOrganizer.Common.application.dto.response.generic;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.activity;
 
-public class ActivityFormSelectOptionsResponse : SelectOptionResponse
+public record ActivityFormSelectOptionsResponse : SelectOptionResponse
 {
-    public SelectOptionResponse RoleOption { get; set; }
-    public SelectOptionResponse? CategoryOption { get; set; }
+    public required SelectOptionResponse RoleOption { get; init; }
+    public SelectOptionResponse? CategoryOption { get; init; }
+    public SelectOptionResponse? TaskUrgencyOption { get; init; }
+    public SelectOptionResponse? RoutineTimePeriodOption { get; init; }
 }

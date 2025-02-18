@@ -1,11 +1,12 @@
+using AdhdTimeOrganizer.Command.application.dto.response.activity;
 using AdhdTimeOrganizer.Command.application.dto.response.extendable;
 using AdhdTimeOrganizer.Common.domain.helper;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.activityHistory;
 
-public class ActivityHistoryResponse : WithActivityResponse
+public record ActivityHistoryResponse : WithActivityResponse
 {
-    public DateTime StartTimestamp { get; set; }
-    public MyIntTime Length { get; set; }
-    public DateTime EndTimestamp { get; set; }
+    public required DateTime StartTimestamp { get; init; }
+    public required MyIntTime Length { get; init; }
+    public required DateTime EndTimestamp { get; init; }
 }

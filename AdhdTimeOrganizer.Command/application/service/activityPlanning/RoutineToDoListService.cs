@@ -12,8 +12,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.Command.application.service.activityPlanning;
 
-
-
 public class RoutineToDoListService(
     IRoutineTimePeriodService timePeriodService,
     IRoutineToDoListRepository repository,
@@ -29,10 +27,12 @@ public class RoutineToDoListService(
         var allItems = await repository.GetAllByUserIdAsQueryable(LoggedUserId)
             .ProjectTo<RoutineToDoListResponse>(mapper.ConfigurationProvider)
             .ToListAsync();
-        var groupedItems = allItems.GroupBy(item => item.timePeriod);
-        var result = allTimePeriods.Select(tp => new RoutineToDoListGroupedResponse(
-            tp, groupedItems.FirstOrDefault(g => g.Key.Equals(tp)) ?? Enumerable.Empty<RoutineToDoListResponse>()
-        ));
+        var groupedItems = allItems.GroupBy(item => item.TimePeriod);
+        var result = allTimePeriods.Select(tp => new RoutineToDoListGroupedResponse
+        {
+            TimePeriod = tp,
+            Items = groupedItems.FirstOrDefault(g => g.Key.Equals(tp)) ?? Enumerable.Empty<RoutineToDoListResponse>()
+        });
         return result;
     }
 };

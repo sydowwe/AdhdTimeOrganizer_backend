@@ -1,13 +1,7 @@
 namespace AdhdTimeOrganizer.Command.application.dto.response.user;
 
-public class EditedUserResponse : UserResponse
+public record EditedUserResponse : UserResponse
 {
-    public EditedUserResponse(UserResponse userResponse)
-    {
-        Email = userResponse.Email;
-        TwoFactorEnabled = userResponse.TwoFactorEnabled;
-    }
-
-    public IEnumerable<string>? ScratchCodes { get; set; }
-    public byte[]? QrCode { get; set; }
+    public IEnumerable<string>? ScratchCodes { get; init; }
+    public byte[]? QrCode { get; init; }
 }

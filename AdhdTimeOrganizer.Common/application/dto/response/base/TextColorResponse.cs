@@ -1,7 +1,7 @@
 namespace AdhdTimeOrganizer.Common.application.dto.response.@base;
 
-public class TextColorResponse : IdResponse
+public record TextColorResponse : IdResponse
 {
-    public string Text { get; set; }
-    public string Color { get; set; }
+    public required string Text { get; init; }
+    public required string Color { get; init; }
 }

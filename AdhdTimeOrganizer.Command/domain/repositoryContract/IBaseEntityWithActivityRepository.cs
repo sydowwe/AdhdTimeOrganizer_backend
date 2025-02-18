@@ -1,4 +1,5 @@
-﻿using AdhdTimeOrganizer.Command.domain.model.entity.activity;
+﻿using AdhdTimeOrganizer.Command.application.dto.response.activity;
+using AdhdTimeOrganizer.Command.domain.model.entity.activity;
 
 namespace AdhdTimeOrganizer.Command.domain.repositoryContract;
 
@@ -8,4 +9,5 @@ public interface IBaseEntityWithActivityRepository<T> : IBaseEntityWithUserRepos
     Task<List<T>> GetByActivityIdAsync(long userId, long activityId);
     IQueryable<T> GetByActivityIdAsQueryable(long userId,long activityId);
     IQueryable<Activity> GetDistinctActivities(long userId);
+    Task<List<ActivityFormSelectOptionsResponse>> GetAllActivityFormOptionsCombinations(long userId);
 }

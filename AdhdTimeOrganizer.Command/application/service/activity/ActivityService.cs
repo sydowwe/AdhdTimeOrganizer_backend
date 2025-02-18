@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.Command.application.service.@base;
 using AdhdTimeOrganizer.Command.domain.@event;
 using AdhdTimeOrganizer.Command.domain.model.entity.activity;
 using AdhdTimeOrganizer.Command.domain.repositoryContract.activity;
+using AdhdTimeOrganizer.Common.application.dto.request.@base;
 using AdhdTimeOrganizer.Common.domain.result;
 using AutoMapper;
 using MediatR;
@@ -14,7 +15,7 @@ using MediatR;
 namespace AdhdTimeOrganizer.Command.application.service.activity;
 
 public class ActivityService(IActivityRepository repository, ILoggedUserService loggedUserService, IMapper mapper, IMediator mediator)
-    : BaseCrudServiceWithUser<Activity, ActivityRequest, ActivityResponse, IActivityRepository>(repository, loggedUserService, mapper),
+    : BaseWithUserService<Activity, ActivityRequest, ActivityResponse, IActivityRepository>(repository, loggedUserService, mapper),
         IActivityService
 {
     public new async Task<ServiceResult<ActivityResponse>> InsertAsync(ActivityRequest request)
@@ -34,7 +35,7 @@ public class ActivityService(IActivityRepository repository, ILoggedUserService 
 
     public async Task<List<ActivityFormSelectOptionsResponse>> GetAllFormSelectOptions()
     {
-        return await ProjectFromQueryToListAsync<ActivityFormSelectOptionsResponse>(_repository.GetAllByUserIdAsQueryable(LoggedUserId));
+        return await ProjectFromQueryToListAsync<ActivityFormSelectOptionsResponse>(_repository.GetAllByUserIdAsQueryable(LoggedUserId).Distinct());
     }
     public async Task<ServiceResult<ActivityResponse>> QuickUpdateAsync(long id, NameTextRequest request)
     {

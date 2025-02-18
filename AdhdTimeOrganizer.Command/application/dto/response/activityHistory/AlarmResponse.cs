@@ -4,9 +4,9 @@ using AdhdTimeOrganizer.Common.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.Command.application.dto.response.activityHistory;
 
-public class AlarmResponse : NameTextColorResponse, IEntityWithActivityResponse
+public record AlarmResponse : NameTextColorResponse, IEntityWithActivityResponse
 {
-    public DateTime StartTimestamp { get; set; }
-    public ActivityResponse Activity { get; set; }
-    public bool IsActive { get; set; }
+    public required DateTime StartTimestamp { get; init; }
+    public required ActivityResponse Activity { get; init; }
+    public required bool IsActive { get; init; }
 }

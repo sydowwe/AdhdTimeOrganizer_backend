@@ -1,7 +1,8 @@
-﻿namespace AdhdTimeOrganizer.Common.application.dto.request.generic;
+﻿using System.ComponentModel.DataAnnotations;
 
-public class SortByRequest
-{
-    public string Key { get; set; }
-    public bool IsDesc { get; set; } = false;
-}
+namespace AdhdTimeOrganizer.Common.application.dto.request.generic;
+
+public record SortByRequest(
+    [Required] string Key,
+    bool IsDesc = false
+);

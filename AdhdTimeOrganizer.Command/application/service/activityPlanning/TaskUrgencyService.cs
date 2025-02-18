@@ -10,7 +10,7 @@ using AutoMapper;
 namespace AdhdTimeOrganizer.Command.application.service.activityPlanning;
 
 public class TaskUrgencyService(ITaskUrgencyRepository repository, ILoggedUserService loggedUserService, IMapper mapper)
-    : BaseCrudServiceWithUser<TaskUrgency, TaskUrgencyRequest, TaskUrgencyResponse, ITaskUrgencyRepository>(repository, loggedUserService, mapper), ITaskUrgencyService
+    : BaseWithUserService<TaskUrgency, TaskUrgencyRequest, TaskUrgencyResponse, ITaskUrgencyRepository>(repository, loggedUserService, mapper), ITaskUrgencyService
 {
     public async Task CreateDefaultItems(long newUserId)
     {
