@@ -60,7 +60,7 @@ public class UserService(
         if (recaptchaResult.Failed)
             return ServiceResult<TwoFactorAuthResponse>.Error(recaptchaResult);
         var newUser = mapper.Map<UserEntity>(registration);
-        var defaultSettingsResult = await SetDefaultSettingsAsync(newUser);
+        var defaultSettingsResult = SetDefaultSettingsAsync(newUser);
         if (defaultSettingsResult.Failed)
         {
             return ServiceResult<TwoFactorAuthResponse>.Error(defaultSettingsResult);
@@ -479,7 +479,7 @@ public class UserService(
 
     #endregion
 
-    private async Task<ServiceResult> SetDefaultSettingsAsync(UserEntity user)
+    private ServiceResult SetDefaultSettingsAsync(UserEntity user)
     {
         userSessionService.UserLogin(user.CurrentLocale, /*user.Timezone.ToString()*/ "");
         return ServiceResult.Successful();
@@ -515,9 +515,12 @@ public class UserService(
     private async Task<UserEntity> GetCurrentUserAsync()
     {
         var principal = loggedUserService.LoggedUserPrincipal;
+        if (principal == null)
+        {
+            throw new NullReferenceException("Logged user principal is null");
+        }
         var user = await userManager.GetUserAsync(principal);
         if (user == null) throw new UserByPrincipalNotFoundException(principal);
-
         return user;
     }
 

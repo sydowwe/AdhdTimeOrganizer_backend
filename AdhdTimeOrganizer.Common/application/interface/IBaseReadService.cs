@@ -10,7 +10,8 @@ public interface IBaseReadService<TEntity, TResponse>: IBaseService<TEntity>
     where TEntity : BaseEntity
     where TResponse : IMyResponse
 {
-    Task<ServiceResult<TResponse>> GetByIdAsync(long id);
+    Task<ServiceResult<TResponse>> GetByIdAsResponseAsync(long id);
+    Task<ServiceResult<TEntity>> GetByIdAsync(long id);
     Task<List<TResponse>> GetAllAsync();
     Task<List<SelectOptionResponse>> GetAllAsOptionsAsync();
 }

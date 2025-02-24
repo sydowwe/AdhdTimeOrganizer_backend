@@ -20,7 +20,7 @@ public class LoggedUserService(IHttpContextAccessor httpContextAccessor) : ILogg
         LoggedUserPrincipal?.FindFirst(ClaimTypes.Email)?.Value ??
         throw new InvalidOperationException("Missing email in claims");
 
-    public long GetUserId =>IsAuthenticated
+    public long GetUserId => IsAuthenticated
         ? long.Parse(LoggedUserPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? throw new InvalidOperationException("Id missing in claims"))
         : throw new InvalidOperationException("Not authenticated cannot get logged user id");
 }

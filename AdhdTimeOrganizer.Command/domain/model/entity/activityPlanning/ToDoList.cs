@@ -7,6 +7,6 @@ namespace AdhdTimeOrganizer.Command.domain.model.entity.activityPlanning;
 
 public class ToDoList : BaseEntityWithIsDone
 {
-    public virtual TaskUrgency TaskUrgency { get; set; }
     public long TaskUrgencyId { get; set; }
+    public TaskUrgency TaskUrgency { get; set; }
 }

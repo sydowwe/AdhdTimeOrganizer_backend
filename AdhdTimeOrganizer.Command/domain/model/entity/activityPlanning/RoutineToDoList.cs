@@ -7,6 +7,6 @@ namespace AdhdTimeOrganizer.Command.domain.model.entity.activityPlanning;
 
 public class RoutineToDoList : BaseEntityWithIsDone
 {
-    public virtual RoutineTimePeriod TimePeriod { get; set; }
     public required long TimePeriodId { get; set; }
+    public RoutineTimePeriod TimePeriod { get; set; }
 }

@@ -17,6 +17,7 @@ public interface IBaseCrudService<TEntity, in TRequest, TResponse> : IBaseReadSe
     Task<ServiceResult<TResponse>> InsertAsync(TRequest request);
     Task<ServiceResult<IEnumerable<TResponse>>> InsertRangeAsync(IEnumerable<TRequest> request);
     Task<ServiceResult<TResponse>> UpdateAsync(TEntity entity, TRequest request);
+    Task<ServiceResult<TResponse>> UpdateAsync(TEntity entity);
     Task<ServiceResult<TResponse>> UpdateAsync(long id, TRequest request);
     Task<ServiceResult> DeleteAsync(long id);
     Task<ServiceResult> DeleteByAsync(Expression<Func<TEntity, bool>> predicate);

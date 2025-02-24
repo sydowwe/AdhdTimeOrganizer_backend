@@ -11,10 +11,12 @@ namespace AdhdTimeOrganizer.Web.controller;
 
 public class ToDoListController(IToDoListService service) : BaseWithActivityController<ToDoList,ToDoListRequest,ToDoListResponse,IToDoListService>(service)
 {
+    private readonly IToDoListService _service = service;
+
     [HttpPost]
     public async Task<ActionResult<SuccessResponse>> ChangeIsDone(List<IdRequest> requestList)
     {
-        await service.SetIsDoneAsync(requestList);
+        await _service.SetIsDoneAsync(requestList);
         return Ok(new SuccessResponse("changed"));
     }
 }

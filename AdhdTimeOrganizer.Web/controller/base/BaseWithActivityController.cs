@@ -16,7 +16,7 @@ public class BaseWithActivityController<TEntity, TRequest, TResponse, TService>(
     private TService _service = service;
 
     [HttpPost]
-    public async Task<ActionResult<IEnumerable<ActivityFormSelectOptionsResponse>>> GetAllActivityFormSelectOptions()
+    public async Task<ActionResult<IEnumerable<ActivityFormSelectOptionsResponse>>> GetAllActivityFormSelectsOptions()
     {
         return Ok(await _service.GetAllActivityFormSelectOptions());
     }

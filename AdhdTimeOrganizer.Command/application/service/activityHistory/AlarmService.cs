@@ -17,7 +17,7 @@ public class AlarmService(IAlarmRepository repository, IActivityService activity
     public async Task SetIsActive(IEnumerable<IdRequest> requestList)
     {
         var ids = requestList.Select(req => req.Id);
-        var affectedRows = await repository.UpdateIsActiveByIds(ids);
+        var affectedRows = await _repository.UpdateIsActiveByIds(ids);
         if (affectedRows <= 0)
         {
             //throw new UpdateFailedException();

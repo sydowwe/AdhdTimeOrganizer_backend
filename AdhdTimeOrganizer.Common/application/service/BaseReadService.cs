@@ -16,10 +16,15 @@ public class BaseReadService<TEntity, TResponse,TRepository>(TRepository reposit
 {
     protected TRepository _repository = repository;
 
-    public async Task<ServiceResult<TResponse>> GetByIdAsync(long id)
+    public async Task<ServiceResult<TResponse>> GetByIdAsResponseAsync(long id)
     {
         var result = await _repository.GetByIdAsync(id);
         return ProcessRepositoryResult<TResponse>(result);
+    }
+    public async Task<ServiceResult<TEntity>> GetByIdAsync(long id)
+    {
+        var result = await _repository.GetByIdAsync(id, false);
+        return ProcessRepositoryResultWithEntity(result);
     }
 
     public virtual async Task<List<TResponse>> GetAllAsync()

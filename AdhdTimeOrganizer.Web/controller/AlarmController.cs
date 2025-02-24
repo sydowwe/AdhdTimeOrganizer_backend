@@ -11,10 +11,12 @@ namespace AdhdTimeOrganizer.Web.controller;
 
 public class AlarmController(IAlarmService service) : BaseWithActivityController<Alarm, AlarmRequest, AlarmResponse, IAlarmService>(service)
 {
+    private readonly IAlarmService _service = service;
+
     [HttpPost]
     public async Task<ActionResult<SuccessResponse>> ChangeActive([FromBody] IEnumerable<IdRequest> requestList)
     {
-        await service.SetIsActive(requestList);
+        await _service.SetIsActive(requestList);
         return Ok(new SuccessResponse("changed"));
     }
 }

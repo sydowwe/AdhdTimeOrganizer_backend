@@ -16,6 +16,6 @@ public class PlannerTaskService(IPlannerTaskRepository repository,IActivityServi
     public async Task<List<PlannerTaskResponse>> GetAllByDateAndHourSpan(PlannerFilterRequest request)
     {
         var endDate = request.FilterDate.AddSeconds(request.HourSpan * 3600);
-        return await ProjectFromQueryToListAsync<PlannerTaskResponse>(repository.GetAllByDateAndHourSpan(loggedUserService.GetUserId, request.FilterDate, endDate));
+        return await ProjectFromQueryToListAsync<PlannerTaskResponse>(_repository.GetAllByDateAndHourSpan(_loggedUserService.GetUserId, request.FilterDate, endDate));
     }
 };

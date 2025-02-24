@@ -23,7 +23,24 @@ public class ActivityHistoryRepository(AppCommandDbContext context) : BaseEntity
             query = query.Where(h => h.Activity.RoleId == filter.CategoryId);
 
         if (filter.IsFromToDoList.HasValue)
-            query = query.Where(h => h.Activity.IsOnToDoList == filter.IsFromToDoList);
+        {
+            query = query.Where(h => h.Activity.IsOnToDoList == filter.IsFromToDoList.Value);
+
+            if (filter.IsFromToDoList.Value && filter.TaskUrgencyId.HasValue)
+            {
+                query = query.Where(h => h.Activity.ToDoList != null && h.Activity.ToDoList.TaskUrgencyId == filter.TaskUrgencyId.Value);
+            }
+        }
+
+        if (filter.IsFromRoutineToDoList.HasValue)
+        {
+            query = query.Where(h => h.Activity.IsOnRoutineToDoList == filter.IsFromRoutineToDoList.Value);
+
+            if (filter.IsFromRoutineToDoList.Value && filter.RoutineTimePeriodId.HasValue)
+            {
+                query = query.Where(h => h.Activity.RoutineToDoList != null && h.Activity.RoutineToDoList.TimePeriodId == filter.RoutineTimePeriodId.Value);
+            }
+        }
 
         if (filter.IsUnavoidable.HasValue)
             query = query.Where(h => h.Activity.IsUnavoidable == filter.IsUnavoidable);

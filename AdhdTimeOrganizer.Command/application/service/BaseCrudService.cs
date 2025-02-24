@@ -63,6 +63,10 @@ public abstract class BaseCrudService<TEntity, TRequest, TResponse, TRepository>
     public async Task<ServiceResult<TResponse>> UpdateAsync(TEntity entity, TRequest request)
     {
         mapper.Map(request, entity);
+        return await UpdateAsync(entity);
+    }
+    public async Task<ServiceResult<TResponse>> UpdateAsync(TEntity entity)
+    {
         var updateResult = await _repository.UpdateAsync(entity);
         return updateResult.Failed
             ? HandleFailedRepositoryResult<TResponse>(updateResult)

@@ -12,6 +12,7 @@ public class Activity : BaseNameTextEntity
 {
     public bool IsOnToDoList { get; set; }
     public bool IsUnavoidable { get; set; }
+    public bool IsOnRoutineToDoList { get; set; }
 
     public long RoleId { get; set; }
     public virtual Role Role { get; set; }

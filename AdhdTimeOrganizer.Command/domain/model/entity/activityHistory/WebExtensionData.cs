@@ -6,8 +6,8 @@ namespace AdhdTimeOrganizer.Command.domain.model.entity.activityHistory;
 
 public class WebExtensionData : BaseEntityWithActivity
 {
-    public string Domain { get; set; }
-    public string Title { get; set; }
-    public int Duration { get; set; }
-    public DateTime StartTimestamp { get; set; }
+    public required string Domain { get; set; }
+    public required string Title { get; set; }
+    public required int Duration { get; set; }
+    public required DateTime StartTimestamp { get; set; }
 }

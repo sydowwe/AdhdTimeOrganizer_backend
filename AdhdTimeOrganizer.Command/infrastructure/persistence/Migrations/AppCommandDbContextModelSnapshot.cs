@@ -37,6 +37,9 @@ namespace AdhdTimeOrganizer.Command.infrastructure.persistence.Migrations
                     b.Property<DateTime>("CreatedTimestamp")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IsOnRoutineToDoList")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsOnToDoList")
                         .HasColumnType("boolean");
 

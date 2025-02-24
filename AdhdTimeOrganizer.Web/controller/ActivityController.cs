@@ -15,7 +15,7 @@ public class ActivityController(IActivityService service)
     private readonly IActivityService _service = service;
 
     [HttpPost]
-    public async Task<ActionResult<IEnumerable<ActivityFormSelectOptionsResponse>>> GetAllFormSelectsOptions()
+    public async Task<ActionResult<IEnumerable<ActivityFormSelectOptionsResponse>>> GetAllActivityFormSelectsOptions()
     {
         return Ok(await _service.GetAllFormSelectOptions());
     }
