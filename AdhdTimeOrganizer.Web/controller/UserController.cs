@@ -29,9 +29,9 @@ public class UserController(IUserService userService) : ControllerBase
 
     [AllowAnonymous]
     [HttpPost]
-    public async Task<IActionResult> Register([FromBody] RegistrationRequest registrationRequest)
+    public async Task<IActionResult> Register([FromBody] PasswordRegistrationRequest registrationRequest)
     {
-        var result = await userService.RegisterAsync(registrationRequest);
+        var result = await userService.PasswordRegisterAsync(registrationRequest);
         return HandleServiceResult(result, "Register");
     }
 

@@ -19,4 +19,6 @@ public class ActivityController(IActivityService service)
     {
         return Ok(await _service.GetAllFormSelectOptions());
     }
+
+    //TODO add quick edit and quick add
 }

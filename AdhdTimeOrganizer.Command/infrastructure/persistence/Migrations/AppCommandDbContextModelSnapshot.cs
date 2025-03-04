@@ -595,8 +595,9 @@ namespace AdhdTimeOrganizer.Command.infrastructure.persistence.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsOAuth2Only")
-                        .HasColumnType("boolean");
+                    b.Property<string>("GoogleOAuthUserId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
@@ -614,12 +615,6 @@ namespace AdhdTimeOrganizer.Command.infrastructure.persistence.Migrations
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");

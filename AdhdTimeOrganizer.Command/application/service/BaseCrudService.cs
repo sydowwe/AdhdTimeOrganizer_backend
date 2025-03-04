@@ -11,7 +11,6 @@ using AutoMapper;
 
 namespace AdhdTimeOrganizer.Command.application.service;
 
-//TODO prerobit aby vracal ServiceResult
 public abstract class BaseCrudService<TEntity, TRequest, TResponse, TRepository>(
     TRepository repository,
     IMapper autoMapper

@@ -7,7 +7,7 @@ namespace AdhdTimeOrganizer.Command.application.@interface.users;
 
 public interface IUserService
 {
-    Task<ServiceResult<TwoFactorAuthResponse>> RegisterAsync(RegistrationRequest registrationRequest);
+    Task<ServiceResult<TwoFactorAuthResponse>> PasswordRegisterAsync(PasswordRegistrationRequest request);
     Task<ServiceResult<GoogleSignInResponse>> GoogleSignInAsync(GoogleSignInRequest googleSignInRequest);
     Task<ServiceResult<LoginResponse>> LoginAsync(PasswordLoginRequest loginRequest);
     Task<ServiceResult> ValidateTwoFactorAuthForLoginAsync(TwoFactorAuthLoginRequest request);

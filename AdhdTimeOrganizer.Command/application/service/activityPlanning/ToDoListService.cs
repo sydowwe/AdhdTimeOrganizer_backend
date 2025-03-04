@@ -27,4 +27,4 @@ public class ToDoListService(
         await mediator.Publish(new ActivityAddedToToDoListEvent(request.ActivityId));
         return await InsertAsync(entity);
     }
-};
+}

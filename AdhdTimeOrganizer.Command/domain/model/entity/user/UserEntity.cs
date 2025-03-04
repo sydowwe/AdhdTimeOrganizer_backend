@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using AdhdTimeOrganizer.Command.domain.model.entity.activity;
 using AdhdTimeOrganizer.Command.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.Command.domain.model.entity.activityPlanning;
@@ -11,7 +12,14 @@ public class UserEntity : IdentityUser<long>, IEntity
 {
     public required AvailableLocales CurrentLocale { get; set; }
     public required TimeZoneInfo Timezone { get; set; }
-    public bool IsOAuth2Only { get; set; }
+    public string? GoogleOAuthUserId { get; set; }
+    public bool HasGoogleOAuth => GoogleOAuthUserId != null;
+    public bool HasPassword => PasswordHash != null;
+
+    [NotMapped]
+    public override string? PhoneNumber { get; set; }
+    [NotMapped]
+    public override bool PhoneNumberConfirmed { get; set; }
 
     // Navigation properties
     public virtual ICollection<Activity> ActivityList { get; set; } = new List<Activity>();

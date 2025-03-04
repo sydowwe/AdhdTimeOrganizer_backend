@@ -5,6 +5,8 @@ public enum ServiceErrorType
     RecaptchaTokenInvalid,
     RecaptchaWrongAction,
 
+    EmailHasPassword,
+    EmailHasGoogleOAuth,
     AuthenticationFailed,
     UserLockedOut,
     EmailNotConfirmed,

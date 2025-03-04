@@ -14,9 +14,6 @@ using AdhdTimeOrganizer.Common.domain.model.@enum;
 using AdhdTimeOrganizer.Common.domain.result;
 using AdhdTimeOrganizer.Common.infrastructure.extension;
 using AutoMapper;
-using Google.Apis.Auth;
-using Google.Apis.Auth.OAuth2;
-using Google.Apis.Auth.OAuth2.Flows;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -54,12 +51,8 @@ public class UserService(
 
     #region Authorization
 
-    public async Task<ServiceResult<TwoFactorAuthResponse>> RegisterAsync(RegistrationRequest registration)
+    private async Task<ServiceResult<TwoFactorAuthResponse>> BaseRegister(UserEntity newUser, string? password = null)
     {
-        var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(registration.RecaptchaToken, "register");
-        if (recaptchaResult.Failed)
-            return ServiceResult<TwoFactorAuthResponse>.Error(recaptchaResult);
-        var newUser = mapper.Map<UserEntity>(registration);
         var defaultSettingsResult = SetDefaultSettingsAsync(newUser);
         if (defaultSettingsResult.Failed)
         {
@@ -67,7 +60,7 @@ public class UserService(
         }
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync();
-        var result = await userManager.CreateAsync(newUser, registration.Password);
+        var result = password != null ? await userManager.CreateAsync(newUser, password) : await userManager.CreateAsync(newUser);
         if (!result.Succeeded)
             return result.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail")
                 ? ServiceResult<TwoFactorAuthResponse>.Error(ServiceErrorType.Conflict,
@@ -93,51 +86,80 @@ public class UserService(
         return response;
     }
 
-    private static async Task<ServiceResult<string>> GetEmailFromGoogleSignInCode(string code)
+//TODO FIX rozlisovat ci je treba google auth a vtedy nenti treba ani confrim email ani 2FA a takisto treba pred registraciou zistit ci uz neexistuje user s danym mailom a ak hej ci ma bud password alebo google auth
+    public async Task<ServiceResult<TwoFactorAuthResponse>> PasswordRegisterAsync(PasswordRegistrationRequest request)
     {
-        var tokenResponse = await new AuthorizationCodeInstalledApp(
-            new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
-            {
-                ClientSecrets = new ClientSecrets
-                {
-                    ClientId = Helper.GetEnvVar("OAUTH2_GOOGLE_CLIENT_ID"),
-                    ClientSecret = Helper.GetEnvVar("OAUTH2_GOOGLE_CLIENT_SECRET")
-                }
-            }),
-            new LocalServerCodeReceiver()
-        ).Flow.ExchangeCodeForTokenAsync("user", code, "<Your Redirect URI>", CancellationToken.None);
-        var idToken = tokenResponse?.IdToken;
-        if (idToken == null)
-            return ServiceResult<string>.Error(ServiceErrorType.BadRequest, "Invalid Google login code");
+        var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(request.RecaptchaToken, "register");
+        if (recaptchaResult.Failed)
+            return ServiceResult<TwoFactorAuthResponse>.Error(recaptchaResult);
+        var newUser = mapper.Map<UserEntity>(request);
+        var result = await BaseRegister(newUser, request.Password);
+        return result;
+    }
 
-        var payload = await GoogleJsonWebSignature.ValidateAsync(idToken);
-        var email = payload.Email;
-        return email == null
-            ? ServiceResult<string>.Error(ServiceErrorType.BadRequest, "Email not found in token")
-            : ServiceResult<string>.Successful(email);
+    private async Task<ServiceResult<UserEntity>> GoogleAuthRegisterAsync(GoogleAuthRegistrationRequest request)
+    {
+        var newUser = mapper.Map<UserEntity>(request);
+        var result = await BaseRegister(newUser);
+        return result.Failed
+            ? ServiceResult<UserEntity>.Error(result)
+            : ServiceResult<UserEntity>.Successful(newUser);
     }
 
     public async Task<ServiceResult<GoogleSignInResponse>> GoogleSignInAsync(GoogleSignInRequest googleSignInRequest)
     {
-        var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(googleSignInRequest.RecaptchaToken, "login");
+        var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(googleSignInRequest.RecaptchaToken, "google_sign_in");
         if (recaptchaResult.Failed)
             return ServiceResult<GoogleSignInResponse>.Error(recaptchaResult);
-        var emailResult = await GetEmailFromGoogleSignInCode(googleSignInRequest.Code);
-        if (emailResult.Failed)
-            return ServiceResult<GoogleSignInResponse>.Error(emailResult);
-        var email = emailResult.Data.ToLower();
-        var userResult = await GetByEmailAsync(email);
-        if (userResult.Failed)
-            return ServiceResult<GoogleSignInResponse>.Error(userResult);
+        var googleSignInResult = await GoogleSignInService.GetUserInfoFromGoogleSignInCode(googleSignInRequest.Code);
+        if (googleSignInResult.Failed)
+            return ServiceResult<GoogleSignInResponse>.Error(googleSignInResult);
+        var googleSignInInfo = googleSignInResult.Data;
+        var userId = googleSignInInfo.UserId;
 
-        var user = userResult.Data;
+        var userResult = await GetByEmailAsync(googleSignInInfo.Email);
+
+        UserEntity user;
+        if (userResult is { Failed: true, ErrorType: ServiceErrorType.NotFound })
+        {
+            var registrationRequest = new GoogleAuthRegistrationRequest
+            {
+                Email = googleSignInInfo.Email,
+                RecaptchaToken = googleSignInRequest.RecaptchaToken,
+                Timezone = googleSignInRequest.Timezone,
+                CurrentLocale = AvailableLocales.En,
+                GoogleOAuthUserId = userId
+            };
+            var registrationResult = await GoogleAuthRegisterAsync(registrationRequest);
+            if (registrationResult.Failed)
+            {
+                return ServiceResult<GoogleSignInResponse>.Error(registrationResult);
+            }
+            user = registrationResult.Data;
+        }
+        else if (userResult.Failed)
+            return ServiceResult<GoogleSignInResponse>.Error(userResult);
+        else
+        {
+            user = userResult.Data;
+        }
+
+        if (!user.HasGoogleOAuth)
+            return ServiceResult<GoogleSignInResponse>.Error(ServiceErrorType.EmailHasPassword,
+                "Password already associated with this email please log in and link your google account in account settings");
+        if (user.GoogleOAuthUserId != userId)
+            return ServiceResult<GoogleSignInResponse>.Error(ServiceErrorType.Conflict, "User already exists with different Google user id");
+
         await signInManager.SignInAsync(user, googleSignInRequest.StayLoggedIn, "Google");
         // user.Timezone = TimeZoneInfo.FindSystemTimeZoneById(googleSignInRequest.Timezone);
-        await userManager.UpdateAsync(user);
+        //
+        // var updateResult = await userManager.UpdateAsync(user);
+        // if (!updateResult.Succeeded)
+        //     return ServiceResult<GoogleSignInResponse>.Error(ServiceErrorType.InternalServerError, "Failed to update user");
         return ServiceResult<GoogleSignInResponse>.Successful(
             new GoogleSignInResponse
             {
-                Email = email,
+                Email = googleSignInInfo.Email,
                 CurrentLocale = user.CurrentLocale
             }
         );
@@ -519,6 +541,7 @@ public class UserService(
         {
             throw new NullReferenceException("Logged user principal is null");
         }
+
         var user = await userManager.GetUserAsync(principal);
         if (user == null) throw new UserByPrincipalNotFoundException(principal);
         return user;

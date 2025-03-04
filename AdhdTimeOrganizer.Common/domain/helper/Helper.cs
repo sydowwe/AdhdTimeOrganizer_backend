@@ -14,6 +14,10 @@ public static partial class Helper
     {
         return new Uri(GetEnvVar("API_URL"));
     }
+    public static Uri GetPageUri()
+    {
+        return new Uri(GetEnvVar("PAGE_URL"));
+    }
 
 
     public static string GetAppLogoUrl()

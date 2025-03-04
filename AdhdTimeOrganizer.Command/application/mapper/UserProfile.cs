@@ -13,7 +13,10 @@ public class UserProfile : Profile
         CreateMap<UserRequest, UserEntity>()
             .ForMember(dest => dest.UserName, opt => opt.MapFrom(a => a.Email))
             .ForMember(dest => dest.Timezone, opt => opt.MapFrom(a => TimeZoneInfo.FindSystemTimeZoneById(a.Timezone)));
-        CreateMap<RegistrationRequest, UserEntity>().ForMember(dest => dest.UserName, opt => opt.MapFrom(a => a.Email))
+        CreateMap<PasswordRegistrationRequest, UserEntity>().ForMember(dest => dest.UserName, opt => opt.MapFrom(a => a.Email))
+            .ForMember(dest => dest.Timezone, opt => opt.MapFrom(a => TimeZoneInfo.FindSystemTimeZoneById(a.Timezone)));
+
+        CreateMap<GoogleAuthRegistrationRequest, UserEntity>().ForMember(dest => dest.UserName, opt => opt.MapFrom(a => a.Email))
             .ForMember(dest => dest.Timezone, opt => opt.MapFrom(a => TimeZoneInfo.FindSystemTimeZoneById(a.Timezone)));
 
         CreateMap<UserEntity, TwoFactorAuthResponse>();
