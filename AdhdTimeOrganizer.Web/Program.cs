@@ -3,10 +3,16 @@ using AdhdTimeOrganizer.Command.infrastructure.persistence;
 using AdhdTimeOrganizer.Common.domain.helper;
 using AdhdTimeOrganizer.Common.infrastructure.persistence;
 using AdhdTimeOrganizer.Web.config;
+using DotNetEnv;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.EntityFrameworkCore;
+using NpgsqlTypes;
 using Serilog;
+using Serilog.Core;
+using Serilog.Events;
+using Serilog.Sinks.PostgreSQL;
+using Serilog.Sinks.PostgreSQL.ColumnWriters;
 
 namespace AdhdTimeOrganizer.Web;
 
@@ -16,7 +22,7 @@ internal class Program
     {
         try
         {
-            MainHelper.LoadEnvVariables();
+            Env.Load();
 
             var builder = WebApplication.CreateBuilder(args);
 
@@ -25,16 +31,17 @@ internal class Program
                 .AddJsonFile("appsettings.json", false, true)
                 .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
 
-            builder.Logging.ClearProviders();
-            builder.Host.UseSerilog((context,config) =>
-            {
-                config.ReadFrom.Configuration(builder.Configuration);
-            });
 
-            Log.Information("Backend starting.");
+
+            builder.Logging.ClearProviders();
+            SerilogConfig.ConfigureSerilog(builder.Configuration, builder.Host);
+
             ConfigureServices(builder.Configuration, builder.Services);
 
             var app = builder.Build();
+            var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+            logger.LogInformation("Backend starting.");
 
             using (var scope = app.Services.CreateScope())
             {
@@ -44,7 +51,7 @@ internal class Program
                 // if (!await MainHelper.EnsureDatabaseCreatedAsync(queryDbContext)) throw new Exception("Query database could not be reached.");
             }
 
-            if (app.Environment.IsDevelopment())
+            if (!app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
@@ -66,12 +73,12 @@ internal class Program
             app.UseSerilogRequestLogging();
             app.MapControllers();
 
-            Log.Information("Backend started.");
+            logger.LogInformation("Backend started.");
             await app.RunAsync();
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Host terminated unexpectedly: \n "+ex.Message);
+            Console.WriteLine("Host terminated unexpectedly: \n " + ex.Message);
         }
         finally
         {
@@ -96,7 +103,6 @@ internal class Program
         try
         {
             services.AddDependencyInjection();
-
         }
         catch (Exception e)
         {

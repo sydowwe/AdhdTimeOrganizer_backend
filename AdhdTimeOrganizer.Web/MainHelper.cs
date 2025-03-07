@@ -10,17 +10,12 @@ public static class MainHelper
 
     public static string GetCommandDatabaseConnectionString => GetDatabaseConnectionString("command_db");
 
-    private static string GetDatabaseConnectionString(string databaseName)
+
+    public static string GetLogDatabaseConnectionString => GetDatabaseConnectionString("log_db", Helper.GetEnvVar("LOG_DB_USER"), Helper.GetEnvVar("LOG_DB_PASSWORD"));
+    private static string GetDatabaseConnectionString(string databaseName, string? username = null, string? password = null)
     {
         return
-            $"Host={Helper.GetEnvVar("DB_HOST")};Port={Helper.GetEnvVar("DB_PORT")};Username={Helper.GetEnvVar("DB_USER")};Password={Helper.GetEnvVar("DB_PASSWORD")};Database={databaseName};Include Error Detail=true;Pooling=true;Timeout=300;CommandTimeout=300";
-    }
-    public static void LoadEnvVariables()
-    {
-        var env = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Development";
-
-        Env.Load();
-        Env.Load(env == "Development" ? ".env.development" : ".env.production");
+            $"Host={Helper.GetEnvVar("DB_HOST")};Port={Helper.GetEnvVar("DB_PORT")};Username={username ?? Helper.GetEnvVar("DB_USER")};Password={password ?? Helper.GetEnvVar("DB_PASSWORD")};Database={databaseName};Include Error Detail=true;Pooling=true;Timeout=300;CommandTimeout=300";
     }
     public static async Task<bool> EnsureDatabaseCreatedAsync(DbContext dbContext)
     {

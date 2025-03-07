@@ -18,7 +18,7 @@
       "sslPort": 8080,
       "useSSL": true,
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Production",
         "LOGGING_LEVEL": "Debug",
         "PAGE_URL": "https://localhost:3000",
         "API_URL": "https://localhost:8080",

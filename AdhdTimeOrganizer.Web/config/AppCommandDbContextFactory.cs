@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Command.infrastructure.persistence;
 using AdhdTimeOrganizer.Common.infrastructure.persistence;
+using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -9,7 +10,7 @@ public class AppCommandDbContextFactory : IDesignTimeDbContextFactory<AppCommand
 {
     public AppCommandDbContext CreateDbContext(string[] args)
     {
-        MainHelper.LoadEnvVariables();
+        Env.Load();
         var optionsBuilder = new DbContextOptionsBuilder<AppCommandDbContext>();
         optionsBuilder.UseNpgsql(MainHelper.GetCommandDatabaseConnectionString);
 

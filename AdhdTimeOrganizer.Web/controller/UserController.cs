@@ -9,7 +9,7 @@ namespace AdhdTimeOrganizer.Web.controller;
 
 //TODO FINISH ERROR HANDLING
 [Route("[controller]/[action]")]
-public class UserController(IUserService userService) : ControllerBase
+public class UserController(IUserService userService, ILogger<UserController> logger) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Logout()
@@ -40,6 +40,8 @@ public class UserController(IUserService userService) : ControllerBase
     public async Task<IActionResult> GoogleSignIn([FromBody] GoogleSignInRequest googleSignInRequest)
     {
         var result = await userService.GoogleSignInAsync(googleSignInRequest);
+
+        logger.LogWarning(new EventId(0, "GoogleSignIn"), "GoogleSignIn");
         return HandleServiceResult(result, "Google sign in");
     }
 
