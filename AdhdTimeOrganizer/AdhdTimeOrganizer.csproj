@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="DotNetEnv" Version="3.1.1" />
+        <PackageReference Include="FastEndpoints" Version="6.2.0" />
+        <PackageReference Include="FastEndpoints.Swagger" Version="6.2.0" />
+        <PackageReference Include="Google.Apis.Auth" Version="1.70.0" />
+        <PackageReference Include="Humanizer.Core" Version="2.14.1" />
+        <PackageReference Include="Humanizer.Core.sk" Version="2.14.1" />
+        <PackageReference Include="Humanizer.Core.uk" Version="2.14.1" />
+        <PackageReference Include="MailKit" Version="4.13.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.8" />
+        <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.3.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.8" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.1"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.8" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.8">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="MimeKit" Version="4.13.0" />
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+        <PackageReference Include="QRCoder" Version="1.6.0" />
+        <PackageReference Include="Riok.Mapperly" Version="4.2.1" />
+        <PackageReference Include="Scrutor" Version="6.1.0" />
+        <PackageReference Include="Serilog" Version="4.3.0" />
+        <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+        <PackageReference Include="Serilog.Enrichers.CorrelationId" Version="3.0.1" />
+        <PackageReference Include="Serilog.Exceptions.EntityFrameworkCore" Version="8.4.0" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
+        <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
+        <PackageReference Include="Serilog.Sinks.Postgresql.Alternative" Version="4.2.0" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EditorConfigFiles Include="..\..\..\..\..\Program Files\dotnet\sdk\9.0.102\Sdks\Microsoft.NET.Sdk\analyzers\build\config\analysislevel_9_default.globalconfig">
+        <Link>config\analysislevel_9_default.globalconfig</Link>
+      </EditorConfigFiles>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="application\dto\filter\" />
+      <Folder Include="application\endpoint\activityHistory\activityHistory\query\" />
+      <Folder Include="application\endpoint\activityHistory\alarm\query\" />
+      <Folder Include="application\endpoint\activityHistory\webExtension\query\" />
+      <Folder Include="application\endpoint\activityPlanning\routineTimePeriod\query\" />
+      <Folder Include="application\endpoint\activityPlanning\routineTodoList\query\" />
+      <Folder Include="application\endpoint\activityPlanning\taskPlanner\query\" />
+      <Folder Include="application\endpoint\activityPlanning\taskUrgency\query\" />
+      <Folder Include="application\endpoint\activity\activity\query\" />
+      <Folder Include="application\endpoint\activity\category\" />
+      <Folder Include="application\endpoint\activity\role\query\" />
+      <Folder Include="application\mapper\activityPlanning\" />
+      <Folder Include="application\mapper\activity\" />
+      <Folder Include="domain\" />
+      <Folder Include="infrastructure\persistence\seeders\dev\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="domain\service\WorkHourCalculatorService.cs" />
+      <Compile Remove="application\commands\UploadToSharePointCommand.cs" />
+    </ItemGroup>
+
+</Project>
