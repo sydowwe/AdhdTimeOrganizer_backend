@@ -10,7 +10,7 @@ public class ActivityConfiguration : IEntityTypeConfiguration<Activity>
     {
         builder.BaseNameTextEntityConfigure();
 
-        builder.Property(x => x.IsOnToDoList).IsRequired();
+        builder.Property(x => x.IsOnTodoList).IsRequired();
         builder.Property(x => x.IsUnavoidable).IsRequired();
 
         builder.IsManyWithOneUser(u => u.ActivityList);

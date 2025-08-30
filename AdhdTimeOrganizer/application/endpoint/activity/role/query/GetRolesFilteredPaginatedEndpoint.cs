@@ -1,17 +1,16 @@
-using AdhdTimeOrganizer.application.dto.request.filter;
+using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response;
-using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.application.mapper.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.activity;
+namespace AdhdTimeOrganizer.application.endpoint.activity.role.query;
 
 public class GetRolesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     ActivityRoleMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<ActivityRole, RoleResponse, RoleFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<ActivityRole, ActivityRoleResponse, RoleFilterRequest>(dbContext)
 {
     private readonly ActivityRoleMapper _mapper = mapper;
 
@@ -45,7 +44,7 @@ public class GetRolesFilteredPaginatedEndpoint(
         return query;
     }
 
-    protected override RoleResponse MapToResponse(ActivityRole entity)
+    protected override ActivityRoleResponse MapToResponse(ActivityRole entity)
     {
         return _mapper.ToResponse(entity);
     }

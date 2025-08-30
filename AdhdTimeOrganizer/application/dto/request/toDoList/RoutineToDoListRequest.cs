@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.application.dto.request.extendable;
 
 namespace AdhdTimeOrganizer.application.dto.request.toDoList;
 
-public record RoutineToDoListRequest : WithIsDoneRequest
+public record RoutineTodoListRequest : WithIsDoneRequest
 {
     [Required]
     public long TimePeriodId { get; init; }

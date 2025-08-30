@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.application.mapper;
 // Example DTOs
 
 [Mapper]
-public partial class UserMapper : IBaseCreateMapper<User, CreateUserRequest>, IBaseUpdateMapper<User, UserRequest>, IBaseResponseMapper<User, UserResponse>
+public partial class UserMapper : IBaseCreateWithoutUserMapper<User, CreateUserRequest>, IBaseUpdateMapper<User, UserRequest>, IBaseResponseMapper<User, UserResponse>
 {
     public partial UserResponse ToResponse(User entity);
 

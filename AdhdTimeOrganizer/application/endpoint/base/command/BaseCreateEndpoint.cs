@@ -1,8 +1,10 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -13,7 +15,7 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 public abstract class BaseCreateEndpoint<TEntity, TRequest, TResponse, TMapper>(
     AppCommandDbContext dbContext,
     TMapper mapper) : Endpoint<TRequest, TResponse>
-    where TEntity : class, IEntityWithId
+    where TEntity : class, IEntityWithUser
     where TRequest : class, ICreateRequest
     where TResponse : class, IIdResponse
     where TMapper : IBaseCreateMapper<TEntity, TRequest>, IBaseResponseMapper<TEntity, TResponse>
@@ -41,7 +43,7 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TResponse, TMapper>(
     {
         try
         {
-            var entity = mapper.ToEntity(req);
+            var entity = mapper.ToEntity(req, User.GetId());
             await dbContext.Set<TEntity>().AddAsync(entity, ct);
             await dbContext.SaveChangesAsync(ct);
 

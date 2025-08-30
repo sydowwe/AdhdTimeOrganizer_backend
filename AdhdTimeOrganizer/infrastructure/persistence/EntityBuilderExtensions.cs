@@ -9,7 +9,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence;
 
 public static class EntityBuilderExtensions
 {
-    public static void BaseEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder) where TEntity : BaseTableEntity
+    public static void BaseEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder) where TEntity : class, IBaseTableEntity
     {
         var tableName = Helper.FromPascalCaseToSnakeCase(typeof(TEntity).Name.Replace("Read", ""));
         builder.ToTable(tableName);

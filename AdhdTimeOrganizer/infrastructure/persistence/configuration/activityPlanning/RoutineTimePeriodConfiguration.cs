@@ -11,8 +11,8 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
         builder.BaseTextColorEntityConfigure();
         builder.Property(t=>t.LengthInDays).IsRequired();
 
-        builder.HasMany(r => r.RoutineToDoListColl)
-            .WithOne(t => t.TimePeriod)
+        builder.HasMany(r => r.RoutineTodoListColl)
+            .WithOne(t => t.RoutineTimePeriod)
             .HasForeignKey(t => t.TimePeriodId)
             .OnDelete(DeleteBehavior.Restrict);
 

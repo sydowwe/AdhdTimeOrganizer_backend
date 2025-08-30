@@ -1,12 +1,12 @@
-using AdhdTimeOrganizer.application.dto.request.filter;
+using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.application.mapper.activityHistory;
+using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityHistory;
+namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.query;
 
 public class GetWebExtensionDataFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,

@@ -1,4 +1,5 @@
 
+using AdhdTimeOrganizer.application.dto.request.activity;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.mapper.@interface;
@@ -8,8 +9,11 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.activity;
 
 [Mapper]
-public partial class ActivityMapper : IBaseReadMapper<Activity, ActivityResponse>
+public partial class ActivityMapper : IBaseCrudMapper<Activity, ActivityRequest, ActivityResponse>
 {
     public partial ActivityResponse ToResponse(Activity entity);
     public partial SelectOptionResponse ToSelectOptionResponse(Activity entity);
+    public partial Activity ToEntity(ActivityRequest request, long userId);
+
+    public partial void UpdateEntity(ActivityRequest request, Activity entity);
 }

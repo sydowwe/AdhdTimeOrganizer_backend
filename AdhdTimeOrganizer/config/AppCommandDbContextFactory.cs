@@ -11,7 +11,7 @@ public class AppCommandDbContextFactory : IDesignTimeDbContextFactory<AppCommand
     {
         Env.Load();
         var optionsBuilder = new DbContextOptionsBuilder<AppCommandDbContext>();
-        optionsBuilder.UseNpgsql(DatabaseStringsHelper.GetAdminPortalDatabaseConnectionString, b => b.MigrationsAssembly("MojaDigitalnaFirma.Sandbox.AdminPortal"));
+        optionsBuilder.UseNpgsql(DatabaseStringsHelper.GetCommandDatabaseConnectionString);
 
         return new AppCommandDbContext(optionsBuilder.Options, null, null);
     }

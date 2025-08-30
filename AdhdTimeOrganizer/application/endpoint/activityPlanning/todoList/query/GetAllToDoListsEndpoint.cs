@@ -5,14 +5,14 @@ using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.todoList.query;
 
-public class GetAllToDoListsEndpoint(
+public class GetAllTodoListsEndpoint(
     AppCommandDbContext dbContext,
-    ToDoListMapper mapper)
-    : BaseGetAllEndpoint<ToDoList, ToDoListResponse, ToDoListMapper>(dbContext, mapper)
+    TodoListMapper mapper)
+    : BaseGetAllEndpoint<TodoList, TodoListResponse, TodoListMapper>(dbContext, mapper)
 {
-    protected override IQueryable<ToDoList> WithIncludes(IQueryable<ToDoList> query)
+    protected override IQueryable<TodoList> WithIncludes(IQueryable<TodoList> query)
     {
         return query
             .Include(tdl => tdl.Activity)

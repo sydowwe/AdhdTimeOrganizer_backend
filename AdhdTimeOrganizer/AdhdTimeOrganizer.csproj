@@ -47,20 +47,28 @@
 
     <ItemGroup>
       <Folder Include="application\dto\filter\" />
+      <Folder Include="application\endpoint\activityHistory\activityHistory\command\" />
       <Folder Include="application\endpoint\activityHistory\activityHistory\query\" />
+      <Folder Include="application\endpoint\activityHistory\alarm\command\" />
       <Folder Include="application\endpoint\activityHistory\alarm\query\" />
       <Folder Include="application\endpoint\activityHistory\webExtension\query\" />
+      <Folder Include="application\endpoint\activityPlanning\routineTimePeriod\command\" />
       <Folder Include="application\endpoint\activityPlanning\routineTimePeriod\query\" />
+      <Folder Include="application\endpoint\activityPlanning\routineTodoList\command\" />
       <Folder Include="application\endpoint\activityPlanning\routineTodoList\query\" />
+      <Folder Include="application\endpoint\activityPlanning\taskPlanner\command\" />
       <Folder Include="application\endpoint\activityPlanning\taskPlanner\query\" />
+      <Folder Include="application\endpoint\activityPlanning\taskUrgency\command\" />
       <Folder Include="application\endpoint\activityPlanning\taskUrgency\query\" />
+      <Folder Include="application\endpoint\activityPlanning\todoList\command\" />
+      <Folder Include="application\endpoint\activity\activity\command\" />
       <Folder Include="application\endpoint\activity\activity\query\" />
-      <Folder Include="application\endpoint\activity\category\" />
+      <Folder Include="application\endpoint\activity\role\command\" />
       <Folder Include="application\endpoint\activity\role\query\" />
       <Folder Include="application\mapper\activityPlanning\" />
       <Folder Include="application\mapper\activity\" />
       <Folder Include="domain\" />
-      <Folder Include="infrastructure\persistence\seeders\dev\" />
+      <Folder Include="infrastructure\persistence\seeder\dev\" />
     </ItemGroup>
 
     <ItemGroup>

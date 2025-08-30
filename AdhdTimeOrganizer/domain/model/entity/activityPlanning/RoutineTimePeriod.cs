@@ -6,5 +6,5 @@ public class RoutineTimePeriod : BaseTextColorEntity
 {
     public required int LengthInDays { get; set; }
     public bool IsHiddenInView { get; set; }
-    public ICollection<RoutineToDoList> RoutineToDoListColl { get; set; } = new List<RoutineToDoList>();
+    public ICollection<RoutineTodoList> RoutineTodoListColl { get; set; } = new List<RoutineTodoList>();
 }

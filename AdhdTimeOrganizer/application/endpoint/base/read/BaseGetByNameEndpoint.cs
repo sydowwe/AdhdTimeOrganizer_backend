@@ -1,8 +1,11 @@
 using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
+using AdhdTimeOrganizer.infrastructure.extension;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
@@ -11,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
 public abstract class BaseGetByNameEndpoint<TEntity, TResponse, TMapper>(AppCommandDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<TResponse>
-    where TEntity : class, IEntityWithId, IEntityWithName
+    where TEntity : class, IEntityWithUser, IEntityWithName
     where TResponse : class, IIdResponse
     where TMapper : IBaseResponseMapper<TEntity, TResponse>
 {
@@ -21,6 +24,8 @@ public abstract class BaseGetByNameEndpoint<TEntity, TResponse, TMapper>(AppComm
     {
         return EndpointHelper.GetUserOrHigherRoles();
     }
+
+    public virtual bool FilteredByUser => true;
 
     public override void Configure()
     {
@@ -41,6 +46,11 @@ public abstract class BaseGetByNameEndpoint<TEntity, TResponse, TMapper>(AppComm
         var name = Route<string>("name");
         var dbSet = dbContext.Set<TEntity>();
         var query = WithIncludes(dbSet);
+
+        if (FilteredByUser)
+        {
+            query.FilteredByUser(User.GetId());
+        }
 
         var entity = await query.FirstOrDefaultAsync(e => e.Name == name, ct);
         if (entity == null)

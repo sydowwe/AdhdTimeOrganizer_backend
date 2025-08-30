@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.@interface;
 
-namespace AdhdTimeOrganizer.application.dto.request.filter;
+namespace AdhdTimeOrganizer.application.dto.filter;
 
 public class TaskUrgencyFilterRequest : IFilterRequest
 {

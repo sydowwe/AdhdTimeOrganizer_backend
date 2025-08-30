@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using AdhdTimeOrganizer.domain.model.entity.@base;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -8,7 +9,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 public static class EntityWithUserExtensions
 {
     public static ReferenceCollectionBuilder<User, TEntity> IsManyWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder,
-        Expression<Func<User, IEnumerable<TEntity>?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IBaseEntityWithUser
+        Expression<Func<User, IEnumerable<TEntity>?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser
     {
         return builder.HasOne(r => r.User)
             .WithMany(navigationProperty)
@@ -17,7 +18,7 @@ public static class EntityWithUserExtensions
     }
 
     public static ReferenceReferenceBuilder<TEntity, User> IsOneWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, TEntity?>>? navigationProperty = null,
-        DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IBaseEntityWithUser
+        DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser
     {
         return builder.HasOne(r => r.User)
             .WithOne(navigationProperty)

@@ -1,7 +1,9 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.extension;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -14,7 +16,7 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 public abstract class BasePaginatedEndpoint<TEntity, TResponse, TMapper>(
     AppCommandDbContext dbContext,
     TMapper mapper) : Endpoint<SortPaginateRequest, BaseTableResponse<TResponse>>
-    where TEntity : class, IEntityWithId
+    where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
     where TMapper : IBaseReadMapper<TEntity, TResponse>
 {
@@ -24,6 +26,7 @@ public abstract class BasePaginatedEndpoint<TEntity, TResponse, TMapper>(
     {
         return EndpointHelper.GetUserOrHigherRoles();
     }
+    public virtual bool FilteredByUser => true;
 
     public override void Configure()
     {
@@ -45,6 +48,10 @@ public abstract class BasePaginatedEndpoint<TEntity, TResponse, TMapper>(
         {
             var query = dbContext.Set<TEntity>().AsNoTracking();
 
+            if (FilteredByUser)
+            {
+                query.FilteredByUser(User.GetId());
+            }
             // Use utility to get paginated and sorted data
             var response = await query.GetTableDataAsync(
                 req.SortBy,

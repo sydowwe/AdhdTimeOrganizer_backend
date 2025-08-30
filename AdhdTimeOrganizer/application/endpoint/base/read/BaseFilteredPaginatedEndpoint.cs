@@ -1,7 +1,9 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.extension;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -13,7 +15,7 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
 public abstract class BaseFilteredPaginatedEndpoint<TEntity, TResponse, TFilter>(
     AppCommandDbContext dbContext) : Endpoint<BaseFilterSortPaginateRequest<TFilter>, BaseTableResponse<TResponse>>
-    where TEntity : class, IEntityWithId
+    where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
     where TFilter : class, IFilterRequest
 {
@@ -23,6 +25,8 @@ public abstract class BaseFilteredPaginatedEndpoint<TEntity, TResponse, TFilter>
     {
         return EndpointHelper.GetUserOrHigherRoles();
     }
+
+    public virtual bool FilteredByUser => true;
 
     public override void Configure()
     {
@@ -44,6 +48,11 @@ public abstract class BaseFilteredPaginatedEndpoint<TEntity, TResponse, TFilter>
         try
         {
             var query = WithIncludes(dbContext.Set<TEntity>().AsNoTracking());
+
+            if (FilteredByUser)
+            {
+                query.FilteredByUser(User.GetId());
+            }
 
             if (req is { UseFilter: true, Filter: not null })
             {

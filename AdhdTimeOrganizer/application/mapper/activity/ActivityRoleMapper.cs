@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.application.dto.request.@base;
 using AdhdTimeOrganizer.application.dto.response;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.generic;
@@ -8,8 +9,11 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.activity;
 
 [Mapper]
-public partial class ActivityRoleMapper : IBaseReadMapper<ActivityRole, RoleResponse>
+public partial class ActivityRoleMapper : IBaseCrudMapper<ActivityRole, NameTextColorIconRequest, ActivityRoleResponse>
 {
-    public partial RoleResponse ToResponse(ActivityRole entity);
+    public partial ActivityRoleResponse ToResponse(ActivityRole entity);
     public partial SelectOptionResponse ToSelectOptionResponse(ActivityRole entity);
+    public partial ActivityRole ToEntity(NameTextColorIconRequest request, long userId);
+
+    public partial void UpdateEntity(NameTextColorIconRequest request, ActivityRole entity);
 }

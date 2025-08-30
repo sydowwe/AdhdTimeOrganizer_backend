@@ -3,11 +3,11 @@ using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.todoList.query;
 
-public class GetToDoListSelectOptionsEndpoint(
+public class GetTodoListSelectOptionsEndpoint(
     AppCommandDbContext appDbContext,
-    ToDoListMapper mapper)
-    : BaseGetSelectOptionsEndpoint<ToDoList, ToDoListMapper>(appDbContext, mapper)
+    TodoListMapper mapper)
+    : BaseGetSelectOptionsEndpoint<TodoList, TodoListMapper>(appDbContext, mapper)
 {
 }

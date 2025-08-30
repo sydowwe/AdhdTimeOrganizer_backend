@@ -1,12 +1,12 @@
-using AdhdTimeOrganizer.application.dto.request.filter;
+using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.application.mapper.activityHistory;
+using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityHistory;
+namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query;
 
 public class GetActivityHistoriesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
@@ -38,23 +38,23 @@ public class GetActivityHistoriesFilteredPaginatedEndpoint(
             query = query.Where(h => h.Activity.RoleId == filter.CategoryId);
 
 
-        if (filter.IsFromToDoList.HasValue)
+        if (filter.IsFromTodoList.HasValue)
         {
-            query = query.Where(h => h.Activity.IsOnToDoList == filter.IsFromToDoList.Value);
+            query = query.Where(h => h.Activity.IsOnTodoList == filter.IsFromTodoList.Value);
 
-            if (filter.IsFromToDoList.Value && filter.TaskUrgencyId.HasValue)
+            if (filter.IsFromTodoList.Value && filter.TaskUrgencyId.HasValue)
             {
-                query = query.Where(h => h.Activity.ToDoList != null && h.Activity.ToDoList.TaskUrgencyId == filter.TaskUrgencyId.Value);
+                query = query.Where(h => h.Activity.TodoList != null && h.Activity.TodoList.TaskUrgencyId == filter.TaskUrgencyId.Value);
             }
         }
 
-        if (filter.IsFromRoutineToDoList.HasValue)
+        if (filter.IsFromRoutineTodoList.HasValue)
         {
-            query = query.Where(h => h.Activity.IsOnRoutineToDoList == filter.IsFromRoutineToDoList.Value);
+            query = query.Where(h => h.Activity.IsOnRoutineTodoList == filter.IsFromRoutineTodoList.Value);
 
-            if (filter.IsFromRoutineToDoList.Value && filter.RoutineTimePeriodId.HasValue)
+            if (filter.IsFromRoutineTodoList.Value && filter.RoutineTimePeriodId.HasValue)
             {
-                query = query.Where(h => h.Activity.RoutineToDoList != null && h.Activity.RoutineToDoList.TimePeriodId == filter.RoutineTimePeriodId.Value);
+                query = query.Where(h => h.Activity.RoutineTodoList != null && h.Activity.RoutineTodoList.TimePeriodId == filter.RoutineTimePeriodId.Value);
             }
         }
 

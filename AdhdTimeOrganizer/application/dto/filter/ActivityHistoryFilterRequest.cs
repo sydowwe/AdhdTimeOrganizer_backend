@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.helper;
 
-namespace AdhdTimeOrganizer.application.dto.request.filter;
+namespace AdhdTimeOrganizer.application.dto.filter;
 
 public class ActivityHistoryFilterRequest : IFilterRequest
 {
@@ -14,9 +14,9 @@ public class ActivityHistoryFilterRequest : IFilterRequest
     public int? HoursBack { get; set; }
     public DateTime? DateFrom { get; set; }
     public DateTime? DateTo { get; set; }
-    public bool? IsFromToDoList { get; set; }
+    public bool? IsFromTodoList { get; set; }
     public long? TaskUrgencyId { get; set; }
-    public bool? IsFromRoutineToDoList { get; set; }
+    public bool? IsFromRoutineTodoList { get; set; }
     public long? RoutineTimePeriodId { get; set; }
     public bool? IsUnavoidable { get; set; }
 }

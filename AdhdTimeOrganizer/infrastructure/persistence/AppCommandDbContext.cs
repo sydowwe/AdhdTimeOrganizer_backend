@@ -19,9 +19,9 @@ public partial class AppCommandDbContext(DbContextOptions<AppCommandDbContext> o
     public DbSet<ActivityRole> ActivityRoles { get; set; }
     public DbSet<ActivityHistory> ActivityHistories { get; set; }
     public DbSet<PlannerTask> PlannerTasks { get; set; }
-    public DbSet<RoutineToDoList> RoutineToDoLists { get; set; }
+    public DbSet<RoutineTodoList> RoutineTodoLists { get; set; }
     public DbSet<RoutineTimePeriod> RoutineTimePeriods { get; set; }
-    public DbSet<ToDoList> ToDoLists { get; set; }
+    public DbSet<TodoList> TodoLists { get; set; }
     public DbSet<TaskUrgency> TaskUrgencies { get; set; }
     public DbSet<WebExtensionData> WebExtensionData { get; set; }
 

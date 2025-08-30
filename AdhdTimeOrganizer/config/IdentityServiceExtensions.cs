@@ -61,7 +61,7 @@ public static class IdentityServiceExtensions
             {
                 options.Password.RequiredLength = 8;
                 options.Password.RequiredUniqueChars = 4;
-                options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789.";
+                options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.";
                 options.User.RequireUniqueEmail = true;
                 options.ClaimsIdentity.UserNameClaimType = ClaimTypes.NameIdentifier;
                 options.ClaimsIdentity.EmailClaimType = ClaimTypes.Email;

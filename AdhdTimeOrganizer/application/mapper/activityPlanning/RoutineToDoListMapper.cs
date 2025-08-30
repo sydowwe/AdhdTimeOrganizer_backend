@@ -1,4 +1,5 @@
 
+using AdhdTimeOrganizer.application.dto.request.toDoList;
 using AdhdTimeOrganizer.application.dto.response.activityPlanning;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.mapper.@interface;
@@ -8,8 +9,11 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
 
 [Mapper]
-public partial class RoutineToDoListMapper : IBaseReadMapper<RoutineToDoList, RoutineToDoListResponse>
+public partial class RoutineTodoListMapper : IBaseCrudMapper<RoutineTodoList, RoutineTodoListRequest, RoutineTodoListResponse>
 {
-    public partial RoutineToDoListResponse ToResponse(RoutineToDoList entity);
-    public partial SelectOptionResponse ToSelectOptionResponse(RoutineToDoList entity);
+    public partial RoutineTodoListResponse ToResponse(RoutineTodoList entity);
+    public partial SelectOptionResponse ToSelectOptionResponse(RoutineTodoList entity);
+    public partial RoutineTodoList ToEntity(RoutineTodoListRequest request, long userId);
+
+    public partial void UpdateEntity(RoutineTodoListRequest request, RoutineTodoList entity);
 }

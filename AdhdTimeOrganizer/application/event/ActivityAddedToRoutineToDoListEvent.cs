@@ -2,4 +2,4 @@
 
 namespace AdhdTimeOrganizer.application.@event;
 
-public record ActivityAddedToRoutineToDoListEvent(long ActivityId) : IEvent;
+public record ActivityAddedToRoutineTodoListEvent(long ActivityId) : IEvent;

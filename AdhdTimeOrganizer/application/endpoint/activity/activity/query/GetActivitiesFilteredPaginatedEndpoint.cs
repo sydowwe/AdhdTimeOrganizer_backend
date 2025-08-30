@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.filter;
+using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.application.mapper.activity;
@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activity;
+namespace AdhdTimeOrganizer.application.endpoint.activity.activity.query;
 
 public class GetActivitiesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
@@ -34,9 +34,9 @@ public class GetActivitiesFilteredPaginatedEndpoint(
             query = query.Where(a => a.Text != null && a.Text.Contains(filter.Text));
         }
 
-        if (filter.IsOnToDoList.HasValue)
+        if (filter.IsOnTodoList.HasValue)
         {
-            query = query.Where(a => a.IsOnToDoList == filter.IsOnToDoList.Value);
+            query = query.Where(a => a.IsOnTodoList == filter.IsOnTodoList.Value);
         }
 
         if (filter.IsUnavoidable.HasValue)
@@ -44,9 +44,9 @@ public class GetActivitiesFilteredPaginatedEndpoint(
             query = query.Where(a => a.IsUnavoidable == filter.IsUnavoidable.Value);
         }
 
-        if (filter.IsOnRoutineToDoList.HasValue)
+        if (filter.IsOnRoutineTodoList.HasValue)
         {
-            query = query.Where(a => a.IsOnRoutineToDoList == filter.IsOnRoutineToDoList.Value);
+            query = query.Where(a => a.IsOnRoutineTodoList == filter.IsOnRoutineTodoList.Value);
         }
 
         if (filter.RoleId.HasValue)

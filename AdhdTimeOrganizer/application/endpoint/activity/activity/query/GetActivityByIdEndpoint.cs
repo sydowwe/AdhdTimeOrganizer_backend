@@ -5,7 +5,7 @@ using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activity;
+namespace AdhdTimeOrganizer.application.endpoint.activity.activity.query;
 
 public class GetActivityByIdEndpoint(
     AppCommandDbContext dbContext,

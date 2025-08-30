@@ -18,7 +18,7 @@ public class SelectOptionMapper<TEntity> : IBaseCreateMapper<TEntity, SelectOpti
         };
     }
 
-    public TEntity ToEntity(SelectOptionRequest request)
+    public TEntity ToEntity(SelectOptionRequest request, long userId)
     {
         var entity = RuntimeHelpers.GetUninitializedObject(typeof(TEntity));
         var typedEntity = (TEntity)entity;
@@ -26,6 +26,7 @@ public class SelectOptionMapper<TEntity> : IBaseCreateMapper<TEntity, SelectOpti
         // Set the properties
         typedEntity.Text = request.Text;
         typedEntity.SortOrder = request.SortOrder ?? 999;
+
         return typedEntity;
     }
 

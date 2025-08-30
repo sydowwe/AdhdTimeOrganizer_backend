@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskUrgency.query;
 
 public class GetTaskUrgencySelectOptionsEndpoint(
     AppCommandDbContext appDbContext,

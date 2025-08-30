@@ -2,6 +2,8 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AdhdTimeOrganizer.config;
@@ -43,6 +45,7 @@ public static class JwtHelper
         };
     }
 
+    public static async Task<List<Claim>> CreateUserClaims(User user, UserManager<User> userManager)
     {
         var claims = new List<Claim>
         {

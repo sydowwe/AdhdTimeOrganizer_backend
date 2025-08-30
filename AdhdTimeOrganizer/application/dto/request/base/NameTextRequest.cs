@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.@base;
 
-public record NameTextRequest : IMyRequest
+public record NameTextRequest : UserIdRequest
 {
     [Required, StringLength(50)] public required string Name { get; init; }
 

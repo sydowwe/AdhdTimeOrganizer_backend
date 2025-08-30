@@ -1,15 +1,24 @@
 ﻿using AdhdTimeOrganizer.application.@event;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.eventHandler;
 
-public class ActivityAddedToRoutineToDoListEventHandler(IActivityService activityService) : IEventHandler<ActivityAddedToRoutineToDoListEvent>
+public class ActivityAddedToRoutineTodoListEventHandler(AppCommandDbContext dbContext, ILogger<ActivityAddedToRoutineTodoListEventHandler> logger) : IEventHandler<ActivityAddedToRoutineTodoListEvent>
 {
-    public async Task Handle(ActivityAddedToRoutineToDoListEvent notification, CancellationToken cancellationToken)
+    public async Task HandleAsync(ActivityAddedToRoutineTodoListEvent eventModel, CancellationToken ct)
     {
-        var activityResult = await activityService.GetByIdAsync(notification.ActivityId);
-        var activity = activityResult.Data;
-        activity.IsOnRoutineToDoList = true;
-        await activityService.UpdateAsync(activity);
+        var activity = await dbContext.Activities.FindAsync([eventModel.ActivityId], ct);
+        if (activity == null)
+        {
+            logger.LogError("Activity with id {EventModelActivityId} not found", eventModel.ActivityId);
+            return;
+        }
+        activity.IsOnRoutineTodoList = true;
+        var res = await dbContext.UpdateEntityAsync(activity, ct);
+        if (res.Failed)
+        {
+            logger.LogError(res.ErrorMessage);
+        }
     }
 }

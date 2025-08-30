@@ -4,18 +4,18 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
 
-public class RoutineToDoListConfiguration : IEntityTypeConfiguration<RoutineToDoList>
+public class RoutineTodoListConfiguration : IEntityTypeConfiguration<RoutineTodoList>
 {
-    public void Configure(EntityTypeBuilder<RoutineToDoList> builder)
+    public void Configure(EntityTypeBuilder<RoutineTodoList> builder)
     {
         builder.BaseEntityConfigure();
 
         builder.Property(p => p.IsDone).HasDefaultValue(false).IsRequired();
-        builder.IsManyWithOneUser(u => u.RoutineToDoListColl);
-        builder.IsOneWithOneActivity(a=>a.RoutineToDoList);
+        builder.IsManyWithOneUser(u => u.RoutineTodoListColl);
+        builder.IsOneWithOneActivity(a=>a.RoutineTodoList);
 
-        builder.HasOne(r => r.TimePeriod)
-            .WithMany(t=>t.RoutineToDoListColl)
+        builder.HasOne(r => r.RoutineTimePeriod)
+            .WithMany(t=>t.RoutineTodoListColl)
             .HasForeignKey(r => r.TimePeriodId)
             .OnDelete(DeleteBehavior.Restrict);
 

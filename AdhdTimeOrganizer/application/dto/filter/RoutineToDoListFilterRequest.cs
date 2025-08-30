@@ -1,8 +1,8 @@
 using AdhdTimeOrganizer.application.dto.request.@interface;
 
-namespace AdhdTimeOrganizer.application.dto.request.filter;
+namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class RoutineToDoListFilterRequest : IFilterRequest
+public class RoutineTodoListFilterRequest : IFilterRequest
 {
     public long? ActivityId { get; set; }
     public long? TimePeriodId { get; set; }

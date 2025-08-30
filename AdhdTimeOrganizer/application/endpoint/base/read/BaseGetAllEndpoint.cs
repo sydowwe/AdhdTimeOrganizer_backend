@@ -1,7 +1,10 @@
 ﻿using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
+using AdhdTimeOrganizer.infrastructure.extension;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
@@ -10,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
 public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppCommandDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<List<TResponse>>
-    where TEntity : class, IEntityWithId
+    where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
     where TMapper : IBaseResponseMapper<TEntity, TResponse>
 {
@@ -22,6 +25,8 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppCommand
     }
 
     public virtual string? RouteParam => null;
+
+    public virtual bool FilteredByUser => true;
 
     private string AddedRouteParam => RouteParam != null ? $"/{RouteParam}" : string.Empty;
 
@@ -43,6 +48,11 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppCommand
     {
         var dbSet = dbContext.Set<TEntity>();
         var query = WithIncludes(dbSet);
+
+        if (FilteredByUser)
+        {
+            query.FilteredByUser(User.GetId());
+        }
 
         var entities = await query.ToListAsync(ct);
         var responses = entities.Select(MapToResponse).ToList();

@@ -23,42 +23,42 @@ public record MyIntTime
     public int Minutes { get; }
     public int Seconds { get; }
 
-    public int GetInSeconds => Hours * 3600 + Minutes * 60 + Seconds;
+    public int TotalSeconds => Hours * 3600 + Minutes * 60 + Seconds;
 
     // Addition operator
     public static MyIntTime operator +(MyIntTime left, MyIntTime right)
     {
-        return new MyIntTime(left.GetInSeconds + right.GetInSeconds);
+        return new MyIntTime(left.TotalSeconds + right.TotalSeconds);
     }
     
     // Subtraction operator
     public static MyIntTime operator -(MyIntTime left, MyIntTime right)
     {
-        return new MyIntTime(left.GetInSeconds - right.GetInSeconds);
+        return new MyIntTime(left.TotalSeconds - right.TotalSeconds);
     }
     
     // Greater than operator
     public static bool operator >(MyIntTime left, MyIntTime right)
     {
-        return left.GetInSeconds > right.GetInSeconds;
+        return left.TotalSeconds > right.TotalSeconds;
     }
     
     // Less than operator
     public static bool operator <(MyIntTime left, MyIntTime right)
     {
-        return left.GetInSeconds < right.GetInSeconds;
+        return left.TotalSeconds < right.TotalSeconds;
     }
     
     // Greater than or equal operator
     public static bool operator >=(MyIntTime left, MyIntTime right)
     {
-        return left.GetInSeconds >= right.GetInSeconds;
+        return left.TotalSeconds >= right.TotalSeconds;
     }
     
     // Less than or equal operator
     public static bool operator <=(MyIntTime left, MyIntTime right)
     {
-        return left.GetInSeconds <= right.GetInSeconds;
+        return left.TotalSeconds <= right.TotalSeconds;
     }
 }
 
@@ -69,5 +69,5 @@ public static class MyIntTimeExtensions
         return new MyIntTime(timeSpan.Hours, timeSpan.Minutes, timeSpan.Seconds);
     }
 
-    public static bool IsNullOrZero(this MyIntTime? time) => time is null || time.GetInSeconds == 0;
+    public static bool IsNullOrZero(this MyIntTime? time) => time is null || time.TotalSeconds == 0;
 }

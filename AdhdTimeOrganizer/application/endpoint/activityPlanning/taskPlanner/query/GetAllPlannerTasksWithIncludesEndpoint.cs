@@ -5,7 +5,7 @@ using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlanner.query;
 
 public class GetAllPlannerTasksEndpoint(
     AppCommandDbContext dbContext,

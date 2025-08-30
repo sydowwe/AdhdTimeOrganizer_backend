@@ -1,7 +1,10 @@
 ﻿using AdhdTimeOrganizer.application.dto.response.generic;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
+using AdhdTimeOrganizer.infrastructure.extension;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
@@ -10,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
 public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppCommandDbContext appDbContext, TMapper mapper) : EndpointWithoutRequest<List<SelectOptionResponse>>
-    where TEntity : class, IEntityWithId
+    where TEntity : class, IEntityWithUser
     where TMapper : IBaseSelectOptionMapper<TEntity>
 {
     private readonly TMapper _mapper = mapper;
@@ -20,15 +23,14 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppCommandD
         return EndpointHelper.GetUserOrHigherRoles();
     }
 
-    public virtual string AddedRouteParam()
-    {
-        return string.Empty;
-    }
+    public virtual string AddedRouteParam => string.Empty;
+
+    public virtual bool FilteredByUser => true;
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Get($"/{entityName.Kebaberize()}/all-options/{AddedRouteParam()}");
+        Get($"/{entityName.Kebaberize()}/all-options/{AddedRouteParam}");
         Roles(AllowedRoles());
         Summary(s =>
         {
@@ -41,6 +43,12 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppCommandD
     public override async Task HandleAsync(CancellationToken ct)
     {
         var query = appDbContext.Set<TEntity>().AsNoTracking();
+
+        if (FilteredByUser)
+        {
+            query.FilteredByUser(User.GetId());
+        }
+
         query = Filter(query);
         var entities = await query.ToListAsync(ct);
         var options = entities.Select(e => _mapper.ToSelectOptionResponse(e)).ToList();

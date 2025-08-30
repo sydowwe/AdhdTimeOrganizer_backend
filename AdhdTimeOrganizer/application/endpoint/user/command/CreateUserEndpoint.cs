@@ -47,7 +47,7 @@ public class CreateUserEndpoint(UserManager<User> userManager, RoleManager<UserR
             return;
         }
 
-        var role = await roleManager.FindByIdAsync(req.RoleId.ToString());
+        var role = await roleManager.FindByNameAsync("User");
         if (role is null)
         {
             await SendErrorsAsync(404, ct);

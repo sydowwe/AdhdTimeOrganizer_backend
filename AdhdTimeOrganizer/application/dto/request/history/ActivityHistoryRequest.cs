@@ -6,10 +6,11 @@ using AdhdTimeOrganizer.domain.helper;
 namespace AdhdTimeOrganizer.application.dto.request.history;
 public record ActivityHistoryRequest : ActivityIdRequest
 {
-
     [Required]
     public required DateTime StartTimestamp { get; init; }
 
     [Required]
     public required MyIntTime Length { get; init; }
+    [Required]
+    public required DateTime EndTimestamp { get; init; }
 }

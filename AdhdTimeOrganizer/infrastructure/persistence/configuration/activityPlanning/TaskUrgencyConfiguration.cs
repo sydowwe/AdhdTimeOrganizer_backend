@@ -12,7 +12,7 @@ public class TaskUrgencyConfiguration : IEntityTypeConfiguration<TaskUrgency>
         builder.Property(t=>t.Priority).IsRequired();
 
         // Configure the relationship
-        builder.HasMany(t => t.ToDoListColl)
+        builder.HasMany(t => t.TodoListColl)
             .WithOne(tl => tl.TaskUrgency)
             .HasForeignKey(tl => tl.TaskUrgencyId)
             .OnDelete(DeleteBehavior.Restrict);
