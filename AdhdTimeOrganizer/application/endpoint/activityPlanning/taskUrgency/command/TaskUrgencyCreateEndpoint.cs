@@ -8,4 +8,4 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskUrgency.command;
 
 public class TaskUrgencyCreateEndpoint(AppCommandDbContext dbContext, TaskUrgencyMapper mapper)
-    : BaseCreateEndpoint<TaskUrgency, TaskUrgencyRequest, TaskUrgencyResponse, TaskUrgencyMapper>(dbContext, mapper);
+    : BaseCreateEndpoint<TaskUrgency, TaskUrgencyRequest, TaskUrgencyMapper>(dbContext, mapper);

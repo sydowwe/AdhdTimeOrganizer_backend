@@ -8,4 +8,4 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.routineTodoList.command;
 
 public class RoutineTodoListCreateEndpoint(AppCommandDbContext dbContext, RoutineTodoListMapper mapper)
-    : BaseCreateEndpoint<RoutineTodoList, RoutineTodoListRequest, RoutineTodoListResponse, RoutineTodoListMapper>(dbContext, mapper);
+    : BaseCreateEndpoint<RoutineTodoList, RoutineTodoListRequest, RoutineTodoListMapper>(dbContext, mapper);

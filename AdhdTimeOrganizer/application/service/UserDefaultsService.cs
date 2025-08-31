@@ -1,20 +1,17 @@
-﻿using AdhdTimeOrganizer.application.commands;
+﻿using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.result;
-using AdhdTimeOrganizer.infrastructure.persistence;
-using FastEndpoints;
 
-namespace AdhdTimeOrganizer.application.handler.command.user;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
-public class CreateDefaultsForNewUserCommandHandler(AppCommandDbContext dbContext, ILogger<CreateDefaultsForNewUserCommandHandler> logger) : ICommandHandler<CreateDefaultsForNewUserCommand, Result>
+public class UserDefaultsService(AppCommandDbContext dbContext, ILogger<UserDefaultsService> logger) : IUserDefaultsService, IScopedService
 {
-    public async Task<Result> ExecuteAsync(CreateDefaultsForNewUserCommand command, CancellationToken ct)
+    public async Task<Result> CreateDefaultsAsync(long userId, CancellationToken ct = default)
     {
-        await CreateTaskUrgencies(command.UserId, ct);
-        await CreateRoutineTimePeriod(command.UserId, ct);
-        await CreateRoles(command.UserId, ct);
+        await CreateTaskUrgencies(userId, ct);
+        await CreateRoutineTimePeriod(userId, ct);
+        await CreateRoles(userId, ct);
 
         try
         {
@@ -23,7 +20,7 @@ public class CreateDefaultsForNewUserCommandHandler(AppCommandDbContext dbContex
         catch (Exception e)
         {
             logger.LogError(e, "Failed to create defaults for new user");
-            return DbUtils.HandleException(e, nameof(CreateDefaultsForNewUserCommandHandler));
+            return DbUtils.HandleException(e, nameof(UserDefaultsService));
         }
 
         return Result.Successful();

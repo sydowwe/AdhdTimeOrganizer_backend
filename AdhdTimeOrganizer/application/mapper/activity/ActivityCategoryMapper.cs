@@ -12,7 +12,9 @@ namespace AdhdTimeOrganizer.application.mapper.activity;
 public partial class ActivityCategoryMapper :  IBaseCrudMapper<ActivityCategory, NameTextColorIconRequest, ActivityCategoryResponse>
 {
     public partial ActivityCategoryResponse ToResponse(ActivityCategory entity);
-    public partial SelectOptionResponse ToSelectOptionResponse(ActivityCategory entity);
     public partial ActivityCategory ToEntity(NameTextColorIconRequest request, long userId);
     public partial void UpdateEntity(NameTextColorIconRequest request, ActivityCategory entity);
+
+    [MapProperty(nameof(ActivityCategory.Name), nameof(SelectOptionResponse.Text))]
+    public partial SelectOptionResponse ToSelectOptionResponse(ActivityCategory entity);
 }

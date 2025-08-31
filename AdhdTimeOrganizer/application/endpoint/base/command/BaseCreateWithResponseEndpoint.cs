@@ -12,12 +12,13 @@ using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
-public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
+public abstract class BaseCreateWithResponseEndpoint<TEntity, TRequest, TResponse, TMapper>(
     AppCommandDbContext dbContext,
-    TMapper mapper) : Endpoint<TRequest, long>
+    TMapper mapper) : Endpoint<TRequest, TResponse>
     where TEntity : class, IEntityWithUser
     where TRequest : class, ICreateRequest
-    where TMapper : IBaseCreateMapper<TEntity, TRequest>
+    where TResponse : class, IIdResponse
+    where TMapper : IBaseCreateMapper<TEntity, TRequest>, IBaseResponseMapper<TEntity, TResponse>
 {
     public virtual string[] AllowedRoles()
     {
@@ -33,7 +34,7 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
         {
             s.Summary = $"Create {entityName}";
             s.Description = $"Creates a new {entityName}";
-            s.Response<long>(201, "Created");
+            s.Response<TResponse>(201, "Created");
             s.Response(400, "Bad request");
         });
     }
@@ -46,7 +47,11 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
             await dbContext.Set<TEntity>().AddAsync(entity, ct);
             await dbContext.SaveChangesAsync(ct);
 
-            await SendAsync(entity.Id, 201, ct);
+            var response = mapper.ToResponse(entity);
+            await SendCreatedAtAsync<BaseGetByIdEndpoint<TEntity, TResponse, TMapper>>(
+                new { id = response.Id },
+                response,
+                cancellation: ct);
         }
         catch (Exception ex)
         {

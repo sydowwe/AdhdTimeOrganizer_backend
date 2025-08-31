@@ -8,4 +8,4 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 
 public class ActivityCreateEndpoint(AppCommandDbContext dbContext, ActivityMapper mapper)
-    : BaseCreateEndpoint<Activity, ActivityRequest, ActivityResponse, ActivityMapper>(dbContext, mapper);
+    : BaseCreateEndpoint<Activity, ActivityRequest, ActivityMapper>(dbContext, mapper);

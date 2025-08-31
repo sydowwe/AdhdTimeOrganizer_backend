@@ -1,14 +1,17 @@
-﻿using AdhdTimeOrganizer.config.dependencyInjection;
+﻿using AdhdTimeOrganizer.application.commands;
+using AdhdTimeOrganizer.application.handler.command.user;
+using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder;
+using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeders.@default;
 
-public class DefaultUsersSeeder(UserManager<User> userManager, AppCommandDbContext dbContext, ILogger<DefaultUsersSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
+public class DefaultUsersSeeder(UserManager<User> userManager, AppCommandDbContext dbContext, IUserDefaultsService userDefaultsService, ILogger<DefaultUsersSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
 {
     public string SeederName => "User";
     public int Order => 5;
@@ -48,6 +51,13 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppCommandDbConte
             if (!result.Succeeded)
             {
                 logger.LogError(result.ToString());
+            }
+
+            // Use the handler directly instead of FastEndpoints command execution
+            var defaultsRes = await userDefaultsService.CreateDefaultsAsync(adminUser.Id);
+            if (defaultsRes.Failed)
+            {
+                logger.LogError(defaultsRes.ErrorMessage);
             }
         }
         catch (Exception e)

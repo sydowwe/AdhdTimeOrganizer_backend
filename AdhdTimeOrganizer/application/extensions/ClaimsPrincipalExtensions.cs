@@ -7,7 +7,8 @@ public static class ClaimsPrincipalExtensions
 {
     public static long GetId(this ClaimsPrincipal principal)
     {
-        var userIdString = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        var userIdString = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
 
         if (string.IsNullOrEmpty(userIdString))
         {
@@ -24,7 +25,8 @@ public static class ClaimsPrincipalExtensions
 
     public static long? GetIdOrNull(this ClaimsPrincipal principal)
     {
-        var userIdString = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        var userIdString = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                          ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         return long.TryParse(userIdString, out var userId) ? userId : null;
     }
 }

@@ -46,11 +46,11 @@ try
 
     logger.LogInformation("Backend starting.");
 
-    // Database seeding
-    await SeedDatabase(app.Services, builder.Environment.IsDevelopment(), logger);
-
     // Configure the HTTP request pipeline
     ConfigurePipeline(app, logger);
+
+    // Database seeding
+    await SeedDatabase(app.Services, builder.Environment.IsDevelopment(), logger);
 
     logger.LogInformation("Backend started.");
     await app.RunAsync();
@@ -89,7 +89,6 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     }
 
     // Identity services
-    services.AddIdentityServices();
 
     // FastEndpoints
     services.AddFastEndpoints();
@@ -97,6 +96,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     {
         services.SwaggerDocument();
     }
+    services.AddIdentityServices();
 
     // Caching
     services.AddDistributedMemoryCache();
@@ -167,17 +167,18 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
     try
     {
         using var scope = services.CreateScope();
+        var scopedServices = scope.ServiceProvider; // Use the scoped provider
 
         logger.LogInformation("Starting database seeding...");
 
-        var defaultSeeder = scope.ServiceProvider.GetService<IDefaultSeederManager>();
+        var defaultSeeder = scopedServices.GetService<IDefaultSeederManager>();
 
         if (defaultSeeder != null)
         {
-            //await defaultSeeder.SeedAllAsync();
+            await defaultSeeder.SeedAllAsync();
         }
 
-        var devSeeder = scope.ServiceProvider.GetService<IDevSeederManager>();
+        var devSeeder = scopedServices.GetService<IDevSeederManager>();
         if (devSeeder != null && isDevelopment)
         {
             // await devSeeder.SeedAllAsync();

@@ -102,8 +102,8 @@ public class RecaptchaResponse
 {
     public bool success { get; init; }
     public float score { get; init; }
-    public required string action { get; init; }
+    public string action { get; init; }
     public string? challengeTs { get; init; }
-    public required string hostname { get; init; }
+    public string hostname { get; init; }
     public string[]? errorCodes { get; init; }
 }

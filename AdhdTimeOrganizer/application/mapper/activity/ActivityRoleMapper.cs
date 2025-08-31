@@ -12,8 +12,10 @@ namespace AdhdTimeOrganizer.application.mapper.activity;
 public partial class ActivityRoleMapper : IBaseCrudMapper<ActivityRole, NameTextColorIconRequest, ActivityRoleResponse>
 {
     public partial ActivityRoleResponse ToResponse(ActivityRole entity);
-    public partial SelectOptionResponse ToSelectOptionResponse(ActivityRole entity);
     public partial ActivityRole ToEntity(NameTextColorIconRequest request, long userId);
 
     public partial void UpdateEntity(NameTextColorIconRequest request, ActivityRole entity);
+
+    [MapProperty(nameof(ActivityRole.Name), nameof(SelectOptionResponse.Text))]
+    public partial SelectOptionResponse ToSelectOptionResponse(ActivityRole entity);
 }
