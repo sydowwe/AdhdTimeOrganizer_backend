@@ -34,19 +34,23 @@ public class GetActivitiesFilteredPaginatedEndpoint(
             query = query.Where(a => a.Text != null && a.Text.Contains(filter.Text));
         }
 
-        if (filter.IsOnTodoList.HasValue)
-        {
-            query = query.Where(a => a.IsOnTodoList == filter.IsOnTodoList.Value);
-        }
-
         if (filter.IsUnavoidable.HasValue)
         {
             query = query.Where(a => a.IsUnavoidable == filter.IsUnavoidable.Value);
         }
 
+        if (filter.IsOnTodoList.HasValue)
+        {
+            query = query.Include(a => a.TodoList);
+
+           query = query.Where(a=> a.TodoList != null == filter.IsOnTodoList.Value );
+        }
+
         if (filter.IsOnRoutineTodoList.HasValue)
         {
-            query = query.Where(a => a.IsOnRoutineTodoList == filter.IsOnRoutineTodoList.Value);
+            query = query.Include(a => a.RoutineTodoLists);
+
+            query = query.Where(a => a.RoutineTodoLists.Any() == filter.IsOnRoutineTodoList.Value);
         }
 
         if (filter.RoleId.HasValue)

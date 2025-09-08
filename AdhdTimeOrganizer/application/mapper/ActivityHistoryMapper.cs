@@ -12,7 +12,16 @@ public partial class ActivityHistoryMapper : IBaseCrudMapper<ActivityHistory, Ac
 {
     public partial ActivityHistoryResponse ToResponse(ActivityHistory entity);
     public partial SelectOptionResponse ToSelectOptionResponse(ActivityHistory entity);
-    public partial ActivityHistory ToEntity(ActivityHistoryRequest request, long userId);
 
     public partial void UpdateEntity(ActivityHistoryRequest request, ActivityHistory entity);
+
+    [MapperIgnoreTarget(nameof(ActivityHistory.EndTimestamp))]
+    private partial ActivityHistory ToEntityBase(ActivityHistoryRequest request, long userId);
+
+    public ActivityHistory ToEntity(ActivityHistoryRequest request, long userId)
+    {
+        var entity = ToEntityBase(request, userId);
+        entity.EndTimestamp = request.StartTimestamp.AddSeconds(request.Length.TotalSeconds);
+        return entity;
+    }
 }

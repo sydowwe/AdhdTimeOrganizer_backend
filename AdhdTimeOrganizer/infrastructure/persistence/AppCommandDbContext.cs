@@ -38,10 +38,6 @@ public partial class AppCommandDbContext(DbContextOptions<AppCommandDbContext> o
         modelBuilder.Entity<IdentityRoleClaim<long>>(entity => entity.ToTable(name: "user_role_claim"));
 
 
-        modelBuilder.HasSequence<int>("user_personal_number_seq")
-            .StartsAt(1000)
-            .IncrementsBy(11);
-
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UserEntityConfiguration).Assembly);
 
         OnModelCreatingPartial(modelBuilder);

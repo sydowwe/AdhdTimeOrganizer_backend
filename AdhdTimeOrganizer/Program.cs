@@ -75,6 +75,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     // Database configuration
     services.AddDbContext<AppCommandDbContext>(options =>
         options.UseNpgsql(DatabaseStringsHelper.GetCommandDatabaseConnectionString, b => b.MigrationsAssembly("MojaDigitalnaFirma.Sandbox.AdminPortal"))
+            .UseSnakeCaseNamingConvention()
             .LogTo(Console.WriteLine));
 
     // Dependency injection
@@ -175,7 +176,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
 
         if (defaultSeeder != null)
         {
-            await defaultSeeder.SeedAllAsync();
+            // await defaultSeeder.SeedAllAsync();
         }
 
         var devSeeder = scopedServices.GetService<IDevSeederManager>();

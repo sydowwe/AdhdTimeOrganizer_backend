@@ -16,4 +16,7 @@ public partial class RoutineTodoListMapper : IBaseCrudMapper<RoutineTodoList, Ro
     public partial RoutineTodoList ToEntity(RoutineTodoListRequest request, long userId);
 
     public partial void UpdateEntity(RoutineTodoListRequest request, RoutineTodoList entity);
+
+    public partial IQueryable<RoutineTodoListResponse> ProjectToResponse(IQueryable<RoutineTodoList> source);
+
 }

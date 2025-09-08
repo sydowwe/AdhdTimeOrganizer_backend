@@ -15,4 +15,7 @@ public partial class RoutineTimePeriodMapper : IBaseCrudMapper<RoutineTimePeriod
     public partial RoutineTimePeriod ToEntity(RoutineTimePeriodRequest request, long userId);
 
     public partial void UpdateEntity(RoutineTimePeriodRequest request, RoutineTimePeriod entity);
+
+    public partial IQueryable<RoutineTimePeriodResponse> ProjectToResponse(IQueryable<RoutineTimePeriod> source);
+
 }

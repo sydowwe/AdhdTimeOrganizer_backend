@@ -11,11 +11,11 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
 public abstract class BaseUpdateEndpoint<TEntity, TRequest, TResponse, TMapper>(
     AppCommandDbContext dbContext,
-    TMapper mapper) : Endpoint<TRequest, TResponse>
+    TMapper mapper) : Endpoint<TRequest, long>
     where TEntity : class, IEntityWithId
     where TRequest : class, IUpdateRequest
     where TResponse : class, IIdResponse
-    where TMapper : IBaseUpdateMapper<TEntity, TRequest>, IBaseResponseMapper<TEntity, TResponse>
+    where TMapper : IBaseUpdateMapper<TEntity, TRequest>
 {
     private readonly TMapper _mapper = mapper;
 
@@ -52,6 +52,7 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TResponse, TMapper>(
 
             _mapper.UpdateEntity(req, entity);
 
+            dbContext.Set<TEntity>().Update(entity);
             var affectedRows = await dbContext.SaveChangesAsync(ct);
             if (affectedRows == 0)
             {
@@ -60,8 +61,7 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TResponse, TMapper>(
                 return;
             }
 
-            var response = _mapper.ToResponse(entity);
-            await SendOkAsync(response, ct);
+            await SendOkAsync(entity.Id, ct);
         }
         catch (Exception ex)
         {

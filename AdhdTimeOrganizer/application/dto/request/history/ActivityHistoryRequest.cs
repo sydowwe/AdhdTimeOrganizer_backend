@@ -11,6 +11,6 @@ public record ActivityHistoryRequest : ActivityIdRequest
 
     [Required]
     public required MyIntTime Length { get; init; }
-    [Required]
-    public required DateTime EndTimestamp { get; init; }
+    // [Required]
+    // public required DateTime EndTimestamp { get; init; }
 }

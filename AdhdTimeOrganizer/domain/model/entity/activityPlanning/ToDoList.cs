@@ -4,6 +4,8 @@ namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 public class TodoList : BaseEntityWithIsDone
 {
-    public long TaskUrgencyId { get; set; }
-    public TaskUrgency TaskUrgency { get; set; }
+    public int? DoneCount { get; set; }
+    public int? TotalCount { get; set; }
+    public required long TaskUrgencyId { get; set; }
+    public TaskUrgency TaskUrgency { get; set; } = null!;
 }

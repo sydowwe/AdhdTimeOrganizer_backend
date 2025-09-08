@@ -5,25 +5,22 @@ namespace AdhdTimeOrganizer.domain.helper;
 public record MyIntTime
 {
     [JsonConstructor]
-    public MyIntTime(int hours, int minutes, int seconds)
+    public MyIntTime(int hours, int minutes)
     {
         Hours = hours;
         Minutes = minutes;
-        Seconds = seconds;
     }
 
     public MyIntTime(int seconds)
     {
         Hours = seconds / 3600;
         Minutes = seconds % 3600 / 60;
-        Seconds = seconds % 60;
     }
 
     public int Hours { get; }
     public int Minutes { get; }
-    public int Seconds { get; }
 
-    public int TotalSeconds => Hours * 3600 + Minutes * 60 + Seconds;
+    public int TotalSeconds => Hours * 3600 + Minutes * 60 ;
 
     // Addition operator
     public static MyIntTime operator +(MyIntTime left, MyIntTime right)
@@ -66,7 +63,7 @@ public static class MyIntTimeExtensions
 {
     public static MyIntTime ToMyIntTime(this TimeSpan timeSpan)
     {
-        return new MyIntTime(timeSpan.Hours, timeSpan.Minutes, timeSpan.Seconds);
+        return new MyIntTime(timeSpan.Hours, timeSpan.Minutes);
     }
 
     public static bool IsNullOrZero(this MyIntTime? time) => time is null || time.TotalSeconds == 0;

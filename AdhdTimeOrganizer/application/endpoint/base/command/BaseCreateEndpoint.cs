@@ -43,6 +43,7 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
         try
         {
             var entity = mapper.ToEntity(req, User.GetId());
+            AfterMapping(entity, req);
             await dbContext.Set<TEntity>().AddAsync(entity, ct);
             await dbContext.SaveChangesAsync(ct);
 
@@ -54,5 +55,9 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
             AddError(result.ErrorMessage!);
             await SendErrorsAsync(400, ct);
         }
+    }
+
+    public virtual void AfterMapping(TEntity entity, TRequest req)
+    {
     }
 }

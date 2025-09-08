@@ -8,4 +8,13 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.todoList.command;
 
 public class TodoListCreateEndpoint(AppCommandDbContext dbContext, TodoListMapper mapper)
-    : BaseCreateEndpoint<TodoList, TodoListRequest,TodoListMapper>(dbContext, mapper);
+    : BaseCreateEndpoint<TodoList, TodoListRequest, TodoListMapper>(dbContext, mapper)
+{
+    public override void AfterMapping(TodoList entity, TodoListRequest req)
+    {
+        if (req.TotalCount.HasValue)
+        {
+            entity.DoneCount = 0;
+        }
+    }
+}

@@ -48,6 +48,7 @@ public class BaseChangeIsDoneEndpoint<TEntity>(AppCommandDbContext dbContext) : 
             entity.IsDone = !entity.IsDone;
         }
 
+        dbContext.Set<TEntity>().UpdateRange(entities);
         await dbContext.SaveChangesAsync(ct);
 
         await SendNoContentAsync(ct);

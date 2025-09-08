@@ -40,21 +40,23 @@ public class GetActivityHistoriesFilteredPaginatedEndpoint(
 
         if (filter.IsFromTodoList.HasValue)
         {
-            query = query.Where(h => h.Activity.IsOnTodoList == filter.IsFromTodoList.Value);
+            query = query.Include(ah => ah.Activity).ThenInclude(a => a.TodoList);
 
-            if (filter.IsFromTodoList.Value && filter.TaskUrgencyId.HasValue)
+            query = query.Where(ah=> ah.Activity.TodoList != null == filter.IsFromTodoList.Value );
+            if (filter.TaskUrgencyId.HasValue && filter.IsFromTodoList.Value)
             {
-                query = query.Where(h => h.Activity.TodoList != null && h.Activity.TodoList.TaskUrgencyId == filter.TaskUrgencyId.Value);
+                query = query.Where(ah => ah.Activity.TodoList!.TaskUrgencyId == filter.TaskUrgencyId.Value);
             }
         }
 
         if (filter.IsFromRoutineTodoList.HasValue)
         {
-            query = query.Where(h => h.Activity.IsOnRoutineTodoList == filter.IsFromRoutineTodoList.Value);
+            query = query.Include(ah => ah.Activity).ThenInclude(a => a.RoutineTodoLists);
 
-            if (filter.IsFromRoutineTodoList.Value && filter.RoutineTimePeriodId.HasValue)
+            query = query.Where(h => h.Activity.RoutineTodoLists.Any() == filter.IsFromRoutineTodoList.Value);
+            if (filter.RoutineTimePeriodId.HasValue && filter.IsFromRoutineTodoList.Value)
             {
-                query = query.Where(h => h.Activity.RoutineTodoList != null && h.Activity.RoutineTodoList.TimePeriodId == filter.RoutineTimePeriodId.Value);
+                query = query.Where(h => h.Activity.RoutineTodoLists.Any(rtd => rtd.TimePeriodId == filter.RoutineTimePeriodId.Value));
             }
         }
 

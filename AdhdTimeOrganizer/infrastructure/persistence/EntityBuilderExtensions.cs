@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entityInterface;
+using Humanizer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Helper = AdhdTimeOrganizer.domain.helper.Helper;
@@ -11,7 +12,7 @@ public static class EntityBuilderExtensions
 {
     public static void BaseEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder) where TEntity : class, IBaseTableEntity
     {
-        var tableName = Helper.FromPascalCaseToSnakeCase(typeof(TEntity).Name.Replace("Read", ""));
+        var tableName = typeof(TEntity).Name.Underscore();
         builder.ToTable(tableName);
 
         builder.HasKey(x => x.Id);

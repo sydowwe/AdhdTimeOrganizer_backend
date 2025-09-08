@@ -5,8 +5,8 @@ namespace AdhdTimeOrganizer.application.dto.request.activity;
 
 public record ActivityRequest : NameTextRequest
 {
-    [Required]
-    public required bool IsOnTodoList { get; init; }
+    // [Required]
+    // public required bool IsOnTodoList { get; init; }
 
     [Required]
     public required bool IsUnavoidable { get; init; }
@@ -16,6 +16,6 @@ public record ActivityRequest : NameTextRequest
 
     public long? CategoryId { get; init; }
 
-    public long? TodoListUrgencyId { get; init; }
+    // public long? TodoListUrgencyId { get; init; }
 
 }

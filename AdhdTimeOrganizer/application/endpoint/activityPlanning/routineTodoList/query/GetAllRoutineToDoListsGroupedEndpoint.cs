@@ -1,4 +1,3 @@
-
 using AdhdTimeOrganizer.application.dto.response.activityPlanning;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
@@ -34,19 +33,19 @@ public class GetAllRoutineTodoListsGroupedEndpoint(
 
         var data = await dbContext.Set<RoutineTimePeriod>()
             .GroupJoin(
-                dbContext.Set<RoutineTodoList>().Where(x => x.UserId == loggedUserId),
+                dbContext.Set<RoutineTodoList>()
+                    .Include(r=>r.Activity)
+                    .ThenInclude(r=>r.Role)
+                    .Include(r=>r.Activity)
+                    .ThenInclude(r=>r.Category)
+                    .Where(x => x.UserId == loggedUserId),
                 tp => tp.Id,
                 rtd => rtd.TimePeriodId,
-                (tp, items) => new
+                (tp, items) => new RoutineTodoListGroupedResponse
                 {
-                    TimePeriod = tp,
-                    Items = items
+                    RoutineTimePeriod = routineTimePeriodMapper.ToResponse(tp),
+                    Items = items.AsQueryable().Select(rtd => mapper.ToResponse(rtd)).ToList()
                 })
-            .Select(x => new RoutineTodoListGroupedResponse
-            {
-                RoutineTimePeriod = routineTimePeriodMapper.ToResponse(x.TimePeriod),
-                Items = x.Items.Select(mapper.ToResponse)
-            })
             .ToListAsync(ct);
 
         await SendOkAsync(data, ct);

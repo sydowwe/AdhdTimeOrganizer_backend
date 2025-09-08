@@ -10,9 +10,16 @@ public class RoutineTodoListConfiguration : IEntityTypeConfiguration<RoutineTodo
     {
         builder.BaseEntityConfigure();
 
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("CK_RoutineTodoList_DoneCount_Min", "done_count >= 0");
+            t.HasCheckConstraint("CK_RoutineTodoList_TotalCount_Range", "total_count >= 2 AND total_count <= 99");
+            t.HasCheckConstraint("CK_RoutineTodoList_DoneCount_LessOrEqual_TotalCount", "done_count <= total_count");
+        });
+
         builder.Property(p => p.IsDone).HasDefaultValue(false).IsRequired();
         builder.IsManyWithOneUser(u => u.RoutineTodoListColl);
-        builder.IsOneWithOneActivity(a=>a.RoutineTodoList);
+        builder.IsManyWithOneActivity(a=>a.RoutineTodoLists);
 
         builder.HasOne(r => r.RoutineTimePeriod)
             .WithMany(t=>t.RoutineTodoListColl)
