@@ -52,6 +52,8 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TResponse, TMapper>(
 
             _mapper.UpdateEntity(req, entity);
 
+            AfterMapping(entity, req);
+
             dbContext.Set<TEntity>().Update(entity);
             var affectedRows = await dbContext.SaveChangesAsync(ct);
             if (affectedRows == 0)
@@ -69,5 +71,9 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TResponse, TMapper>(
             AddError(result.ErrorMessage!);
             await SendErrorsAsync(400, ct);
         }
+    }
+
+    protected virtual void AfterMapping(TEntity entity, TRequest req)
+    {
     }
 }

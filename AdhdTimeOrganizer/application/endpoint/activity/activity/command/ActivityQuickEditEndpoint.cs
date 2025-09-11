@@ -11,7 +11,7 @@ using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 
-public class ActivityQuickEditEndpoint(AppCommandDbContext dbContext) : Endpoint<QuickEditActivityRequest>
+public class ActivityQuickEditEndpoint(AppCommandDbContext dbContext) : Endpoint<QuickEditActivityRequest, long?>
 {
     public virtual string[] AllowedRoles()
     {
@@ -20,7 +20,7 @@ public class ActivityQuickEditEndpoint(AppCommandDbContext dbContext) : Endpoint
 
     public override void Configure()
     {
-        Patch($"/activity/{{id}}");
+        Patch($"/activity/{{id}}/{{mode}}");
         Roles(AllowedRoles());
         Summary(s =>
         {
@@ -43,20 +43,43 @@ public class ActivityQuickEditEndpoint(AppCommandDbContext dbContext) : Endpoint
                 return;
             }
 
-            entity.Name = req.Name;
-            entity.Text = req.Text;
-            entity.CategoryId = req.CategoryId;
+            var mode = Route<string>("mode");
 
-            dbContext.Activities.Update(entity);
-            var affectedRows = await dbContext.SaveChangesAsync(ct);
-            if (affectedRows == 0)
+            if (mode == "Overwrite")
             {
-                AddError("No rows were updated. Entity may not exist.");
-                await SendErrorsAsync(400, ct);
-                return;
-            }
+                entity.Name = req.Name;
+                entity.Text = req.Text;
+                entity.CategoryId = req.CategoryId;
 
-            await SendNoContentAsync(ct);
+                var result = await dbContext.UpdateEntityAsync(entity,ct);
+                if (result.Failed)
+                {
+                    AddError(result.ErrorMessage!);
+                    await SendErrorsAsync(400, ct);
+                }
+            }
+            else if (mode == "Clone")
+            {
+                var clonedEntity = entity.Clone();
+
+                clonedEntity.Name = req.Name;
+                clonedEntity.Text = req.Text;
+                clonedEntity.CategoryId = req.CategoryId;
+
+                var result = await dbContext.AddEntityAsync(clonedEntity, ct);
+                if (result.Failed)
+                {
+                    AddError(result.ErrorMessage!);
+                    await SendErrorsAsync(400, ct);
+                    return;
+                }
+                await SendOkAsync(clonedEntity.Id, ct);
+            }
+            else
+            {
+                AddError("Invalid mode.");
+                await SendErrorsAsync(400, ct);
+            }
         }
         catch (Exception ex)
         {

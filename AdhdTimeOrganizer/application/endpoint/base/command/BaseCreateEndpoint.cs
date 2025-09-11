@@ -57,7 +57,7 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
         }
     }
 
-    public virtual void AfterMapping(TEntity entity, TRequest req)
+    protected virtual void AfterMapping(TEntity entity, TRequest req)
     {
     }
 }

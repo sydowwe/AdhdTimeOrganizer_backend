@@ -21,4 +21,9 @@ public class GetAllTodoListsEndpoint(
                 .ThenInclude(a => a.Category)
             .Include(tdl => tdl.TaskUrgency);
     }
+
+    protected override IQueryable<TodoList> Sort(IQueryable<TodoList> query)
+    {
+        return query.OrderBy(td=>td.TaskUrgency.Priority);
+    }
 }

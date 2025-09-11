@@ -5,5 +5,5 @@ namespace AdhdTimeOrganizer.application.dto.response.activityPlanning;
 public record RoutineTimePeriodResponse : TextColorResponse
 {
     public required int LengthInDays { get; init; }
-    public bool IsHiddenInView { get; init; } = false;
+    public bool IsHidden { get; init; } = false;
 }

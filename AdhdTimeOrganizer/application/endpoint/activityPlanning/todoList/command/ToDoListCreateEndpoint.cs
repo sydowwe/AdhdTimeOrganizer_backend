@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.todoList.comma
 public class TodoListCreateEndpoint(AppCommandDbContext dbContext, TodoListMapper mapper)
     : BaseCreateEndpoint<TodoList, TodoListRequest, TodoListMapper>(dbContext, mapper)
 {
-    public override void AfterMapping(TodoList entity, TodoListRequest req)
+    protected override void AfterMapping(TodoList entity, TodoListRequest req)
     {
         if (req.TotalCount.HasValue)
         {

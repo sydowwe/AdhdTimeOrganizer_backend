@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
 
-public class BaseChangeIsDoneEndpoint<TEntity>(AppCommandDbContext dbContext) : Endpoint<IdListRequest>
-    where TEntity : class, IEntityWithId, IEntityWithIsDone
+public class BaseToggleIsHiddenEndpoint<TEntity>(AppCommandDbContext dbContext) : Endpoint<IdListRequest>
+    where TEntity : class, IEntityWithId, IEntityWithIsHidden
 {
     public virtual string[] AllowedRoles()
     {
@@ -22,12 +22,12 @@ public class BaseChangeIsDoneEndpoint<TEntity>(AppCommandDbContext dbContext) : 
     {
         var entityName = typeof(TEntity).Name;
 
-        Patch($"{entityName.Kebaberize()}/toggle-is-done");
+        Patch($"{entityName.Kebaberize()}/toggle-is-hidden");
         Roles(AllowedRoles());
         Summary(s =>
         {
-            s.Summary = $"Toggles {entityName} IsDone status";
-            s.Description = $"Toggles {entityName} IsDone status";
+            s.Summary = $"Toggles {entityName} IsHidden status";
+            s.Description = $"Toggles {entityName} IsHidden status";
             s.Response(204, "Toggled");
             s.Response(400, "Bad request");
         });
@@ -45,7 +45,7 @@ public class BaseChangeIsDoneEndpoint<TEntity>(AppCommandDbContext dbContext) : 
 
         foreach (var entity in entities)
         {
-            entity.IsDone = !entity.IsDone;
+            entity.IsHidden = !entity.IsHidden;
         }
 
         dbContext.Set<TEntity>().UpdateRange(entities);

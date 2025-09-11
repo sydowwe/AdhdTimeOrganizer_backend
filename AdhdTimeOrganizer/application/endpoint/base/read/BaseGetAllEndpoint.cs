@@ -53,7 +53,7 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppCommand
         {
             query.FilteredByUser(User.GetId());
         }
-
+        Sort(query);
         var entities = await query.ToListAsync(ct);
         var responses = entities.Select(MapToResponse).ToList();
 
@@ -61,6 +61,8 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppCommand
     }
 
     protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;
+
+    protected virtual IQueryable<TEntity> Sort(IQueryable<TEntity> query) => query.OrderBy(e => e.Id);
 
     protected virtual TResponse MapToResponse(TEntity entity) => _mapper.ToResponse(entity);
 }

@@ -5,4 +5,4 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
 
-public class PlannerTaskToggleIsDoneEndpoint(AppCommandDbContext dbContext) : BaseChangeIsDoneEndpoint<PlannerTask>(dbContext);
+public class PlannerTaskToggleIsDoneEndpoint(AppCommandDbContext dbContext) : BaseToggleIsDoneEndpoint<PlannerTask>(dbContext);

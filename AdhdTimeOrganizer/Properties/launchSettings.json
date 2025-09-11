@@ -19,7 +19,7 @@
       "useSSL": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "LOGGING_LEVEL": "Debug",
+        "LOGGING_LEVEL": "Information",
         "PAGE_URL": "https://localhost:3000",
         "API_URL": "https://localhost:8080",
 

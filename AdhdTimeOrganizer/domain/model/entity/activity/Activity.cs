@@ -22,4 +22,11 @@ public class Activity : BaseNameTextEntity
     public virtual ICollection<WebExtensionData> WebExtensionDataList { get; set; } = new List<WebExtensionData>();
     public virtual ICollection<PlannerTask> PlannerTaskList { get; set; } = new List<PlannerTask>();
 
+
+    public Activity Clone()
+    {
+        var cloned = (Activity)this.MemberwiseClone();
+        cloned.Id = 0; // Reset ID for new entity
+        return cloned;
+    }
 }

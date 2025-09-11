@@ -36,9 +36,9 @@ public class GetRoutineTimePeriodsFilteredPaginatedEndpoint(
             query = query.Where(rtp => rtp.LengthInDays <= filter.MaxLengthInDays.Value);
         }
 
-        if (filter.IsHiddenInView.HasValue)
+        if (filter.IsHidden.HasValue)
         {
-            query = query.Where(rtp => rtp.IsHiddenInView == filter.IsHiddenInView.Value);
+            query = query.Where(rtp => rtp.IsHidden == filter.IsHidden.Value);
         }
 
         if (filter.UserId.HasValue)

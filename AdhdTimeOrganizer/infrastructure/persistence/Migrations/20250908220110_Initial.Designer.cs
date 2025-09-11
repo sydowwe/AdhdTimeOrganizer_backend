@@ -495,7 +495,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnName("created_timestamp")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<bool>("IsHiddenInView")
+                    b.Property<bool>("IsHidden")
                         .HasColumnType("boolean")
                         .HasColumnName("is_hidden_in_view");
 

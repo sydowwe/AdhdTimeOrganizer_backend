@@ -5,4 +5,4 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
 
-public class RoutineTodoListToggleIsDoneEndpoint(AppCommandDbContext dbContext) : BaseChangeIsDoneEndpoint<RoutineTodoList>(dbContext);
+public class RoutineTodoListToggleIsDoneEndpoint(AppCommandDbContext dbContext) : BaseTodoListToggleIsDoneEndpoint<RoutineTodoList>(dbContext);

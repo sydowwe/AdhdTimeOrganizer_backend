@@ -1,8 +1,9 @@
 using AdhdTimeOrganizer.domain.model.entity.@base;
+using AdhdTimeOrganizer.domain.model.entityInterface;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
-public class RoutineTodoList : BaseEntityWithIsDone
+public class RoutineTodoList : BaseEntityWithIsDone, IEntityWithDoneAndTotalCount
 {
     public int? DoneCount { get; set; }
     public int? TotalCount { get; set; }
