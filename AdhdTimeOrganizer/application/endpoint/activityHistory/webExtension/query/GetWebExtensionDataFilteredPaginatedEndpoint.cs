@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.qu
 public class GetWebExtensionDataFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     WebExtensionDataMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<WebExtensionData, WebExtensionDataResponse, WebExtensionDataFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<WebExtensionData, WebExtensionDataResponse, WebExtensionDataFilterRequest, WebExtensionDataMapper>(dbContext, mapper)
 {
     private readonly WebExtensionDataMapper _mapper = mapper;
 
@@ -67,10 +67,5 @@ public class GetWebExtensionDataFilteredPaginatedEndpoint(
         }
 
         return query;
-    }
-
-    protected override WebExtensionDataResponse MapToResponse(WebExtensionData entity)
-    {
-        return _mapper.ToResponse(entity);
     }
 }

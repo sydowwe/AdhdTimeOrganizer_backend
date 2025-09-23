@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.routineTimePer
 public class GetRoutineTimePeriodsFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     RoutineTimePeriodMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<RoutineTimePeriod, RoutineTimePeriodResponse, RoutineTimePeriodFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<RoutineTimePeriod, RoutineTimePeriodResponse, RoutineTimePeriodFilterRequest, RoutineTimePeriodMapper>(dbContext, mapper)
 {
     private readonly RoutineTimePeriodMapper _mapper = mapper;
 
@@ -47,10 +47,5 @@ public class GetRoutineTimePeriodsFilteredPaginatedEndpoint(
         }
 
         return query;
-    }
-
-    protected override RoutineTimePeriodResponse MapToResponse(RoutineTimePeriod entity)
-    {
-        return _mapper.ToResponse(entity);
     }
 }

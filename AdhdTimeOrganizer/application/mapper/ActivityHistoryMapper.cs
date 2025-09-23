@@ -8,7 +8,7 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper;
 
 [Mapper]
-public partial class ActivityHistoryMapper : IBaseCrudMapper<ActivityHistory, ActivityHistoryRequest, ActivityHistoryResponse>
+public partial class ActivityHistoryMapper : IBaseSimpleCrudMapper<ActivityHistory, ActivityHistoryRequest, ActivityHistoryResponse>
 {
     public partial ActivityHistoryResponse ToResponse(ActivityHistory entity);
     public partial SelectOptionResponse ToSelectOptionResponse(ActivityHistory entity);
@@ -24,4 +24,7 @@ public partial class ActivityHistoryMapper : IBaseCrudMapper<ActivityHistory, Ac
         entity.EndTimestamp = request.StartTimestamp.AddSeconds(request.Length.TotalSeconds);
         return entity;
     }
+
+    public partial IQueryable<ActivityHistoryResponse> ProjectToResponse(IQueryable<ActivityHistory> source);
+
 }

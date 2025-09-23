@@ -46,12 +46,11 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppCommandD
 
         if (FilteredByUser)
         {
-            query.FilteredByUser(User.GetId());
+            query = query.FilteredByUser(User.GetId());
         }
 
         query = Filter(query);
-        var entities = await query.ToListAsync(ct);
-        var options = entities.Select(e => _mapper.ToSelectOptionResponse(e)).ToList();
+        var options = await query.Select(e => _mapper.ToSelectOptionResponse(e)).ToListAsync(ct);
 
         await SendOkAsync(options, ct);
     }

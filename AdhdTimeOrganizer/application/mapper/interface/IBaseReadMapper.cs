@@ -7,4 +7,5 @@ public interface IBaseReadMapper<in TEntity, out TResponse> : IBaseResponseMappe
     where TEntity : class, IEntityWithId
     where TResponse : class, IMyResponse
 {
+    public IQueryable<TResponse> ProjectToResponse(IQueryable<TEntity> query);
 }

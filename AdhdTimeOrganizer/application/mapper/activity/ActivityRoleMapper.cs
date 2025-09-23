@@ -9,7 +9,7 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.activity;
 
 [Mapper]
-public partial class ActivityRoleMapper : IBaseCrudMapper<ActivityRole, NameTextColorIconRequest, ActivityRoleResponse>
+public partial class ActivityRoleMapper : IBaseSimpleCrudMapper<ActivityRole, NameTextColorIconRequest, ActivityRoleResponse>
 {
     public partial ActivityRoleResponse ToResponse(ActivityRole entity);
     public partial ActivityRole ToEntity(NameTextColorIconRequest request, long userId);
@@ -18,4 +18,6 @@ public partial class ActivityRoleMapper : IBaseCrudMapper<ActivityRole, NameText
 
     [MapProperty(nameof(ActivityRole.Name), nameof(SelectOptionResponse.Text))]
     public partial SelectOptionResponse ToSelectOptionResponse(ActivityRole entity);
+
+    public partial IQueryable<ActivityRoleResponse> ProjectToResponse(IQueryable<ActivityRole> source);
 }

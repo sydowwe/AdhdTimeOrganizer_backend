@@ -10,10 +10,8 @@ namespace AdhdTimeOrganizer.application.endpoint.activity.role.query;
 public class GetRolesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     ActivityRoleMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<ActivityRole, ActivityRoleResponse, RoleFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<ActivityRole, ActivityRoleResponse, RoleFilterRequest, ActivityRoleMapper>(dbContext, mapper)
 {
-    private readonly ActivityRoleMapper _mapper = mapper;
-
     protected override IQueryable<ActivityRole> ApplyCustomFiltering(IQueryable<ActivityRole> query, RoleFilterRequest filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Name))
@@ -42,10 +40,5 @@ public class GetRolesFilteredPaginatedEndpoint(
         }
 
         return query;
-    }
-
-    protected override ActivityRoleResponse MapToResponse(ActivityRole entity)
-    {
-        return _mapper.ToResponse(entity);
     }
 }

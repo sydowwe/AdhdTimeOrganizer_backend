@@ -15,9 +15,8 @@ public abstract class BaseWithoutUserPaginatedEndpoint<TEntity, TResponse, TMapp
     TMapper mapper) : Endpoint<SortPaginateRequest, BaseTableResponse<TResponse>>
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse
-    where TMapper : IBaseReadMapper<TEntity, TResponse>
+    where TMapper : class, IBaseReadMapper<TEntity, TResponse>
 {
-    private readonly TMapper _mapper = mapper;
 
     public virtual string[] AllowedRoles()
     {
@@ -45,11 +44,11 @@ public abstract class BaseWithoutUserPaginatedEndpoint<TEntity, TResponse, TMapp
             var query = dbContext.Set<TEntity>().AsNoTracking();
 
             // Use utility to get paginated and sorted data
-            var response = await query.GetTableDataAsync(
+            var response = await query.GetTableDataAsync<TResponse, TEntity, TMapper>(
                 req.SortBy,
                 req.ItemsPerPage,
                 req.Page,
-                entity => _mapper.ToResponse(entity),
+                mapper,
                 ct);
 
             await SendOkAsync(response, ct);

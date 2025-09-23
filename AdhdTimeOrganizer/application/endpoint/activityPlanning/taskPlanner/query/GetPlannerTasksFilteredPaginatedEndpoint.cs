@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlanner.qu
 public class GetPlannerTasksFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     PlannerTaskMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<PlannerTask, PlannerTaskResponse, PlannerTaskFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<PlannerTask, PlannerTaskResponse, PlannerTaskFilterRequest, PlannerTaskMapper>(dbContext, mapper)
 {
     private readonly PlannerTaskMapper _mapper = mapper;
 
@@ -56,10 +56,5 @@ public class GetPlannerTasksFilteredPaginatedEndpoint(
         }
 
         return query;
-    }
-
-    protected override PlannerTaskResponse MapToResponse(PlannerTask entity)
-    {
-        return _mapper.ToResponse(entity);
     }
 }

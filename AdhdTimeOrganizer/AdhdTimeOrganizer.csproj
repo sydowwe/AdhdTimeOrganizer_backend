@@ -54,7 +54,6 @@
       <Folder Include="application\endpoint\activityHistory\alarm\query\" />
       <Folder Include="application\endpoint\activityHistory\webExtension\query\" />
       <Folder Include="application\endpoint\activityPlanning\routineTimePeriod\query\" />
-      <Folder Include="application\endpoint\activityPlanning\routineTodoList\command\" />
       <Folder Include="application\endpoint\activityPlanning\routineTodoList\query\" />
       <Folder Include="application\endpoint\activityPlanning\taskPlanner\command\" />
       <Folder Include="application\endpoint\activityPlanning\taskPlanner\query\" />

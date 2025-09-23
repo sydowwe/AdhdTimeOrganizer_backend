@@ -8,7 +8,7 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
 
 [Mapper]
-public partial class RoutineTimePeriodMapper : IBaseCrudMapper<RoutineTimePeriod, RoutineTimePeriodRequest, RoutineTimePeriodResponse>
+public partial class RoutineTimePeriodMapper : IBaseSimpleCrudMapper<RoutineTimePeriod, RoutineTimePeriodRequest, RoutineTimePeriodResponse>
 {
     public partial RoutineTimePeriodResponse ToResponse(RoutineTimePeriod entity);
     public partial SelectOptionResponse ToSelectOptionResponse(RoutineTimePeriod entity);

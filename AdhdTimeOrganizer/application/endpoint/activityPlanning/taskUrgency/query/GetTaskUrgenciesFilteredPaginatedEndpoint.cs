@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskUrgency.qu
 public class GetTaskUrgenciesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     TaskUrgencyMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<TaskUrgency, TaskUrgencyResponse, TaskUrgencyFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<TaskUrgency, TaskUrgencyResponse, TaskUrgencyFilterRequest, TaskUrgencyMapper>(dbContext, mapper)
 {
     private readonly TaskUrgencyMapper _mapper = mapper;
 
@@ -42,10 +42,5 @@ public class GetTaskUrgenciesFilteredPaginatedEndpoint(
         }
 
         return query;
-    }
-
-    protected override TaskUrgencyResponse MapToResponse(TaskUrgency entity)
-    {
-        return _mapper.ToResponse(entity);
     }
 }
