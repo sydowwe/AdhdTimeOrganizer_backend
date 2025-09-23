@@ -40,11 +40,6 @@
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
     </ItemGroup>
 
-    <ItemGroup>
-      <EditorConfigFiles Include="..\..\..\..\..\Program Files\dotnet\sdk\9.0.102\Sdks\Microsoft.NET.Sdk\analyzers\build\config\analysislevel_9_default.globalconfig">
-        <Link>config\analysislevel_9_default.globalconfig</Link>
-      </EditorConfigFiles>
-    </ItemGroup>
 
     <ItemGroup>
       <Folder Include="application\dto\filter\" />
@@ -68,10 +63,4 @@
       <Folder Include="infrastructure\persistence\Migrations\" />
       <Folder Include="infrastructure\persistence\seeder\dev\" />
     </ItemGroup>
-
-    <ItemGroup>
-      <Compile Remove="domain\service\WorkHourCalculatorService.cs" />
-      <Compile Remove="application\commands\UploadToSharePointCommand.cs" />
-    </ItemGroup>
-
 </Project>
