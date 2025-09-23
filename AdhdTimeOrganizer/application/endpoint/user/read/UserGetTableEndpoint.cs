@@ -10,7 +10,7 @@ using UserMapper = AdhdTimeOrganizer.application.mapper.UserMapper;
 namespace AdhdTimeOrganizer.application.endpoint.user.read;
 
 public class UserGetTableEndpoint(AppCommandDbContext dbContext, UserMapper mapper)
-    : BaseWithoutUserFilteredPaginatedEndpoint<User, UserResponse, UserFilter>(dbContext)
+    : BaseWithoutUserFilteredPaginatedEndpoint<User, UserResponse, UserFilter, UserMapper>(dbContext, mapper)
 {
     public override string[] AllowedRoles()
     {
@@ -30,10 +30,5 @@ public class UserGetTableEndpoint(AppCommandDbContext dbContext, UserMapper mapp
         }
 
         return query;
-    }
-
-    protected override UserResponse MapToResponse(User entity)
-    {
-        return mapper.ToResponse(entity);
     }
 }

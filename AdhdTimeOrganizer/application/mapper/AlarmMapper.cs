@@ -8,7 +8,7 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper;
 
 [Mapper]
-public partial class AlarmMapper : IBaseCrudMapper<Alarm, AlarmRequest, AlarmResponse>
+public partial class AlarmMapper : IBaseSimpleCrudMapper<Alarm, AlarmRequest, AlarmResponse>
 {
     [MapProperty(nameof(Alarm.Activity.Name), nameof(AlarmResponse.Name))]
     [MapProperty(nameof(Alarm.Activity.Text), nameof(AlarmResponse.Text))]
@@ -18,4 +18,7 @@ public partial class AlarmMapper : IBaseCrudMapper<Alarm, AlarmRequest, AlarmRes
     public partial Alarm ToEntity(AlarmRequest request, long userId);
 
     public partial void UpdateEntity(AlarmRequest request, Alarm entity);
+
+    public partial IQueryable<AlarmResponse> ProjectToResponse(IQueryable<Alarm> source);
+
 }

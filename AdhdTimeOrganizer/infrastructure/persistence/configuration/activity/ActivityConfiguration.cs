@@ -24,5 +24,13 @@ public class ActivityConfiguration : IEntityTypeConfiguration<Activity>
             .WithMany(r => r.Activities)
             .HasForeignKey(e => e.CategoryId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Add indexes for foreign keys used in joins
+        builder.HasIndex(e => e.RoleId);
+        builder.HasIndex(e => e.CategoryId);
+
+        // Composite index for user filtering with role/category lookups
+        builder.HasIndex(e => new { e.UserId, e.RoleId });
+        builder.HasIndex(e => new { e.UserId, e.CategoryId });
     }
 }

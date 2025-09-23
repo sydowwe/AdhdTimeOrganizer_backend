@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityHistory.alarm.query;
 public class GetAlarmsFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     AlarmMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<Alarm, AlarmResponse, AlarmFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<Alarm, AlarmResponse, AlarmFilterRequest, AlarmMapper>(dbContext, mapper)
 {
     private readonly AlarmMapper _mapper = mapper;
 
@@ -52,10 +52,5 @@ public class GetAlarmsFilteredPaginatedEndpoint(
         }
 
         return query;
-    }
-
-    protected override AlarmResponse MapToResponse(Alarm entity)
-    {
-        return _mapper.ToResponse(entity);
     }
 }

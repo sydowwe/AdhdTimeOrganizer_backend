@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.manager;
+using AdhdTimeOrganizer.infrastructure.settings;
 using DotNetEnv;
 using FastEndpoints;
 using FastEndpoints.Swagger;
@@ -40,6 +41,7 @@ try
 
     // Configure services
     ConfigureServices(builder.Configuration, builder.Services, builder.Environment.IsDevelopment());
+    LoadSettingsFromConfiguration(builder.Configuration, builder.Services);
 
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
@@ -51,6 +53,7 @@ try
 
     // Database seeding
     await SeedDatabase(app.Services, builder.Environment.IsDevelopment(), logger);
+
 
     logger.LogInformation("Backend started.");
     await app.RunAsync();
@@ -259,4 +262,11 @@ static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
         config.Endpoints.RoutePrefix = "api";
         config.Endpoints.ShortNames = true;
     });
+}
+
+static void LoadSettingsFromConfiguration(IConfiguration configuration, IServiceCollection services)
+{
+    services.Configure<TodoListSettings>(
+        configuration.GetSection("TodoListSettings")
+    );
 }

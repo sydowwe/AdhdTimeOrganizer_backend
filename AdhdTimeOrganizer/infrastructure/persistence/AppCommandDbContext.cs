@@ -45,6 +45,11 @@ public partial class AppCommandDbContext(DbContextOptions<AppCommandDbContext> o
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 
+    // In your DbContext configuration
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.LogTo(Console.WriteLine, Microsoft.Extensions.Logging.LogLevel.Information);
+    }
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         this.BaseSaveChangesAsync();

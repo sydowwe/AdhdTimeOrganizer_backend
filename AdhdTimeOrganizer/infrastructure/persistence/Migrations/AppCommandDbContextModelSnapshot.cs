@@ -88,9 +88,15 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("RoleId")
                         .HasDatabaseName("ix_activity_role_id");
 
+                    b.HasIndex("UserId", "CategoryId")
+                        .HasDatabaseName("ix_activity_user_id_category_id");
+
                     b.HasIndex("UserId", "Name")
                         .IsUnique()
                         .HasDatabaseName("ix_activity_user_id_name");
+
+                    b.HasIndex("UserId", "RoleId")
+                        .HasDatabaseName("ix_activity_user_id_role_id");
 
                     b.ToTable("activity", "public");
                 });
@@ -494,7 +500,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.Property<bool>("IsHidden")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_hidden_in_view");
+                        .HasColumnName("is_hidden");
 
                     b.Property<int>("LengthInDays")
                         .HasColumnType("integer")
@@ -555,6 +561,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_timestamp")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<long>("DisplayOrder")
+                        .HasColumnType("bigint")
+                        .HasColumnName("display_order");
 
                     b.Property<int?>("DoneCount")
                         .HasColumnType("integer")
@@ -667,6 +677,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_task_urgency");
 
+                    b.HasIndex("Priority")
+                        .HasDatabaseName("ix_task_urgency_priority");
+
                     b.HasIndex("UserId", "Priority")
                         .IsUnique()
                         .HasDatabaseName("ix_task_urgency_user_id_priority");
@@ -696,6 +709,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_timestamp")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<long>("DisplayOrder")
+                        .HasColumnType("bigint")
+                        .HasColumnName("display_order");
 
                     b.Property<int?>("DoneCount")
                         .HasColumnType("integer")

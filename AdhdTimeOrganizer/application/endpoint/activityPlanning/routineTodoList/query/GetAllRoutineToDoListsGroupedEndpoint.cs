@@ -38,7 +38,7 @@ public class GetAllRoutineTodoListsGroupedEndpoint(
                     .ThenInclude(r=>r.Role)
                     .Include(r=>r.Activity)
                     .ThenInclude(r=>r.Category)
-                    .Where(x => x.UserId == loggedUserId),
+                    .Where(x => x.UserId == loggedUserId).OrderBy(e=>e.DisplayOrder),
                 tp => tp.Id,
                 rtd => rtd.TimePeriodId,
                 (tp, items) => new RoutineTodoListGroupedResponse

@@ -1,0 +1,10 @@
+# .dockerignore
+
+# Ignore host-specific build artifacts
+**/bin
+**/obj
+
+# Ignore other development/source control folders
+**/.git
+**/.vs
+**/.vscode

@@ -11,10 +11,8 @@ namespace AdhdTimeOrganizer.application.endpoint.activity.activity.query;
 public class GetActivitiesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     ActivityMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<Activity, ActivityResponse, ActivityFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<Activity, ActivityResponse, ActivityFilterRequest, ActivityMapper>(dbContext, mapper)
 {
-    private readonly ActivityMapper _mapper = mapper;
-
     protected override IQueryable<Activity> WithIncludes(IQueryable<Activity> query)
     {
         return query
@@ -69,10 +67,5 @@ public class GetActivitiesFilteredPaginatedEndpoint(
         }
 
         return query;
-    }
-
-    protected override ActivityResponse MapToResponse(Activity entity)
-    {
-        return _mapper.ToResponse(entity);
     }
 }

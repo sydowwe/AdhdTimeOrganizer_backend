@@ -40,4 +40,9 @@ public class SelectOptionMapper<TEntity> : IBaseCreateMapper<TEntity, SelectOpti
     {
         return new SelectOptionResponse(entity.Id, entity.Text);
     }
+
+    public IQueryable<SelectOptionResponse> ProjectToResponse(IQueryable<TEntity> source)
+    {
+        return source.Select(e=> ToSelectOptionResponse(e));
+    }
 }

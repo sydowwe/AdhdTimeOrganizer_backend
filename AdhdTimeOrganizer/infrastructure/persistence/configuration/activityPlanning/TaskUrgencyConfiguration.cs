@@ -19,5 +19,7 @@ public class TaskUrgencyConfiguration : IEntityTypeConfiguration<TaskUrgency>
 
         builder.HasIndex(t => new { t.UserId, t.Priority }).IsUnique();
 
+        // Add index for sorting performance
+        builder.HasIndex(t => t.Priority);
     }
 }

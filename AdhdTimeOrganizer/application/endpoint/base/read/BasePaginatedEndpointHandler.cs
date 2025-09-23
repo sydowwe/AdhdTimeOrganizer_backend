@@ -18,14 +18,13 @@ public abstract class BasePaginatedEndpoint<TEntity, TResponse, TMapper>(
     TMapper mapper) : Endpoint<SortPaginateRequest, BaseTableResponse<TResponse>>
     where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
-    where TMapper : IBaseReadMapper<TEntity, TResponse>
+    where TMapper : class, IBaseReadMapper<TEntity, TResponse>
 {
-    private readonly TMapper _mapper = mapper;
-
     public virtual string[] AllowedRoles()
     {
         return EndpointHelper.GetUserOrHigherRoles();
     }
+
     public virtual bool FilteredByUser => true;
 
     public override void Configure()
@@ -50,14 +49,15 @@ public abstract class BasePaginatedEndpoint<TEntity, TResponse, TMapper>(
 
             if (FilteredByUser)
             {
-                query.FilteredByUser(User.GetId());
+                query = query.FilteredByUser(User.GetId());
             }
+
             // Use utility to get paginated and sorted data
-            var response = await query.GetTableDataAsync(
+            var response = await query.GetTableDataAsync<TResponse, TEntity, TMapper>(
                 req.SortBy,
                 req.ItemsPerPage,
                 req.Page,
-                entity => _mapper.ToResponse(entity),
+                mapper,
                 ct);
 
             await SendOkAsync(response, ct);

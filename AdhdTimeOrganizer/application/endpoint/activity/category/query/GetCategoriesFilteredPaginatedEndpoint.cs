@@ -10,10 +10,8 @@ namespace AdhdTimeOrganizer.application.endpoint.activity.category.query;
 public class GetCategoriesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     ActivityCategoryMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<ActivityCategory, ActivityCategoryResponse, CategoryFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<ActivityCategory, ActivityCategoryResponse, CategoryFilterRequest, ActivityCategoryMapper>(dbContext, mapper)
 {
-    private readonly ActivityCategoryMapper _mapper = mapper;
-
     protected override IQueryable<ActivityCategory> ApplyCustomFiltering(IQueryable<ActivityCategory> query, CategoryFilterRequest filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Name))
@@ -37,10 +35,5 @@ public class GetCategoriesFilteredPaginatedEndpoint(
         }
 
         return query;
-    }
-
-    protected override ActivityCategoryResponse MapToResponse(ActivityCategory entity)
-    {
-        return _mapper.ToResponse(entity);
     }
 }

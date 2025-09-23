@@ -1,4 +1,5 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -10,15 +11,8 @@ public class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
     {
         builder.BaseEntityConfigure();
 
+        builder.BaseTodoListConfigure();
 
-        builder.ToTable(t =>
-        {
-            t.HasCheckConstraint("CK_TodoList_DoneCount_Min", "done_count >= 0");
-            t.HasCheckConstraint("CK_TodoList_TotalCount_Range", "total_count >= 2 AND total_count <= 99");
-            t.HasCheckConstraint("CK_TodoList_DoneCount_LessOrEqual_TotalCount", "done_count <= total_count");
-        });
-
-        builder.Property(p => p.IsDone).HasDefaultValue(false).IsRequired();
         builder.IsManyWithOneUser(u => u.TodoListColl);
         builder.IsOneWithOneActivity(a=>a.TodoList);
 

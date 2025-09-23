@@ -15,9 +15,8 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppCommandDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<List<TResponse>>
     where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
-    where TMapper : IBaseResponseMapper<TEntity, TResponse>
+    where TMapper : IBaseReadMapper<TEntity, TResponse>
 {
-    private readonly TMapper _mapper = mapper;
 
     public virtual string[] AllowedRoles()
     {
@@ -51,18 +50,16 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppCommand
 
         if (FilteredByUser)
         {
-            query.FilteredByUser(User.GetId());
+            query = query.FilteredByUser(User.GetId());
         }
-        Sort(query);
-        var entities = await query.ToListAsync(ct);
-        var responses = entities.Select(MapToResponse).ToList();
+        query = Sort(query);
 
-        await SendOkAsync(responses, ct);
+        var items = await mapper.ProjectToResponse(query).ToListAsync(ct);
+        await SendOkAsync(items, ct);
     }
 
     protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;
 
     protected virtual IQueryable<TEntity> Sort(IQueryable<TEntity> query) => query.OrderBy(e => e.Id);
 
-    protected virtual TResponse MapToResponse(TEntity entity) => _mapper.ToResponse(entity);
 }

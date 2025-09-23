@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.domain.model.@enum;
@@ -53,7 +54,7 @@ public static class QueryableEntityExtensions
     public static IQueryable<TEntity> FilteredByUser<TEntity>(this IQueryable<TEntity> query, long userId)
         where TEntity : class, IEntityWithUser
     {
-        return query.Where(e=>e.UserId == userId);
+        return query.Where(e => e.UserId == userId);
     }
 
     public static IQueryable<TEntity> SortBySingleAndPaginate<TEntity>(this IQueryable<TEntity> query, SortByRequest sortBy, int showPerPage, int currentPage)
@@ -87,16 +88,17 @@ public static class QueryableEntityExtensions
     }
 
 
-    public static async Task<BaseTableResponse<TResponse>> GetTableDataAsync<TEntity, TResponse>(
+    public static async Task<BaseTableResponse<TResponse>> GetTableDataAsync<TResponse, TEntity, TMapper>(
         this IQueryable<TEntity> query,
         SortByRequest[] sortBy,
         int itemsPerPage,
         int page,
-        Func<TEntity, TResponse> mapping,
+        TMapper mapper,
         CancellationToken cancellationToken = default
     )
-        where TEntity : class, IEntity
+        where TEntity : class, IEntityWithId
         where TResponse : class, IIdResponse
+        where TMapper : class, IBaseReadMapper<TEntity, TResponse>
     {
         // Get total count before pagination
         var itemsCount = await query.CountAsync(cancellationToken);
@@ -106,8 +108,7 @@ public static class QueryableEntityExtensions
         var paginatedQuery = query.SortByManyAndPaginate(sortBy, itemsPerPage, page);
 
         // Execute query and map results
-        var entities = await paginatedQuery.ToListAsync(cancellationToken);
-        var items = entities.Select(mapping).ToList();
+        var items = await mapper.ProjectToResponse(paginatedQuery).ToListAsync(cancellationToken);
 
         return new BaseTableResponse<TResponse>
         {

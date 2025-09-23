@@ -1,6 +1,7 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -10,11 +11,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read.withoutUser;
 
-public abstract class BaseWithoutUserFilteredPaginatedEndpoint<TEntity, TResponse, TFilter>(
-    AppCommandDbContext dbContext) : Endpoint<BaseFilterSortPaginateRequest<TFilter>, BaseTableResponse<TResponse>>
+public abstract class BaseWithoutUserFilteredPaginatedEndpoint<TEntity, TResponse, TFilter, TMapper>(
+    AppCommandDbContext dbContext,
+    TMapper mapper) : Endpoint<BaseFilterSortPaginateRequest<TFilter>, BaseTableResponse<TResponse>>
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse
     where TFilter : class, IFilterRequest
+    where TMapper : class, IBaseReadMapper<TEntity, TResponse>
 {
     public virtual string EndpointPath => "filtered-table";
 
@@ -50,11 +53,11 @@ public abstract class BaseWithoutUserFilteredPaginatedEndpoint<TEntity, TRespons
                 query = ApplyCustomFiltering(query, req.Filter);
             }
 
-            var response = await query.GetTableDataAsync(
+            var response = await query.GetTableDataAsync<TResponse, TEntity, TMapper>(
                 req.SortBy,
                 req.ItemsPerPage,
                 req.Page,
-                MapToResponse,
+                mapper,
                 ct);
 
             await SendOkAsync(response, ct);
@@ -72,6 +75,4 @@ public abstract class BaseWithoutUserFilteredPaginatedEndpoint<TEntity, TRespons
     {
         return query;
     }
-
-    protected abstract TResponse MapToResponse(TEntity entity);
 }

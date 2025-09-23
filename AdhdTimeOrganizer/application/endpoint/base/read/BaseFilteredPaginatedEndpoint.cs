@@ -2,6 +2,7 @@
 using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.extensions;
+using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
@@ -13,11 +14,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
-public abstract class BaseFilteredPaginatedEndpoint<TEntity, TResponse, TFilter>(
-    AppCommandDbContext dbContext) : Endpoint<BaseFilterSortPaginateRequest<TFilter>, BaseTableResponse<TResponse>>
+public abstract class BaseFilteredPaginatedEndpoint<TEntity, TResponse, TFilter, TMapper>(
+    AppCommandDbContext dbContext,
+    TMapper mapper) : Endpoint<BaseFilterSortPaginateRequest<TFilter>, BaseTableResponse<TResponse>>
     where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
     where TFilter : class, IFilterRequest
+    where TMapper : class, IBaseReadMapper<TEntity, TResponse>
 {
     public virtual string EndpointPath => "filtered-table";
 
@@ -51,7 +54,7 @@ public abstract class BaseFilteredPaginatedEndpoint<TEntity, TResponse, TFilter>
 
             if (FilteredByUser)
             {
-                query.FilteredByUser(User.GetId());
+                query = query.FilteredByUser(User.GetId());
             }
 
             if (req is { UseFilter: true, Filter: not null })
@@ -59,11 +62,11 @@ public abstract class BaseFilteredPaginatedEndpoint<TEntity, TResponse, TFilter>
                 query = ApplyCustomFiltering(query, req.Filter);
             }
 
-            var response = await query.GetTableDataAsync(
+            var response = await query.GetTableDataAsync<TResponse, TEntity, TMapper>(
                 req.SortBy,
                 req.ItemsPerPage,
                 req.Page,
-                MapToResponse,
+                mapper,
                 ct);
 
             await SendOkAsync(response, ct);
@@ -81,6 +84,4 @@ public abstract class BaseFilteredPaginatedEndpoint<TEntity, TResponse, TFilter>
     {
         return query;
     }
-
-    protected abstract TResponse MapToResponse(TEntity entity);
 }

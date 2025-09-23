@@ -52,7 +52,7 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TResponse, TMapper>(
 
             _mapper.UpdateEntity(req, entity);
 
-            AfterMapping(entity, req);
+            await AfterMapping(entity, req, ct);
 
             dbContext.Set<TEntity>().Update(entity);
             var affectedRows = await dbContext.SaveChangesAsync(ct);
@@ -73,7 +73,8 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TResponse, TMapper>(
         }
     }
 
-    protected virtual void AfterMapping(TEntity entity, TRequest req)
+    protected virtual Task AfterMapping(TEntity entity, TRequest req, CancellationToken ct = default)
     {
+        return Task.CompletedTask;
     }
 }

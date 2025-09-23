@@ -49,7 +49,7 @@ public abstract class BaseGetByNameEndpoint<TEntity, TResponse, TMapper>(AppComm
 
         if (FilteredByUser)
         {
-            query.FilteredByUser(User.GetId());
+            query = query.FilteredByUser(User.GetId());
         }
 
         var entity = await query.FirstOrDefaultAsync(e => e.Name == name, ct);

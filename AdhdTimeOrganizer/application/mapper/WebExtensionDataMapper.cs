@@ -11,4 +11,6 @@ public partial class WebExtensionDataMapper : IBaseReadMapper<WebExtensionData, 
 {
     public partial WebExtensionDataResponse ToResponse(WebExtensionData entity);
     public partial SelectOptionResponse ToSelectOptionResponse(WebExtensionData entity);
+
+    public partial IQueryable<WebExtensionDataResponse> ProjectToResponse(IQueryable<WebExtensionData> source);
 }

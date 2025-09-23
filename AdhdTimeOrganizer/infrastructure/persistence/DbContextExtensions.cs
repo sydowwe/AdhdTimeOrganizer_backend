@@ -26,7 +26,6 @@ public static class DbContextHelper
         try
         {
             await dbContext.Set<TEntity>().AddAsync(entity, ct);
-            dbContext.BaseSaveChangesAsync();
             await dbContext.SaveChangesAsync(ct);
         }
         catch (Exception ex)
@@ -45,7 +44,6 @@ public static class DbContextHelper
             foreach (var chunk in entities.Chunk(300))
             {
                 await dbContext.Set<TEntity>().AddRangeAsync(chunk, ct);
-                dbContext.BaseSaveChangesAsync();
                 await dbContext.SaveChangesAsync(ct);
             }
 
@@ -65,7 +63,6 @@ public static class DbContextHelper
         try
         {
             dbContext.Set<TEntity>().Update(entity);
-            dbContext.BaseSaveChangesAsync();
             var affectedRows = await dbContext.SaveChangesAsync(ct);
             if (affectedRows == 0)
             {
@@ -85,7 +82,6 @@ public static class DbContextHelper
         try
         {
             dbContext.Set<TEntity>().UpdateRange(entities);
-            dbContext.BaseSaveChangesAsync();
             var affectedRows = await dbContext.SaveChangesAsync(ct);
             if (affectedRows == 0)
             {

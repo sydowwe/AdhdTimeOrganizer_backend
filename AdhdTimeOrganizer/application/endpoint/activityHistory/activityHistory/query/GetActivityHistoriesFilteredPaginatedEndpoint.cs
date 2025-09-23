@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory
 public class GetActivityHistoriesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     ActivityHistoryMapper mapper)
-    : BaseFilteredPaginatedEndpoint<ActivityHistory, ActivityHistoryResponse, ActivityHistoryFilterRequest>(dbContext)
+    : BaseFilteredPaginatedEndpoint<ActivityHistory, ActivityHistoryResponse, ActivityHistoryFilterRequest, ActivityHistoryMapper>(dbContext, mapper)
 {
     private readonly ActivityHistoryMapper _mapper = mapper;
 
@@ -92,10 +92,5 @@ public class GetActivityHistoriesFilteredPaginatedEndpoint(
         }
 
         return query;
-    }
-
-    protected override ActivityHistoryResponse MapToResponse(ActivityHistory entity)
-    {
-        return _mapper.ToResponse(entity);
     }
 }

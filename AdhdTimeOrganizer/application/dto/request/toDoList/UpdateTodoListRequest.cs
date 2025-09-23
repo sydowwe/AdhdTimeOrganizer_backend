@@ -3,10 +3,8 @@ using AdhdTimeOrganizer.application.dto.request.extendable;
 
 namespace AdhdTimeOrganizer.application.dto.request.toDoList;
 
-public record RoutineTodoListRequest : WithIsDoneRequest
+public record UpdateTodoListRequest : BaseUpdateTodoListRequest
 {
-    public int? DoneCount { get; set; }
-    public int? TotalCount { get; set; }
     [Required]
-    public long TimePeriodId { get; init; }
+    public long TaskUrgencyId { get; init; }
 }
