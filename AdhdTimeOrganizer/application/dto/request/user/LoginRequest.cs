@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.user;
@@ -5,6 +6,6 @@ namespace AdhdTimeOrganizer.application.dto.request.user;
 public record LoginRequest : IMyRequest
 {
     public bool StayLoggedIn { get; set; }
-    public string RecaptchaToken { get; set; }
-    public string Timezone { get; set; }
+    [Required] public required string RecaptchaToken { get; init; }
+    [Required] public required string Timezone { get; init; }
 }

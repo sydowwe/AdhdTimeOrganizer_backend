@@ -2,8 +2,10 @@
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.result;
+using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
+namespace AdhdTimeOrganizer.application.service;
 
 public class UserDefaultsService(AppCommandDbContext dbContext, ILogger<UserDefaultsService> logger) : IUserDefaultsService, IScopedService
 {

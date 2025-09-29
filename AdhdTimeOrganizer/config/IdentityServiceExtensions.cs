@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
+using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -13,16 +14,6 @@ public static class IdentityServiceExtensions
 {
     public static IServiceCollection AddIdentityServices(this IServiceCollection services)
     {
-        var ecdsaPublicPem = File.ReadAllText("secrets/ec_public.pem");
-
-        var ecdsa = ECDsa.Create();
-        ecdsa.ImportFromPem(ecdsaPublicPem);
-
-        var securityKey = new ECDsaSecurityKey(ecdsa)
-        {
-            KeyId = "your-key-id"
-        };
-
         services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -31,13 +22,15 @@ public static class IdentityServiceExtensions
             })
             .AddJwtBearer(options =>
             {
+                var serviceProvider = services.BuildServiceProvider();
+                var keyProvider = serviceProvider.GetRequiredService<IEcdsaKeyProvider>();
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidIssuer = Helper.GetEnvVar("JWT_ISSUER"),
                     ValidAudience = Helper.GetEnvVar("JWT_AUDIENCE"),
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = securityKey,
-                    ValidAlgorithms = [SecurityAlgorithms.EcdsaSha256],
+                    IssuerSigningKey = keyProvider.GetSigningKey(),
+                    ValidAlgorithms = [keyProvider.SecurityAlgorithm],
                 };
                 options.Events = new JwtBearerEvents
                 {

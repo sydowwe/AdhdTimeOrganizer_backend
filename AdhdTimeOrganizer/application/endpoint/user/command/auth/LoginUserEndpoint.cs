@@ -4,13 +4,14 @@ using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.infrastructure.extService.user.auth;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using UserMapper = AdhdTimeOrganizer.application.mapper.UserMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
 
-public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> userManager, IGoogleRecaptchaService googleRecaptchaService, UserMapper mapper)
+public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> userManager, IJwtService jwtService, IGoogleRecaptchaService googleRecaptchaService, UserMapper mapper)
     : Endpoint<PasswordLoginRequest, LoginResponse>
 {
     public override void Configure()
@@ -72,20 +73,7 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
             return;
         }
 
-
-        // Create claims using the helper
-        var claims = await JwtHelper.CreateUserClaims(user, userManager);
-
-        // Add regular login specific claim
-        claims.Add(new Claim("auth_method", "password"));
-
-        var tokenExpiry = req.StayLoggedIn ? DateTime.UtcNow.AddDays(30) : DateTime.UtcNow.AddDays(1);
-
-        // Create JWT token with ECDSA
-        var jwtToken = JwtHelper.CreateEcdsaJwtToken(claims, tokenExpiry);
-
-        // Set the cookie using helper
-        JwtHelper.SetAuthCookie(HttpContext, jwtToken, tokenExpiry);
+        await jwtService.GenerateJwtAndSetAuthCookie(req.StayLoggedIn, AuthMethodEnum.Password, user, userManager, HttpContext);
 
         var response = new LoginResponse
         {

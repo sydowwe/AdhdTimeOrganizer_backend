@@ -15,6 +15,8 @@ public enum ResultErrorType
     TwoFactorAuthRequired,
     InvalidTwoFactorAuthToken,
 
+    Unauthorized,
+
 
     FileUploadError,
     ExternalServiceError,

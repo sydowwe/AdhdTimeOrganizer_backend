@@ -42,6 +42,7 @@
 
 
     <ItemGroup>
+      <Folder Include="application\commands\" />
       <Folder Include="application\dto\filter\" />
       <Folder Include="application\endpoint\activityHistory\activityHistory\command\" />
       <Folder Include="application\endpoint\activityHistory\activityHistory\query\" />
@@ -57,10 +58,27 @@
       <Folder Include="application\endpoint\activity\activity\query\" />
       <Folder Include="application\endpoint\activity\role\command\" />
       <Folder Include="application\endpoint\activity\role\query\" />
+      <Folder Include="application\handler\command\user\" />
       <Folder Include="application\mapper\activityPlanning\" />
       <Folder Include="application\mapper\activity\" />
       <Folder Include="domain\" />
       <Folder Include="infrastructure\persistence\Migrations\" />
       <Folder Include="infrastructure\persistence\seeder\dev\" />
+    </ItemGroup>
+
+
+    <ItemGroup>
+      <None Remove="infrastructure\templates\email\ConfirmEmail.html" />
+      <Resource Include="infrastructure\templates\email\ConfirmEmail.html">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Resource>
+      <None Remove="infrastructure\templates\email\ResetPassword.html" />
+      <Resource Include="infrastructure\templates\email\ResetPassword.html">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Resource>
+      <None Remove="infrastructure\templates\email\ResetPasswordCode.html" />
+      <Resource Include="infrastructure\templates\email\ResetPasswordCode.html">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Resource>
     </ItemGroup>
 </Project>

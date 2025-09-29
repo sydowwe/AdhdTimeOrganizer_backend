@@ -4,5 +4,5 @@ namespace AdhdTimeOrganizer.application.dto.request.user;
 
 public record EmailRequest : IMyRequest
 {
-    public string Email { get; set; }
+    public required string Email { get; set; }
 }

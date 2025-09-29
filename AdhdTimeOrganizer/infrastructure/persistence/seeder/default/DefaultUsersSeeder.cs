@@ -1,15 +1,12 @@
-﻿using AdhdTimeOrganizer.application.commands;
-using AdhdTimeOrganizer.application.handler.command.user;
-using AdhdTimeOrganizer.config.dependencyInjection;
+﻿using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder;
-using FastEndpoints;
+using AdhdTimeOrganizer.infrastructure.persistence.seeders;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeders.@default;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
 
 public class DefaultUsersSeeder(UserManager<User> userManager, AppCommandDbContext dbContext, IUserDefaultsService userDefaultsService, ILogger<DefaultUsersSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
 {
