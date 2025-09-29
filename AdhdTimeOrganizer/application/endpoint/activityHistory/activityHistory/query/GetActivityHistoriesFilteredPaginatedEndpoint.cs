@@ -1,9 +1,15 @@
 using AdhdTimeOrganizer.application.dto.filter;
+using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
+using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper;
+using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using FastEndpoints;
+using Humanizer;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query;
@@ -11,11 +17,65 @@ namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory
 public class GetActivityHistoriesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
     ActivityHistoryMapper mapper)
-    : BaseFilteredPaginatedEndpoint<ActivityHistory, ActivityHistoryResponse, ActivityHistoryFilterRequest, ActivityHistoryMapper>(dbContext, mapper)
+    : Endpoint<BaseFilterSortPaginateRequest<ActivityHistoryFilterRequest>, List<ActivityHistoryListGroupedByDateResponse>>
 {
-    private readonly ActivityHistoryMapper _mapper = mapper;
+    public virtual string EndpointPath => "filtered-table";
 
-    protected override IQueryable<ActivityHistory> WithIncludes(IQueryable<ActivityHistory> query)
+    public virtual string[] AllowedRoles()
+    {
+        return EndpointHelper.GetUserOrHigherRoles();
+    }
+
+
+    public override void Configure()
+    {
+        const string entityName = nameof(ActivityHistory);
+        Post($"/{entityName.Kebaberize()}/{EndpointPath}");
+        Summary(s =>
+        {
+            s.Summary = $"Get filtered and paginated {entityName} list";
+            s.Description = $"Retrieves a filtered, paginated and sorted list of {entityName}";
+            Roles(AllowedRoles());
+
+            s.Response<List<ActivityHistoryListGroupedByDateResponse>>(200, "Success");
+            s.Response(400, "Bad request");
+        });
+    }
+
+    public override async Task HandleAsync(BaseFilterSortPaginateRequest<ActivityHistoryFilterRequest> req, CancellationToken ct)
+    {
+        try
+        {
+            var query = WithIncludes(dbContext.ActivityHistories.AsNoTracking());
+
+            query = query.FilteredByUser(User.GetId());
+
+            if (req is { UseFilter: true, Filter: not null })
+            {
+                query = ApplyCustomFiltering(query, req.Filter);
+            }
+
+            var history = await mapper.ProjectToResponse(query)
+                .GroupBy(hr => hr.StartTimestamp.ToUniversalTime().Date)
+                .Select(group => new ActivityHistoryListGroupedByDateResponse
+                {
+                    Date = group.Key,
+                    // Ensure IEnumerable<T> in final projection
+                    HistoryResponseList = group.OrderBy(h => h.StartTimestamp).ToList()
+                })
+                .OrderBy(response => response.Date)
+                .ToListAsync(ct);
+
+            await SendOkAsync(history, ct);
+        }
+        catch (Exception ex)
+        {
+            AddError($"An error occurred while retrieving filtered data: {ex.Message}");
+            await SendErrorsAsync(500, ct);
+        }
+    }
+
+    protected IQueryable<ActivityHistory> WithIncludes(IQueryable<ActivityHistory> query)
     {
         return query
             .Include(ah => ah.Activity)
@@ -24,7 +84,7 @@ public class GetActivityHistoriesFilteredPaginatedEndpoint(
             .ThenInclude(a => a.Category);
     }
 
-    protected override IQueryable<ActivityHistory> ApplyCustomFiltering(IQueryable<ActivityHistory> query, ActivityHistoryFilterRequest filter)
+    protected IQueryable<ActivityHistory> ApplyCustomFiltering(IQueryable<ActivityHistory> query, ActivityHistoryFilterRequest filter)
     {
         if (filter.ActivityId.HasValue)
         {
@@ -42,7 +102,7 @@ public class GetActivityHistoriesFilteredPaginatedEndpoint(
         {
             query = query.Include(ah => ah.Activity).ThenInclude(a => a.TodoList);
 
-            query = query.Where(ah=> ah.Activity.TodoList != null == filter.IsFromTodoList.Value );
+            query = query.Where(ah => ah.Activity.TodoList != null == filter.IsFromTodoList.Value);
             if (filter.TaskUrgencyId.HasValue && filter.IsFromTodoList.Value)
             {
                 query = query.Where(ah => ah.Activity.TodoList!.TaskUrgencyId == filter.TaskUrgencyId.Value);
