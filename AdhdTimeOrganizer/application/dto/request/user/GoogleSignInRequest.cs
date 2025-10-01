@@ -8,5 +8,5 @@ public record GoogleSignInRequest : ICreateRequest
     [Required] public required string Timezone { get; init; }
 
     [Required]
-    public string Code { get; init; }
+    public required string Code { get; init; }
 }

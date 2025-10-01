@@ -47,15 +47,21 @@ public static class IdentityServiceExtensions
                 };
             });
 
-
         services.AddAuthorization();
 
         services.AddIdentityCore<User>(options =>
             {
                 options.Password.RequiredLength = 8;
                 options.Password.RequiredUniqueChars = 4;
-                options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.";
+                options.Password.RequireNonAlphanumeric = true;
+                options.Password.RequireDigit = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireLowercase = true;
+
+                // options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.";
                 options.User.RequireUniqueEmail = true;
+                options.SignIn.RequireConfirmedEmail = true;
+
                 options.ClaimsIdentity.UserNameClaimType = ClaimTypes.NameIdentifier;
                 options.ClaimsIdentity.EmailClaimType = ClaimTypes.Email;
             }).AddRoles<UserRole>()
@@ -83,6 +89,11 @@ public static class IdentityServiceExtensions
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return Task.CompletedTask;
             };
+        });
+
+        services.Configure<IdentityOptions>(options =>
+        {
+            options.Tokens.AuthenticatorTokenProvider = TokenOptions.DefaultAuthenticatorProvider;
         });
         return services;
     }

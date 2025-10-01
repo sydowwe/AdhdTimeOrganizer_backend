@@ -61,6 +61,7 @@
       <Folder Include="application\handler\command\user\" />
       <Folder Include="application\mapper\activityPlanning\" />
       <Folder Include="application\mapper\activity\" />
+      <Folder Include="application\preprocessor\" />
       <Folder Include="domain\" />
       <Folder Include="infrastructure\persistence\Migrations\" />
       <Folder Include="infrastructure\persistence\seeder\dev\" />

@@ -27,60 +27,68 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
         var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(req.RecaptchaToken, "login");
         if (recaptchaResult.Failed)
         {
-            AddError("Recaptcha failed.");
-            await SendErrorsAsync(403, ct);
+            AddError("Recaptcha verification failed.");
+            await SendErrorsAsync(400, ct);
             return;
         }
 
         var user = await userManager.FindByEmailAsync(req.Email);
         if (user is null)
         {
-            AddError(r => r.Email, "Email or password is invalid.");
-            await SendNotFoundAsync(ct);
+            // Generic error to prevent user enumeration
+            AddError("Invalid email or password");
+            await SendErrorsAsync(401, ct);
+            return;
+        }
+
+        // Check email confirmation first
+        if (!user.EmailConfirmed)
+        {
+            AddError("Email not confirmed");
+            await SendErrorsAsync(403, ct);
             return;
         }
 
         var result = await signInManager.CheckPasswordSignInAsync(user, req.Password, lockoutOnFailure: true);
+
         if (result.IsLockedOut)
         {
             var lockoutDuration = user.LockoutEnd!.Value - DateTimeOffset.Now;
             var minutes = (int)lockoutDuration.TotalMinutes;
             var seconds = lockoutDuration.Seconds;
-            AddError($"User locked out for {minutes}m {seconds}s");
+            AddError($"Too many failed login attempts. Try again in {minutes}m {seconds}s");
             await SendErrorsAsync(403, ct);
             return;
         }
 
-        if (result.IsNotAllowed)
+        if (user.TwoFactorEnabled)
         {
-            if (!user.EmailConfirmed)
+            var response = new LoginResponse
             {
-                AddError("Email not confirmed.");
-                await SendErrorsAsync(500, ct);
-                return;
-            }
-
-            await userManager.AccessFailedAsync(user);
-            AddError("Too many failed login attempts.");
-            await SendErrorsAsync(500, ct);
+                RequiresTwoFactor = true,
+                Email = user.Email!
+            };
+            await SendOkAsync(response, ct);
             return;
         }
 
-        if (result is { Succeeded: false, RequiresTwoFactor: false })
+        if (!result.Succeeded)
         {
-            AddError(result.ToString());
-            await SendErrorsAsync(500, ct);
+            // Generic error to prevent user enumeration
+            AddError("Invalid email or password");
+            await SendErrorsAsync(401, ct);
             return;
         }
 
+        // Successful login - generate JWT and set cookie
         await jwtService.GenerateJwtAndSetAuthCookie(req.StayLoggedIn, AuthMethodEnum.Password, user, userManager, HttpContext);
 
-        var response = new LoginResponse
+        var successResponse = new LoginResponse
         {
-            RequiresTwoFactor = result.RequiresTwoFactor,
+            RequiresTwoFactor = false,
             Email = user.Email!
         };
 
-        await SendOkAsync(response, ct);
+        await SendOkAsync(successResponse, ct);
     }
 }

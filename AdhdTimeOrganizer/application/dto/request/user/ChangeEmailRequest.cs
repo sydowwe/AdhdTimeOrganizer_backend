@@ -4,5 +4,5 @@ namespace AdhdTimeOrganizer.application.dto.request.user;
 
 public record ChangeEmailRequest : VerifyUserRequest
 {
-    [Required] public string NewEmail { get; init; }
+    [Required] public required string NewEmail { get; init; }
 }

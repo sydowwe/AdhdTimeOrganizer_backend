@@ -10,7 +10,7 @@ public class ResendConfirmationEmailEndpoint(IUserEmailSenderService emailSender
 {
     public override void Configure()
     {
-        Post("/user/resend-confirmation-email/{userId:required:long}");
+        Post("user/resend-confirmation-email/{userId:required:long}");
         AllowAnonymous();
     }
 
@@ -39,7 +39,7 @@ public class ResendConfirmationEmailEndpoint(IUserEmailSenderService emailSender
 
         var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
         
-        await emailSender.SendConfirmationLinkAsync(user, user.Email!, token);
+        await emailSender.SendConfirmationLinkAsync(user, token);
         
         await SendOkAsync("Confirmation email has been resent successfully", ct);
     }

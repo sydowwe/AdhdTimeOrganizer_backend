@@ -4,7 +4,7 @@ namespace AdhdTimeOrganizer.application.dto.request.user;
 
 public record ResetPasswordRequest : IMyRequest
 {
-    public long UserId { get; set; }
-    public string Token { get; set; }
-    public string NewPassword { get; set; }
+    public required long UserId { get; set; }
+    public required string Token { get; set; }
+    public required string NewPassword { get; set; }
 }

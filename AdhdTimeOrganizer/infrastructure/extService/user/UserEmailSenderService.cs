@@ -9,7 +9,7 @@ public class UserEmailSenderService(IConfiguration configuration) : EmailSenderS
 {
     private readonly string _templatePath = Path.Combine(Directory.GetCurrentDirectory(), "infrastructure", "templates", "email");
 
-    public async Task SendConfirmationLinkAsync(User user, string email, string token)
+    public async Task SendConfirmationLinkAsync(User user, string token)
     {
         var confirmationLink =
             $"{Helper.GetEnvVar("PAGE_URL")}/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
@@ -21,10 +21,25 @@ public class UserEmailSenderService(IConfiguration configuration) : EmailSenderS
             .Replace("{{ConfirmationLink}}", confirmationLink)
             .Replace("{{CurrentYear}}", DateTime.Now.Year.ToString());
 
-        await SendEmailAsync(email, $"Confirm your email for {appName}", htmlContent);
+        await SendEmailAsync(user.Email!, $"Confirm your email for {appName}", htmlContent);
     }
 
-    public async Task SendPasswordResetLinkAsync(User user, string email, string resetLink)
+    public async Task SendEmailChangeConfirmationAsync(User user, string newEmail, string token)
+    {
+        var confirmationLink =
+            $"{Helper.GetEnvVar("PAGE_URL")}/confirm-email-change?userId={user.Id}&email={Uri.EscapeDataString(newEmail)}&token={Uri.EscapeDataString(token)}";
+        var template = await File.ReadAllTextAsync(Path.Combine(_templatePath, "ConfirmEmail.html"));
+        var htmlContent = template
+            .Replace("{{AppName}}", appName)
+            .Replace("{{AppLogoUrl}}", appLogo)
+            .Replace("{{Email}}", user.Email)
+            .Replace("{{ConfirmationLink}}", confirmationLink)
+            .Replace("{{CurrentYear}}", DateTime.Now.Year.ToString());
+
+        await SendEmailAsync(user.Email!, $"Confirm your email for {appName}", htmlContent);
+    }
+
+    public async Task SendPasswordResetLinkAsync(User user, string resetLink)
     {
         var template = await File.ReadAllTextAsync(Path.Combine(_templatePath, "ResetPassword.html"));
         var htmlContent = template
@@ -34,10 +49,10 @@ public class UserEmailSenderService(IConfiguration configuration) : EmailSenderS
             .Replace("{{ResetLink}}", resetLink)
             .Replace("{{CurrentYear}}", DateTime.Now.Year.ToString());
 
-        await SendEmailAsync(email, $"Reset your {appName} password", htmlContent);
+        await SendEmailAsync(user.Email!, $"Reset your {appName} password", htmlContent);
     }
 
-    public async Task SendPasswordResetCodeAsync(User user, string email, string resetCode)
+    public async Task SendPasswordResetCodeAsync(User user, string resetCode)
     {
         var template = await File.ReadAllTextAsync(Path.Combine(_templatePath, "ResetPasswordCode.html"));
         var htmlContent = template
@@ -47,6 +62,6 @@ public class UserEmailSenderService(IConfiguration configuration) : EmailSenderS
             .Replace("{{ResetCode}}", resetCode)
             .Replace("{{CurrentYear}}", DateTime.Now.Year.ToString());
 
-        await SendEmailAsync(email, $"Your {appName} password reset code", htmlContent);
+        await SendEmailAsync(user.Email!, $"Your {appName} password reset code", htmlContent);
     }
 }

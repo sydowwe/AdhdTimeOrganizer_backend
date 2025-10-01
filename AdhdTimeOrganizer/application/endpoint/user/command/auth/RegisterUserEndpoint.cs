@@ -107,7 +107,7 @@ public class RegisterUserEndpoint(
         if (!user.EmailConfirmed)
         {
             var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
-            await emailSender.SendConfirmationLinkAsync(user, user.Email!, token);
+            await emailSender.SendConfirmationLinkAsync(user, token);
         }
     }
 }

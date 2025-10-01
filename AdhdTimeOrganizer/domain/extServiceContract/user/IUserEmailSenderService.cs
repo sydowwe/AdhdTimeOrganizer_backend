@@ -5,7 +5,8 @@ namespace AdhdTimeOrganizer.domain.extServiceContract.user;
 
 public interface IUserEmailSenderService : IEmailSenderService
 {
-    Task SendConfirmationLinkAsync(User user, string email, string token);
-    Task SendPasswordResetLinkAsync(User user, string email, string resetLink);
-    Task SendPasswordResetCodeAsync(User user, string email, string resetCode);
+    Task SendConfirmationLinkAsync(User user, string token);
+    Task SendEmailChangeConfirmationAsync(User user, string newEmail, string token);
+    Task SendPasswordResetLinkAsync(User user, string resetLink);
+    Task SendPasswordResetCodeAsync(User user, string resetCode);
 }
