@@ -103,9 +103,9 @@ public class GetActivityHistoriesFilteredPaginatedEndpoint(
             query = query.Include(ah => ah.Activity).ThenInclude(a => a.TodoList);
 
             query = query.Where(ah => ah.Activity.TodoList != null == filter.IsFromTodoList.Value);
-            if (filter.TaskUrgencyId.HasValue && filter.IsFromTodoList.Value)
+            if (filter.TaskPriorityId.HasValue && filter.IsFromTodoList.Value)
             {
-                query = query.Where(ah => ah.Activity.TodoList!.TaskUrgencyId == filter.TaskUrgencyId.Value);
+                query = query.Where(ah => ah.Activity.TodoList!.TaskPriorityId == filter.TaskPriorityId.Value);
             }
         }
 

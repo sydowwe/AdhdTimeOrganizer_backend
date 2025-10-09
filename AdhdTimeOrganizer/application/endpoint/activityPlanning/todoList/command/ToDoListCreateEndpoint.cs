@@ -20,7 +20,7 @@ public class TodoListCreateEndpoint(AppCommandDbContext dbContext, TodoListMappe
 
     protected override async Task AfterMapping(TodoList entity, CreateTodoListRequest req, CancellationToken ct = default)
     {
-        entity.DisplayOrder = await _dbContext.TodoLists.GetNextDisplayOrder(_settings, User.GetId(), entity.TaskUrgencyId, ct);
+        entity.DisplayOrder = await _dbContext.TodoLists.GetNextDisplayOrder(_settings, User.GetId(), entity.TaskPriorityId, ct);
         if (req.TotalCount.HasValue)
         {
             entity.DoneCount = 0;

@@ -9,7 +9,7 @@ public class ActivityCreatedIsOnTodoListEventHandler(AppCommandDbContext dbConte
 {
     public async Task HandleAsync(ActivityCreatedIsOnTodoListEvent eventModel, CancellationToken ct)
     {
-        var toDoList = new TodoList { UserId = eventModel.UserId, ActivityId = eventModel.ActivityId, TaskUrgencyId = eventModel.TaskUrgencyId };
+        var toDoList = new TodoList { UserId = eventModel.UserId, ActivityId = eventModel.ActivityId, TaskPriorityId = eventModel.TaskPriorityId };
         var result = await dbContext.AddEntityAsync(toDoList, ct);
         if (result.Failed)
         {

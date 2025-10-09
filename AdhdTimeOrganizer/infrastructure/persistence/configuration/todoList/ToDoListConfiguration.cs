@@ -16,14 +16,14 @@ public class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
         builder.IsManyWithOneUser(u => u.TodoListColl);
         builder.IsOneWithOneActivity(a=>a.TodoList);
 
-        builder.HasOne(r => r.TaskUrgency)
+        builder.HasOne(r => r.TaskPriority)
             .WithMany(t=>t.TodoListColl)
-            .HasForeignKey(r => r.TaskUrgencyId)
+            .HasForeignKey(r => r.TaskPriorityId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(t => new { userId = t.UserId, activityId = t.ActivityId })
             .IsUnique();
 
-        builder.HasIndex(t => new { userId = t.UserId, taskUrgencyId = t.TaskUrgencyId });
+        builder.HasIndex(t => new { userId = t.UserId, TaskPriorityId = t.TaskPriorityId });
     }
 }

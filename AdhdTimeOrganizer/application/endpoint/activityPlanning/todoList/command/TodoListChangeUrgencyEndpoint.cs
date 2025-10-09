@@ -33,7 +33,7 @@ public class TodoListChangeUrgencyEndpoint(AppCommandDbContext dbContext) : Endp
             return;
         }
 
-        entity.TaskUrgencyId = Route<long>("urgencyId");
+        entity.TaskPriorityId = Route<long>("urgencyId");
 
         dbContext.TodoLists.Update(entity);
         await dbContext.SaveChangesAsync(ct);

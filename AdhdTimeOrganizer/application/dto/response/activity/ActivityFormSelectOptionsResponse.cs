@@ -6,6 +6,6 @@ public record ActivityFormSelectOptionsResponse : SelectOptionResponse
 {
     public required SelectOptionResponse RoleOption { get; init; }
     public SelectOptionResponse? CategoryOption { get; init; }
-    public SelectOptionResponse? TaskUrgencyOption { get; init; }
+    public SelectOptionResponse? TaskPriorityOption { get; init; }
     public SelectOptionResponse? RoutineTimePeriodOption { get; init; }
 }

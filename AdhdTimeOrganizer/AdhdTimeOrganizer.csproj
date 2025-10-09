@@ -53,8 +53,8 @@
       <Folder Include="application\endpoint\activityPlanning\routineTodoList\query\" />
       <Folder Include="application\endpoint\activityPlanning\taskPlanner\command\" />
       <Folder Include="application\endpoint\activityPlanning\taskPlanner\query\" />
-      <Folder Include="application\endpoint\activityPlanning\taskUrgency\command\" />
-      <Folder Include="application\endpoint\activityPlanning\taskUrgency\query\" />
+      <Folder Include="application\endpoint\activityPlanning\TaskPriority\command\" />
+      <Folder Include="application\endpoint\activityPlanning\TaskPriority\query\" />
       <Folder Include="application\endpoint\activity\activity\query\" />
       <Folder Include="application\endpoint\activity\role\command\" />
       <Folder Include="application\endpoint\activity\role\query\" />

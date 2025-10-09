@@ -15,7 +15,7 @@ public class ActivityHistoryFilterRequest : IFilterRequest
     public DateTime? DateFrom { get; set; }
     public DateTime? DateTo { get; set; }
     public bool? IsFromTodoList { get; set; }
-    public long? TaskUrgencyId { get; set; }
+    public long? TaskPriorityId { get; set; }
     public bool? IsFromRoutineTodoList { get; set; }
     public long? RoutineTimePeriodId { get; set; }
     public bool? IsUnavoidable { get; set; }

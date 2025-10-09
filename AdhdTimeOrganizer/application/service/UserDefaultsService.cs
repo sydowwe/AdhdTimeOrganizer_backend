@@ -32,10 +32,10 @@ public class UserDefaultsService(AppCommandDbContext dbContext, ILogger<UserDefa
     {
         await dbContext.TaskUrgencies.AddRangeAsync(
             [
-                new TaskUrgency { UserId = userId, Text = "Today", Color = "#FF5252", Priority = 1 }, // Red
-                new TaskUrgency { UserId = userId, Text = "This week", Color = "#FFA726", Priority = 2 }, // Orange
-                new TaskUrgency { UserId = userId, Text = "This month", Color = "#FFD600", Priority = 3 }, // Yellow
-                new TaskUrgency { UserId = userId, Text = "This year", Color = "#4CAF50", Priority = 4 }
+                new TaskPriority { UserId = userId, Text = "Today", Color = "#FF5252", Priority = 1 }, // Red
+                new TaskPriority { UserId = userId, Text = "This week", Color = "#FFA726", Priority = 2 }, // Orange
+                new TaskPriority { UserId = userId, Text = "This month", Color = "#FFD600", Priority = 3 }, // Yellow
+                new TaskPriority { UserId = userId, Text = "This year", Color = "#4CAF50", Priority = 4 }
             ], ct
         );
     }

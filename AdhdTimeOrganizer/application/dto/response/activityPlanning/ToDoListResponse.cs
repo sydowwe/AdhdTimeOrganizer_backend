@@ -4,5 +4,5 @@ namespace AdhdTimeOrganizer.application.dto.response.activityPlanning;
 
 public record TodoListResponse : BaseTodoListResponse
 {
-    public required TaskUrgencyResponse TaskUrgency { get; init; }
+    public required TaskPriorityResponse TaskPriority { get; init; }
 }

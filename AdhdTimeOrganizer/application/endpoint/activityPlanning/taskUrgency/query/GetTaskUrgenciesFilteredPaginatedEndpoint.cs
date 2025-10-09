@@ -5,16 +5,16 @@ using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskUrgency.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.TaskPriority.query;
 
 public class GetTaskUrgenciesFilteredPaginatedEndpoint(
     AppCommandDbContext dbContext,
-    TaskUrgencyMapper mapper) 
-    : BaseFilteredPaginatedEndpoint<TaskUrgency, TaskUrgencyResponse, TaskUrgencyFilterRequest, TaskUrgencyMapper>(dbContext, mapper)
+    TaskPriorityMapper mapper) 
+    : BaseFilteredPaginatedEndpoint<TaskPriority, TaskPriorityResponse, TaskPriorityFilterRequest, TaskPriorityMapper>(dbContext, mapper)
 {
-    private readonly TaskUrgencyMapper _mapper = mapper;
+    private readonly TaskPriorityMapper _mapper = mapper;
 
-    protected override IQueryable<TaskUrgency> ApplyCustomFiltering(IQueryable<TaskUrgency> query, TaskUrgencyFilterRequest filter)
+    protected override IQueryable<TaskPriority> ApplyCustomFiltering(IQueryable<TaskPriority> query, TaskPriorityFilterRequest filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Text))
         {

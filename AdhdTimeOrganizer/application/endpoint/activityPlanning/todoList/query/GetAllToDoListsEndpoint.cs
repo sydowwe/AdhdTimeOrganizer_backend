@@ -19,7 +19,7 @@ public class GetAllTodoListsEndpoint(
                 .ThenInclude(a => a.Role)
             .Include(tdl => tdl.Activity)
                 .ThenInclude(a => a.Category)
-            .Include(tdl => tdl.TaskUrgency);
+            .Include(tdl => tdl.TaskPriority);
     }
 
     protected override IQueryable<TodoList> Sort(IQueryable<TodoList> query)

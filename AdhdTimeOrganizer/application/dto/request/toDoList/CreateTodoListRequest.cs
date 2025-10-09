@@ -6,5 +6,5 @@ namespace AdhdTimeOrganizer.application.dto.request.toDoList;
 public record CreateTodoListRequest : BaseCreateTodoListRequest
 {
     [Required]
-    public long TaskUrgencyId { get; init; }
+    public long TaskPriorityId { get; init; }
 }

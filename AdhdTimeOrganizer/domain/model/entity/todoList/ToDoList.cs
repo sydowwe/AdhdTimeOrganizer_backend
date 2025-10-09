@@ -6,6 +6,6 @@ namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 public class TodoList : BaseTodoList
 {
 
-    public required long TaskUrgencyId { get; set; }
-    public TaskUrgency TaskUrgency { get; set; } = null!;
+    public required long TaskPriorityId { get; set; }
+    public TaskPriority TaskPriority { get; set; } = null!;
 }

@@ -2,7 +2,7 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class TaskUrgencyFilterRequest : IFilterRequest
+public class TaskPriorityFilterRequest : IFilterRequest
 {
     public string? Text { get; set; }
     public string? Color { get; set; }

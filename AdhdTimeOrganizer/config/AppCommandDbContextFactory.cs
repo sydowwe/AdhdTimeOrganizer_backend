@@ -11,7 +11,7 @@ public class AppCommandDbContextFactory : IDesignTimeDbContextFactory<AppCommand
     {
         Env.Load();
         var optionsBuilder = new DbContextOptionsBuilder<AppCommandDbContext>();
-        optionsBuilder.UseNpgsql(DatabaseStringsHelper.GetCommandDatabaseConnectionString).UseSnakeCaseNamingConvention();
+        optionsBuilder.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString).UseSnakeCaseNamingConvention();
 
         return new AppCommandDbContext(optionsBuilder.Options, null, null);
     }

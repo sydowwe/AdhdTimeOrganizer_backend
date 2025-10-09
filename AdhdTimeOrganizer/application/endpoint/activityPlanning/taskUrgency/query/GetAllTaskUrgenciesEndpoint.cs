@@ -4,11 +4,11 @@ using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskUrgency.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.TaskPriority.query;
 
 public class GetAllTaskUrgenciesEndpoint(
     AppCommandDbContext dbContext,
-    TaskUrgencyMapper mapper)
-    : BaseGetAllEndpoint<TaskUrgency, TaskUrgencyResponse, TaskUrgencyMapper>(dbContext, mapper)
+    TaskPriorityMapper mapper)
+    : BaseGetAllEndpoint<TaskPriority, TaskPriorityResponse, TaskPriorityMapper>(dbContext, mapper)
 {
 }

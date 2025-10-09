@@ -19,6 +19,6 @@ public class GetTodoListByIdEndpoint(
                 .ThenInclude(a => a.Role)
             .Include(tdl => tdl.Activity)
                 .ThenInclude(a => a.Category)
-            .Include(tdl => tdl.TaskUrgency);
+            .Include(tdl => tdl.TaskPriority);
     }
 }

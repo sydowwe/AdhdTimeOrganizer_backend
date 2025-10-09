@@ -625,7 +625,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskUrgency", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskPriority", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -725,7 +725,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnName("modified_timestamp")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long>("TaskUrgencyId")
+                    b.Property<long>("TaskPriorityId")
                         .HasColumnType("bigint")
                         .HasColumnName("task_urgency_id");
 
@@ -750,14 +750,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_todo_list_activity_id");
 
-                    b.HasIndex("TaskUrgencyId")
+                    b.HasIndex("TaskPriorityId")
                         .HasDatabaseName("ix_todo_list_task_urgency_id");
 
                     b.HasIndex("UserId", "ActivityId")
                         .IsUnique()
                         .HasDatabaseName("ix_todo_list_user_id_activity_id");
 
-                    b.HasIndex("UserId", "TaskUrgencyId")
+                    b.HasIndex("UserId", "TaskPriorityId")
                         .HasDatabaseName("ix_todo_list_user_id_task_urgency_id");
 
                     b.ToTable("todo_list", "public", t =>
@@ -1243,10 +1243,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskUrgency", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskPriority", b =>
                 {
                     b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
-                        .WithMany("TaskUrgencyList")
+                        .WithMany("TaskPriorityList")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
@@ -1264,9 +1264,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_todo_list_activity_activity_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskUrgency", "TaskUrgency")
+                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskPriority", "TaskPriority")
                         .WithMany("TodoListColl")
-                        .HasForeignKey("TaskUrgencyId")
+                        .HasForeignKey("TaskPriorityId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_todo_list_task_urgency_task_urgency_id");
@@ -1280,7 +1280,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.Navigation("Activity");
 
-                    b.Navigation("TaskUrgency");
+                    b.Navigation("TaskPriority");
 
                     b.Navigation("User");
                 });
@@ -1372,7 +1372,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("RoutineTodoListColl");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskUrgency", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskPriority", b =>
                 {
                     b.Navigation("TodoListColl");
                 });
@@ -1395,7 +1395,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.Navigation("RoutineTodoListColl");
 
-                    b.Navigation("TaskUrgencyList");
+                    b.Navigation("TaskPriorityList");
 
                     b.Navigation("TodoListColl");
 

@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.application.dto.request.@base;
 
 namespace AdhdTimeOrganizer.application.dto.request.toDoList;
 
-public record TaskUrgencyRequest : TextColorRequest
+public record TaskPriorityRequest : TextColorRequest
 {
     [Required]
     public short Priority { get; init; }

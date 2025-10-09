@@ -77,7 +77,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
 
     // Database configuration
     services.AddDbContext<AppCommandDbContext>(options =>
-        options.UseNpgsql(DatabaseStringsHelper.GetCommandDatabaseConnectionString, b => b.MigrationsAssembly("MojaDigitalnaFirma.Sandbox.AdminPortal"))
+        options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly("MojaDigitalnaFirma.Sandbox.AdminPortal"))
             .UseSnakeCaseNamingConvention()
             .LogTo(Console.WriteLine));
 

@@ -62,7 +62,7 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(AppCommandD
                 CategoryOption = a.CategoryId.HasValue && a.CategoryName != null 
                     ? new SelectOptionResponse(a.CategoryId.Value, a.CategoryName)
                     : null,
-                TaskUrgencyOption = null,
+                TaskPriorityOption = null,
                 RoutineTimePeriodOption = null
             })
             .ToList();

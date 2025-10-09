@@ -33,7 +33,7 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public ICollection<WebExtensionData> WebExtensionDataList { get; set; } = new List<WebExtensionData>();
 
     public ICollection<TodoList> TodoListColl { get; set; } = new List<TodoList>();
-    public ICollection<TaskUrgency> TaskUrgencyList { get; set; } = new List<TaskUrgency>();
+    public ICollection<TaskPriority> TaskPriorityList { get; set; } = new List<TaskPriority>();
     public ICollection<PlannerTask> PlannerTaskList { get; set; } = new List<PlannerTask>();
     public ICollection<RoutineTodoList> RoutineTodoListColl { get; set; } = new List<RoutineTodoList>();
     public ICollection<RoutineTimePeriod> RoutineTimePeriodList { get; set; } = new List<RoutineTimePeriod>();
