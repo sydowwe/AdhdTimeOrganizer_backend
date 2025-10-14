@@ -24,6 +24,7 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public override bool PhoneNumberConfirmed { get; set; }
 
     // Navigation properties
+    public ICollection<Calendar> Calendar { get; set; } = new List<Calendar>();
     public ICollection<Activity> ActivityList { get; set; } = new List<Activity>();
     public ICollection<ActivityCategory> CategoryList { get; set; } = new List<ActivityCategory>();
     public ICollection<ActivityRole> RoleList { get; set; } = new List<ActivityRole>();
