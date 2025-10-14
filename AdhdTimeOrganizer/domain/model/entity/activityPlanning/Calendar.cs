@@ -5,7 +5,7 @@ namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 public class Calendar : BaseEntityWithUser
 {
-    public DateOnly Date { get; set; }
+    public required DateOnly Date { get; set; }
 
     // Day metadata
     public DayType DayType { get; set; } // Workday, Weekend, Holiday, Vacation
@@ -17,7 +17,7 @@ public class Calendar : BaseEntityWithUser
 
     // Planning status
     public bool IsPlanned { get; set; }
-    public int? AppliedTemplateId { get; set; }
+    public long? AppliedTemplateId { get; set; }
     public string? AppliedTemplateName { get; set; }
 
     // Day-specific notes

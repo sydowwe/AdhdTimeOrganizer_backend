@@ -6,7 +6,7 @@ namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 public class TaskPlannerDayTemplate : BaseEntityWithUser
 {
     // Template info
-    public string Name { get; set; } // "HomeOffice", "Office", "Weekend", "Sick Day"
+    public required string Name { get; set; } // "HomeOffice", "Office", "Weekend", "Sick Day"
     public string? Description { get; set; }
     public string? Icon { get; set; } // Optional icon/emoji
     public bool IsActive { get; set; } // Can be disabled without deleting

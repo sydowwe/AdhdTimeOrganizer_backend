@@ -17,4 +17,5 @@ public partial class PlannerTaskMapper : IBaseSimpleCrudMapper<PlannerTask, Plan
     public partial void UpdateEntity(PlannerTaskRequest request, PlannerTask entity);
     public partial IQueryable<PlannerTaskResponse> ProjectToResponse(IQueryable<PlannerTask> source);
 
+    private string MapStatus(TaskStatus status) => status.ToString();
 }

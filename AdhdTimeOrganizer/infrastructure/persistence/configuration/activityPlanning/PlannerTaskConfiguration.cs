@@ -12,13 +12,35 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
 
         builder.Property(p => p.IsDone).HasDefaultValue(false).IsRequired();
         builder.IsManyWithOneUser(u => u.PlannerTaskList);
-        builder.IsManyWithOneActivity(a=>a.PlannerTaskList);
+        builder.IsManyWithOneActivity(a => a.PlannerTaskList);
 
-        builder.Property(p => p.StartTimestamp).IsRequired();
-        builder.Property(p => p.MinuteLength).IsRequired();
-        builder.Property(p => p.Color).HasMaxLength(7);
+        builder.Property(p => p.StartTime).IsRequired();
+        builder.Property(p => p.EndTime).IsRequired();
+        builder.Property(p => p.IsBackground).IsRequired();
+        builder.Property(p => p.IsOptional).HasDefaultValue(false).IsRequired();
+        builder.Property(p => p.Status).IsRequired();
+        builder.Property(p => p.IsFromTemplate).HasDefaultValue(false).IsRequired();
 
-        builder.HasIndex(p => new { userId = p.UserId, startTimestamp = p.StartTimestamp })
-            .IsUnique();
+        builder.Property(p => p.Location).HasMaxLength(200);
+        builder.Property(p => p.Notes).HasMaxLength(1000);
+        builder.Property(p => p.SkipReason).HasMaxLength(500);
+
+        builder.HasOne(p => p.Calendar)
+            .WithMany(c => c.Tasks)
+            .HasForeignKey(p => p.CalendarId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.Priority)
+            .WithMany()
+            .HasForeignKey(p => p.PriorityId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(p => p.Todolist)
+            .WithMany()
+            .HasForeignKey(p => p.TodolistId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(p => new { p.UserId, p.CalendarId, p.StartTime });
+        builder.HasIndex(p => p.Status);
     }
 }

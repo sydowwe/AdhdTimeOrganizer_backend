@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlanner.command;
 
-public class PlannerTaskDeleteEndpoint(AppCommandDbContext dbContext)
+public class DeletePlannerTaskEndpoint(AppCommandDbContext dbContext)
     : BaseDeleteEndpoint<PlannerTask>(dbContext);

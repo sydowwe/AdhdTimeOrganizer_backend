@@ -7,7 +7,7 @@ public class PlannerTask : BaseEntityWithIsDone
     public required TimeOnly StartTime { get; set; }
     public required TimeOnly EndTime { get; set; }
     public required bool IsBackground { get; set; }
-    public bool IsOptional { get; set; }
+    public required bool IsOptional { get; set; }
 
     public TaskStatus Status { get; set; } // Pending, InProgress, Completed, Skipped
     public TimeOnly? ActualStartTime { get; set; }
@@ -22,7 +22,7 @@ public class PlannerTask : BaseEntityWithIsDone
     public string? Notes { get; set; }
     public string? SkipReason { get; set; }
 
-    public int CalendarId { get; set; }
+    public long CalendarId { get; set; }
     public virtual Calendar Calendar { get; set; } = null!;
     public long? PriorityId { get; set; }
     public TaskPriority? Priority { get; set; }

@@ -5,7 +5,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlanner.query;
 
-public class GetPlannerTaskSelectOptionsEndpoint(
+public class GetSelectOptionsPlannerTaskEndpoint(
     AppCommandDbContext appDbContext,
     PlannerTaskMapper mapper)
     : BaseGetSelectOptionsEndpoint<PlannerTask, PlannerTaskMapper>(appDbContext, mapper)
