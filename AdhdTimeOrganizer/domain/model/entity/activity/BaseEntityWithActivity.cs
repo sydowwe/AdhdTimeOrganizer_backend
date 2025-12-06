@@ -5,5 +5,5 @@ namespace AdhdTimeOrganizer.domain.model.entity.activity;
 public abstract class BaseEntityWithActivity : BaseEntityWithUser
 {
     public long ActivityId { get; set; }
-    public virtual Activity Activity { get; set; }
+    public Activity Activity { get; set; } = null!;
 }

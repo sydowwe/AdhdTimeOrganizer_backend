@@ -1,0 +1,22 @@
+using AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
+using AdhdTimeOrganizer.application.endpoint.@base.read;
+using AdhdTimeOrganizer.application.mapper;
+using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.infrastructure.persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace AdhdTimeOrganizer.application.endpoint.templateTask.query;
+
+public class GetByIdTemplateTaskEndpoint(AppCommandDbContext dbContext, TemplateTaskMapper mapper)
+    : BaseGetByIdEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse, TemplateTaskMapper>(dbContext, mapper)
+{
+    protected override IQueryable<TemplatePlannerTask> WithIncludes(IQueryable<TemplatePlannerTask> query)
+    {
+        return query
+            .Include(t => t.Activity)
+            .ThenInclude(a => a.Role)
+            .Include(t => t.Activity)
+            .ThenInclude(a => a.Category)
+            .Include(t => t.Priority);
+    }
+}

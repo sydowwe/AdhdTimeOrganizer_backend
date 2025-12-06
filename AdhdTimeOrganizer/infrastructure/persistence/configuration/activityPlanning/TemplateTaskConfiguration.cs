@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
 
-public class TemplateTaskConfiguration : IEntityTypeConfiguration<TemplateTask>
+public class TemplateTaskConfiguration : IEntityTypeConfiguration<TemplatePlannerTask>
 {
-    public void Configure(EntityTypeBuilder<TemplateTask> builder)
+    public void Configure(EntityTypeBuilder<TemplatePlannerTask> builder)
     {
         builder.BaseEntityConfigure();
         builder.IsManyWithOneUser();

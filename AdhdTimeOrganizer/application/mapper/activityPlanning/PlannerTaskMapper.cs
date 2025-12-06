@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.plannerTask;
+using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.dto.response.activityPlanning;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.mapper.@interface;
@@ -18,4 +19,5 @@ public partial class PlannerTaskMapper : IBaseSimpleCrudMapper<PlannerTask, Plan
     public partial IQueryable<PlannerTaskResponse> ProjectToResponse(IQueryable<PlannerTask> source);
 
     private string MapStatus(TaskStatus status) => status.ToString();
+    private TaskStatus MapStatus(string status) => Enum.Parse<TaskStatus>(status);
 }

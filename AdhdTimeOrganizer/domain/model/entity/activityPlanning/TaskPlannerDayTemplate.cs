@@ -14,13 +14,13 @@ public class TaskPlannerDayTemplate : BaseEntityWithUser
     public TimeOnly? DefaultWakeUpTime { get; set; }
     public TimeOnly? DefaultBedTime { get; set; }
 
-    // Usage tracking
-    public int UsageCount { get; set; } // How often has this been applied
-    public DateTimeOffset? LastUsedAt { get; set; }
-
     // Template customization
     public DayType SuggestedForDayType { get; set; } // Workday, Weekend, etc.
     public List<string> Tags { get; set; } = new(); // ["productive", "relaxed", "minimal"]
 
-    public virtual ICollection<TemplateTask> Tasks { get; set; } = new List<TemplateTask>();
+    // Usage tracking
+    public int UsageCount { get; set; } // How often has this been applied
+    public DateTimeOffset? LastUsedAt { get; set; }
+
+    public virtual ICollection<TemplatePlannerTask> Tasks { get; set; } = new List<TemplatePlannerTask>();
 }
