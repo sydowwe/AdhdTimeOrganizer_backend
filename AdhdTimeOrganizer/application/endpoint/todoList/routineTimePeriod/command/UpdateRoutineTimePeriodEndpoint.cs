@@ -8,4 +8,4 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.routineTimePeriod.command;
 
 public class UpdateRoutineTimePeriodEndpoint(AppCommandDbContext dbContext, RoutineTimePeriodMapper mapper)
-    : BaseUpdateEndpoint<RoutineTimePeriod, RoutineTimePeriodRequest, RoutineTimePeriodResponse, RoutineTimePeriodMapper>(dbContext, mapper);
+    : BaseUpdateEndpoint<RoutineTimePeriod, RoutineTimePeriodRequest, RoutineTimePeriodMapper>(dbContext, mapper);

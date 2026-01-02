@@ -8,6 +8,6 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.taskPlannerDayTemplate.command;
 
 public class UpdateTaskPlannerDayTemplateEndpoint(AppCommandDbContext dbContext, TaskPlannerDayTemplateMapper mapper)
-    : BaseUpdateEndpoint<TaskPlannerDayTemplate, TaskPlannerDayTemplateRequest, TaskPlannerDayTemplateResponse, TaskPlannerDayTemplateMapper>(dbContext, mapper)
+    : BaseUpdateEndpoint<TaskPlannerDayTemplate, TaskPlannerDayTemplateRequest, TaskPlannerDayTemplateMapper>(dbContext, mapper)
 {
 }

@@ -51,7 +51,7 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
         }
         catch (Exception ex)
         {
-            var result = DbUtils.HandleException(ex, nameof(HandleAsync));
+            var result = DbUtils.HandleException(ex, "Create");
             AddError(result.ErrorMessage!);
             await SendErrorsAsync(400, ct);
         }

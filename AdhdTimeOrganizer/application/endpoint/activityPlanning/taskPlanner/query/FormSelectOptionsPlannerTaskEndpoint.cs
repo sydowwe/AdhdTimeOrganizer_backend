@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activity.read;
 public class FormSelectOptionsPlannerTaskEndpoint(AppCommandDbContext appDbContext) 
     : BaseActivityFormSelectOptionsEndpoint<PlannerTask>(appDbContext)
 {
-    public override string EntityRoute => "task-planner";
+    public override string EntityRoute => "planner-task";
 
     protected override IQueryable<Activity> GetBaseQuery(long userId)
     {

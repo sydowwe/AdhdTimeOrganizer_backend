@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.@enum;
 
@@ -18,9 +19,9 @@ public record TaskPlannerDayTemplateRequest : IMyRequest
     [Required]
     public required bool IsActive { get; init; }
 
-    public TimeOnly? DefaultWakeUpTime { get; init; }
+    public TimeDto? DefaultWakeUpTime { get; init; }
 
-    public TimeOnly? DefaultBedTime { get; init; }
+    public TimeDto? DefaultBedTime { get; init; }
 
     [Required]
     public required DayType SuggestedForDayType { get; init; }

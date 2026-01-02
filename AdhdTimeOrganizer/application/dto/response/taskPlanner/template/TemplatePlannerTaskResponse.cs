@@ -6,4 +6,5 @@ namespace AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlanne
 
 public record TemplatePlannerTaskResponse : BasePlannerTaskResponse
 {
+    public required long TemplateId { get; init; }
 }

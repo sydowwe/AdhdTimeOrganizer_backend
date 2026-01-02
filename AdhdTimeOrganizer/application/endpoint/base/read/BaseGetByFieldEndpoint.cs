@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.extensions;
@@ -13,8 +14,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
-public abstract class BaseGetByNameEndpoint<TEntity, TResponse, TMapper>(AppCommandDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<TResponse>
-    where TEntity : class, IEntityWithUser, IEntityWithName
+public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppCommandDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<TResponse>
+    where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
     where TMapper : IBaseResponseMapper<TEntity, TResponse>
 {
@@ -26,11 +27,12 @@ public abstract class BaseGetByNameEndpoint<TEntity, TResponse, TMapper>(AppComm
     }
 
     public virtual bool FilteredByUser => true;
+    protected abstract string FieldName { get; }
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Get($"/{entityName.Kebaberize()}/by-name/{{name}}");
+        Get($"/{entityName.Kebaberize()}/by-{FieldName}/{{value}}");
         Roles(AllowedRoles());
         Summary(s =>
         {
@@ -43,7 +45,14 @@ public abstract class BaseGetByNameEndpoint<TEntity, TResponse, TMapper>(AppComm
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var name = Route<string>("name");
+        var value = Route<string>("value");
+        if (string.IsNullOrEmpty(value))
+        {
+            AddError($"The value parameter is required and cannot be empty. /{typeof(TEntity).Name.Kebaberize()}/by-{FieldName}/{{value}}");
+            await SendErrorsAsync(cancellation: ct);
+            return;
+        }
+
         var dbSet = dbContext.Set<TEntity>();
         var query = WithIncludes(dbSet);
 
@@ -52,7 +61,7 @@ public abstract class BaseGetByNameEndpoint<TEntity, TResponse, TMapper>(AppComm
             query = query.FilteredByUser(User.GetId());
         }
 
-        var entity = await query.FirstOrDefaultAsync(e => e.Name == name, ct);
+        var entity = await query.FirstOrDefaultAsync(FilterQuery(value), ct);
         if (entity == null)
         {
             await SendNotFoundAsync(ct);
@@ -64,4 +73,6 @@ public abstract class BaseGetByNameEndpoint<TEntity, TResponse, TMapper>(AppComm
     }
 
     protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;
+
+    protected abstract Expression<Func<TEntity, bool>> FilterQuery(string value);
 }

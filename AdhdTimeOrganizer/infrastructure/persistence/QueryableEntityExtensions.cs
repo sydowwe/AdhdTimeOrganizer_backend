@@ -66,7 +66,7 @@ public static class QueryableEntityExtensions
         return query.Skip((currentPage - 1) * showPerPage).Take(showPerPage);
     }
 
-    public static IQueryable<TEntity> SortByManyAndPaginate<TEntity>(this IQueryable<TEntity> query, SortByRequest[] sortByList, int itemsPerPage, int page)
+    public static IQueryable<TEntity> SortByMany<TEntity>(this IQueryable<TEntity> query, SortByRequest[] sortByList)
         where TEntity : IEntity
     {
         //WARMING: Can fail with views without id
@@ -84,7 +84,14 @@ public static class QueryableEntityExtensions
             }
         }
 
-        return query.Skip((page - 1) * itemsPerPage).Take(itemsPerPage);
+        return query;
+    }
+
+
+    public static IQueryable<TEntity> SortByManyAndPaginate<TEntity>(this IQueryable<TEntity> query, SortByRequest[] sortByList, int itemsPerPage, int page)
+        where TEntity : IEntity
+    {
+        return query.SortByMany(sortByList).Skip((page - 1) * itemsPerPage).Take(itemsPerPage);
     }
 
 

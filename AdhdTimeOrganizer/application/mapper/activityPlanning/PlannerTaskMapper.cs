@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.plannerTask;
+using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.dto.response.activityPlanning;
 using AdhdTimeOrganizer.application.dto.response.generic;
@@ -20,4 +20,7 @@ public partial class PlannerTaskMapper : IBaseSimpleCrudMapper<PlannerTask, Plan
 
     private string MapStatus(TaskStatus status) => status.ToString();
     private TaskStatus MapStatus(string status) => Enum.Parse<TaskStatus>(status);
+    private DateOnly MapCalendarToDate(Calendar calendar) => calendar.Date;
+    private TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new TimeDto { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
+    private TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new TimeOnly(timeDto.Hours, timeDto.Minutes);
 }

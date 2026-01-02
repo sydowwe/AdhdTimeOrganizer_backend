@@ -1,4 +1,5 @@
-﻿using AdhdTimeOrganizer.application.dto.response.@base;
+﻿using AdhdTimeOrganizer.application.dto.dto;
+using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
 
@@ -6,23 +7,24 @@ namespace AdhdTimeOrganizer.application.dto.response.activityPlanning;
 
 public record CalendarResponse : IdResponse
 {
-    public required DateOnly Date { get; set; }
+    public required DateOnly Date { get; init; }
 
-    public DayType DayType { get; set; }
-    public string? Label { get; set; }
+    public required int DayIndex { get; init; }
+    public required DayType DayType { get; init; }
+    public string? Label { get; init; }
 
-    public TimeOnly? WakeUpTime { get; set; }
-    public TimeOnly? BedTime { get; set; }
+    public TimeDto? WakeUpTime { get; init; }
+    public TimeDto? BedTime { get; init; }
 
-    public bool IsPlanned { get; set; }
-    public long? AppliedTemplateId { get; set; }
-    public string? AppliedTemplateName { get; set; }
+    public long? AppliedTemplateId { get; init; }
+    public string? AppliedTemplateName { get; init; }
 
-    public string? Weather { get; set; }
-    public string? Notes { get; set; }
+    public string? Weather { get; init; }
+    public string? Notes { get; init; }
 
-    public int TotalTasks { get; set; }
-    public int CompletedTasks { get; set; }
+    // public required virtual ICollection<PlannerTaskResponse> Tasks { get; init; }
 
-    public int CompletionRate => TotalTasks > 0 ? (CompletedTasks * 100) / TotalTasks : 0;
+    public required int TotalTasks { get; init; }
+    public required int CompletedTasks { get; init; }
+    public required int CompletionRate { get; init; }
 }

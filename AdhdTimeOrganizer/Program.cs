@@ -179,13 +179,13 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
 
         if (defaultSeeder != null)
         {
-            // await defaultSeeder.SeedAllAsync();
+            //await defaultSeeder.SeedAllAsync();
         }
 
         var devSeeder = scopedServices.GetService<IDevSeederManager>();
         if (devSeeder != null && isDevelopment)
         {
-            // await devSeeder.SeedAllAsync();
+            //await devSeeder.SeedAllAsync();
         }
 
         logger.LogInformation("Database seeding completed.");

@@ -8,7 +8,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.todoList.command;
 
 public class UpdateTodoListEndpoint(AppCommandDbContext dbContext, TodoListMapper mapper)
-    : BaseUpdateEndpoint<TodoList, UpdateTodoListRequest, TodoListResponse, TodoListMapper>(dbContext, mapper)
+    : BaseUpdateEndpoint<TodoList, UpdateTodoListRequest, TodoListMapper>(dbContext, mapper)
 {
     protected override Task AfterMapping(TodoList entity, UpdateTodoListRequest req, CancellationToken ct = default)
     {

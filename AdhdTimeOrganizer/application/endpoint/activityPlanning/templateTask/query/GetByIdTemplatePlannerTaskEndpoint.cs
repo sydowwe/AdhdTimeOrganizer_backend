@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.templateTask.query;
 
-public class GetByIdTemplateTaskEndpoint(AppCommandDbContext dbContext, TemplateTaskMapper mapper)
-    : BaseGetByIdEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse, TemplateTaskMapper>(dbContext, mapper)
+public class GetByIdTemplatePlannerTaskEndpoint(AppCommandDbContext dbContext, TemplatePlannerTaskMapper mapper)
+    : BaseGetByIdEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse, TemplatePlannerTaskMapper>(dbContext, mapper)
 {
     protected override IQueryable<TemplatePlannerTask> WithIncludes(IQueryable<TemplatePlannerTask> query)
     {

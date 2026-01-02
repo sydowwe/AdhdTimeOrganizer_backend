@@ -7,10 +7,10 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.category.query;
 
-public class GetFilteredTableActivityCategoryEndpoint(
+public class GetFetchTableActivityCategoryEndpoint(
     AppCommandDbContext dbContext,
     ActivityCategoryMapper mapper) 
-    : BaseFilteredTableEndpoint<ActivityCategory, ActivityCategoryResponse, CategoryFilterRequest, ActivityCategoryMapper>(dbContext, mapper)
+    : BaseFetchTableEndpoint<ActivityCategory, ActivityCategoryResponse, CategoryFilterRequest, ActivityCategoryMapper>(dbContext, mapper)
 {
     protected override IQueryable<ActivityCategory> ApplyCustomFiltering(IQueryable<ActivityCategory> query, CategoryFilterRequest filter)
     {

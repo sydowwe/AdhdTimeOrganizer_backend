@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.request.taskPlannerDayTemplate;
 using AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
 using AdhdTimeOrganizer.application.dto.response.generic;
@@ -20,4 +21,6 @@ public partial class TaskPlannerDayTemplateMapper : IBaseSimpleCrudMapper<TaskPl
     public partial TaskPlannerDayTemplate ToEntity(TaskPlannerDayTemplateRequest request, long userId);
 
     public partial IQueryable<TaskPlannerDayTemplateResponse> ProjectToResponse(IQueryable<TaskPlannerDayTemplate> source);
+    private TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new() { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
+    private TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new(timeDto.Hours, timeDto.Minutes);
 }

@@ -42,21 +42,16 @@
 
 
     <ItemGroup>
-      <Folder Include="application\commands\" />
-      <Folder Include="application\dto\filter\" />
       <Folder Include="application\endpoint\activityHistory\activityHistory\command\" />
       <Folder Include="application\endpoint\activityHistory\activityHistory\query\" />
       <Folder Include="application\endpoint\activityHistory\alarm\command\" />
       <Folder Include="application\endpoint\activityHistory\alarm\query\" />
       <Folder Include="application\endpoint\activityHistory\webExtension\query\" />
-      <Folder Include="application\endpoint\activityPlanning\taskPlanner\command\" />
-      <Folder Include="application\endpoint\activityPlanning\taskPlanner\query\" />
       <Folder Include="application\endpoint\activityPlanning\TaskPriority\command\" />
       <Folder Include="application\endpoint\activityPlanning\TaskPriority\query\" />
       <Folder Include="application\endpoint\activity\activity\query\" />
       <Folder Include="application\endpoint\activity\role\command\" />
       <Folder Include="application\endpoint\activity\role\query\" />
-      <Folder Include="application\handler\command\user\" />
       <Folder Include="application\mapper\activity\" />
       <Folder Include="application\preprocessor\" />
       <Folder Include="domain\" />

@@ -8,10 +8,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.query;
 
-public class GetActivitiesFilteredTableEndpoint(
+public class GetActivitiesFetchTableEndpoint(
     AppCommandDbContext dbContext,
     ActivityMapper mapper) 
-    : BaseFilteredTableEndpoint<Activity, ActivityResponse, ActivityFilterRequest, ActivityMapper>(dbContext, mapper)
+    : BaseFetchTableEndpoint<Activity, ActivityResponse, ActivityFilterRequest, ActivityMapper>(dbContext, mapper)
 {
     protected override IQueryable<Activity> WithIncludes(IQueryable<Activity> query)
     {

@@ -7,10 +7,10 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.role.query;
 
-public class GetFilteredTableActivityRoleEndpoint(
+public class GetFetchTableActivityRoleEndpoint(
     AppCommandDbContext dbContext,
     ActivityRoleMapper mapper) 
-    : BaseFilteredTableEndpoint<ActivityRole, ActivityRoleResponse, RoleFilterRequest, ActivityRoleMapper>(dbContext, mapper)
+    : BaseFetchTableEndpoint<ActivityRole, ActivityRoleResponse, RoleFilterRequest, ActivityRoleMapper>(dbContext, mapper)
 {
     protected override IQueryable<ActivityRole> ApplyCustomFiltering(IQueryable<ActivityRole> query, RoleFilterRequest filter)
     {

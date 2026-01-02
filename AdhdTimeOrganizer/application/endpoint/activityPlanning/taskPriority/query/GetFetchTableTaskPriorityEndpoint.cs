@@ -7,10 +7,10 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPriority.query;
 
-public class GetFilteredTableTaskPriorityEndpoint(
+public class GetFetchTableTaskPriorityEndpoint(
     AppCommandDbContext dbContext,
     TaskPriorityMapper mapper) 
-    : BaseFilteredTableEndpoint<TaskPriority, TaskPriorityResponse, TaskPriorityFilterRequest, TaskPriorityMapper>(dbContext, mapper)
+    : BaseFetchTableEndpoint<TaskPriority, TaskPriorityResponse, TaskPriorityFilterRequest, TaskPriorityMapper>(dbContext, mapper)
 {
     private readonly TaskPriorityMapper _mapper = mapper;
 

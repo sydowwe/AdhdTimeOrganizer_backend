@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.domain.model.@enum;
 
@@ -9,8 +10,8 @@ public record TaskPlannerDayTemplateResponse : IdResponse
     public string? Description { get; init; }
     public string? Icon { get; init; }
     public required bool IsActive { get; init; }
-    public TimeOnly? DefaultWakeUpTime { get; init; }
-    public TimeOnly? DefaultBedTime { get; init; }
+    public TimeDto? DefaultWakeUpTime { get; init; }
+    public TimeDto? DefaultBedTime { get; init; }
     public required int UsageCount { get; init; }
     public DateTimeOffset? LastUsedAt { get; init; }
     public required DayType SuggestedForDayType { get; init; }

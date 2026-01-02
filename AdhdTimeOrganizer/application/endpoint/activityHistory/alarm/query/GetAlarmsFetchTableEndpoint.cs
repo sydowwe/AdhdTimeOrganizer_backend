@@ -8,10 +8,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.alarm.query;
 
-public class GetAlarmsFilteredTableEndpoint(
+public class GetAlarmsFetchTableEndpoint(
     AppCommandDbContext dbContext,
     AlarmMapper mapper) 
-    : BaseFilteredTableEndpoint<Alarm, AlarmResponse, AlarmFilterRequest, AlarmMapper>(dbContext, mapper)
+    : BaseFetchTableEndpoint<Alarm, AlarmResponse, AlarmFilterRequest, AlarmMapper>(dbContext, mapper)
 {
     private readonly AlarmMapper _mapper = mapper;
 

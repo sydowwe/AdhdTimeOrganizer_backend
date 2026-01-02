@@ -4,6 +4,7 @@ namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 public abstract class BasePlannerTask : BaseEntityWithActivity
 {
+    // public bool IsNextDay { get; set; } = false;
     public required TimeOnly StartTime { get; set; }
     public required TimeOnly EndTime { get; set; }
     public required bool IsBackground { get; set; }

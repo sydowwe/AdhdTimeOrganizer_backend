@@ -8,4 +8,4 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPriority.command;
 
 public class UpdateTaskPriorityEndpoint(AppCommandDbContext dbContext, TaskPriorityMapper mapper)
-    : BaseUpdateEndpoint<TaskPriority, TaskPriorityRequest, TaskPriorityResponse, TaskPriorityMapper>(dbContext, mapper);
+    : BaseUpdateEndpoint<TaskPriority, TaskPriorityRequest, TaskPriorityMapper>(dbContext, mapper);

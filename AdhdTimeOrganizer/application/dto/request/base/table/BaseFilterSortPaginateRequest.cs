@@ -2,9 +2,10 @@
 
 namespace AdhdTimeOrganizer.application.dto.request.@base.table;
 
-public record BaseFilterSortPaginateRequest<TFilter> : SortPaginateRequest
+public record BaseFilterSortPaginateRequest<TFilter> : BaseFilterSortRequest<TFilter>
     where TFilter : IFilterRequest
 {
-    public required bool UseFilter { get; set; } = false;
-    public required TFilter? Filter { get; set; }
+    public required int ItemsPerPage { get; set; }
+
+    public required int Page { get; set; }
 }

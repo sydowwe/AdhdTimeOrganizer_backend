@@ -18,6 +18,7 @@ public partial class AppCommandDbContext(DbContextOptions<AppCommandDbContext> o
     public DbSet<ActivityCategory> ActivityCategories { get; set; }
     public DbSet<ActivityRole> ActivityRoles { get; set; }
     public DbSet<ActivityHistory> ActivityHistories { get; set; }
+    public DbSet<Calendar> Calendars { get; set; }
     public DbSet<PlannerTask> PlannerTasks { get; set; }
     public DbSet<RoutineTodoList> RoutineTodoLists { get; set; }
     public DbSet<RoutineTimePeriod> RoutineTimePeriods { get; set; }

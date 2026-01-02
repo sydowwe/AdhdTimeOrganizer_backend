@@ -7,10 +7,10 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.routineTimePeriod.query;
 
-public class GetRoutineTimePeriodsFilteredTableEndpoint(
+public class GetRoutineTimePeriodsFetchTableEndpoint(
     AppCommandDbContext dbContext,
     RoutineTimePeriodMapper mapper) 
-    : BaseFilteredTableEndpoint<RoutineTimePeriod, RoutineTimePeriodResponse, RoutineTimePeriodFilterRequest, RoutineTimePeriodMapper>(dbContext, mapper)
+    : BaseFetchTableEndpoint<RoutineTimePeriod, RoutineTimePeriodResponse, RoutineTimePeriodFilterRequest, RoutineTimePeriodMapper>(dbContext, mapper)
 {
     private readonly RoutineTimePeriodMapper _mapper = mapper;
 

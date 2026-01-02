@@ -8,10 +8,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.query;
 
-public class GetWebExtensionDataFilteredTableEndpoint(
+public class GetWebExtensionDataFetchTableEndpoint(
     AppCommandDbContext dbContext,
     WebExtensionDataMapper mapper) 
-    : BaseFilteredTableEndpoint<WebExtensionData, WebExtensionDataResponse, WebExtensionDataFilterRequest, WebExtensionDataMapper>(dbContext, mapper)
+    : BaseFetchTableEndpoint<WebExtensionData, WebExtensionDataResponse, WebExtensionDataFilterRequest, WebExtensionDataMapper>(dbContext, mapper)
 {
     private readonly WebExtensionDataMapper _mapper = mapper;
 

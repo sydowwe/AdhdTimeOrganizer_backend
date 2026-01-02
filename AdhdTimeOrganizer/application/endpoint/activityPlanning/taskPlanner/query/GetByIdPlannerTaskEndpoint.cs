@@ -15,6 +15,7 @@ public class GetByIdPlannerTaskEndpoint(
     protected override IQueryable<PlannerTask> WithIncludes(IQueryable<PlannerTask> query)
     {
         return query
+            .Include(pt => pt.Priority)
             .Include(pt => pt.Activity)
                 .ThenInclude(a => a.Role)
             .Include(pt => pt.Activity)

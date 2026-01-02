@@ -13,9 +13,6 @@ public class CalendarConfiguration : IEntityTypeConfiguration<Calendar>
         builder.EnumColumn(c => c.DayType);
 
         builder.Property(c => c.Date).IsRequired();
-        builder.Property(c => c.IsPlanned).HasDefaultValue(false).IsRequired();
-        builder.Property(c => c.TotalTasks).HasDefaultValue(0).IsRequired();
-        builder.Property(c => c.CompletedTasks).HasDefaultValue(0).IsRequired();
 
         builder.Property(c => c.Label).HasMaxLength(100);
         builder.Property(c => c.AppliedTemplateName).HasMaxLength(200);

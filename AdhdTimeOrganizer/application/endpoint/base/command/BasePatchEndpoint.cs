@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.request.@interface;
+using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.helper;
@@ -9,15 +9,12 @@ using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
-public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
-    AppCommandDbContext dbContext,
-    TMapper mapper) : Endpoint<TRequest, long>
+public abstract class BasePatchEndpoint<TEntity, TRequest, TResponse>(
+    AppCommandDbContext dbContext) : Endpoint<TRequest, long>
     where TEntity : class, IEntityWithId
-    where TRequest : class, IUpdateRequest
-    where TMapper : IBaseUpdateMapper<TEntity, TRequest>
+    where TRequest : class, IPatchRequest
+    where TResponse : class, IIdResponse
 {
-    private readonly TMapper _mapper = mapper;
-
     public virtual string[] AllowedRoles()
     {
         return EndpointHelper.GetUserOrHigherRoles();
@@ -26,13 +23,13 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Put($"/{entityName.Kebaberize()}/{{id}}");
+        Patch($"/{entityName.Kebaberize()}/{{id}}");
         Roles(AllowedRoles());
         Summary(s =>
         {
-            s.Summary = $"Update {entityName}";
-            s.Description = $"Updates an existing {entityName}";
-            s.Response(204, "Success");
+            s.Summary = $"Patch {entityName}";
+            s.Description = $"Partially updates an existing {entityName}";
+            s.Response<TResponse>(200, "Success");
             s.Response(404, "Not found");
             s.Response(400, "Bad request");
         });
@@ -49,9 +46,7 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
                 return;
             }
 
-            _mapper.UpdateEntity(req, entity);
-
-            await AfterMapping(entity, req, ct);
+            Mapping(entity, req);
 
             dbContext.Set<TEntity>().Update(entity);
             var affectedRows = await dbContext.SaveChangesAsync(ct);
@@ -62,7 +57,7 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
                 return;
             }
 
-            await SendNoContentAsync(ct);
+            await SendOkAsync(entity.Id, ct);
         }
         catch (Exception ex)
         {
@@ -72,8 +67,5 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
         }
     }
 
-    protected virtual Task AfterMapping(TEntity entity, TRequest req, CancellationToken ct = default)
-    {
-        return Task.CompletedTask;
-    }
+    protected abstract void Mapping(TEntity entity, TRequest req);
 }
