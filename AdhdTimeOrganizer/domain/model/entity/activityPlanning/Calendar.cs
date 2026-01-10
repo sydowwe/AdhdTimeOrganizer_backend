@@ -8,12 +8,12 @@ public class Calendar : BaseEntityWithUser
     public required DateOnly Date { get; set; }
 
     // Day metadata
-    public DayType DayType { get; set; } // Workday, Weekend, Holiday, Vacation
+    public required DayType DayType { get; set; } // Workday, Weekend, Holiday, Vacation
     public string? Label { get; set; } // "HomeOffice", "Office", "Sick Day", custom labels
 
     // Sleep schedule for this day
-    public TimeOnly? WakeUpTime { get; set; }
-    public TimeOnly? BedTime { get; set; }
+    public required TimeOnly WakeUpTime { get; set; }
+    public required TimeOnly BedTime { get; set; }
 
     // Planning status
     public long? AppliedTemplateId { get; set; }

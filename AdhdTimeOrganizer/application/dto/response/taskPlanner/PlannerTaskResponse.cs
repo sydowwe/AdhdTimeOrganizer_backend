@@ -8,8 +8,8 @@ public record PlannerTaskResponse : BasePlannerTaskResponse
 {
     public required bool IsDone { get; init; }
     public required TaskStatus Status { get; init; }
-    public required TimeDto ActualStartTime { get; init; }
-    public required TimeDto ActualEndTime { get; init; }
+    public TimeDto? ActualStartTime { get; init; }
+    public TimeDto? ActualEndTime { get; init; }
 
     public required bool IsFromTemplate { get; init; }
     public long? SourceTemplateTaskId { get; init; }

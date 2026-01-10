@@ -35,7 +35,7 @@ public class BaseToggleIsHiddenEndpoint<TEntity>(AppCommandDbContext dbContext) 
 
     public override async Task HandleAsync(IdListRequest request, CancellationToken ct)
     {
-        var entities = await dbContext.Set<TEntity>().Where(e => request.IdList.Contains(e.Id)).ToListAsync(ct);
+        var entities = await dbContext.Set<TEntity>().Where(e => request.Ids.Contains(e.Id)).ToListAsync(ct);
 
         if (entities.Count < 1)
         {

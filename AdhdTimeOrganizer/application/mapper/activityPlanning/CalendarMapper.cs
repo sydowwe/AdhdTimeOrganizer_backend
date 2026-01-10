@@ -11,11 +11,14 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper;
 
 [Mapper]
-public partial class CalendarMapper : IBaseReadMapper<Calendar, CalendarResponse>
+public partial class CalendarMapper : IBaseReadMapper<Calendar, CalendarResponse>, IBaseUpdateMapper<Calendar,CalendarRequest>
 {
     public partial CalendarResponse ToResponse(Calendar entity);
     public partial SelectOptionResponse ToSelectOptionResponse(Calendar entity);
-
-
+    public partial void UpdateEntity(CalendarRequest request, Calendar entity);
     public partial IQueryable<CalendarResponse> ProjectToResponse(IQueryable<Calendar> source);
+
+
+    private TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new TimeDto { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
+    private TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new TimeOnly(timeDto.Hours, timeDto.Minutes);
 }

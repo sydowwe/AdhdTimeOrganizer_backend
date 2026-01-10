@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 namespace AdhdTimeOrganizer.application.dto.request.generic;
 
 public record IdListRequest(
-    [Required] List<long> IdList
+    [Required] List<long> Ids
 ) : IMyRequest;

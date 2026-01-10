@@ -91,6 +91,8 @@ public class CalendarSeeder(
 
             var calendar = new Calendar
             {
+                WakeUpTime = new TimeOnly(8, 0),
+                BedTime = new TimeOnly(0, 0),
                 Date = date,
                 DayType = dayType,
                 Label = label,

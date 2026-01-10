@@ -8,7 +8,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templateTask.command;
 
-public class TemplateTaskChangeSpanEndpoint(AppCommandDbContext dbContext) : BasePatchEndpoint<TemplatePlannerTask, PlannerTaskChangeSpanRequest, TemplatePlannerTaskResponse>(dbContext)
+public class TemplatePlannerTaskChangeSpanEndpoint(AppCommandDbContext dbContext) : BasePatchEndpoint<TemplatePlannerTask, PlannerTaskChangeSpanRequest, TemplatePlannerTaskResponse>(dbContext)
 {
     protected override void Mapping(TemplatePlannerTask entity, PlannerTaskChangeSpanRequest req)
     {
