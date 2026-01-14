@@ -24,6 +24,7 @@ public partial class AppCommandDbContext(DbContextOptions<AppCommandDbContext> o
     public DbSet<RoutineTimePeriod> RoutineTimePeriods { get; set; }
     public DbSet<TodoList> TodoLists { get; set; }
     public DbSet<TaskPriority> TaskUrgencies { get; set; }
+    public DbSet<TaskImportance> TaskImportances { get; set; }
     public DbSet<WebExtensionData> WebExtensionData { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

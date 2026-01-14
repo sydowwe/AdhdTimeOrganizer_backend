@@ -14,6 +14,7 @@ public class UserDefaultsService(AppCommandDbContext dbContext, ILogger<UserDefa
         await CreateTaskUrgencies(userId, ct);
         await CreateRoutineTimePeriod(userId, ct);
         await CreateRoles(userId, ct);
+        await CreateTaskImportances(userId, ct);
 
         try
         {
@@ -40,6 +41,18 @@ public class UserDefaultsService(AppCommandDbContext dbContext, ILogger<UserDefa
         );
     }
 
+    private async Task CreateTaskImportances(long userId, CancellationToken ct = default)
+    {
+        await dbContext.TaskImportances.AddRangeAsync(
+            [
+                new TaskImportance { UserId = userId, Text = "Critical", Color = "#FF5252", Importance = 1000 }, // Red
+                new TaskImportance { UserId = userId, Text = "High", Color = "#FFA726", Importance = 700 }, // Orange
+                new TaskImportance { UserId = userId, Text = "Normal", Color = "#4287f5", Importance = 400 }, // Blue
+                new TaskImportance { UserId = userId, Text = "Low", Color = "#888", Importance = 100 }
+            ], ct
+        );
+    }
+
     private async Task CreateRoutineTimePeriod(long userId, CancellationToken ct = default)
     {
         await dbContext.RoutineTimePeriods.AddRangeAsync(
@@ -62,4 +75,5 @@ public class UserDefaultsService(AppCommandDbContext dbContext, ILogger<UserDefa
             ], ct
         );
     }
+
 }

@@ -16,5 +16,5 @@ public record BasePlannerTaskResponse : IdResponse
     public string? Notes { get; set; }
 
     public required ActivityResponse Activity { get; set; }
-    public TaskPriorityResponse? Priority { get; init; }
+    public TaskImportanceResponse? Importance { get; init; }
 }

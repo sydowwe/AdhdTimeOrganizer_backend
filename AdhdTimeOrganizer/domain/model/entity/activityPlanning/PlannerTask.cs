@@ -20,6 +20,7 @@ public class PlannerTask : BasePlannerTask, IEntityWithIsDone
     public long? TodolistId { get; set; }
     public virtual TodoList? Todolist { get; set; }
 
+
     public string Color => Activity.Role.Color;
     public int EstimatedMinuteLength => (int) (StartTime - EndTime).TotalMinutes;
 }

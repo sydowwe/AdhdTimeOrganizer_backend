@@ -27,5 +27,5 @@ public record BasePlannerTaskRequest
     [Required]
     public required long ActivityId { get; init; }
 
-    public long? PriorityId { get; init; }
+    public long? ImportanceId { get; init; }
 }

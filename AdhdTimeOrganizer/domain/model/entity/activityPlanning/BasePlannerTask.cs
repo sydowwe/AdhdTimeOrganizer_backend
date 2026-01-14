@@ -14,6 +14,6 @@ public abstract class BasePlannerTask : BaseEntityWithActivity
     public string? Location { get; set; } // "Home", "Gym", "Office"
     public string? Notes { get; set; }
 
-    public long? PriorityId { get; set; }
-    public TaskPriority? Priority { get; set; }
+    public long? ImportanceId { get; set; }
+    public TaskImportance? Importance { get; set; }
 }

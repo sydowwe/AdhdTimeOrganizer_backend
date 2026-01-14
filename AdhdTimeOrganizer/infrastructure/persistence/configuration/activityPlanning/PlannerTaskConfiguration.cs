@@ -30,9 +30,9 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
             .HasForeignKey(p => p.CalendarId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(p => p.Priority)
+        builder.HasOne(p => p.Importance)
             .WithMany()
-            .HasForeignKey(p => p.PriorityId)
+            .HasForeignKey(p => p.ImportanceId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(p => p.Todolist)

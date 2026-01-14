@@ -25,9 +25,9 @@ public class TemplateTaskConfiguration : IEntityTypeConfiguration<TemplatePlanne
             .HasForeignKey(t => t.TemplateId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(t => t.Priority)
+        builder.HasOne(t => t.Importance)
             .WithMany()
-            .HasForeignKey(t => t.PriorityId)
+            .HasForeignKey(t => t.ImportanceId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(t => new { t.TemplateId, t.StartTime });

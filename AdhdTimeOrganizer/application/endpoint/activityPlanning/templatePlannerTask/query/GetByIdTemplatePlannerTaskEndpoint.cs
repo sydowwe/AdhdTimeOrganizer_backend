@@ -17,6 +17,6 @@ public class GetByIdTemplatePlannerTaskEndpoint(AppCommandDbContext dbContext, T
             .ThenInclude(a => a.Role)
             .Include(t => t.Activity)
             .ThenInclude(a => a.Category)
-            .Include(t => t.Priority);
+            .Include(t => t.Importance);
     }
 }
