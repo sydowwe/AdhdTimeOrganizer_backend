@@ -5,11 +5,12 @@ namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 public class Calendar : BaseEntityWithUser
 {
-    public required DateOnly Date { get; set; }
+    public required DateOnly Date { get; init; }
 
     // Day metadata
-    public required DayType DayType { get; set; } // Workday, Weekend, Holiday, Vacation
-    public string? Label { get; set; } // "HomeOffice", "Office", "Sick Day", custom labels
+    public required DayType DayType { get; set; } // Workday, Weekend, Holiday, Vacation, SickDay, Special
+    public string? HolidayName { get; init; } // Name of the holiday (e.g., "Christmas", "New Year")
+    public string? Label { get; set; } // "HomeOffice", "Office", custom labels - independent of holiday
 
     // Sleep schedule for this day
     public required TimeOnly WakeUpTime { get; set; }
@@ -27,7 +28,8 @@ public class Calendar : BaseEntityWithUser
     public virtual ICollection<PlannerTask> Tasks { get; set; } = new List<PlannerTask>();
     // Future: Events, TodoLists, Habits, etc.
 
-    public int DayIndex => Date.DayOfWeek == DayOfWeek.Sunday ? 7 :(int)Date.DayOfWeek;
+    public int DayIndex => Date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)Date.DayOfWeek;
+    public bool IsWeekend => DayIndex is 6 or 7;
     // Completion tracking
     public int TotalTasks => Tasks.Count;
     public int CompletedTasks => Tasks.Select(t => t.IsDone).Count();

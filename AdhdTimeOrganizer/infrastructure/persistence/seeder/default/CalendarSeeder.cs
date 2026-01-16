@@ -74,7 +74,7 @@ public class CalendarSeeder(
         {
             var dayOfWeek = date.DayOfWeek;
             var dayType = DayType.Workday;
-            string? label = null;
+            string? holidayName = null;
 
             // Check if it's a weekend
             if (dayOfWeek == DayOfWeek.Saturday || dayOfWeek == DayOfWeek.Sunday)
@@ -83,10 +83,10 @@ public class CalendarSeeder(
             }
 
             // Check if it's a holiday (holidays override weekends)
-            if (holidays.TryGetValue(date, out var holidayName))
+            if (holidays.TryGetValue(date, out var holiday))
             {
                 dayType = DayType.Holiday;
-                label = holidayName;
+                holidayName = holiday;
             }
 
             var calendar = new Calendar
@@ -95,7 +95,7 @@ public class CalendarSeeder(
                 BedTime = new TimeOnly(0, 0),
                 Date = date,
                 DayType = dayType,
-                Label = label,
+                HolidayName = holidayName,
                 UserId = userId
             };
 

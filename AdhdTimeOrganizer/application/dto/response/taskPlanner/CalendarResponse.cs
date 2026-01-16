@@ -11,6 +11,7 @@ public record CalendarResponse : IdResponse
 
     public required int DayIndex { get; init; }
     public required DayType DayType { get; init; }
+    public string? HolidayName { get; init; }
     public string? Label { get; init; }
 
     public required TimeDto WakeUpTime { get; init; }
