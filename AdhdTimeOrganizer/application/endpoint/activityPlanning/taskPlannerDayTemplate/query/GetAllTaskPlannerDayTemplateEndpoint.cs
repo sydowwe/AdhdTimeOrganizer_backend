@@ -10,7 +10,5 @@ public class GetAllTaskPlannerDayTemplateEndpoint(AppCommandDbContext dbContext,
     : BaseGetAllEndpoint<TaskPlannerDayTemplate, TaskPlannerDayTemplateResponse, TaskPlannerDayTemplateMapper>(dbContext, mapper)
 {
     protected override IQueryable<TaskPlannerDayTemplate> Sort(IQueryable<TaskPlannerDayTemplate> query)
-    {
-        return query.OrderByDescending(t => t.LastUsedAt).ThenBy(t => t.Name);
-    }
+        => query.OrderByDescending(t => t.LastUsedAt).ThenBy(t => t.Name);
 }

@@ -138,7 +138,7 @@ public static class DbContextHelper
     {
         try
         {
-            var entity = await dbContext.Set<TEntity>().FindAsync(new[] { id }, ct);
+            var entity = await dbContext.Set<TEntity>().FindAsync([id], ct);
             if (entity == null)
             {
                 return Result.Error(ResultErrorType.NotFound, "Entity not found for deletion.");

@@ -22,8 +22,5 @@ public class GetAllTodoListEndpoint(
             .Include(tdl => tdl.TaskPriority);
     }
 
-    protected override IQueryable<TodoList> Sort(IQueryable<TodoList> query)
-    {
-        return query.OrderBy(td=>td.DisplayOrder);
-    }
+    protected override IQueryable<TodoList> Sort(IQueryable<TodoList> query) => query.OrderBy(td=>td.DisplayOrder);
 }

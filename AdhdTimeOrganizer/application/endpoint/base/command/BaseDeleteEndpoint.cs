@@ -33,7 +33,7 @@ public abstract class BaseDeleteEndpoint<TEntity>(AppCommandDbContext dbContext)
     {
         try
         {
-            var entity = await dbContext.Set<TEntity>().FindAsync(new object[] { req.Id }, ct);
+            var entity = await dbContext.Set<TEntity>().FindAsync([req.Id], ct);
             if (entity == null)
             {
                 await SendNotFoundAsync(ct);

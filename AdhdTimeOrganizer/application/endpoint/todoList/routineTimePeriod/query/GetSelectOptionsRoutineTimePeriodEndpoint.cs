@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
@@ -10,4 +11,5 @@ public class GetSelectOptionsRoutineTimePeriodEndpoint(
     RoutineTimePeriodMapper mapper)
     : BaseGetSelectOptionsEndpoint<RoutineTimePeriod, RoutineTimePeriodMapper>(appDbContext, mapper)
 {
+    protected override IQueryable<RoutineTimePeriod> Sort(IQueryable<RoutineTimePeriod> query) => query.OrderBy(tp => tp.LengthInDays);
 }

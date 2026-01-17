@@ -1,4 +1,5 @@
-﻿using AdhdTimeOrganizer.application.dto.response.generic;
+﻿using System.Linq.Expressions;
+using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.helper;
@@ -50,10 +51,16 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppCommandD
         }
 
         query = Filter(query);
+
+        query = Sort(query);
+
         var options = await query.Select(e => _mapper.ToSelectOptionResponse(e)).ToListAsync(ct);
 
         await SendOkAsync(options, ct);
     }
 
     public virtual IQueryable<TEntity> Filter(IQueryable<TEntity> query) => query;
+
+    protected virtual IQueryable<TEntity> Sort(IQueryable<TEntity> query) => query.OrderBy(e => e.Id);
+
 }
