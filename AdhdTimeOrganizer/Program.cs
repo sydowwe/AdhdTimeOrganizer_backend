@@ -182,10 +182,16 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
             // await defaultSeeder.SeedAllAsync();
         }
 
+        var userDefaultsSeeder = scopedServices.GetService<IUserDefaultSeederManager>();
+        if (userDefaultsSeeder != null && isDevelopment)
+        {
+           await userDefaultsSeeder.SeedAllForAllUsersAsync(true);
+        }
+
         var devSeeder = scopedServices.GetService<IDevSeederManager>();
         if (devSeeder != null && isDevelopment)
         {
-            // await devSeeder.SeedAllAsync();
+            await devSeeder.SeedAllAsync();
         }
 
         logger.LogInformation("Database seeding completed.");

@@ -18,9 +18,9 @@ public partial class PlannerTaskMapper : IBaseSimpleCrudMapper<PlannerTask, Plan
     public partial void UpdateEntity(PlannerTaskRequest request, PlannerTask entity);
     public partial IQueryable<PlannerTaskResponse> ProjectToResponse(IQueryable<PlannerTask> source);
 
-    private string MapStatus(TaskStatus status) => status.ToString();
-    private TaskStatus MapStatus(string status) => Enum.Parse<TaskStatus>(status);
-    private DateOnly MapCalendarToDate(Calendar calendar) => calendar.Date;
-    private TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new TimeDto { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
-    private TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new TimeOnly(timeDto.Hours, timeDto.Minutes);
+    private static string MapStatus(TaskStatus status) => status.ToString();
+    private static TaskStatus MapStatus(string status) => Enum.Parse<TaskStatus>(status);
+    private static DateOnly MapCalendarToDate(Calendar calendar) => calendar.Date;
+    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new TimeDto { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
+    private static TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new TimeOnly(timeDto.Hours, timeDto.Minutes);
 }

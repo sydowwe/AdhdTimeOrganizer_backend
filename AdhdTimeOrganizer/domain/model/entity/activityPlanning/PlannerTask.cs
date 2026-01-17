@@ -1,11 +1,12 @@
 using AdhdTimeOrganizer.domain.model.entity.@base;
+using AdhdTimeOrganizer.domain.model.@enum;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 public class PlannerTask : BasePlannerTask, IEntityWithIsDone
 {
     public bool IsDone { get; set; }
-    public TaskStatus Status { get; set; } // Pending, InProgress, Completed, Skipped
+    public PlannerTaskStatus Status { get; set; } // Pending, InProgress, Completed, Skipped
     public TimeOnly? ActualStartTime { get; set; }
     public TimeOnly? ActualEndTime { get; set; }
     public string? SkipReason { get; set; }

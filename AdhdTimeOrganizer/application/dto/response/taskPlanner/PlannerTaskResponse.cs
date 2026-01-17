@@ -1,13 +1,13 @@
 using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
-using TaskStatus = AdhdTimeOrganizer.domain.model.@enum.TaskStatus;
+using AdhdTimeOrganizer.domain.model.@enum;
 
 namespace AdhdTimeOrganizer.application.dto.response.activityPlanning;
 
 public record PlannerTaskResponse : BasePlannerTaskResponse
 {
     public required bool IsDone { get; init; }
-    public required TaskStatus Status { get; init; }
+    public required PlannerTaskStatus Status { get; init; }
     public TimeDto? ActualStartTime { get; init; }
     public TimeDto? ActualEndTime { get; init; }
 

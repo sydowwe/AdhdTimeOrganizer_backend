@@ -13,11 +13,11 @@ public class LocalizationService<TResource> : ILocalizationService
     public string GetString(string key, CultureInfo? culture = null)
     {
         culture ??= CultureInfo.CurrentUICulture;
-        var resourceManager = GetResourceManagerFromType();
+        var resourceManager = LocalizationService<TResource>.GetResourceManagerFromType();
         return resourceManager?.GetString(key, culture) ?? $"[[{key}]]";
     }
 
-    private ResourceManager GetResourceManagerFromType()
+    private static ResourceManager GetResourceManagerFromType()
     {
         var property = typeof(TResource).GetProperty("ResourceManager", BindingFlags.Static | BindingFlags.Public);
         if (property == null)

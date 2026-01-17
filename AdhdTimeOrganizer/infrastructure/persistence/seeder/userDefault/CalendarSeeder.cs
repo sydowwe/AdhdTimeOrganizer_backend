@@ -4,46 +4,32 @@ using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence.seeders;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class CalendarSeeder(
     AppCommandDbContext dbContext,
-    ILogger<CalendarSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
+    ILogger<CalendarSeeder> logger) : IScopedService, IUserDefaultSeeder
 {
     public string SeederName => "Calendar";
-    public int Order => 6;
+    public int Order => 5;
 
     public async Task TruncateTable()
     {
         await dbContext.TruncateTableAsync<Calendar>();
     }
 
-    public async Task Seed()
+    public async Task SetupDefaults(long userId, CancellationToken ct = default)
     {
-        // Get all existing users
-        var userIds = await dbContext.Users
-            .Select(u => u.Id)
-            .ToListAsync();
-
-        if (!userIds.Any())
-        {
-            logger.LogWarning("No users found in database. Skipping calendar seeding.");
-            return;
-        }
-
         var years = new[] { 2025, 2026 };
         var countryCode = "SK";
 
-        foreach (var userId in userIds)
+        foreach (var year in years)
         {
-            foreach (var year in years)
-            {
-                await SeedForUser(year, countryCode, userId);
-            }
+            await SeedYearForUser(year, countryCode, userId, ct);
         }
 
-        logger.LogInformation("Completed seeding calendars for {UserCount} users across years {Years}",
-            userIds.Count, string.Join(", ", years));
+        logger.LogInformation("Completed seeding calendars for user {UserId} across years {Years}",
+            userId, string.Join(", ", years));
     }
 
     /// <summary>
@@ -52,11 +38,12 @@ public class CalendarSeeder(
     /// <param name="year">Year to seed</param>
     /// <param name="countryCode">Country code (SK, CZ)</param>
     /// <param name="userId">User ID to associate calendars with</param>
-    private async Task SeedForUser(int year, string countryCode, long userId)
+    /// <param name="ct">Cancellation token</param>
+    private async Task SeedYearForUser(int year, string countryCode, long userId, CancellationToken ct = default)
     {
         var existingCount = await dbContext.Calendars
             .Where(c => c.Date.Year == year && c.UserId == userId)
-            .CountAsync();
+            .CountAsync(ct);
 
         if (existingCount > 0)
         {
@@ -102,33 +89,22 @@ public class CalendarSeeder(
             calendars.Add(calendar);
         }
 
-        await dbContext.Calendars.AddRangeAsync(calendars);
-        await dbContext.SaveChangesAsync();
+        await dbContext.Calendars.AddRangeAsync(calendars, ct);
+        await dbContext.SaveChangesAsync(ct);
 
         logger.LogInformation("Seeded {Count} calendar entries for year {Year} ({Country}) for user {UserId}",
             calendars.Count, year, countryCode, userId);
     }
 
     /// <summary>
-    /// Seeds calendar data for a specific year and country (public method for manual seeding)
+    /// Public method to seed a specific year for a user (can be called manually)
     /// </summary>
     /// <param name="year">Year to seed</param>
     /// <param name="countryCode">Country code (SK, CZ)</param>
-    /// <param name="userId">Optional user ID to associate calendars with</param>
-    public async Task SeedYear(int year, string countryCode, long? userId = null)
+    /// <param name="userId">User ID to associate calendars with</param>
+    public async Task SeedYear(int year, string countryCode, long userId)
     {
-        if (userId.HasValue)
-        {
-            await SeedForUser(year, countryCode, userId.Value);
-        }
-        else
-        {
-            var userIds = await dbContext.Users.Select(u => u.Id).ToListAsync();
-            foreach (var uid in userIds)
-            {
-                await SeedForUser(year, countryCode, uid);
-            }
-        }
+        await SeedYearForUser(year, countryCode, userId);
     }
 
     /// <summary>
@@ -215,7 +191,7 @@ public class CalendarSeeder(
     /// <summary>
     /// Calculates Easter Sunday using Computus algorithm (Anonymous Gregorian algorithm)
     /// </summary>
-    private DateOnly CalculateEaster(int year)
+    private static DateOnly CalculateEaster(int year)
     {
         int a = year % 19;
         int b = year / 100;
@@ -233,5 +209,13 @@ public class CalendarSeeder(
         int day = ((h + l - 7 * m + 114) % 31) + 1;
 
         return new DateOnly(year, month, day);
+    }
+
+    public async Task<bool> ResetDefaults(long userId, CancellationToken ct = default)
+    {
+        // Calendar seeder doesn't support reset - calendars are generated per year
+        // and resetting them doesn't make sense as they are date-based
+        logger.LogWarning("ResetDefaults is not supported for CalendarSeeder");
+        return false;
     }
 }

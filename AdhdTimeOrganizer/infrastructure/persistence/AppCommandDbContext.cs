@@ -19,12 +19,15 @@ public partial class AppCommandDbContext(DbContextOptions<AppCommandDbContext> o
     public DbSet<ActivityRole> ActivityRoles { get; set; }
     public DbSet<ActivityHistory> ActivityHistories { get; set; }
     public DbSet<Calendar> Calendars { get; set; }
+    public DbSet<TaskImportance> TaskImportances { get; set; }
     public DbSet<PlannerTask> PlannerTasks { get; set; }
+    public DbSet<TemplatePlannerTask> TemplatePlannerTasks { get; set; }
+    public DbSet<TaskPlannerDayTemplate> TaskPlannerDayTemplates { get; set; }
+
     public DbSet<RoutineTodoList> RoutineTodoLists { get; set; }
     public DbSet<RoutineTimePeriod> RoutineTimePeriods { get; set; }
     public DbSet<TodoList> TodoLists { get; set; }
     public DbSet<TaskPriority> TaskUrgencies { get; set; }
-    public DbSet<TaskImportance> TaskImportances { get; set; }
     public DbSet<WebExtensionData> WebExtensionData { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -1,6 +1,6 @@
 ﻿namespace AdhdTimeOrganizer.domain.model.@enum;
 
-public enum TaskStatus
+public enum PlannerTaskStatus
 {
     NotStarted = 0,
     InProgress = 1,

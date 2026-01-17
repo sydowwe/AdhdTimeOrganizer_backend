@@ -10,20 +10,11 @@ public class DefaultSeederManager(IServiceProvider serviceProvider) : IScopedSer
     {
         var seeders = serviceProvider.GetServices<IDefaultDatabaseSeeder>().ToList();
 
-        if (overrideData)
-        {
-            var descSortedSeeders = seeders.OrderByDescending(s => s.Order).ToList();
-            foreach (var seeder in descSortedSeeders)
-            {
-                await seeder.TruncateTable();
-            }
-        }
-
         var sortedSeeders = seeders.OrderBy(s => s.Order).ToList();
 
         foreach (var seeder in sortedSeeders)
         {
-            await seeder.Seed();
+            await seeder.Seed(overrideData);
         }
     }
 
@@ -34,7 +25,7 @@ public class DefaultSeederManager(IServiceProvider serviceProvider) : IScopedSer
 
         if (seeder != null)
         {
-            await seeder.Seed();
+            await seeder.Seed(false);
         }
         else
         {

@@ -58,7 +58,7 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider) : IJwtService, IScop
         return tokenHandler.WriteToken(token);
     }
 
-    private async Task<List<Claim>> CreateUserClaims(User user, UserManager<User> userManager)
+    private static async Task<List<Claim>> CreateUserClaims(User user, UserManager<User> userManager)
     {
         var claims = new List<Claim>
         {

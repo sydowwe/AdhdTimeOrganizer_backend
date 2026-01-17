@@ -13,12 +13,7 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppCommandDbConte
     public string SeederName => "User";
     public int Order => 5;
 
-    public async Task TruncateTable()
-    {
-        await dbContext.TruncateTableAsync<User>();
-    }
-
-    public async Task Seed()
+    public async Task Seed(bool overrideData = false)
     {
         var adminUser = new User
         {
@@ -30,8 +25,25 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppCommandDbConte
             Timezone = TimeZoneInfo.Local,
         };
 
-        if (await dbContext.Users.AnyAsync(u => u.UserName == adminUser.UserName))
+        var existingAdmin = await dbContext.Users
+            .FirstOrDefaultAsync(u => u.UserName == adminUser.UserName);
+        if (existingAdmin != null)
         {
+            if (overrideData)
+            {
+                existingAdmin.Email = adminUser.Email;
+                existingAdmin.CurrentLocale = adminUser.CurrentLocale;
+                existingAdmin.Timezone = adminUser.Timezone;
+                existingAdmin.EmailConfirmed = true;
+
+                await userManager.UpdateAsync(existingAdmin);
+
+                // If you also need to reset the password during override:
+                var token = await userManager.GeneratePasswordResetTokenAsync(existingAdmin);
+                await userManager.ResetPasswordAsync(existingAdmin, token, Helper.GetEnvVar("ROOT_ADMIN_PASSWORD"));
+                return;
+            }
+
             logger.LogInformation("Root admin user already exists, skipping seeding.");
             return;
         }

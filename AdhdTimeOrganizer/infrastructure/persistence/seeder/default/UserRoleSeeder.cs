@@ -12,19 +12,8 @@ public class UserRoleSeeder(RoleManager<UserRole> roleManager, AppCommandDbConte
     public string SeederName => "UserRole";
     public int Order => 4;
 
-    public async Task TruncateTable()
+    public async Task Seed(bool overrideData = false)
     {
-        await dbContext.TruncateTableAsync<UserRole>();
-    }
-
-    public async Task Seed()
-    {
-        if (await dbContext.UserRoles.AnyAsync())
-        {
-            logger.LogInformation("User roles already exist, skipping seeding.");
-            return;
-        }
-
         List<UserRole> roles =
         [
             new()
@@ -57,10 +46,32 @@ public class UserRoleSeeder(RoleManager<UserRole> roleManager, AppCommandDbConte
         {
             try
             {
+                var existingRole = await roleManager.FindByNameAsync(role.Name);
+                    
+                if (existingRole != null)
+                {
+                    if (overrideData)
+                    {
+                        existingRole.Description = role.Description;
+                        existingRole.IsDefault = role.IsDefault;
+                        existingRole.RoleLevel = role.RoleLevel;
+                        existingRole.IsAssignable = role.IsAssignable;
+
+                        await roleManager.UpdateAsync(existingRole);
+                        logger.LogInformation($"Role '{role.Name}' updated.");
+                    }
+                    else
+                    {
+                        logger.LogInformation($"Role '{role.Name}' already exists, skipping.");
+                    }
+                    continue;
+                }
+
                 var result = await roleManager.CreateAsync(role);
                 if (result.Succeeded)
                 {
                     await roleManager.AddClaimAsync(role, new Claim(ClaimTypes.Role, role.Name));
+                    logger.LogInformation($"Role '{role.Name}' created.");
                 }
             }
             catch (Exception e)

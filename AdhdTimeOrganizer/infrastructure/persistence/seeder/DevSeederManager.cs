@@ -1,13 +1,26 @@
 ﻿using AdhdTimeOrganizer.config.dependencyInjection;
+using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.manager;
+using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeders;
 
-public class DevSeederManager(IServiceProvider serviceProvider) : IScopedService, IDevSeederManager
+public class DevSeederManager(
+    IServiceProvider serviceProvider,
+    AppCommandDbContext dbContext,
+    IUserDefaultSeederManager userDefaultSeederManager,
+    ILogger<DevSeederManager> logger) : IScopedService, IDevSeederManager
 {
     public async Task SeedAllAsync(bool overrideData = true)
     {
+        var adminUserId = await GetRootAdminUserId();
+        if (!adminUserId.HasValue)
+        {
+            logger.LogWarning("Root admin user not found. Skipping activity seeding.");
+            return;
+        }
+
         var devSeeders = serviceProvider.GetServices<IDevDatabaseSeeder>().ToList();
 
         if (overrideData)
@@ -19,29 +32,33 @@ public class DevSeederManager(IServiceProvider serviceProvider) : IScopedService
             }
         }
 
+        dbContext.ChangeTracker.Clear();
+
+        await userDefaultSeederManager.SeedAllForAllUsersAsync(false);
+
         // Sort by Priority (ascending order - lower numbers run first)
         var sortedDevSeeders = devSeeders.OrderBy(s => s.Order).ToList();
 
         // Execute each dev seeder in order
         foreach (var seeder in sortedDevSeeders)
         {
-            await seeder.Seed();
+            await seeder.SeedForUser(adminUserId.Value);
         }
     }
 
-    public async Task SeedAsync(string seederName)
+    private async Task<long?> GetRootAdminUserId()
     {
-        var seeders = serviceProvider.GetServices<IDevDatabaseSeeder>();
-        var seeder = seeders.FirstOrDefault(s => s.SeederName == seederName);
+        // Get root admin user ID for user default seeders
+        var rootAdminUsername = Helper.GetEnvVar("ROOT_ADMIN_USERNAME");
+        var adminUser = await dbContext.Users
+            .FirstOrDefaultAsync(u => u.UserName == rootAdminUsername);
 
-        if (seeder != null)
+        if (adminUser == null)
         {
-            await seeder.Seed();
+            logger.LogWarning("Root admin user not found. Cannot seed user defaults before dev data.");
         }
-        else
-        {
-            throw new InvalidOperationException($"Dev seeder with name '{seederName}' not found.");
-        }
+
+        return adminUser?.Id;
     }
 
     public IEnumerable<string> GetAllSeederNames()
