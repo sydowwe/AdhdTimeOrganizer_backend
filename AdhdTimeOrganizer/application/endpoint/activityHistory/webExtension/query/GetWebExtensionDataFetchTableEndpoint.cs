@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
-using AdhdTimeOrganizer.application.endpoint.@base.read;
+using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;

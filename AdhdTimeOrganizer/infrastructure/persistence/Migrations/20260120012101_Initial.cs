@@ -27,10 +27,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     current_locale = table.Column<string>(type: "text", nullable: false),
                     timezone = table.Column<string>(type: "text", nullable: false),
                     google_o_auth_user_id = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     user_name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     normalized_user_name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     normalized_email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     email_confirmed = table.Column<bool>(type: "boolean", nullable: false),
                     password_hash = table.Column<string>(type: "text", nullable: true),
@@ -80,7 +80,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     user_id = table.Column<long>(type: "bigint", nullable: false),
                     name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     text = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false)
+                    color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false),
+                    icon = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -101,20 +102,54 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
-                    icon = table.Column<string>(type: "text", nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     user_id = table.Column<long>(type: "bigint", nullable: false),
                     name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     text = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false)
+                    color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false),
+                    icon = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_activity_role", x => x.id);
                     table.ForeignKey(
                         name: "fk_activity_role_user_user_id",
+                        column: x => x.user_id,
+                        principalSchema: "public",
+                        principalTable: "user",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "calendar",
+                schema: "public",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    date = table.Column<DateOnly>(type: "date", nullable: false),
+                    day_type = table.Column<string>(type: "text", nullable: false),
+                    holiday_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    label = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    wake_up_time = table.Column<TimeOnly>(type: "time without time zone", nullable: false),
+                    bed_time = table.Column<TimeOnly>(type: "time without time zone", nullable: false),
+                    applied_template_id = table.Column<long>(type: "bigint", nullable: true),
+                    applied_template_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    weather = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    notes = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    user_id = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_calendar", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_calendar_user_user_id",
                         column: x => x.user_id,
                         principalSchema: "public",
                         principalTable: "user",
@@ -130,7 +165,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
                     length_in_days = table.Column<int>(type: "integer", nullable: false),
-                    is_hidden_in_view = table.Column<bool>(type: "boolean", nullable: false),
+                    is_hidden = table.Column<bool>(type: "boolean", nullable: false),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
@@ -151,7 +186,69 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "task_urgency",
+                name: "task_importance",
+                schema: "public",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    importance = table.Column<int>(type: "integer", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    user_id = table.Column<long>(type: "bigint", nullable: false),
+                    text = table.Column<string>(type: "text", nullable: false),
+                    color = table.Column<string>(type: "text", nullable: false),
+                    icon = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_task_importance", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_task_importance_user_user_id",
+                        column: x => x.user_id,
+                        principalSchema: "public",
+                        principalTable: "user",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "task_planner_day_template",
+                schema: "public",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    icon = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    is_active = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
+                    default_wake_up_time = table.Column<TimeOnly>(type: "time without time zone", nullable: true),
+                    default_bed_time = table.Column<TimeOnly>(type: "time without time zone", nullable: true),
+                    suggested_for_day_type = table.Column<int>(type: "integer", nullable: false),
+                    tags = table.Column<string>(type: "text", nullable: false),
+                    usage_count = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
+                    last_used_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    user_id = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_task_planner_day_template", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_task_planner_day_template_user_user_id",
+                        column: x => x.user_id,
+                        principalSchema: "public",
+                        principalTable: "user",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "task_priority",
                 schema: "public",
                 columns: table => new
                 {
@@ -167,9 +264,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("pk_task_urgency", x => x.id);
+                    table.PrimaryKey("pk_task_priority", x => x.id);
                     table.ForeignKey(
-                        name: "fk_task_urgency_user_user_id",
+                        name: "fk_task_priority_user_user_id",
                         column: x => x.user_id,
                         principalSchema: "public",
                         principalTable: "user",
@@ -407,64 +504,29 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "planner_task",
-                schema: "public",
-                columns: table => new
-                {
-                    id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
-                    start_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    minute_length = table.Column<int>(type: "integer", nullable: false),
-                    color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false),
-                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
-                    created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    user_id = table.Column<long>(type: "bigint", nullable: false),
-                    activity_id = table.Column<long>(type: "bigint", nullable: false),
-                    is_done = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_planner_task", x => x.id);
-                    table.ForeignKey(
-                        name: "fk_planner_task_activity_activity_id",
-                        column: x => x.activity_id,
-                        principalSchema: "public",
-                        principalTable: "activity",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "fk_planner_task_user_user_id",
-                        column: x => x.user_id,
-                        principalSchema: "public",
-                        principalTable: "user",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "routine_todo_list",
                 schema: "public",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
-                    done_count = table.Column<int>(type: "integer", nullable: true),
-                    total_count = table.Column<int>(type: "integer", nullable: true),
                     time_period_id = table.Column<long>(type: "bigint", nullable: false),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     user_id = table.Column<long>(type: "bigint", nullable: false),
                     activity_id = table.Column<long>(type: "bigint", nullable: false),
-                    is_done = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
+                    is_done = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    done_count = table.Column<int>(type: "integer", nullable: true),
+                    total_count = table.Column<int>(type: "integer", nullable: true),
+                    display_order = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_routine_todo_list", x => x.id);
                     table.CheckConstraint("CK_RoutineTodoList_DoneCount_LessOrEqual_TotalCount", "done_count <= total_count");
-                    table.CheckConstraint("CK_RoutineTodoList_DoneCount_Min", "done_count >= 0");
-                    table.CheckConstraint("CK_RoutineTodoList_TotalCount_Range", "total_count >= 2 AND total_count <= 99");
+                    table.CheckConstraint("CK_RoutineTodoList_DoneCount_Min", "done_count IS NULL OR done_count >= 0");
+                    table.CheckConstraint("CK_RoutineTodoList_TotalCount_Range", "total_count IS NULL OR total_count >= 2 AND total_count <= 99");
                     table.ForeignKey(
                         name: "fk_routine_todo_list_activity_activity_id",
                         column: x => x.activity_id,
@@ -489,28 +551,82 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "template_planner_task",
+                schema: "public",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    template_id = table.Column<long>(type: "bigint", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    user_id = table.Column<long>(type: "bigint", nullable: false),
+                    activity_id = table.Column<long>(type: "bigint", nullable: false),
+                    start_time = table.Column<TimeOnly>(type: "time without time zone", nullable: false),
+                    end_time = table.Column<TimeOnly>(type: "time without time zone", nullable: false),
+                    is_background = table.Column<bool>(type: "boolean", nullable: false),
+                    location = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    notes = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    importance_id = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_template_planner_task", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_template_planner_task_activity_activity_id",
+                        column: x => x.activity_id,
+                        principalSchema: "public",
+                        principalTable: "activity",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "fk_template_planner_task_task_importance_importance_id",
+                        column: x => x.importance_id,
+                        principalSchema: "public",
+                        principalTable: "task_importance",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "fk_template_planner_task_task_planner_day_template_template_id",
+                        column: x => x.template_id,
+                        principalSchema: "public",
+                        principalTable: "task_planner_day_template",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "fk_template_planner_task_user_user_id",
+                        column: x => x.user_id,
+                        principalSchema: "public",
+                        principalTable: "user",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "todo_list",
                 schema: "public",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
-                    done_count = table.Column<int>(type: "integer", nullable: false),
-                    total_count = table.Column<int>(type: "integer", nullable: false),
-                    task_urgency_id = table.Column<long>(type: "bigint", nullable: false),
+                    task_priority_id = table.Column<long>(type: "bigint", nullable: false),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     user_id = table.Column<long>(type: "bigint", nullable: false),
                     activity_id = table.Column<long>(type: "bigint", nullable: false),
-                    is_done = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
+                    is_done = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    done_count = table.Column<int>(type: "integer", nullable: true),
+                    total_count = table.Column<int>(type: "integer", nullable: true),
+                    display_order = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_todo_list", x => x.id);
                     table.CheckConstraint("CK_TodoList_DoneCount_LessOrEqual_TotalCount", "done_count <= total_count");
-                    table.CheckConstraint("CK_TodoList_DoneCount_Min", "done_count >= 0");
-                    table.CheckConstraint("CK_TodoList_TotalCount_Range", "total_count >= 2 AND total_count <= 99");
+                    table.CheckConstraint("CK_TodoList_DoneCount_Min", "done_count IS NULL OR done_count >= 0");
+                    table.CheckConstraint("CK_TodoList_TotalCount_Range", "total_count IS NULL OR total_count >= 2 AND total_count <= 99");
                     table.ForeignKey(
                         name: "fk_todo_list_activity_activity_id",
                         column: x => x.activity_id,
@@ -519,10 +635,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "fk_todo_list_task_urgency_task_urgency_id",
-                        column: x => x.task_urgency_id,
+                        name: "fk_todo_list_task_priority_task_priority_id",
+                        column: x => x.task_priority_id,
                         principalSchema: "public",
-                        principalTable: "task_urgency",
+                        principalTable: "task_priority",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -570,6 +686,74 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "planner_task",
+                schema: "public",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    is_done = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    status = table.Column<int>(type: "integer", nullable: false),
+                    actual_start_time = table.Column<TimeOnly>(type: "time without time zone", nullable: true),
+                    actual_end_time = table.Column<TimeOnly>(type: "time without time zone", nullable: true),
+                    skip_reason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    is_from_template = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    source_template_task_id = table.Column<long>(type: "bigint", nullable: true),
+                    calendar_id = table.Column<long>(type: "bigint", nullable: false),
+                    todolist_id = table.Column<long>(type: "bigint", nullable: true),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    user_id = table.Column<long>(type: "bigint", nullable: false),
+                    activity_id = table.Column<long>(type: "bigint", nullable: false),
+                    start_time = table.Column<TimeOnly>(type: "time without time zone", nullable: false),
+                    end_time = table.Column<TimeOnly>(type: "time without time zone", nullable: false),
+                    is_background = table.Column<bool>(type: "boolean", nullable: false),
+                    location = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    notes = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    importance_id = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_planner_task", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_planner_task_activity_activity_id",
+                        column: x => x.activity_id,
+                        principalSchema: "public",
+                        principalTable: "activity",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "fk_planner_task_calendar_calendar_id",
+                        column: x => x.calendar_id,
+                        principalSchema: "public",
+                        principalTable: "calendar",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_planner_task_task_importances_importance_id",
+                        column: x => x.importance_id,
+                        principalSchema: "public",
+                        principalTable: "task_importance",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "fk_planner_task_todo_lists_todolist_id",
+                        column: x => x.todolist_id,
+                        principalSchema: "public",
+                        principalTable: "todo_list",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "fk_planner_task_user_user_id",
+                        column: x => x.user_id,
+                        principalSchema: "public",
+                        principalTable: "user",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "ix_activity_category_id",
                 schema: "public",
@@ -583,11 +767,23 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 column: "role_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_activity_user_id_category_id",
+                schema: "public",
+                table: "activity",
+                columns: new[] { "user_id", "category_id" });
+
+            migrationBuilder.CreateIndex(
                 name: "ix_activity_user_id_name",
                 schema: "public",
                 table: "activity",
                 columns: new[] { "user_id", "name" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_activity_user_id_role_id",
+                schema: "public",
+                table: "activity",
+                columns: new[] { "user_id", "role_id" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_category_user_id_name",
@@ -630,17 +826,53 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "ix_calendar_day_type",
+                schema: "public",
+                table: "calendar",
+                column: "day_type");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_calendar_user_id_date",
+                schema: "public",
+                table: "calendar",
+                columns: new[] { "user_id", "date" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "ix_planner_task_activity_id",
                 schema: "public",
                 table: "planner_task",
                 column: "activity_id");
 
             migrationBuilder.CreateIndex(
-                name: "ix_planner_task_user_id_start_timestamp",
+                name: "ix_planner_task_calendar_id",
                 schema: "public",
                 table: "planner_task",
-                columns: new[] { "user_id", "start_timestamp" },
-                unique: true);
+                column: "calendar_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_planner_task_importance_id",
+                schema: "public",
+                table: "planner_task",
+                column: "importance_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_planner_task_status",
+                schema: "public",
+                table: "planner_task",
+                column: "status");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_planner_task_todolist_id",
+                schema: "public",
+                table: "planner_task",
+                column: "todolist_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_planner_task_user_id_calendar_id_start_time",
+                schema: "public",
+                table: "planner_task",
+                columns: new[] { "user_id", "calendar_id", "start_time" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_time_period_user_id_length_in_days",
@@ -682,18 +914,73 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "ix_task_urgency_user_id_priority",
+                name: "ix_task_importance_importance",
                 schema: "public",
-                table: "task_urgency",
+                table: "task_importance",
+                column: "importance");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_task_importance_user_id_importance",
+                schema: "public",
+                table: "task_importance",
+                columns: new[] { "user_id", "importance" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_task_planner_day_template_suggested_for_day_type",
+                schema: "public",
+                table: "task_planner_day_template",
+                column: "suggested_for_day_type");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_task_planner_day_template_user_id_name",
+                schema: "public",
+                table: "task_planner_day_template",
+                columns: new[] { "user_id", "name" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_task_priority_priority",
+                schema: "public",
+                table: "task_priority",
+                column: "priority");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_task_priority_user_id_priority",
+                schema: "public",
+                table: "task_priority",
                 columns: new[] { "user_id", "priority" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "ix_task_urgency_user_id_text",
+                name: "ix_task_priority_user_id_text",
                 schema: "public",
-                table: "task_urgency",
+                table: "task_priority",
                 columns: new[] { "user_id", "text" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_template_planner_task_activity_id",
+                schema: "public",
+                table: "template_planner_task",
+                column: "activity_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_template_planner_task_importance_id",
+                schema: "public",
+                table: "template_planner_task",
+                column: "importance_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_template_planner_task_template_id_start_time",
+                schema: "public",
+                table: "template_planner_task",
+                columns: new[] { "template_id", "start_time" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_template_planner_task_user_id",
+                schema: "public",
+                table: "template_planner_task",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_activity_id",
@@ -703,10 +990,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "ix_todo_list_task_urgency_id",
+                name: "ix_todo_list_task_priority_id",
                 schema: "public",
                 table: "todo_list",
-                column: "task_urgency_id");
+                column: "task_priority_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_user_id_activity_id",
@@ -716,10 +1003,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "ix_todo_list_user_id_task_urgency_id",
+                name: "ix_todo_list_user_id_task_priority_id",
                 schema: "public",
                 table: "todo_list",
-                columns: new[] { "user_id", "task_urgency_id" });
+                columns: new[] { "user_id", "task_priority_id" });
 
             migrationBuilder.CreateIndex(
                 name: "EmailIndex",
@@ -799,7 +1086,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public");
 
             migrationBuilder.DropTable(
-                name: "todo_list",
+                name: "template_planner_task",
                 schema: "public");
 
             migrationBuilder.DropTable(
@@ -827,11 +1114,23 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public");
 
             migrationBuilder.DropTable(
+                name: "calendar",
+                schema: "public");
+
+            migrationBuilder.DropTable(
+                name: "todo_list",
+                schema: "public");
+
+            migrationBuilder.DropTable(
                 name: "routine_time_period",
                 schema: "public");
 
             migrationBuilder.DropTable(
-                name: "task_urgency",
+                name: "task_importance",
+                schema: "public");
+
+            migrationBuilder.DropTable(
+                name: "task_planner_day_template",
                 schema: "public");
 
             migrationBuilder.DropTable(
@@ -840,6 +1139,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "activity",
+                schema: "public");
+
+            migrationBuilder.DropTable(
+                name: "task_priority",
                 schema: "public");
 
             migrationBuilder.DropTable(

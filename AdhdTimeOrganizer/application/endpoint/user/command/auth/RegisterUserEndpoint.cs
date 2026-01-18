@@ -4,14 +4,10 @@ using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 using AdhdTimeOrganizer.application.mapper;
-using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.domain.extServiceContract.user;
-using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
 

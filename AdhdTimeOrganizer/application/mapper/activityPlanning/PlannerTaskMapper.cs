@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.request.taskPlanner;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning;
 using AdhdTimeOrganizer.application.dto.response.generic;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using Riok.Mapperly.Abstractions;
@@ -21,6 +21,6 @@ public partial class PlannerTaskMapper : IBaseSimpleCrudMapper<PlannerTask, Plan
     private static string MapStatus(TaskStatus status) => status.ToString();
     private static TaskStatus MapStatus(string status) => Enum.Parse<TaskStatus>(status);
     private static DateOnly MapCalendarToDate(Calendar calendar) => calendar.Date;
-    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new TimeDto { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
-    private static TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new TimeOnly(timeDto.Hours, timeDto.Minutes);
+    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new() { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
+    private static TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new(timeDto.Hours, timeDto.Minutes);
 }

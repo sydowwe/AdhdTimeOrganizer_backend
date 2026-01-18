@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using TaskPlannerDayTemplateMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.TaskPlannerDayTemplateMapper;
 
-namespace AdhdTimeOrganizer.application.endpoint.taskPlannerDayTemplate.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlannerDayTemplate.query;
 
 public class GetSelectOptionsTaskPlannerDayTemplateEndpoint(AppCommandDbContext dbContext, TaskPlannerDayTemplateMapper mapper)
     : BaseGetSelectOptionsEndpoint<TaskPlannerDayTemplate, TaskPlannerDayTemplateMapper>(dbContext, mapper)

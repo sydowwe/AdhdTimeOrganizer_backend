@@ -8,7 +8,7 @@ public class RoleConfiguration : IEntityTypeConfiguration<ActivityRole>
 {
     public void Configure(EntityTypeBuilder<ActivityRole> builder)
     {
-        builder.BaseNameTextColorEntityConfigure();
+        builder.BaseNameTextColorIconEntityConfigure();
 
         builder.IsManyWithOneUser(u=>u.RoleList);
     }

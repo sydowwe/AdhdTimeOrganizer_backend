@@ -1,10 +1,10 @@
 ﻿using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.manager;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface.manager;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeders;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
 public class DevSeederManager(
     IServiceProvider serviceProvider,

@@ -1,8 +1,8 @@
 using AdhdTimeOrganizer.application.dto.request.toDoList;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning;
 using AdhdTimeOrganizer.application.dto.response.generic;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.mapper.@interface;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Riok.Mapperly.Abstractions;
 
 namespace AdhdTimeOrganizer.application.mapper.activityPlanning;

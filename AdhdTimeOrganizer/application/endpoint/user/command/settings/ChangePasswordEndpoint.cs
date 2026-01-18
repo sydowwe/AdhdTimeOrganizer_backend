@@ -4,7 +4,7 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.profile;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.settings;
 
 /// <summary>
 /// Changes user password. Requires current password and optionally 2FA token.

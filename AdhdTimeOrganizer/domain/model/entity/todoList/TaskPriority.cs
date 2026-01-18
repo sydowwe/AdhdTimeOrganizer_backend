@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.domain.model.entity.@base;
 
-namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+namespace AdhdTimeOrganizer.domain.model.entity.todoList;
 
 public class TaskPriority : BaseTextColorEntity
 {

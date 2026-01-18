@@ -2,7 +2,7 @@
 
 namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
-public class TaskImportance : BaseTextColorEntity
+public class TaskImportance : BaseTextColorIconEntity
 {
-    public int Importance { get; set; }
+    public required int Importance { get; set; }
 }

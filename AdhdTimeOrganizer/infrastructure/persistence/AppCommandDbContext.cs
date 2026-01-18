@@ -2,8 +2,10 @@
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.user;
+using AdhdTimeOrganizer.infrastructure.persistence.extensions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;

@@ -2,7 +2,8 @@
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeders;
+using AdhdTimeOrganizer.domain.serviceContract;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 

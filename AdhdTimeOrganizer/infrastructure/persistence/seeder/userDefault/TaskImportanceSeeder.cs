@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.infrastructure.persistence.seeders;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
@@ -14,10 +14,30 @@ public class TaskImportanceSeeder(
 
     private static List<TaskImportance> Defaults(long userId) =>
     [
-        new() { UserId = userId, Text = "Critical", Color = "#FF5252", Importance = 999 }, // Red
-        new() { UserId = userId, Text = "High", Color = "#FFA726", Importance = 888 }, // Orange
-        new() { UserId = userId, Text = "Normal", Color = "#4287f5", Importance = 777 }, // Blue
-        new() { UserId = userId, Text = "Low", Color = "#888", Importance = 666 } // Gray
+        new() { UserId = userId,
+            Text = "Critical",
+            Color = "#FF5252", // Red
+            Icon = "fas fa-exclamation-triangle",
+            Importance = 999
+        },
+        new() { UserId = userId,
+            Text = "High",
+            Color = "#FFA726", // Orange
+            Icon = "fas fa-star",
+            Importance = 888
+        },
+        new() { UserId = userId,
+            Text = "Normal",
+            Color = "#4287f5", // Blue
+            Icon = "fas fa-bell",
+            Importance = 777
+        },
+        new() { UserId = userId,
+            Text = "Optional",
+            Color = "#666", // Gray
+            Icon = "fas fa-question-circle",
+            Importance = 666
+        }
     ];
 
     public async Task SetupDefaults(long userId, CancellationToken ct = default)

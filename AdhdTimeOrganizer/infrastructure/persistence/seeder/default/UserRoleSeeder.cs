@@ -1,11 +1,10 @@
 ﻿using System.Security.Claims;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeders.@default;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
 
 public class UserRoleSeeder(RoleManager<UserRole> roleManager, AppCommandDbContext dbContext, ILogger<UserRoleSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
 {

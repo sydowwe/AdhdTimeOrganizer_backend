@@ -1,11 +1,11 @@
-using AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
+using TemplatePlannerTaskMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.TemplatePlannerTaskMapper;
 
-namespace AdhdTimeOrganizer.application.endpoint.templateTask.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templatePlannerTask.query;
 
 public class GetByIdTemplatePlannerTaskEndpoint(AppCommandDbContext dbContext, TemplatePlannerTaskMapper mapper)
     : BaseGetByIdEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse, TemplatePlannerTaskMapper>(dbContext, mapper)

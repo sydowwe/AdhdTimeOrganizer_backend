@@ -1,9 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.model.entityInterface;
-using AdhdTimeOrganizer.infrastructure.persistence.seeders;
-using Microsoft.EntityFrameworkCore;
-
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
+﻿namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 
 public interface IDevDatabaseSeeder : IDatabaseSeeder
 {

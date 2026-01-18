@@ -1,11 +1,11 @@
-using AdhdTimeOrganizer.application.dto.response.activityPlanning;
+using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using CalendarMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.CalendarMapper;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlanner.command;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 
 public class UpdateCalendarEndpoint(AppCommandDbContext dbContext, CalendarMapper mapper)
     : BaseUpdateEndpoint<Calendar, CalendarRequest, CalendarMapper>(dbContext, mapper)

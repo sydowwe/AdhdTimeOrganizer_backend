@@ -2,7 +2,7 @@ using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.domain.model.@enum;
 
-namespace AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
+namespace AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 
 public record TaskPlannerDayTemplateResponse : IdResponse
 {

@@ -1,6 +1,6 @@
 ﻿using AdhdTimeOrganizer.domain.result;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
+namespace AdhdTimeOrganizer.domain.serviceContract;
 
 public interface IUserDefaultsService
 {

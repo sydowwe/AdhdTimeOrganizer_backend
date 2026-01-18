@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.application.dto.filter;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning;
-using AdhdTimeOrganizer.application.endpoint.@base.read;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;

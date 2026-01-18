@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.infrastructure.persistence.seeders;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;

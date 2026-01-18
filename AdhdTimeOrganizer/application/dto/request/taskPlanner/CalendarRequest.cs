@@ -1,10 +1,8 @@
 ﻿using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.request.@interface;
-using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
 
-namespace AdhdTimeOrganizer.application.dto.response.activityPlanning;
+namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 
 public record CalendarRequest : IUpdateRequest
 {

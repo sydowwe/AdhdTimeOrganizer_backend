@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
+﻿namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 
 public interface IDefaultDatabaseSeeder : IDatabaseSeeder
 {

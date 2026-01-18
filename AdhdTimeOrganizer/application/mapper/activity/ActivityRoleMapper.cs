@@ -1,6 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.@base;
 using AdhdTimeOrganizer.application.dto.response;
-using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.activity;

@@ -1,13 +1,11 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.infrastructure.persistence.extensions;
-using AdhdTimeOrganizer.infrastructure.persistence.seeders;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using AdhdTimeOrganizer.infrastructure.settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class RoutineTodoListSeeder(
     AppCommandDbContext dbContext,

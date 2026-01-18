@@ -1,14 +1,12 @@
 using AdhdTimeOrganizer.application.dto.dto;
-using AdhdTimeOrganizer.application.dto.request.taskPlanner.template;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
+using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.dto.response.generic;
-using AdhdTimeOrganizer.application.endpoint.activityPlanning.templateTask.command;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using Riok.Mapperly.Abstractions;
 
-namespace AdhdTimeOrganizer.application.mapper;
+namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
 
 [Mapper]
 public partial class CalendarMapper : IBaseReadMapper<Calendar, CalendarResponse>, IBaseUpdateMapper<Calendar,CalendarRequest>
@@ -19,6 +17,6 @@ public partial class CalendarMapper : IBaseReadMapper<Calendar, CalendarResponse
     public partial IQueryable<CalendarResponse> ProjectToResponse(IQueryable<Calendar> source);
 
 
-    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new TimeDto { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
-    private static TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new TimeOnly(timeDto.Hours, timeDto.Minutes);
+    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new() { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
+    private static TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new(timeDto.Hours, timeDto.Minutes);
 }

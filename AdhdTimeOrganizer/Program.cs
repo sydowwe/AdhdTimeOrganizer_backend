@@ -4,7 +4,7 @@ using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.manager;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface.manager;
 using AdhdTimeOrganizer.infrastructure.settings;
 using DotNetEnv;
 using FastEndpoints;
@@ -185,13 +185,13 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         var userDefaultsSeeder = scopedServices.GetService<IUserDefaultSeederManager>();
         if (userDefaultsSeeder != null && isDevelopment)
         {
-           await userDefaultsSeeder.SeedAllForAllUsersAsync(true);
+           // await userDefaultsSeeder.SeedAllForAllUsersAsync(true);
         }
 
         var devSeeder = scopedServices.GetService<IDevSeederManager>();
         if (devSeeder != null && isDevelopment)
         {
-            await devSeeder.SeedAllAsync();
+            // await devSeeder.SeedAllAsync();
         }
 
         logger.LogInformation("Database seeding completed.");

@@ -1,10 +1,9 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
-using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
+namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.command;
 
 public class ChangePriorityTodoListEndpoint(AppCommandDbContext dbContext) : EndpointWithoutRequest
 {

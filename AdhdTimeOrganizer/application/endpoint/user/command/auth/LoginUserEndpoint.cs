@@ -1,10 +1,7 @@
-using System.Security.Claims;
 using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.dto.response.user;
-using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.infrastructure.extService.user.auth;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using UserMapper = AdhdTimeOrganizer.application.mapper.UserMapper;

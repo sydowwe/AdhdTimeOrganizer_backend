@@ -4,7 +4,6 @@ using AdhdTimeOrganizer.domain.model.entityInterface;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Helper = AdhdTimeOrganizer.domain.helper.Helper;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence;
 
@@ -25,11 +24,6 @@ public static class EntityBuilderExtensions
             .IsRequired();
         builder.Property(x => x.ModifiedTimestamp).HasDefaultValueSql("now()")
             .IsRequired();
-    }
-
-    public static PropertyBuilder<object> PriceColumn<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<TEntity, object>> column, bool isRequired = true) where TEntity : BaseEntity
-    {
-        return builder.Property(column).HasColumnType("decimal(18,2)").IsRequired(isRequired);
     }
 
     public static PropertyBuilder<TEnum> EnumColumn<TEntity, TEnum>(this EntityTypeBuilder<TEntity> builder, Expression<Func<TEntity, TEnum>> column, bool isRequired = true)

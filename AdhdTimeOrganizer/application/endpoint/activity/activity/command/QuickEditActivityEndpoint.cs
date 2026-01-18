@@ -1,13 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.activity;
-using AdhdTimeOrganizer.application.dto.response.activity;
-using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.mapper.activity;
-using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
-using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 

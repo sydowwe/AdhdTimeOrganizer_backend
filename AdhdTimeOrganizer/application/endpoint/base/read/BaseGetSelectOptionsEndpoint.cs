@@ -1,11 +1,8 @@
-﻿using System.Linq.Expressions;
-using AdhdTimeOrganizer.application.dto.response.generic;
+﻿using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.extensions;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.@interface;
-using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.entityInterface;
-using AdhdTimeOrganizer.infrastructure.extension;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;

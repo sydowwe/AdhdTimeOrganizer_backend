@@ -1,9 +1,9 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
+namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.todoList;
 
 public class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
 {

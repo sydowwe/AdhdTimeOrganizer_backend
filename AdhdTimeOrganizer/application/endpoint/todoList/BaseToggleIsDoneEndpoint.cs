@@ -1,14 +1,12 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.generic;
-using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.model.entity.@base;
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
+namespace AdhdTimeOrganizer.application.endpoint.todoList;
 
 public class BaseToggleIsDoneEndpoint<TEntity>(AppCommandDbContext dbContext) : Endpoint<IdListRequest>
     where TEntity : class, IEntityWithId, IEntityWithIsDone

@@ -1,8 +1,8 @@
 ﻿using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.manager;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface.manager;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeders;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
 public class DefaultSeederManager(IServiceProvider serviceProvider) : IScopedService, IDefaultSeederManager
 {

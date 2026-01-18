@@ -1,8 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.response.activity;
-using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.application.dto.response.taskPlanner;
-
-namespace AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
+﻿namespace AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 
 public record TemplatePlannerTaskResponse : BasePlannerTaskResponse
 {

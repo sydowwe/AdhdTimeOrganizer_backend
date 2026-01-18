@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.generic;
-using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

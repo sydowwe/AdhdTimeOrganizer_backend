@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;

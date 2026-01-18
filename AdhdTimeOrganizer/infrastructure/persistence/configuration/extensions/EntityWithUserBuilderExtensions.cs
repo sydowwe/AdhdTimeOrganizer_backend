@@ -4,28 +4,24 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
+namespace AdhdTimeOrganizer.infrastructure.persistence;
 
-public static class EntityWithUserExtensions
+public static class EntityWIthUserBuilderExtensions
 {
-    public static ReferenceCollectionBuilder<User, TEntity> IsManyWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder,
-        Expression<Func<User, IEnumerable<TEntity>?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser
+    public static ReferenceCollectionBuilder<User, TEntity> IsManyWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, IEnumerable<TEntity>?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser
     {
-        return builder.HasOne(r => r.User)
-            .WithMany(navigationProperty)
-            .HasForeignKey(r => r.UserId).IsRequired()
-            .OnDelete(deleteBehavior);
+       return builder.HasOne(r => r.User)
+           .WithMany(navigationProperty)
+           .HasForeignKey(r => r.UserId).IsRequired()
+           .OnDelete(deleteBehavior);
     }
-
-    public static ReferenceReferenceBuilder<TEntity, User> IsOneWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, TEntity?>>? navigationProperty = null,
-        DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser
+    public static ReferenceReferenceBuilder<TEntity,User> IsOneWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, TEntity?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser
     {
         return builder.HasOne(r => r.User)
             .WithOne(navigationProperty)
             .HasForeignKey<TEntity>(r => r.UserId).IsRequired()
             .OnDelete(deleteBehavior);
     }
-
 
     public static void BaseNameTextEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder, bool isNameUnique = true) where TEntity : BaseNameTextEntity
     {
@@ -49,9 +45,20 @@ public static class EntityWithUserExtensions
                 .IsUnique();
         }
     }
+    public static void BaseTextColorIconEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder, bool isTextUnique = true) where TEntity : BaseTextColorIconEntity
+    {
+        builder.BaseEntityConfigure();
+        builder.Property(r => r.Icon).HasMaxLength(50);
+    }
     public static void BaseNameTextColorEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder) where TEntity : BaseNameTextColorEntity
     {
         builder.BaseNameTextEntityConfigure();
         builder.Property(r => r.Color).HasMaxLength(7).IsRequired();
+    }
+
+    public static void BaseNameTextColorIconEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder) where TEntity : BaseNameTextColorIconEntity
+    {
+        builder.BaseNameTextColorEntityConfigure();
+        builder.Property(r => r.Icon).HasMaxLength(50);
     }
 }

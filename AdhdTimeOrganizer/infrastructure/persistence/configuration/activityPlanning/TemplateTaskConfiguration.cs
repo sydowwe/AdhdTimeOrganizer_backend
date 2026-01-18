@@ -15,7 +15,6 @@ public class TemplateTaskConfiguration : IEntityTypeConfiguration<TemplatePlanne
         builder.Property(t => t.StartTime).IsRequired();
         builder.Property(t => t.EndTime).IsRequired();
         builder.Property(t => t.IsBackground).IsRequired();
-        builder.Property(t => t.IsOptional).IsRequired();
 
         builder.Property(t => t.Location).HasMaxLength(200);
         builder.Property(t => t.Notes).HasMaxLength(1000);

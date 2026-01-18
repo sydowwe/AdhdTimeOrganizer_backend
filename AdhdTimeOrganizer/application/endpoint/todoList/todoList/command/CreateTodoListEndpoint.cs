@@ -1,15 +1,14 @@
 using AdhdTimeOrganizer.application.dto.request.toDoList;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.infrastructure.settings;
 using Microsoft.Extensions.Options;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.todoList.command;
+namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.command;
 
 public class CreateTodoListEndpoint(AppCommandDbContext dbContext, TodoListMapper mapper, IOptions<TodoListSettings> settings)
     : BaseCreateEndpoint<TodoList, CreateTodoListRequest, TodoListMapper>(dbContext, mapper)

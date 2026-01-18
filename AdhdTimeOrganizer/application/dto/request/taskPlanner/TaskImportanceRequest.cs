@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using AdhdTimeOrganizer.application.dto.request.@base;
 
-namespace AdhdTimeOrganizer.application.dto.request.toDoList;
+namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 
 public record TaskImportanceRequest : TextColorRequest
 {

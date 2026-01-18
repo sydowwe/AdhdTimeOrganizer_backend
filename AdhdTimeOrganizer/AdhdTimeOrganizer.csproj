@@ -47,15 +47,12 @@
       <Folder Include="application\endpoint\activityHistory\alarm\command\" />
       <Folder Include="application\endpoint\activityHistory\alarm\query\" />
       <Folder Include="application\endpoint\activityHistory\webExtension\query\" />
-      <Folder Include="application\endpoint\activityPlanning\TaskPriority\command\" />
-      <Folder Include="application\endpoint\activityPlanning\TaskPriority\query\" />
       <Folder Include="application\endpoint\activity\activity\query\" />
       <Folder Include="application\endpoint\activity\role\command\" />
       <Folder Include="application\endpoint\activity\role\query\" />
       <Folder Include="application\mapper\activity\" />
       <Folder Include="application\preprocessor\" />
       <Folder Include="domain\" />
-      <Folder Include="infrastructure\persistence\Migrations\" />
     </ItemGroup>
 
 

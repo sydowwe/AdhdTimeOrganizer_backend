@@ -1,10 +1,10 @@
-﻿using AdhdTimeOrganizer.application.dto.response.activityPlanning;
+﻿using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPriority.query;
+namespace AdhdTimeOrganizer.application.endpoint.todoList.taskPriority.query;
 
 public class GetByIdTaskPriorityEndpoint(
     AppCommandDbContext dbContext,

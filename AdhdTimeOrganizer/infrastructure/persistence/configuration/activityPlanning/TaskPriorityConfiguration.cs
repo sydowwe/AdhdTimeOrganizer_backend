@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

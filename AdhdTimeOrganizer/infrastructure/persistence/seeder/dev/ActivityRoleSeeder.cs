@@ -1,10 +1,8 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.activity;
-using AdhdTimeOrganizer.infrastructure.persistence.seeders;
-using Microsoft.EntityFrameworkCore;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityRoleSeeder(
     AppCommandDbContext dbContext,
@@ -22,68 +20,68 @@ public class ActivityRoleSeeder(
     {
         var activityRoles = new List<ActivityRole>
         {
-            new ActivityRole
+            new()
             {
                 Name = "Work",
                 Text = "Professional and career-related activities",
                 Color = "#1976D2", // Blue
-                Icon = "💼",
+                Icon = "fas fa-briefcase",
                 UserId = userId
             },
-            new ActivityRole
+            new()
             {
                 Name = "Personal Development",
                 Text = "Learning, growth, and self-improvement",
                 Color = "#7B1FA2", // Purple
-                Icon = "📚",
+                Icon = "fas fa-book",
                 UserId = userId
             },
-            new ActivityRole
+            new()
             {
                 Name = "Health & Fitness",
                 Text = "Physical health, exercise, and wellness",
                 Color = "#388E3C", // Green
-                Icon = "💪",
+                Icon = "fas fa-dumbbell",
                 UserId = userId
             },
-            new ActivityRole
+            new()
             {
                 Name = "Social",
                 Text = "Family, friends, and social interactions",
                 Color = "#F57C00", // Orange
-                Icon = "👥",
+                Icon = "fas fa-users",
                 UserId = userId
             },
-            new ActivityRole
+            new()
             {
                 Name = "Hobbies & Leisure",
                 Text = "Recreation, entertainment, and enjoyment",
                 Color = "#E91E63", // Pink
-                Icon = "🎮",
+                Icon = "fas fa-gamepad",
                 UserId = userId
             },
-            new ActivityRole
+            new()
             {
                 Name = "Household",
                 Text = "Home maintenance, chores, and errands",
                 Color = "#795548", // Brown
-                Icon = "🏠",
+                Icon = "fas fa-house",
                 UserId = userId
             },
-            new ActivityRole
+            new()
             {
                 Name = "Finance",
                 Text = "Money management and financial planning",
                 Color = "#4CAF50", // Light Green
-                Icon = "💰",
+                Icon = "fas fa-money-bill-wave",
                 UserId = userId
             },
-            new ActivityRole
+            new()
             {
                 Name = "Self-Care",
                 Text = "Rest, relaxation, and mental well-being",
                 Color = "#00BCD4", // Cyan
-                Icon = "🧘",
+                Icon = "fas fa-spa",
                 UserId = userId
             }
         };

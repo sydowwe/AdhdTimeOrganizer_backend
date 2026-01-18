@@ -1,10 +1,10 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeders;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class PlannerTaskSeeder(
     AppCommandDbContext dbContext,
@@ -65,12 +65,21 @@ public class PlannerTaskSeeder(
         var onlineCourse = activities.FirstOrDefault(a => a.Name == "Online Course");
         var sideProject = activities.FirstOrDefault(a => a.Name == "Side Project");
         var gaming = activities.FirstOrDefault(a => a.Name == "Gaming Session");
+        var sprintPlanning = activities.FirstOrDefault(a => a.Name == "Sprint Planning");
+        var laundry = activities.FirstOrDefault(a => a.Name == "Laundry");
+        var houseCleaning = activities.FirstOrDefault(a => a.Name == "House Cleaning");
+        var groceryShopping = activities.FirstOrDefault(a => a.Name == "Grocery Shopping");
+        var watchMovie = activities.FirstOrDefault(a => a.Name == "Watch Movie/Series");
 
         // Get importance levels
         var criticalImportance = importances.FirstOrDefault(i => i.Importance == 999);
         var highImportance = importances.FirstOrDefault(i => i.Importance == 888);
         var mediumImportance = importances.FirstOrDefault(i => i.Importance == 777);
-        var lowImportance = importances.FirstOrDefault(i => i.Importance == 666);
+        var optionalImportance = importances.FirstOrDefault(i => i.Importance == 666);
+        if (criticalImportance == null || highImportance == null || mediumImportance == null || optionalImportance == null)
+        {
+            throw new InvalidOperationException("Critical importance levels are missing in the database.");
+        }
 
         // Get a to-do list to link (optional)
         var bugFixingTodo = todoLists.FirstOrDefault(tl => tl.ActivityId == bugFixing?.Id);
@@ -104,8 +113,8 @@ public class PlannerTaskSeeder(
                     StartTime = isWeekend ? new TimeOnly(9, 0) : new TimeOnly(7, 30),
                     EndTime = isWeekend ? new TimeOnly(10, 0) : new TimeOnly(8, 30),
                     IsBackground = false,
-                    IsOptional = true,
-                    ImportanceId = highImportance?.Id,
+
+                    ImportanceId = mediumImportance.Id,
                     IsDone = false,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
@@ -127,12 +136,30 @@ public class PlannerTaskSeeder(
                         StartTime = new TimeOnly(9, 0),
                         EndTime = new TimeOnly(9, 15),
                         IsBackground = false,
-                        IsOptional = false,
-                        ImportanceId = highImportance?.Id,
+                        ImportanceId = criticalImportance.Id,
                         IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
-                        Notes = "Daily team sync",
+                        Notes = "Daily team sync - Mandatory",
+                        IsFromTemplate = false,
+                        UserId = userId
+                    });
+                }
+
+                if (calendar.Date.DayOfWeek == DayOfWeek.Monday && sprintPlanning != null)
+                {
+                    plannerTasks.Add(new PlannerTask
+                    {
+                        CalendarId = calendar.Id,
+                        ActivityId = sprintPlanning.Id,
+                        StartTime = new TimeOnly(10, 0),
+                        EndTime = new TimeOnly(11, 30),
+                        IsBackground = false,
+                        ImportanceId = criticalImportance.Id,
+                        IsDone = false,
+                        Status = PlannerTaskStatus.NotStarted,
+                        Location = "Meeting Room",
+                        Notes = "Weekly sprint planning",
                         IsFromTemplate = false,
                         UserId = userId
                     });
@@ -144,11 +171,10 @@ public class PlannerTaskSeeder(
                     {
                         CalendarId = calendar.Id,
                         ActivityId = featureDev.Id,
-                        StartTime = new TimeOnly(9, 30),
-                        EndTime = new TimeOnly(12, 30),
+                        StartTime = calendar.Date.DayOfWeek == DayOfWeek.Monday ? new TimeOnly(11, 30) : new TimeOnly(9, 30),
+                        EndTime = new TimeOnly(13, 0),
                         IsBackground = false,
-                        IsOptional = false,
-                        ImportanceId = highImportance?.Id,
+                        ImportanceId = highImportance.Id,
                         IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
@@ -168,8 +194,7 @@ public class PlannerTaskSeeder(
                         StartTime = new TimeOnly(14, 0),
                         EndTime = new TimeOnly(16, 0),
                         IsBackground = false,
-                        IsOptional = false,
-                        ImportanceId = highImportance?.Id,
+                        ImportanceId = highImportance.Id,
                         IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
@@ -188,8 +213,8 @@ public class PlannerTaskSeeder(
                         StartTime = new TimeOnly(16, 0),
                         EndTime = new TimeOnly(17, 0),
                         IsBackground = false,
-                        IsOptional = true,
-                        ImportanceId = mediumImportance?.Id,
+
+                        ImportanceId = mediumImportance.Id,
                         IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
@@ -198,21 +223,78 @@ public class PlannerTaskSeeder(
                         UserId = userId
                     });
                 }
+
+                if (laundry != null && calendar.Date.DayOfWeek == DayOfWeek.Wednesday)
+                {
+                    plannerTasks.Add(new PlannerTask
+                    {
+                        CalendarId = calendar.Id,
+                        ActivityId = laundry.Id,
+                        StartTime = new TimeOnly(17, 0),
+                        EndTime = new TimeOnly(18, 0),
+                        IsBackground = true,
+                        ImportanceId = optionalImportance.Id,
+                        IsDone = false,
+                        Status = PlannerTaskStatus.NotStarted,
+                        Location = "Home",
+                        Notes = "Do some laundry",
+                        IsFromTemplate = false,
+                        UserId = userId
+                    });
+                }
             }
             else
             {
                 // Weekend tasks
+                if (houseCleaning != null && calendar.Date.DayOfWeek == DayOfWeek.Saturday)
+                {
+                    plannerTasks.Add(new PlannerTask
+                    {
+                        CalendarId = calendar.Id,
+                        ActivityId = houseCleaning.Id,
+                        StartTime = new TimeOnly(10, 0),
+                        EndTime = new TimeOnly(12, 0),
+                        IsBackground = false,
+                        ImportanceId = mediumImportance.Id,
+                        IsDone = false,
+                        Status = PlannerTaskStatus.NotStarted,
+                        Location = "Home",
+                        Notes = "Weekly cleaning",
+                        IsFromTemplate = false,
+                        UserId = userId
+                    });
+                }
+
+                if (groceryShopping != null && calendar.Date.DayOfWeek == DayOfWeek.Saturday)
+                {
+                    plannerTasks.Add(new PlannerTask
+                    {
+                        CalendarId = calendar.Id,
+                        ActivityId = groceryShopping.Id,
+                        StartTime = new TimeOnly(13, 0),
+                        EndTime = new TimeOnly(14, 30),
+                        IsBackground = false,
+                        ImportanceId = highImportance.Id,
+                        IsDone = false,
+                        Status = PlannerTaskStatus.NotStarted,
+                        Location = "Supermarket",
+                        Notes = "Buy food for the week",
+                        IsFromTemplate = false,
+                        UserId = userId
+                    });
+                }
+
                 if (onlineCourse != null)
                 {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
                         ActivityId = onlineCourse.Id,
-                        StartTime = new TimeOnly(11, 0),
-                        EndTime = new TimeOnly(12, 30),
+                        StartTime = isWeekend && calendar.Date.DayOfWeek == DayOfWeek.Saturday ? new TimeOnly(15, 0) : new TimeOnly(11, 0),
+                        EndTime = isWeekend && calendar.Date.DayOfWeek == DayOfWeek.Saturday ? new TimeOnly(16, 30) : new TimeOnly(12, 30),
                         IsBackground = false,
-                        IsOptional = true,
-                        ImportanceId = mediumImportance?.Id,
+
+                        ImportanceId = mediumImportance.Id,
                         IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
@@ -231,8 +313,8 @@ public class PlannerTaskSeeder(
                         StartTime = new TimeOnly(14, 0),
                         EndTime = new TimeOnly(17, 0),
                         IsBackground = false,
-                        IsOptional = true,
-                        ImportanceId = mediumImportance?.Id,
+
+                        ImportanceId = optionalImportance.Id,
                         IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
@@ -251,12 +333,31 @@ public class PlannerTaskSeeder(
                         StartTime = new TimeOnly(19, 0),
                         EndTime = new TimeOnly(21, 0),
                         IsBackground = false,
-                        IsOptional = true,
-                        ImportanceId = lowImportance?.Id,
+
+                        ImportanceId = optionalImportance.Id,
                         IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Gaming session for fun",
+                        IsFromTemplate = false,
+                        UserId = userId
+                    });
+                }
+
+                if (watchMovie != null && calendar.Date.DayOfWeek == DayOfWeek.Sunday)
+                {
+                    plannerTasks.Add(new PlannerTask
+                    {
+                        CalendarId = calendar.Id,
+                        ActivityId = watchMovie.Id,
+                        StartTime = new TimeOnly(20, 0),
+                        EndTime = new TimeOnly(22, 0),
+                        IsBackground = false,
+                        ImportanceId = optionalImportance.Id,
+                        IsDone = false,
+                        Status = PlannerTaskStatus.NotStarted,
+                        Location = "Home",
+                        Notes = "Relaxing with a movie",
                         IsFromTemplate = false,
                         UserId = userId
                     });
@@ -273,12 +374,11 @@ public class PlannerTaskSeeder(
                     StartTime = new TimeOnly(18, 30),
                     EndTime = new TimeOnly(19, 30),
                     IsBackground = false,
-                    IsOptional = false,
-                    ImportanceId = highImportance?.Id,
+                    ImportanceId = criticalImportance.Id,
                     IsDone = false,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
-                    Notes = "Family time",
+                    Notes = "Family time - Important",
                     IsFromTemplate = false,
                     UserId = userId
                 });
@@ -293,8 +393,8 @@ public class PlannerTaskSeeder(
                     StartTime = new TimeOnly(21, 30),
                     EndTime = new TimeOnly(22, 0),
                     IsBackground = false,
-                    IsOptional = true,
-                    ImportanceId = mediumImportance?.Id,
+
+                    ImportanceId = mediumImportance.Id,
                     IsDone = false,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
@@ -313,8 +413,7 @@ public class PlannerTaskSeeder(
                     StartTime = new TimeOnly(22, 30),
                     EndTime = new TimeOnly(23, 0),
                     IsBackground = false,
-                    IsOptional = false,
-                    ImportanceId = highImportance?.Id,
+                    ImportanceId = highImportance.Id,
                     IsDone = false,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",

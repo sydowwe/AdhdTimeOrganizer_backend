@@ -1,9 +1,8 @@
 ﻿using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
 
-namespace AdhdTimeOrganizer.application.dto.response.activityPlanning;
+namespace AdhdTimeOrganizer.application.dto.response.taskPlanner;
 
 public record CalendarResponse : IdResponse
 {
@@ -23,9 +22,6 @@ public record CalendarResponse : IdResponse
     public string? Weather { get; init; }
     public string? Notes { get; init; }
 
-    // public required virtual ICollection<PlannerTaskResponse> Tasks { get; init; }
-
     public required int TotalTasks { get; init; }
     public required int CompletedTasks { get; init; }
-    public required int CompletionRate { get; init; }
 }

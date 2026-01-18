@@ -1,11 +1,10 @@
 ﻿using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.infrastructure.extension;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activity.read;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.query;
 
 public class FormSelectOptionsPlannerTaskEndpoint(AppCommandDbContext appDbContext) 
     : BaseActivityFormSelectOptionsEndpoint<PlannerTask>(appDbContext)

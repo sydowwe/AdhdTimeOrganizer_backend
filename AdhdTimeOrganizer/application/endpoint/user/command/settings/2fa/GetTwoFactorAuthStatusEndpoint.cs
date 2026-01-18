@@ -2,7 +2,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.settings;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.settings._2fa;
 
 /// <summary>
 /// Returns the current user's two-factor authentication status.

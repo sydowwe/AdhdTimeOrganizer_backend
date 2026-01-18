@@ -8,12 +8,13 @@ public abstract class BasePlannerTask : BaseEntityWithActivity
     public required TimeOnly StartTime { get; set; }
     public required TimeOnly EndTime { get; set; }
     public required bool IsBackground { get; set; }
-    public required bool IsOptional { get; set; }
 
     // Notes
     public string? Location { get; set; } // "Home", "Gym", "Office"
     public string? Notes { get; set; }
 
-    public long? ImportanceId { get; set; }
-    public TaskImportance? Importance { get; set; }
+    public long ImportanceId { get; set; }
+    public TaskImportance Importance { get; set; } = null!;
+
+    public bool IsOptional => Importance.Importance == 666;
 }

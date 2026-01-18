@@ -2,7 +2,7 @@ using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.templateTask.command;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templatePlannerTask.command;
 
 public class DeleteTemplatePlannerTaskEndpoint(AppCommandDbContext dbContext)
     : BaseDeleteEndpoint<TemplatePlannerTask>(dbContext)

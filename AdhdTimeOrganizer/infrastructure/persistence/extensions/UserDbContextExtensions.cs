@@ -2,7 +2,7 @@
 using AdhdTimeOrganizer.domain.model.entity.user;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence;
+namespace AdhdTimeOrganizer.infrastructure.persistence.extensions;
 
 public static class UserDbContextExtensions
 {

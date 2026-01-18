@@ -1,9 +1,7 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.domain.model.entity.@base;
-using AdhdTimeOrganizer.domain.model.entityInterface;
+﻿using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
+namespace AdhdTimeOrganizer.application.endpoint.todoList;
 
 public class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppCommandDbContext dbContext) : BaseToggleIsDoneEndpoint<TEntity>(dbContext)
     where TEntity : class, IEntityWithDoneAndTotalCount, IEntityWithIsDone

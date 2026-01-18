@@ -1,13 +1,13 @@
 ﻿using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.request.generic;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
-using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.application.mapper;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
+using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
+using TemplatePlannerTaskMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.TemplatePlannerTaskMapper;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlannerDayTemplate.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templatePlannerTask.query;
 
 public class GetFilterSortedTemplatePlannerTask(AppCommandDbContext dbContext, TemplatePlannerTaskMapper mapper)
     : BaseFilterEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse, TemplatePlannerTaskFilter, TemplatePlannerTaskMapper>(dbContext, mapper)

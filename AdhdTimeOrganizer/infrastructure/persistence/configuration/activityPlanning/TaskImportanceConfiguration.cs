@@ -8,7 +8,7 @@ public class TaskImportanceConfiguration : IEntityTypeConfiguration<TaskImportan
 {
     public void Configure(EntityTypeBuilder<TaskImportance> builder)
     {
-        builder.BaseTextColorEntityConfigure();
+        builder.BaseTextColorIconEntityConfigure();
         builder.Property(t=>t.Importance).IsRequired();
 
         builder.HasIndex(t => new { t.UserId, t.Importance }).IsUnique();

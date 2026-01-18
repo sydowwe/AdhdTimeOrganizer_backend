@@ -1,5 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.@event;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 

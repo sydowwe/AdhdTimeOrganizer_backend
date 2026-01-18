@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using AdhdTimeOrganizer.application.dto.request.@interface;
 
-namespace AdhdTimeOrganizer.application.dto.request.plannerTask;
+namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 
 public record PlannerFilterRequest : IMyRequest
 {

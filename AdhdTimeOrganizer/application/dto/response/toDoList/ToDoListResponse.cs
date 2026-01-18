@@ -1,6 +1,6 @@
-using AdhdTimeOrganizer.application.dto.response.extendable;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 
-namespace AdhdTimeOrganizer.application.dto.response.activityPlanning;
+namespace AdhdTimeOrganizer.application.dto.response.toDoList;
 
 public record TodoListResponse : BaseTodoListResponse
 {

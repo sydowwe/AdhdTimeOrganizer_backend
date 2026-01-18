@@ -4,9 +4,9 @@ using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.extService.user.auth;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 

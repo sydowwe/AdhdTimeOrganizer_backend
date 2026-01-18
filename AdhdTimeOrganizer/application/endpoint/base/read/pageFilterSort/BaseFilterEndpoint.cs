@@ -1,19 +1,16 @@
-﻿using AdhdTimeOrganizer.application.dto.request.@base.table;
-using AdhdTimeOrganizer.application.dto.request.generic;
+﻿using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.extensions;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.@interface;
-using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.entityInterface;
-using AdhdTimeOrganizer.infrastructure.extension;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.@base.read;
+namespace AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 
 public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>(
     AppCommandDbContext dbContext,

@@ -1,7 +1,6 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.result;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 

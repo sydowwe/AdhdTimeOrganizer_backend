@@ -1,12 +1,12 @@
 using AdhdTimeOrganizer.application.dto.dto;
-using AdhdTimeOrganizer.application.dto.request.taskPlannerDayTemplate;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
+using AdhdTimeOrganizer.application.dto.request.taskPlanner.template;
 using AdhdTimeOrganizer.application.dto.response.generic;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using Riok.Mapperly.Abstractions;
 
-namespace AdhdTimeOrganizer.application.mapper;
+namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
 
 [Mapper]
 public partial class TaskPlannerDayTemplateMapper : IBaseSimpleCrudMapper<TaskPlannerDayTemplate, TaskPlannerDayTemplateRequest, TaskPlannerDayTemplateResponse>

@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
+﻿namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 
 /// <summary>
 /// Common interface for all database seeders.

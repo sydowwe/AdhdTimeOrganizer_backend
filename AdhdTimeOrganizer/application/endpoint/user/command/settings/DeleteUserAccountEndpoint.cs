@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.profile;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.settings;
 
 /// <summary>
 /// Permanently deletes user account. Requires password and 2FA verification.

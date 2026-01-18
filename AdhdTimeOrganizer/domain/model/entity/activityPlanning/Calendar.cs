@@ -32,6 +32,5 @@ public class Calendar : BaseEntityWithUser
     public bool IsWeekend => DayIndex is 6 or 7;
     // Completion tracking
     public int TotalTasks => Tasks.Count;
-    public int CompletedTasks => Tasks.Select(t => t.IsDone).Count();
-    public int CompletionRate => TotalTasks > 0 ? (CompletedTasks * 100) / TotalTasks : 0;
+    public int CompletedTasks => Tasks.Count(t => t.IsDone);
 }

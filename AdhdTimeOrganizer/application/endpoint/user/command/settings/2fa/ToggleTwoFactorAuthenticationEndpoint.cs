@@ -7,7 +7,7 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.profile;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.settings._2fa;
 
 /// <summary>
 /// Enables or disables two-factor authentication for the user.

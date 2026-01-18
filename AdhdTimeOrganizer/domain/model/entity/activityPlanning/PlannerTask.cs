@@ -1,12 +1,13 @@
-using AdhdTimeOrganizer.domain.model.entity.@base;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.domain.model.@enum;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 public class PlannerTask : BasePlannerTask, IEntityWithIsDone
 {
-    public bool IsDone { get; set; }
-    public PlannerTaskStatus Status { get; set; } // Pending, InProgress, Completed, Skipped
+    public required bool IsDone { get; set; }
+    public required PlannerTaskStatus Status { get; set; } // Pending, InProgress, Completed, Skipped
     public TimeOnly? ActualStartTime { get; set; }
     public TimeOnly? ActualEndTime { get; set; }
     public string? SkipReason { get; set; }
@@ -15,7 +16,7 @@ public class PlannerTask : BasePlannerTask, IEntityWithIsDone
     public bool IsFromTemplate { get; set; }
     public long? SourceTemplateTaskId { get; set; } // Track which template task this came from
 
-    public long CalendarId { get; set; }
+    public required long CalendarId { get; set; }
     public virtual Calendar Calendar { get; set; } = null!;
 
     public long? TodolistId { get; set; }

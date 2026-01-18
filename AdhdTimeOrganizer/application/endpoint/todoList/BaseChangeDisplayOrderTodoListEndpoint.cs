@@ -1,6 +1,4 @@
 ﻿using System.Linq.Expressions;
-using FastEndpoints;
-using Microsoft.EntityFrameworkCore;
 using AdhdTimeOrganizer.application.dto.request.@base;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity;
@@ -8,10 +6,12 @@ using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.infrastructure.settings;
+using FastEndpoints;
 using Humanizer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
+namespace AdhdTimeOrganizer.application.endpoint.todoList;
 
 public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppCommandDbContext dbContext, IOptions<TodoListSettings> settings) : Endpoint<ChangeDisplayOrderRequest>
     where TEntity : BaseTodoList

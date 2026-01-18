@@ -1,13 +1,13 @@
-using AdhdTimeOrganizer.application.dto.response.activityPlanning;
+using AdhdTimeOrganizer.application.dto.response.toDoList;
 using AdhdTimeOrganizer.application.extensions;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
-using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.routineTodoList.query;
+namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.query;
 
 public class GetAllGroupedRoutineTodoListEndpoint(
     AppCommandDbContext dbContext,

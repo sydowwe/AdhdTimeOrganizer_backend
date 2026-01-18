@@ -1,11 +1,9 @@
 using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
-using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.application.extensions;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper;
-using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

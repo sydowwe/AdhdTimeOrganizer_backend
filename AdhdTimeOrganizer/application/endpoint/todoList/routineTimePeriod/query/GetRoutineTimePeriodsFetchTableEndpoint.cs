@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.application.dto.filter;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning;
-using AdhdTimeOrganizer.application.endpoint.@base.read;
+using AdhdTimeOrganizer.application.dto.response.toDoList;
+using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.routineTimePeriod.query;
+namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTimePeriod.query;
 
 public class GetRoutineTimePeriodsFetchTableEndpoint(
     AppCommandDbContext dbContext,

@@ -1,5 +1,4 @@
-﻿using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.application.endpoint.@base.read.withoutUser;
+﻿using AdhdTimeOrganizer.application.endpoint.@base.read.withoutUser;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using mapper_UserRoleMapper = AdhdTimeOrganizer.application.mapper.UserRoleMapper;

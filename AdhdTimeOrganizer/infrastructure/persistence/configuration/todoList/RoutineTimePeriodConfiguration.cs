@@ -1,8 +1,8 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
+namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.todoList;
 
 public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTimePeriod>
 {

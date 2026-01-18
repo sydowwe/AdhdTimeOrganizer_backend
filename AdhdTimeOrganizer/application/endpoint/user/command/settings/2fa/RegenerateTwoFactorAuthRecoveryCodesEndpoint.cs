@@ -4,7 +4,7 @@ using AdhdTimeOrganizer.application.preprocessor;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using FastEndpoints;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.settings;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.settings._2fa;
 
 /// <summary>
 /// Regenerates 2FA recovery codes. Invalidates all previous recovery codes.

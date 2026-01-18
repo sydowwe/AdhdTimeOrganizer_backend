@@ -14,4 +14,14 @@ public static class EndpointHelper
         return context.Items["VerifiedUser"] as User
                ?? throw new InvalidOperationException("User not verified. Ensure VerifyUserPreProcessor is configured.");
     }
+
+    public static string[] GetUserOrHigherRoles()
+    {
+        return ["User", "Admin", "Root"];
+    }
+
+    public static string[] GetAdminOrHigherRoles()
+    {
+        return ["Admin", "Root"];
+    }
 }

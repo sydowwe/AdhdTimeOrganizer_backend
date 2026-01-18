@@ -1,4 +1,4 @@
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 
 /// <summary>
 /// Interface for seeders that create default data for individual users.

@@ -1,8 +1,6 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using FastEndpoints;
-using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning;
+namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.command;
 
 public class ToggleIsDoneTodoListEndpoint(AppCommandDbContext dbContext) : BaseToggleIsDoneTodoListEndpoint<TodoList>(dbContext);

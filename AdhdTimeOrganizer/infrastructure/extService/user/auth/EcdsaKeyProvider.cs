@@ -1,7 +1,6 @@
 ﻿using System.Security.Cryptography;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AdhdTimeOrganizer.infrastructure.extService.user.auth;

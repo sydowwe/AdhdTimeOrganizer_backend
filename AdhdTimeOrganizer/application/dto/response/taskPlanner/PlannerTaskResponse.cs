@@ -1,8 +1,7 @@
 using AdhdTimeOrganizer.application.dto.dto;
-using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.domain.model.@enum;
 
-namespace AdhdTimeOrganizer.application.dto.response.activityPlanning;
+namespace AdhdTimeOrganizer.application.dto.response.taskPlanner;
 
 public record PlannerTaskResponse : BasePlannerTaskResponse
 {

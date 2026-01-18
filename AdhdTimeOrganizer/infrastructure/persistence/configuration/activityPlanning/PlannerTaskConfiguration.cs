@@ -17,7 +17,6 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
         builder.Property(p => p.StartTime).IsRequired();
         builder.Property(p => p.EndTime).IsRequired();
         builder.Property(p => p.IsBackground).IsRequired();
-        builder.Property(p => p.IsOptional).HasDefaultValue(false).IsRequired();
         builder.Property(p => p.Status).IsRequired();
         builder.Property(p => p.IsFromTemplate).HasDefaultValue(false).IsRequired();
 

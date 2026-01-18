@@ -2,9 +2,9 @@
 
 public enum PlannerTaskStatus
 {
-    NotStarted = 0,
-    InProgress = 1,
-    OnHold = 2,
-    Completed = 3,
-    Cancelled = 4
+    NotStarted,
+    InProgress,
+    OnHold,
+    Completed,
+    Cancelled
 }

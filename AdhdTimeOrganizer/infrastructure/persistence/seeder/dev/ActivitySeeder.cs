@@ -1,10 +1,9 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.activity;
-using AdhdTimeOrganizer.infrastructure.persistence.seeders;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivitySeeder(
     AppCommandDbContext dbContext,

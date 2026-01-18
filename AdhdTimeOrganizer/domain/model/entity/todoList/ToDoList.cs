@@ -1,7 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.@base;
-using AdhdTimeOrganizer.domain.model.entityInterface;
-
-namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+namespace AdhdTimeOrganizer.domain.model.entity.todoList;
 
 public class TodoList : BaseTodoList
 {

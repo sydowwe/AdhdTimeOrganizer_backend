@@ -1,11 +1,10 @@
 ﻿using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
-using AdhdTimeOrganizer.infrastructure.extension;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activity.read;
+namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query;
 
 public class FormSelectOptionsActivityHistoryEndpoint(AppCommandDbContext appDbContext) 
     : BaseActivityFormSelectOptionsEndpoint<ActivityHistory>(appDbContext)

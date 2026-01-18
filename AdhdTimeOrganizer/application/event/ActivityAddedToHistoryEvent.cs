@@ -1,5 +1,4 @@
 ﻿using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.model.dto;
 using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.@event;

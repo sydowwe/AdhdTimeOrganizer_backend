@@ -1,7 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.activity;
-using AdhdTimeOrganizer.domain.model.entityInterface;
-
-namespace AdhdTimeOrganizer.domain.model.entity.@base;
+namespace AdhdTimeOrganizer.domain.model.entityInterface;
 
 public interface IEntityWithIsDone : IEntityWithId
 {

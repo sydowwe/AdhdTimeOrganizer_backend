@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence.seeders;
+namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
 public static class SeederExtensions
 {

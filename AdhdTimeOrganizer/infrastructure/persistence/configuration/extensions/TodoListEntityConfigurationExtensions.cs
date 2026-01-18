@@ -11,8 +11,8 @@ public static class TodoListEntityConfigurationExtensions
         var entityName = typeof(TEntity).Name;
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint($"CK_{entityName}_DoneCount_Min", "done_count >= 0");
-            t.HasCheckConstraint($"CK_{entityName}_TotalCount_Range", "total_count >= 2 AND total_count <= 99");
+            t.HasCheckConstraint($"CK_{entityName}_DoneCount_Min", "done_count IS NULL OR done_count >= 0");
+            t.HasCheckConstraint($"CK_{entityName}_TotalCount_Range", "total_count IS NULL OR total_count >= 2 AND total_count <= 99");
             t.HasCheckConstraint($"CK_{entityName}_DoneCount_LessOrEqual_TotalCount", "done_count <= total_count");
         });
 

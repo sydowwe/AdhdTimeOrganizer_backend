@@ -1,8 +1,7 @@
-﻿using AdhdTimeOrganizer.application.dto.request.filter;
+﻿using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.user;
-using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.application.endpoint.@base.read.withoutUser;
-using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using UserMapper = AdhdTimeOrganizer.application.mapper.UserMapper;

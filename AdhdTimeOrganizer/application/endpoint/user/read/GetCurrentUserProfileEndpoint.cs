@@ -4,7 +4,7 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.settings;
+namespace AdhdTimeOrganizer.application.endpoint.user.read;
 
 /// <summary>
 /// Returns the currently logged-in user's profile data.

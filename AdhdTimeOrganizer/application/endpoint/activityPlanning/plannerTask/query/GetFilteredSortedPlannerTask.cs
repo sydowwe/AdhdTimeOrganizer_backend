@@ -1,15 +1,14 @@
 ﻿using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.request.generic;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
-using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.application.mapper;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlannerDayTemplate.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.query;
 
 public class GetFilterSortedPlannerTask(AppCommandDbContext dbContext, PlannerTaskMapper mapper)
     : BaseFilterEndpoint<PlannerTask, PlannerTaskResponse, PlannerTaskFilter, PlannerTaskMapper>(dbContext, mapper)
@@ -59,11 +58,6 @@ public class GetFilterSortedPlannerTask(AppCommandDbContext dbContext, PlannerTa
 
     protected override IQueryable<PlannerTask> WithIncludes(IQueryable<PlannerTask> query)
     {
-        return query
-            .Include(pt => pt.Importance)
-            .Include(pt => pt.Activity)
-                .ThenInclude(a => a.Role)
-            .Include(pt => pt.Activity)
-                .ThenInclude(a => a.Category);
+        return query.WithIncludes();
     }
 }

@@ -1,12 +1,10 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.taskPlanner;
-using AdhdTimeOrganizer.application.dto.request.taskPlanner.template;
-using AdhdTimeOrganizer.application.dto.response.activityPlanning.taskPlannerDayTemplate;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templateTask.command;
+namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templatePlannerTask.command;
 
 public class TemplatePlannerTaskChangeSpanEndpoint(AppCommandDbContext dbContext) : BasePatchEndpoint<TemplatePlannerTask, PlannerTaskChangeSpanRequest, TemplatePlannerTaskResponse>(dbContext)
 {

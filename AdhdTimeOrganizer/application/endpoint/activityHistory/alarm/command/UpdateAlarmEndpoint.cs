@@ -1,5 +1,4 @@
 using AdhdTimeOrganizer.application.dto.request;
-using AdhdTimeOrganizer.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;

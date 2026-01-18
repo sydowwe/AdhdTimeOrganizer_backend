@@ -1,8 +1,6 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.entityInterface;
 
 namespace AdhdTimeOrganizer.application.mapper.@interface;
 
