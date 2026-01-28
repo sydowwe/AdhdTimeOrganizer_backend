@@ -2,6 +2,7 @@
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.timer;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.user;
@@ -31,6 +32,8 @@ public partial class AppCommandDbContext(DbContextOptions<AppCommandDbContext> o
     public DbSet<TodoList> TodoLists { get; set; }
     public DbSet<TaskPriority> TaskUrgencies { get; set; }
     public DbSet<WebExtensionData> WebExtensionData { get; set; }
+    public DbSet<TimerPreset> TimerPresets { get; set; }
+    public DbSet<PomodoroTimerPreset> PomodoroTimerPresets { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

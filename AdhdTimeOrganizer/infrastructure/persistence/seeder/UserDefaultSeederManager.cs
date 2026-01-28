@@ -24,7 +24,7 @@ public class UserDefaultSeederManager(
                 logger.LogInformation("Resetting {SeederName} for user {UserId}", seeder.SeederName, userId);
                 resetSuccessful = await seeder.ResetDefaults(userId, ct);
             }
-            if (!resetSuccessful)
+            if (!resetSuccessful && !overrideData)
             {
                 continue;
             }
