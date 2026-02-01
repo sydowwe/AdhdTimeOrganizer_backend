@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.application.dto.response.timer;
@@ -10,6 +11,6 @@ public record PomodoroTimerPresetResponse : IdResponse
     public required int LongBreakDuration { get; init; }
     public required int FocusPeriodInCycleCount { get; init; }
     public required int NumberOfCycles { get; init; }
-    public long? FocusActivityId { get; init; }
-    public long? RestActivityId { get; init; }
+    public ActivityResponse? FocusActivity { get; init; }
+    public ActivityResponse? RestActivity { get; init; }
 }
