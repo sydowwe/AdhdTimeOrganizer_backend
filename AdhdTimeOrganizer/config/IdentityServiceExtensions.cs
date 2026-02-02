@@ -35,12 +35,29 @@ public static class IdentityServiceExtensions
                 {
                     OnMessageReceived = context =>
                     {
-                        // Try to get token from cookie first, then from Authorization header
+                        // Priority 1: Authorization Bearer header (for extension)
+                        var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                        if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
+                        {
+                            context.Token = authHeader.Substring("Bearer ".Length).Trim();
+                            return Task.CompletedTask;
+                        }
+
+                        // Priority 2: Cookie (for web)
                         if (context.Request.Cookies.ContainsKey("auth-token"))
                         {
                             context.Token = context.Request.Cookies["auth-token"];
                         }
 
+                        return Task.CompletedTask;
+                    },
+                    OnAuthenticationFailed = context =>
+                    {
+                        // Set custom header for expired tokens
+                        if (context.Exception is SecurityTokenExpiredException)
+                        {
+                            context.Response.Headers.Append("X-Token-Expired", "true");
+                        }
                         return Task.CompletedTask;
                     }
                 };

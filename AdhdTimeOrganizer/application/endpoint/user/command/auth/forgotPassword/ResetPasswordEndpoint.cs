@@ -3,14 +3,14 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.forgotPassword;
 
 public class ResetPasswordEndpoint(UserManager<User> userManager)
     : Endpoint<ResetPasswordRequest, EmptyResponse>
 {
     public override void Configure()
     {
-        Post("user/reset-password");
+        Post("auth/reset-password");
         AllowAnonymous();
         Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => { s.Summary = "Reset password using reset token"; });

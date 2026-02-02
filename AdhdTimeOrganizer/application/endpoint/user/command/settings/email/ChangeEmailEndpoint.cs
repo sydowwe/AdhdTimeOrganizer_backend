@@ -22,7 +22,7 @@ public class ChangeEmailEndpoint(
 {
     public override void Configure()
     {
-        Patch("user/email");
+        Patch("user/change-email");
         PreProcessor<VerifyUserPreProcessor<VerifyUserRequest>>();
         Summary(s => { s.Summary = "Change user email address"; });
     }

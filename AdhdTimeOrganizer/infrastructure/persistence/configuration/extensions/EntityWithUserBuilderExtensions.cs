@@ -4,7 +4,7 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence;
+namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 
 public static class EntityWIthUserBuilderExtensions
 {

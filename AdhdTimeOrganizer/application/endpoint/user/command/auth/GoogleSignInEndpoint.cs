@@ -22,7 +22,7 @@ public class GoogleSignInEndpoint(
 {
     public override void Configure()
     {
-        Post("user/google/sign-in");
+        Post("auth/login/google");
         AllowAnonymous();
         Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => { s.Summary = "Sign in with Google OAuth"; });
@@ -71,7 +71,7 @@ public class GoogleSignInEndpoint(
             return;
         }
 
-        await jwtService.GenerateJwtAndSetAuthCookie(true, AuthMethodEnum.Google, user, userManager, HttpContext);
+        await jwtService.GenerateJwtAndSetAuthCookie(true, AuthMethodEnum.Google, user, HttpContext);
 
         var response = new GoogleSignInResponse
         {

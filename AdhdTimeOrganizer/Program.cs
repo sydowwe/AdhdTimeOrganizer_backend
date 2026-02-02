@@ -102,6 +102,9 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     }
     services.AddIdentityServices();
 
+    // Background services
+    services.AddHostedService<AdhdTimeOrganizer.infrastructure.extService.RefreshTokenCleanupService>();
+
     // Caching
     services.AddDistributedMemoryCache();
 

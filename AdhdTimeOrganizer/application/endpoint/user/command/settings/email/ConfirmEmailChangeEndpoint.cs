@@ -16,7 +16,7 @@ public class ConfirmEmailChangeEndpoint(
 {
     public override void Configure()
     {
-        Post("user/email/confirm");
+        Post("user/change-email/confirm");
         AllowAnonymous();
         Summary(s => { s.Summary = "Confirm email change with token"; });
     }

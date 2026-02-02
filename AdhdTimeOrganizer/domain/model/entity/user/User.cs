@@ -18,6 +18,7 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public string? GoogleOAuthUserId { get; set; }
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
     public bool HasPassword => PasswordHash != null;
+    public bool HasExtensionAccess { get; set; } = false;
 
     [NotMapped]
     public override string? PhoneNumber { get; set; }
@@ -39,6 +40,8 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public ICollection<PlannerTask> PlannerTaskList { get; set; } = new List<PlannerTask>();
     public ICollection<RoutineTodoList> RoutineTodoListColl { get; set; } = new List<RoutineTodoList>();
     public ICollection<RoutineTimePeriod> RoutineTimePeriodList { get; set; } = new List<RoutineTimePeriod>();
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
 
     public override string? Email
     {

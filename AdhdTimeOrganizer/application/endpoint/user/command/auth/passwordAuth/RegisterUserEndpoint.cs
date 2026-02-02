@@ -1,15 +1,15 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.dto.response.user;
-using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
-using AdhdTimeOrganizer.domain.model.entity.user;
-using FastEndpoints;
-using Microsoft.AspNetCore.Identity;
 using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.extServiceContract.user;
+using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using FastEndpoints;
+using Microsoft.AspNetCore.Identity;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
 
 public class RegisterUserEndpoint(
     UserManager<User> userManager,
@@ -23,7 +23,7 @@ public class RegisterUserEndpoint(
 {
     public override void Configure()
     {
-        Post("user/register");
+        Post("auth/register");
         AllowAnonymous();
         Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => s.Summary = "Register a user with email & password");

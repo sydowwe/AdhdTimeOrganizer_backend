@@ -4,14 +4,14 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.forgotPassword;
 
 public class ForgotPasswordEndpoint(UserManager<User> userManager, IUserEmailSenderService emailSender, IConfiguration configuration)
     : Endpoint<ForgotPasswordRequest, EmptyResponse>
 {
     public override void Configure()
     {
-        Post("user/forgot-password");
+        Post("auth/forgotten-password");
         AllowAnonymous();
         Throttle(hitLimit: 3, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => { s.Summary = "Request a password reset link"; });

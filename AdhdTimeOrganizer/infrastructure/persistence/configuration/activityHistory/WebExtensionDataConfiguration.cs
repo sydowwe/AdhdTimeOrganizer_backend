@@ -1,4 +1,5 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

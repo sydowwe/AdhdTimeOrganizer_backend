@@ -34,6 +34,7 @@ public partial class AppCommandDbContext(DbContextOptions<AppCommandDbContext> o
     public DbSet<WebExtensionData> WebExtensionData { get; set; }
     public DbSet<TimerPreset> TimerPresets { get; set; }
     public DbSet<PomodoroTimerPreset> PomodoroTimerPresets { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -2,13 +2,13 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.emailConfirmation;
 
 public class ConfirmEmailEndpoint(UserManager<User> userManager) : EndpointWithoutRequest
 {
     public override void Configure()
     {
-        Post("/user/confirm-email");
+        Post("auth/confirm-email");
         AllowAnonymous();
     }
 

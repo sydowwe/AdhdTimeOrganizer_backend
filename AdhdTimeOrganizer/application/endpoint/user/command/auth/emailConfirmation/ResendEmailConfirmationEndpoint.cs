@@ -1,16 +1,15 @@
-﻿
-using AdhdTimeOrganizer.domain.extServiceContract.user;
+﻿using AdhdTimeOrganizer.domain.extServiceContract.user;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.emailConfirmation;
 
 public class ResendConfirmationEmailEndpoint(IUserEmailSenderService emailSender,UserManager<User> userManager) : EndpointWithoutRequest
 {
     public override void Configure()
     {
-        Post("user/resend-confirmation-email/{userId:required:long}");
+        Post("auth/resend-confirmation-email/{userId:required:long}");
         AllowAnonymous();
     }
 

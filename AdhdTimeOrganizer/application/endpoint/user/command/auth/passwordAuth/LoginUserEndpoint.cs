@@ -6,14 +6,14 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using UserMapper = AdhdTimeOrganizer.application.mapper.UserMapper;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
 
 public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> userManager, IJwtService jwtService, IGoogleRecaptchaService googleRecaptchaService, UserMapper mapper)
     : Endpoint<PasswordLoginRequest, LoginResponse>
 {
     public override void Configure()
     {
-        Post("user/login");
+        Post("auth/login");
         AllowAnonymous();
         Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => { s.Summary = "Login a user"; });
@@ -78,7 +78,7 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
         }
 
         // Successful login - generate JWT and set cookie
-        await jwtService.GenerateJwtAndSetAuthCookie(req.StayLoggedIn, AuthMethodEnum.Password, user, userManager, HttpContext);
+        await jwtService.GenerateJwtAndSetAuthCookie(req.StayLoggedIn, AuthMethodEnum.Password, user, HttpContext);
 
         var successResponse = new LoginResponse
         {

@@ -1,11 +1,10 @@
 ﻿using System.Linq.Expressions;
-using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence;
+namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 
 public static class EntityBuilderExtensions
 {

@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.domain.model.entity.activity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace AdhdTimeOrganizer.infrastructure.persistence;
+namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 
 public static class EntityWithActivityBuilderExtensions
 {
