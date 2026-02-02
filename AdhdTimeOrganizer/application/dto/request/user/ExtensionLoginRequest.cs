@@ -1,6 +1,9 @@
+using AdhdTimeOrganizer.application.dto.request.@interface;
+
 namespace AdhdTimeOrganizer.application.dto.request.user;
 
-public record ExtensionLoginRequest : PasswordLoginRequest
+public record ExtensionLoginRequest
 {
-    // Inherits Email, Password, RecaptchaToken, Timezone, StayLoggedIn
+    public required string Email { get; init; }
+    public required string Password { get; init; }
 }

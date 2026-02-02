@@ -4,7 +4,7 @@ using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
 
-public class RefreshTokenEndpoint(IJwtService jwtService) : EndpointWithoutRequest<RefreshTokenResponse>
+public class RefreshTokenEndpoint(IJwtService jwtService) : EndpointWithoutRequest
 {
     public override void Configure()
     {

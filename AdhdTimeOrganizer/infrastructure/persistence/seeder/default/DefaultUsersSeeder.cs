@@ -24,6 +24,7 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppCommandDbConte
             EmailConfirmed = true,
             CurrentLocale = AvailableLocales.Sk,
             Timezone = TimeZoneInfo.Local,
+            HasExtensionAccess = true
         };
 
         var existingAdmin = await dbContext.Users

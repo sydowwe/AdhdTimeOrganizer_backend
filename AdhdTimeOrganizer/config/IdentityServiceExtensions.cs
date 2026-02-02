@@ -3,7 +3,9 @@ using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.infrastructure.security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 
@@ -63,7 +65,39 @@ public static class IdentityServiceExtensions
                 };
             });
 
-        services.AddAuthorization();
+        // Register authorization handler
+        services.AddSingleton<IAuthorizationHandler, ExtensionClientAuthorizationHandler>();
+
+        services.AddAuthorization(options =>
+        {
+            // Default policy: deny extension clients (for web-only endpoints)
+            options.AddPolicy("WebOnly", policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new ExtensionClientRequirement(allowExtensionClients: false));
+            });
+
+            // Policy for extension clients only
+            options.AddPolicy("ExtensionOnly", policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim("client_type", "Extension");
+            });
+
+            // Policy for activity tracking endpoints (allows extension clients)
+            options.AddPolicy("ActivityTracking", policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("ActivityTracking");
+                policy.AddRequirements(new ExtensionClientRequirement(allowExtensionClients: true));
+            });
+
+            // Set fallback policy: all authenticated endpoints deny extension clients by default
+            options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .AddRequirements(new ExtensionClientRequirement(allowExtensionClients: false))
+                .Build();
+        });
 
         services.AddIdentityCore<User>(options =>
             {

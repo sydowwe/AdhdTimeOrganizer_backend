@@ -99,6 +99,12 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
         var userRoles = await userManager.GetRolesAsync(user);
         claims.AddRange(userRoles.Select(role => new Claim(ClaimTypes.Role, role)));
 
+        // Add ActivityTracking role claim for extension clients (not persisted to database)
+        if (clientType == ClientTypeEnum.Extension)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "ActivityTracking"));
+        }
+
         return claims;
     }
 

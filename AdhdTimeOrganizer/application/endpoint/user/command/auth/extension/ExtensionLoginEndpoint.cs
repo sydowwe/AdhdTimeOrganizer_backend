@@ -24,13 +24,13 @@ public class ExtensionLoginEndpoint(
 
     public override async Task HandleAsync(ExtensionLoginRequest req, CancellationToken ct)
     {
-        var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(req.RecaptchaToken, "extension_login");
-        if (recaptchaResult.Failed)
-        {
-            AddError("Recaptcha verification failed.");
-            await SendErrorsAsync(400, ct);
-            return;
-        }
+        // var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(req.RecaptchaToken, "extension_login");
+        // if (recaptchaResult.Failed)
+        // {
+        //     AddError("Recaptcha verification failed.");
+        //     await SendErrorsAsync(400, ct);
+        //     return;
+        // }
 
         var user = await userManager.FindByEmailAsync(req.Email);
         if (user is null)
@@ -83,13 +83,6 @@ public class ExtensionLoginEndpoint(
             AddError("Invalid email or password");
             await SendErrorsAsync(401, ct);
             return;
-        }
-
-        // Assign ActivityTracking role if not present
-        var roles = await userManager.GetRolesAsync(user);
-        if (!roles.Contains("ActivityTracking"))
-        {
-            await userManager.AddToRoleAsync(user, "ActivityTracking");
         }
 
         // Generate tokens for extension

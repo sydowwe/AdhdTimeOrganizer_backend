@@ -16,9 +16,9 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public required AvailableLocales CurrentLocale { get; set; }
     public required TimeZoneInfo Timezone { get; set; }
     public string? GoogleOAuthUserId { get; set; }
+    public bool HasExtensionAccess { get; set; } = false;
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
     public bool HasPassword => PasswordHash != null;
-    public bool HasExtensionAccess { get; set; } = false;
 
     [NotMapped]
     public override string? PhoneNumber { get; set; }
