@@ -4,4 +4,4 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTimePeriod.command;
 
-public class ToggleIsHiddenRoutineTimePeriodEndpoint(AppCommandDbContext dbContext) : BaseToggleIsHiddenEndpoint<RoutineTimePeriod>(dbContext);
+public class ToggleIsHiddenRoutineTimePeriodEndpoint(AppDbContext dbContext) : BaseToggleIsHiddenEndpoint<RoutineTimePeriod>(dbContext);

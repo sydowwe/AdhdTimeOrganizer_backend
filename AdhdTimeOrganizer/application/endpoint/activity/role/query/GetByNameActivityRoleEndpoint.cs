@@ -7,7 +7,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.role.query;
 
-public class GetByNameActivityRoleEndpoint(AppCommandDbContext dbContext, ActivityRoleMapper mapper)
+public class GetByNameActivityRoleEndpoint(AppDbContext dbContext, ActivityRoleMapper mapper)
     : BaseGetByFieldEndpoint<ActivityRole, ActivityRoleResponse, ActivityRoleMapper>(dbContext, mapper)
 {
     protected override string FieldName => nameof(ActivityRole.Name);

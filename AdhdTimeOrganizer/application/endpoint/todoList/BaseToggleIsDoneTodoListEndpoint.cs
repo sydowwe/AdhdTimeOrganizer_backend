@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList;
 
-public class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppCommandDbContext dbContext) : BaseToggleIsDoneEndpoint<TEntity>(dbContext)
+public class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbContext) : BaseToggleIsDoneEndpoint<TEntity>(dbContext)
     where TEntity : class, IEntityWithDoneAndTotalCount, IEntityWithIsDone
 {
     protected override void IsDoneLogic(TEntity entity)

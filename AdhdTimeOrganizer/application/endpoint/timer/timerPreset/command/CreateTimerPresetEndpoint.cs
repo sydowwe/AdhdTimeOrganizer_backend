@@ -6,5 +6,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.timer.timerPreset.command;
 
-public class CreateTimerPresetEndpoint(AppCommandDbContext dbContext, TimerPresetMapper mapper)
+public class CreateTimerPresetEndpoint(AppDbContext dbContext, TimerPresetMapper mapper)
     : BaseCreateEndpoint<TimerPreset, TimerPresetRequest, TimerPresetMapper>(dbContext, mapper);

@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList;
 
-public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppCommandDbContext dbContext, IOptions<TodoListSettings> settings) : Endpoint<ChangeDisplayOrderRequest>
+public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbContext dbContext, IOptions<TodoListSettings> settings) : Endpoint<ChangeDisplayOrderRequest>
     where TEntity : BaseTodoList
 {
     private readonly DbSet<TEntity> _dbSet = dbContext.Set<TEntity>();

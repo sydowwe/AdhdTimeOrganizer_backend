@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.query;
 
-public class GetFilterSortedPlannerTask(AppCommandDbContext dbContext, PlannerTaskMapper mapper)
+public class GetFilterSortedPlannerTask(AppDbContext dbContext, PlannerTaskMapper mapper)
     : BaseFilterEndpoint<PlannerTask, PlannerTaskResponse, PlannerTaskFilter, PlannerTaskMapper>(dbContext, mapper)
 {
     protected override IQueryable<PlannerTask> ApplyCustomFiltering(IQueryable<PlannerTask> query, PlannerTaskFilter filter)

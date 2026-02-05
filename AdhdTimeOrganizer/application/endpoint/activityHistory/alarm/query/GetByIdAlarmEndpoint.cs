@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.alarm.query;
 
 public class GetByIdAlarmEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     AlarmMapper mapper)
     : BaseGetByIdEndpoint<Alarm, AlarmResponse, AlarmMapper>(dbContext, mapper)
 {

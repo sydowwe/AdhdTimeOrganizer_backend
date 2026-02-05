@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class CalendarSeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<CalendarSeeder> logger) : IScopedService, IUserDefaultSeeder
 {
     public string SeederName => "Calendar";

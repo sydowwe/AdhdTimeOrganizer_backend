@@ -115,7 +115,7 @@ public static class IdentityServiceExtensions
                 options.ClaimsIdentity.UserNameClaimType = ClaimTypes.NameIdentifier;
                 options.ClaimsIdentity.EmailClaimType = ClaimTypes.Email;
             }).AddRoles<UserRole>()
-            .AddEntityFrameworkStores<AppCommandDbContext>()
+            .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders()
             .AddSignInManager<SignInManager<User>>()
             .AddRoleManager<RoleManager<UserRole>>()

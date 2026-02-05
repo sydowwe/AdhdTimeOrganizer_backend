@@ -8,7 +8,7 @@ using UserMapper = AdhdTimeOrganizer.application.mapper.UserMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.read;
 
-public class UserGetByIdEndpoint(AppCommandDbContext dbContext, UserMapper mapper)
+public class UserGetByIdEndpoint(AppDbContext dbContext, UserMapper mapper)
     : BaseGetByIdEndpoint<User, UserResponse, mapper_UserMapper>(dbContext, mapper)
 {
     public override string[] AllowedRoles()

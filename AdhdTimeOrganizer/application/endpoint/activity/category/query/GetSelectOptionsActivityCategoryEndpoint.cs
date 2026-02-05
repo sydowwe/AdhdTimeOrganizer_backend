@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activity.category.query;
 
 public class GetSelectOptionsActivityCategoryEndpoint(
-    AppCommandDbContext appDbContext,
+    AppDbContext appDbContext,
     ActivityCategoryMapper mapper)
     : BaseGetSelectOptionsEndpoint<ActivityCategory, ActivityCategoryMapper>(appDbContext, mapper)
 {

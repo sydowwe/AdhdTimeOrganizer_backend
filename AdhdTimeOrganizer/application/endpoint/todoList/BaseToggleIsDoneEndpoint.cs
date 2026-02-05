@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList;
 
-public class BaseToggleIsDoneEndpoint<TEntity>(AppCommandDbContext dbContext) : Endpoint<IdListRequest>
+public class BaseToggleIsDoneEndpoint<TEntity>(AppDbContext dbContext) : Endpoint<IdListRequest>
     where TEntity : class, IEntityWithId, IEntityWithIsDone
 {
     public virtual string[] AllowedRoles()

@@ -6,5 +6,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.category.command;
 
-public class CreateActivityCategoryEndpoint(AppCommandDbContext dbContext, ActivityCategoryMapper mapper)
+public class CreateActivityCategoryEndpoint(AppDbContext dbContext, ActivityCategoryMapper mapper)
     : BaseCreateEndpoint<ActivityCategory, NameTextColorIconRequest, ActivityCategoryMapper>(dbContext, mapper);

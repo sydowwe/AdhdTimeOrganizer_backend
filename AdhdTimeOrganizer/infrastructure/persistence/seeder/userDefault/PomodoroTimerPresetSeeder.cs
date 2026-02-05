@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class PomodoroTimerPresetSeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<PomodoroTimerPresetSeeder> logger) : IScopedService, IUserDefaultSeeder
 {
     public string SeederName => "PomodoroTimerPreset";

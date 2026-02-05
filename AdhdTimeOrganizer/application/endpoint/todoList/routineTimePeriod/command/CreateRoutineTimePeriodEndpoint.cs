@@ -6,5 +6,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTimePeriod.command;
 
-public class CreateRoutineTimePeriodEndpoint(AppCommandDbContext dbContext, RoutineTimePeriodMapper mapper)
+public class CreateRoutineTimePeriodEndpoint(AppDbContext dbContext, RoutineTimePeriodMapper mapper)
     : BaseCreateEndpoint<RoutineTimePeriod, RoutineTimePeriodRequest, RoutineTimePeriodMapper>(dbContext, mapper);

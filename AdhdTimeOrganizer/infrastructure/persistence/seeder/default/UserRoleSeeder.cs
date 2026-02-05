@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
 
-public class UserRoleSeeder(RoleManager<UserRole> roleManager, AppCommandDbContext dbContext, ILogger<UserRoleSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
+public class UserRoleSeeder(RoleManager<UserRole> roleManager, AppDbContext dbContext, ILogger<UserRoleSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
 {
     public string SeederName => "UserRole";
     public int Order => 4;

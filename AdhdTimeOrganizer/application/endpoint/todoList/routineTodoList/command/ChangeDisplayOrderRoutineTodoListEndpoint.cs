@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.command;
 
-public class ChangeDisplayOrderRoutineTodoListEndpoint(AppCommandDbContext dbContext, IOptions<TodoListSettings> settings) : BaseChangeDisplayOrderTodoListEndpoint<RoutineTodoList>(dbContext, settings)
+public class ChangeDisplayOrderRoutineTodoListEndpoint(AppDbContext dbContext, IOptions<TodoListSettings> settings) : BaseChangeDisplayOrderTodoListEndpoint<RoutineTodoList>(dbContext, settings)
 {
     protected override Expression<Func<RoutineTodoList, long>> GroupFilterExpression => e => e.TimePeriodId;
 }

@@ -6,5 +6,5 @@ using AlarmMapper = AdhdTimeOrganizer.application.mapper.AlarmMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.alarm.command;
 
-public class UpdateAlarmEndpoint(AppCommandDbContext dbContext, AlarmMapper mapper)
+public class UpdateAlarmEndpoint(AppDbContext dbContext, AlarmMapper mapper)
     : BaseUpdateEndpoint<Alarm, AlarmRequest, AlarmMapper>(dbContext, mapper);

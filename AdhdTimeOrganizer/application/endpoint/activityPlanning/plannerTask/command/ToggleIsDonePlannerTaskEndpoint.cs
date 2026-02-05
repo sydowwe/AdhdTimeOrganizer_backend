@@ -4,4 +4,4 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.command;
 
-public class ToggleIsDonePlannerTaskEndpoint(AppCommandDbContext dbContext) : BaseToggleIsDoneEndpoint<PlannerTask>(dbContext);
+public class ToggleIsDonePlannerTaskEndpoint(AppDbContext dbContext) : BaseToggleIsDoneEndpoint<PlannerTask>(dbContext);

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.timer.timerPreset.query;
 
 public class GetByIdTimerPresetEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     TimerPresetMapper mapper)
     : BaseGetByIdEndpoint<TimerPreset, TimerPresetResponse, TimerPresetMapper>(dbContext, mapper)
 {

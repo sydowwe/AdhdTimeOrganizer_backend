@@ -4,7 +4,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlannerDayTemplate.command;
 
-public class DeleteTaskPlannerDayTemplateEndpoint(AppCommandDbContext dbContext)
+public class DeleteTaskPlannerDayTemplateEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<TaskPlannerDayTemplate>(dbContext)
 {
 }

@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.command;
 
-public class DeleteTodoListEndpoint(AppCommandDbContext dbContext)
+public class DeleteTodoListEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<TodoList>(dbContext);

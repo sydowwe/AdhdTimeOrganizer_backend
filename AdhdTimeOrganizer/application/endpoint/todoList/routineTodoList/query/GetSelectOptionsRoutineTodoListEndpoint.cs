@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.query;
 
 public class GetSelectOptionsRoutineTodoListEndpoint(
-    AppCommandDbContext appDbContext,
+    AppDbContext appDbContext,
     RoutineTodoListMapper mapper)
     : BaseGetSelectOptionsEndpoint<RoutineTodoList, RoutineTodoListMapper>(appDbContext, mapper)
 {

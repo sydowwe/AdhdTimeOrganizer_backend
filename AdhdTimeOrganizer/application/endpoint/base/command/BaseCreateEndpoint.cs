@@ -10,7 +10,7 @@ using Humanizer;
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
 public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     TMapper mapper) : Endpoint<TRequest, long>
     where TEntity : class, IEntityWithUser
     where TRequest : class, ICreateRequest

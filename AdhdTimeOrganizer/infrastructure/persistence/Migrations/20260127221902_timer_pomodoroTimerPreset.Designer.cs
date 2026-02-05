@@ -11,7 +11,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 {
-    [DbContext(typeof(AppCommandDbContext))]
+    [DbContext(typeof(AppDbContext))]
     [Migration("20260127221902_timer_pomodoroTimerPreset")]
     partial class timer_pomodoroTimerPreset
     {

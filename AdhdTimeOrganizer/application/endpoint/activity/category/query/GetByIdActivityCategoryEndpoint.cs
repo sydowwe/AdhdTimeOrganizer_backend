@@ -7,7 +7,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activity.category.query;
 
 public class GetByIdActivityCategoryEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ActivityCategoryMapper mapper)
     : BaseGetByIdEndpoint<ActivityCategory, ActivityCategoryResponse, ActivityCategoryMapper>(dbContext, mapper)
 {

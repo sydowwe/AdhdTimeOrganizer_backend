@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.query;
 
-public class ActivityFormSelectOptionsEndpoint(AppCommandDbContext appDbContext) 
+public class ActivityFormSelectOptionsEndpoint(AppDbContext appDbContext) 
     : BaseActivityFormSelectOptionsEndpoint<Activity>(appDbContext)
 {
     public override string EntityRoute => "activity";

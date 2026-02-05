@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.command.misc;
 
-public class BaseToggleIsHiddenEndpoint<TEntity>(AppCommandDbContext dbContext) : Endpoint<IdListRequest>
+public class BaseToggleIsHiddenEndpoint<TEntity>(AppDbContext dbContext) : Endpoint<IdListRequest>
     where TEntity : class, IEntityWithId, IEntityWithIsHidden
 {
     public virtual string[] AllowedRoles()

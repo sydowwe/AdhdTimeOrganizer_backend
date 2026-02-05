@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.category.command;
 
-public class DeleteActivityCategoryEndpoint(AppCommandDbContext dbContext)
+public class DeleteActivityCategoryEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<ActivityCategory>(dbContext);

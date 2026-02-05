@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTimePeriod.command;
 
-public class DeleteRoutineTimePeriodEndpoint(AppCommandDbContext dbContext)
+public class DeleteRoutineTimePeriodEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<RoutineTimePeriod>(dbContext);

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class TemplatePlannerTaskSeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<TemplatePlannerTaskSeeder> logger) : IDevDatabaseSeeder, IScopedService
 {
     public string SeederName => "TemplatePlannerTask";

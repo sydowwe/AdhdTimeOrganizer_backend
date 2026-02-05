@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.command;
 
 public class ApplyTemplatePlannerTaskEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     CalendarMapper calendarMapper,
     PlannerTaskMapper plannerTaskMapper) : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
 {

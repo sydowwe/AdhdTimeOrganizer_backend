@@ -9,7 +9,7 @@ using Humanizer;
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
 public abstract class BasePatchEndpoint<TEntity, TRequest, TResponse>(
-    AppCommandDbContext dbContext) : Endpoint<TRequest, long>
+    AppDbContext dbContext) : Endpoint<TRequest, long>
     where TEntity : class, IEntityWithId
     where TRequest : class, IPatchRequest
     where TResponse : class, IIdResponse

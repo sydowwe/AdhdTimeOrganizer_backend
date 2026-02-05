@@ -5,7 +5,7 @@ using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.eventHandler;
 
-public class ActivityCreatedIsOnTodoListEventHandler(AppCommandDbContext dbContext, ILogger<ActivityCreatedIsOnTodoListEventHandler> logger) : IEventHandler<ActivityCreatedIsOnTodoListEvent>
+public class ActivityCreatedIsOnTodoListEventHandler(AppDbContext dbContext, ILogger<ActivityCreatedIsOnTodoListEventHandler> logger) : IEventHandler<ActivityCreatedIsOnTodoListEvent>
 {
     public async Task HandleAsync(ActivityCreatedIsOnTodoListEvent eventModel, CancellationToken ct)
     {

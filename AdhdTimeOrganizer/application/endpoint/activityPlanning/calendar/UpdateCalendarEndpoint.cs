@@ -7,7 +7,7 @@ using CalendarMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.Cal
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 
-public class UpdateCalendarEndpoint(AppCommandDbContext dbContext, CalendarMapper mapper)
+public class UpdateCalendarEndpoint(AppDbContext dbContext, CalendarMapper mapper)
     : BaseUpdateEndpoint<Calendar, CalendarRequest, CalendarMapper>(dbContext, mapper)
 {
     protected override Task AfterMapping(Calendar entity, CalendarRequest req, CancellationToken ct = default)

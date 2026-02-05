@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 
 public abstract class BaseFetchTableEndpoint<TEntity, TResponse, TFilter, TMapper>(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     TMapper mapper) : Endpoint<BaseFilterSortPaginateRequest<TFilter>, BaseTableResponse<TResponse>>
     where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse

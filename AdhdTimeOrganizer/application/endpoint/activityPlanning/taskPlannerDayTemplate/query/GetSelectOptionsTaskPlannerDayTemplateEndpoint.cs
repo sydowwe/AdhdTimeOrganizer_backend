@@ -5,7 +5,7 @@ using TaskPlannerDayTemplateMapper = AdhdTimeOrganizer.application.mapper.activi
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlannerDayTemplate.query;
 
-public class GetSelectOptionsTaskPlannerDayTemplateEndpoint(AppCommandDbContext dbContext, TaskPlannerDayTemplateMapper mapper)
+public class GetSelectOptionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext, TaskPlannerDayTemplateMapper mapper)
     : BaseGetSelectOptionsEndpoint<TaskPlannerDayTemplate, TaskPlannerDayTemplateMapper>(dbContext, mapper)
 {
     public override IQueryable<TaskPlannerDayTemplate> Filter(IQueryable<TaskPlannerDayTemplate> query)

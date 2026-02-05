@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.role.command;
 
-public class DeleteActivityRoleEndpoint(AppCommandDbContext dbContext)
+public class DeleteActivityRoleEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<ActivityRole>(dbContext);

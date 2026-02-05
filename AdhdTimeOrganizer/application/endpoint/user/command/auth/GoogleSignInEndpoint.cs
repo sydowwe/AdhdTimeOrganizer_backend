@@ -14,7 +14,7 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
 
 public class GoogleSignInEndpoint(
     UserManager<User> userManager,
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     UserMapper mapper,
     IJwtService jwtService,
     IUserDefaultsService userDefaultsService)

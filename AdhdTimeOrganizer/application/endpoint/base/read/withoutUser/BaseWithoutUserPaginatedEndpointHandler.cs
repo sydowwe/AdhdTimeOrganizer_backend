@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.@base.read.withoutUser;
 
 public abstract class BaseWithoutUserPaginatedEndpoint<TEntity, TResponse, TMapper>(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     TMapper mapper) : Endpoint<SortPaginateRequest, BaseTableResponse<TResponse>>
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse

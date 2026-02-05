@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read.withoutUser;
 
-public abstract class BaseWithoutUserGetSelectOptionsEndpoint<TEntity, TMapper>(AppCommandDbContext appDbContext, TMapper mapper) : EndpointWithoutRequest<List<SelectOptionResponse>>
+public abstract class BaseWithoutUserGetSelectOptionsEndpoint<TEntity, TMapper>(AppDbContext appDbContext, TMapper mapper) : EndpointWithoutRequest<List<SelectOptionResponse>>
     where TEntity : class, IEntityWithId
     where TMapper : IBaseSelectOptionMapper<TEntity>
 {

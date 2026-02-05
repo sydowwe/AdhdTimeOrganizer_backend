@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.alarm.command;
 
-public class DeleteAlarmEndpoint(AppCommandDbContext dbContext)
+public class DeleteAlarmEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<Alarm>(dbContext);

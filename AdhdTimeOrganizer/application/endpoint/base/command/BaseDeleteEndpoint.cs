@@ -7,7 +7,7 @@ using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
-public abstract class BaseDeleteEndpoint<TEntity>(AppCommandDbContext dbContext) : Endpoint<IdRequest>
+public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endpoint<IdRequest>
     where TEntity : class, IEntityWithId
 {
     public virtual string[] AllowedRoles()

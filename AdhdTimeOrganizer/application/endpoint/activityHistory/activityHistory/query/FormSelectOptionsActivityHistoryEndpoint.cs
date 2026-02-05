@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query;
 
-public class FormSelectOptionsActivityHistoryEndpoint(AppCommandDbContext appDbContext) 
+public class FormSelectOptionsActivityHistoryEndpoint(AppDbContext appDbContext) 
     : BaseActivityFormSelectOptionsEndpoint<ActivityHistory>(appDbContext)
 {
     public override string EntityRoute => "activity-history";

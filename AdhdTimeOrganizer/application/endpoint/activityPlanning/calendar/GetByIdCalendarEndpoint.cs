@@ -8,7 +8,7 @@ using CalendarMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.Cal
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 
-public class GetByIdCalendarEndpoint(AppCommandDbContext dbContext, CalendarMapper mapper)
+public class GetByIdCalendarEndpoint(AppDbContext dbContext, CalendarMapper mapper)
     : BaseGetByIdEndpoint<Calendar, CalendarResponse, CalendarMapper>(dbContext, mapper)
 {
     protected override IQueryable<Calendar> WithIncludes(IQueryable<Calendar> query)

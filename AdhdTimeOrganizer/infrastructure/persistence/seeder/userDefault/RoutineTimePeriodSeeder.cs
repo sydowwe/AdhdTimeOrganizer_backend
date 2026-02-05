@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class RoutineTimePeriodSeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<RoutineTimePeriodSeeder> logger) : IScopedService, IUserDefaultSeeder
 {
     public string SeederName => "RoutineTimePeriod";

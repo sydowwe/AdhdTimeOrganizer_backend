@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class TaskPrioritySeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<TaskPrioritySeeder> logger) : IScopedService, IUserDefaultSeeder
 {
     public string SeederName => "TaskPriority";

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivitySeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<ActivitySeeder> logger) : IDevDatabaseSeeder, IScopedService
 {
     public string SeederName => "Activity";

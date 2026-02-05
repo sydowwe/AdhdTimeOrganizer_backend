@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
-public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppCommandDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<TResponse>
+public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<TResponse>
     where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
     where TMapper : IBaseResponseMapper<TEntity, TResponse>

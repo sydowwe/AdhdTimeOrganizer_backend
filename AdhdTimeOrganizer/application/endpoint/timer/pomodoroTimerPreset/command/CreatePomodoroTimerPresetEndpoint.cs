@@ -6,5 +6,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.timer.pomodoroTimerPreset.command;
 
-public class CreatePomodoroTimerPresetEndpoint(AppCommandDbContext dbContext, PomodoroTimerPresetMapper mapper)
+public class CreatePomodoroTimerPresetEndpoint(AppDbContext dbContext, PomodoroTimerPresetMapper mapper)
     : BaseCreateEndpoint<PomodoroTimerPreset, PomodoroTimerPresetRequest, PomodoroTimerPresetMapper>(dbContext, mapper);

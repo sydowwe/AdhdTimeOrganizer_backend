@@ -5,14 +5,14 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace AdhdTimeOrganizer.config;
 
-public class AppCommandDbContextFactory : IDesignTimeDbContextFactory<AppCommandDbContext>
+public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
-    public AppCommandDbContext CreateDbContext(string[] args)
+    public AppDbContext CreateDbContext(string[] args)
     {
         Env.Load();
-        var optionsBuilder = new DbContextOptionsBuilder<AppCommandDbContext>();
+        var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
         optionsBuilder.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString).UseSnakeCaseNamingConvention();
 
-        return new AppCommandDbContext(optionsBuilder.Options, null, null);
+        return new AppDbContext(optionsBuilder.Options, null, null);
     }
 }

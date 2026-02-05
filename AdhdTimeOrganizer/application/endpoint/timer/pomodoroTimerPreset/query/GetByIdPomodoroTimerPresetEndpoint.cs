@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.timer.pomodoroTimerPreset.query;
 
 public class GetByIdPomodoroTimerPresetEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     PomodoroTimerPresetMapper mapper)
     : BaseGetByIdEndpoint<PomodoroTimerPreset, PomodoroTimerPresetResponse, PomodoroTimerPresetMapper>(dbContext, mapper)
 {

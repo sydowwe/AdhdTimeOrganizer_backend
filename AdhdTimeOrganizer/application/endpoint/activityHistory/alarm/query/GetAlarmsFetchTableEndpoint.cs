@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.alarm.query;
 
 public class GetAlarmsFetchTableEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     AlarmMapper mapper) 
     : BaseFetchTableEndpoint<Alarm, AlarmResponse, AlarmFilterRequest, AlarmMapper>(dbContext, mapper)
 {

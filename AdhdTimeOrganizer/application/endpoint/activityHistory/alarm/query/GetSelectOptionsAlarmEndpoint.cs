@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.alarm.query;
 
 public class GetSelectOptionsAlarmEndpoint(
-    AppCommandDbContext appDbContext,
+    AppDbContext appDbContext,
     AlarmMapper mapper)
     : BaseGetSelectOptionsEndpoint<Alarm, AlarmMapper>(appDbContext, mapper)
 {

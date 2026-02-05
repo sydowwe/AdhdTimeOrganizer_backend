@@ -5,7 +5,7 @@ using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 
-public class QuickEditActivityEndpoint(AppCommandDbContext dbContext) : Endpoint<QuickEditActivityRequest, long?>
+public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickEditActivityRequest, long?>
 {
     public virtual string[] AllowedRoles()
     {

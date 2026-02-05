@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.infrastructure.extService.user.auth;
 
-public class RefreshTokenService(AppCommandDbContext dbContext, ILogger<RefreshTokenService> logger)
+public class RefreshTokenService(AppDbContext dbContext, ILogger<RefreshTokenService> logger)
     : IRefreshTokenService, IScopedService
 {
     public async Task<string> GenerateRefreshTokenAsync(long userId, bool isExtensionClient, AuthMethodEnum authMethod, bool stayLoggedIn = true, string? ipAddress = null)

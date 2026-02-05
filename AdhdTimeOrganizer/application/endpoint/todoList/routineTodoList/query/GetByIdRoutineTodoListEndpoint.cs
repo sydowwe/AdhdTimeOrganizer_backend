@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.query;
 
 public class GetByIdRoutineTodoListEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     RoutineTodoListMapper mapper)
     : BaseGetByIdEndpoint<RoutineTodoList, RoutineTodoListResponse, RoutineTodoListMapper>(dbContext, mapper)
 {

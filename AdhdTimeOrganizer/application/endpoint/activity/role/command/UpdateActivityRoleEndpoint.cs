@@ -6,5 +6,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.role.command;
 
-public class UpdateActivityRoleEndpoint(AppCommandDbContext dbContext, ActivityRoleMapper mapper)
+public class UpdateActivityRoleEndpoint(AppDbContext dbContext, ActivityRoleMapper mapper)
     : BaseUpdateEndpoint<ActivityRole, NameTextColorIconRequest, ActivityRoleMapper>(dbContext, mapper);

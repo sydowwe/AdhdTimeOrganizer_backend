@@ -11,7 +11,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 {
-    [DbContext(typeof(AppCommandDbContext))]
+    [DbContext(typeof(AppDbContext))]
     [Migration("20260120012101_Initial")]
     partial class Initial
     {

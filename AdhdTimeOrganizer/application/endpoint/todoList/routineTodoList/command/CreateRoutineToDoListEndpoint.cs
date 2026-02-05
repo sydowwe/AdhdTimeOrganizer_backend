@@ -10,10 +10,10 @@ using Microsoft.Extensions.Options;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.command;
 
-public class CreateRoutineToDoListEndpoint(AppCommandDbContext dbContext, RoutineTodoListMapper mapper, IOptions<TodoListSettings> settings)
+public class CreateRoutineToDoListEndpoint(AppDbContext dbContext, RoutineTodoListMapper mapper, IOptions<TodoListSettings> settings)
     : BaseCreateEndpoint<RoutineTodoList, UpdateRoutineTodoListRequest, RoutineTodoListMapper>(dbContext, mapper)
 {
-    private readonly AppCommandDbContext _dbContext = dbContext;
+    private readonly AppDbContext _dbContext = dbContext;
     private readonly TodoListSettings _settings = settings.Value;
 
     protected override async Task AfterMapping(RoutineTodoList entity, UpdateRoutineTodoListRequest req, CancellationToken ct = default)

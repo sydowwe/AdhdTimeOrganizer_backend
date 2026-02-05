@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
-public abstract class BaseGetByIdEndpoint<TEntity, TResponse, TMapper>(AppCommandDbContext dbContext, TMapper mapper) : Endpoint<IdRequest, TResponse>
+public abstract class BaseGetByIdEndpoint<TEntity, TResponse, TMapper>(AppDbContext dbContext, TMapper mapper) : Endpoint<IdRequest, TResponse>
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse
     where TMapper : IBaseResponseMapper<TEntity, TResponse>

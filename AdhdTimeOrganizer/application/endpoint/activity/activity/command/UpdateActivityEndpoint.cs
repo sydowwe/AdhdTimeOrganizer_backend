@@ -6,5 +6,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 
-public class UpdateActivityEndpoint(AppCommandDbContext dbContext, ActivityMapper mapper)
+public class UpdateActivityEndpoint(AppDbContext dbContext, ActivityMapper mapper)
     : BaseUpdateEndpoint<Activity, ActivityRequest, ActivityMapper>(dbContext, mapper);

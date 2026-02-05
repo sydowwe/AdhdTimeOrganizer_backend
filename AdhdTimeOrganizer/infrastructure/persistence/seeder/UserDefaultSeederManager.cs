@@ -7,7 +7,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
 public class UserDefaultSeederManager(
     IServiceProvider serviceProvider,
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<UserDefaultSeederManager> logger) : IScopedService, IUserDefaultSeederManager
 {
     public async Task SeedAllForUserAsync(long userId, bool overrideData = false, CancellationToken ct = default)

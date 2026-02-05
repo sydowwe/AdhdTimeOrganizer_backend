@@ -6,7 +6,7 @@ using UserRoleMapper = AdhdTimeOrganizer.application.mapper.UserRoleMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.read;
 
-public class UserRoleGetAllSelectOptionsEndpoint(AppCommandDbContext appDbContext, UserRoleMapper mapper)
+public class UserRoleGetAllSelectOptionsEndpoint(AppDbContext appDbContext, UserRoleMapper mapper)
     : BaseWithoutUserGetSelectOptionsEndpoint<UserRole, mapper_UserRoleMapper>(appDbContext, mapper)
 {
 }

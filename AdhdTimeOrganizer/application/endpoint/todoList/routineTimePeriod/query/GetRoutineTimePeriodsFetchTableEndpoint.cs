@@ -8,7 +8,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTimePeriod.query;
 
 public class GetRoutineTimePeriodsFetchTableEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     RoutineTimePeriodMapper mapper) 
     : BaseFetchTableEndpoint<RoutineTimePeriod, RoutineTimePeriodResponse, RoutineTimePeriodFilterRequest, RoutineTimePeriodMapper>(dbContext, mapper)
 {

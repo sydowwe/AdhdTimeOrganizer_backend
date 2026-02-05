@@ -5,7 +5,7 @@ using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.eventHandler;
 
-public class ActivityAddedToHistoryEventHandler(AppCommandDbContext dbContext, ILogger<ActivityAddedToHistoryEventHandler> logger) : IEventHandler<ActivityAddedToHistoryEvent>
+public class ActivityAddedToHistoryEventHandler(AppDbContext dbContext, ILogger<ActivityAddedToHistoryEventHandler> logger) : IEventHandler<ActivityAddedToHistoryEvent>
 {
     public async Task HandleAsync(ActivityAddedToHistoryEvent eventModel, CancellationToken ct)
     {

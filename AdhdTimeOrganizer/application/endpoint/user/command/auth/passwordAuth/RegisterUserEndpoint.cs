@@ -18,7 +18,7 @@ public class RegisterUserEndpoint(
     IUserEmailSenderService emailSender,
     IUserDefaultsService userDefaultsService,
     UserMapper mapper,
-    AppCommandDbContext dbContext
+    AppDbContext dbContext
 ) : Endpoint<PasswordRegistrationRequest, TwoFactorAuthResponse>
 {
     public override void Configure()

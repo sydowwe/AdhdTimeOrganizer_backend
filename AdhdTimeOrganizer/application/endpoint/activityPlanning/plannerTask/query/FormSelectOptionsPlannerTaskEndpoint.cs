@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.query;
 
-public class FormSelectOptionsPlannerTaskEndpoint(AppCommandDbContext appDbContext) 
+public class FormSelectOptionsPlannerTaskEndpoint(AppDbContext appDbContext) 
     : BaseActivityFormSelectOptionsEndpoint<PlannerTask>(appDbContext)
 {
     public override string EntityRoute => "planner-task";

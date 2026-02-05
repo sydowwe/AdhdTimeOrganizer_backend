@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
 
-public class DefaultUsersSeeder(UserManager<User> userManager, AppCommandDbContext dbContext, IUserDefaultsService userDefaultsService, ILogger<DefaultUsersSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
+public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbContext, IUserDefaultsService userDefaultsService, ILogger<DefaultUsersSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
 {
     public string SeederName => "User";
     public int Order => 5;

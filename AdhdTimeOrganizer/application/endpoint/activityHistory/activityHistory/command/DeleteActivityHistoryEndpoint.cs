@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.command;
 
-public class DeleteActivityHistoryEndpoint(AppCommandDbContext dbContext)
+public class DeleteActivityHistoryEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<ActivityHistory>(dbContext);

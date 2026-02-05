@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.command;
 
-public class ChangeDisplayOrderTodoListEndpoint(AppCommandDbContext dbContext, IOptions<TodoListSettings> settings) : BaseChangeDisplayOrderTodoListEndpoint<TodoList>(dbContext, settings)
+public class ChangeDisplayOrderTodoListEndpoint(AppDbContext dbContext, IOptions<TodoListSettings> settings) : BaseChangeDisplayOrderTodoListEndpoint<TodoList>(dbContext, settings)
 {
     //TODO add after more todo lists are implemented
     protected override Expression<Func<TodoList, long>> GroupFilterExpression => e => e.TaskPriorityId;

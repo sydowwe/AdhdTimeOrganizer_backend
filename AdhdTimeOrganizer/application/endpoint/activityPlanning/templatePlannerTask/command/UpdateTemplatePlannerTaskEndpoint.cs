@@ -6,7 +6,7 @@ using TemplatePlannerTaskMapper = AdhdTimeOrganizer.application.mapper.activityP
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templatePlannerTask.command;
 
-public class UpdateTemplatePlannerTaskEndpoint(AppCommandDbContext dbContext, TemplatePlannerTaskMapper mapper)
+public class UpdateTemplatePlannerTaskEndpoint(AppDbContext dbContext, TemplatePlannerTaskMapper mapper)
     : BaseUpdateEndpoint<TemplatePlannerTask, TemplatePlannerTaskRequest, TemplatePlannerTaskMapper>(dbContext, mapper)
 {
 }

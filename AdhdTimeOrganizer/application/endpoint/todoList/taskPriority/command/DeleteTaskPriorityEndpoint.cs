@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.taskPriority.command;
 
-public class DeleteTaskPriorityEndpoint(AppCommandDbContext dbContext)
+public class DeleteTaskPriorityEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<TaskPriority>(dbContext);

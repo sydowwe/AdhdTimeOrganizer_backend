@@ -3,4 +3,4 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.command;
 
-public class RoutineToggleIsDoneTodoListEndpoint(AppCommandDbContext dbContext) : BaseToggleIsDoneTodoListEndpoint<RoutineTodoList>(dbContext);
+public class RoutineToggleIsDoneTodoListEndpoint(AppDbContext dbContext) : BaseToggleIsDoneTodoListEndpoint<RoutineTodoList>(dbContext);

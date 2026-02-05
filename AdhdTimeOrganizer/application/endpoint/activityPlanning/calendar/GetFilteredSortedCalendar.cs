@@ -9,7 +9,7 @@ using CalendarMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.Cal
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 
-public class GetFilteredSortedCalendar(AppCommandDbContext dbContext, CalendarMapper mapper)
+public class GetFilteredSortedCalendar(AppDbContext dbContext, CalendarMapper mapper)
     : BaseFilterEndpoint<Calendar, CalendarResponse, CalendarFilter, CalendarMapper>(dbContext, mapper)
 {
     protected override IQueryable<Calendar> ApplyCustomFiltering(IQueryable<Calendar> query, CalendarFilter filter)

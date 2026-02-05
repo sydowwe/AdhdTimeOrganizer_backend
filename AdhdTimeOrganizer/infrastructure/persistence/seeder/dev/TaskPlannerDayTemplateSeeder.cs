@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class TaskPlannerDayTemplateSeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<TaskPlannerDayTemplateSeeder> logger) : IDevDatabaseSeeder, IScopedService
 {
     public string SeederName => "TaskPlannerDayTemplate";

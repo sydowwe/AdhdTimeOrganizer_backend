@@ -7,7 +7,7 @@ using TemplatePlannerTaskMapper = AdhdTimeOrganizer.application.mapper.activityP
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templatePlannerTask.query;
 
-public class GetByIdTemplatePlannerTaskEndpoint(AppCommandDbContext dbContext, TemplatePlannerTaskMapper mapper)
+public class GetByIdTemplatePlannerTaskEndpoint(AppDbContext dbContext, TemplatePlannerTaskMapper mapper)
     : BaseGetByIdEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse, TemplatePlannerTaskMapper>(dbContext, mapper)
 {
     protected override IQueryable<TemplatePlannerTask> WithIncludes(IQueryable<TemplatePlannerTask> query)

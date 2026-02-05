@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.todoList.taskPriority.query;
 
 public class GetSelectOptionsTaskPriorityEndpoint(
-    AppCommandDbContext appDbContext,
+    AppDbContext appDbContext,
     TaskPriorityMapper mapper)
     : BaseGetSelectOptionsEndpoint<TaskPriority, TaskPriorityMapper>(appDbContext, mapper)
 {

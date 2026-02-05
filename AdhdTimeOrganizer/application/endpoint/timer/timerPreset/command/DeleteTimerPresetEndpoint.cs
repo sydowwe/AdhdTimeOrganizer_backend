@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.timer.timerPreset.command;
 
-public class DeleteTimerPresetEndpoint(AppCommandDbContext dbContext)
+public class DeleteTimerPresetEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<TimerPreset>(dbContext);

@@ -7,7 +7,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskImportance.query;
 
 public class GetAllTaskImportanceEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     TaskImportanceMapper mapper)
     : BaseGetAllEndpoint<TaskImportance, TaskImportanceResponse, TaskImportanceMapper>(dbContext, mapper)
 {

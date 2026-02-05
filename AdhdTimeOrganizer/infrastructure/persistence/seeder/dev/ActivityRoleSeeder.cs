@@ -5,7 +5,7 @@ using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityRoleSeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<ActivityRoleSeeder> logger) : IScopedService, IDevDatabaseSeeder
 {
     public string SeederName => "ActivityRole";

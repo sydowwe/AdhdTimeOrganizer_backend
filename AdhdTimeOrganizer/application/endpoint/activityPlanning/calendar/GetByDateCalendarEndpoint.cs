@@ -8,7 +8,7 @@ using CalendarMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.Cal
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 
-public class GetByDateCalendarEndpoint(AppCommandDbContext dbContext, CalendarMapper mapper) : BaseGetByFieldEndpoint<Calendar, CalendarResponse, CalendarMapper>(dbContext, mapper)
+public class GetByDateCalendarEndpoint(AppDbContext dbContext, CalendarMapper mapper) : BaseGetByFieldEndpoint<Calendar, CalendarResponse, CalendarMapper>(dbContext, mapper)
 {
     protected override string FieldName => nameof(Calendar.Date);
     protected override Expression<Func<Calendar, bool>> FilterQuery(string value)

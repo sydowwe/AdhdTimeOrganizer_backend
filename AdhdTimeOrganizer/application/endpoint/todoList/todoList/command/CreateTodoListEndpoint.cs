@@ -10,10 +10,10 @@ using Microsoft.Extensions.Options;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.command;
 
-public class CreateTodoListEndpoint(AppCommandDbContext dbContext, TodoListMapper mapper, IOptions<TodoListSettings> settings)
+public class CreateTodoListEndpoint(AppDbContext dbContext, TodoListMapper mapper, IOptions<TodoListSettings> settings)
     : BaseCreateEndpoint<TodoList, CreateTodoListRequest, TodoListMapper>(dbContext, mapper)
 {
-    private readonly AppCommandDbContext _dbContext = dbContext;
+    private readonly AppDbContext _dbContext = dbContext;
     private readonly TodoListSettings _settings = settings.Value;
 
 

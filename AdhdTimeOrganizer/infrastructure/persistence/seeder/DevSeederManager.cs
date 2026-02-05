@@ -8,7 +8,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
 public class DevSeederManager(
     IServiceProvider serviceProvider,
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     IUserDefaultSeederManager userDefaultSeederManager,
     ILogger<DevSeederManager> logger) : IScopedService, IDevSeederManager
 {

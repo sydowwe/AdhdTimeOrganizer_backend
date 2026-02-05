@@ -6,7 +6,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.extensions;
 
 public static class UserDbContextExtensions
 {
-    public static void BaseWithUserEntitySaveChangesAsync(this DbContext dbContext, ILoggedUserService loggedUserService, ILogger<AppCommandDbContext> logger)
+    public static void BaseWithUserEntitySaveChangesAsync(this DbContext dbContext, ILoggedUserService loggedUserService, ILogger<AppDbContext> logger)
     {
         if (dbContext.ChangeTracker.Entries<BaseEntityWithUser>().Any(entry => entry.State == EntityState.Added))
         {

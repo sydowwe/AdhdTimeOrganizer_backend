@@ -9,10 +9,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
-public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(AppCommandDbContext appDbContext) : EndpointWithoutRequest<List<ActivityFormSelectOptionsResponse>>
+public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(AppDbContext appDbContext) : EndpointWithoutRequest<List<ActivityFormSelectOptionsResponse>>
     where TEntity : class
 {
-    protected readonly AppCommandDbContext _appDbContext = appDbContext;
+    protected readonly AppDbContext _appDbContext = appDbContext;
 
     public abstract string EntityRoute { get; }
     

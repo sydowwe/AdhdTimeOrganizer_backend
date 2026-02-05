@@ -4,5 +4,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskImportance.command;
 
-public class DeleteTaskImportanceEndpoint(AppCommandDbContext dbContext)
+public class DeleteTaskImportanceEndpoint(AppDbContext dbContext)
     : BaseDeleteEndpoint<TaskImportance>(dbContext);

@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence;
 
-public partial class AppCommandDbContext(DbContextOptions<AppCommandDbContext> options, ILoggedUserService loggedUserService, ILogger<AppCommandDbContext> logger)
+public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILoggedUserService loggedUserService, ILogger<AppDbContext> logger)
     : IdentityDbContext<User, UserRole, long>(options)
 {
     public DbSet<Activity> Activities { get; set; }

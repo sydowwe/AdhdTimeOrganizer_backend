@@ -6,5 +6,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.taskPriority.command;
 
-public class CreateTaskPriorityEndpoint(AppCommandDbContext dbContext, TaskPriorityMapper mapper)
+public class CreateTaskPriorityEndpoint(AppDbContext dbContext, TaskPriorityMapper mapper)
     : BaseCreateEndpoint<TaskPriority, TaskPriorityRequest, TaskPriorityMapper>(dbContext, mapper);

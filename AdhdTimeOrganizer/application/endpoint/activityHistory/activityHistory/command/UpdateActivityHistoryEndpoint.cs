@@ -6,5 +6,5 @@ using ActivityHistoryMapper = AdhdTimeOrganizer.application.mapper.ActivityHisto
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.command;
 
-public class UpdateActivityHistoryEndpoint(AppCommandDbContext dbContext, ActivityHistoryMapper mapper)
+public class UpdateActivityHistoryEndpoint(AppDbContext dbContext, ActivityHistoryMapper mapper)
     : BaseUpdateEndpoint<ActivityHistory, ActivityHistoryRequest, ActivityHistoryMapper>(dbContext, mapper);

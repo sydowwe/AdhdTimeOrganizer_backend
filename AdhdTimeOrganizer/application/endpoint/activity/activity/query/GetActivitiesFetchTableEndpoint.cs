@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.query;
 
 public class GetActivitiesFetchTableEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ActivityMapper mapper) 
     : BaseFetchTableEndpoint<Activity, ActivityResponse, ActivityFilterRequest, ActivityMapper>(dbContext, mapper)
 {

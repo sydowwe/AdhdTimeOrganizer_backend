@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class TodoListSeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     IOptions<TodoListSettings> settings,
     ILogger<TodoListSeeder> logger) : IScopedService, IDevDatabaseSeeder
 {

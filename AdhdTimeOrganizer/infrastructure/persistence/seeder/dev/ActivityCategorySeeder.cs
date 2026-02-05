@@ -5,7 +5,7 @@ using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityCategorySeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<ActivityCategorySeeder> logger) : IScopedService, IDevDatabaseSeeder
 {
     public string SeederName => "ActivityCategory";

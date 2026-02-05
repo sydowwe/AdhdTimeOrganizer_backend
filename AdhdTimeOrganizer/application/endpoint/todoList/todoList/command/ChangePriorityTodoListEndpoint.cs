@@ -5,7 +5,7 @@ using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.command;
 
-public class ChangePriorityTodoListEndpoint(AppCommandDbContext dbContext) : EndpointWithoutRequest
+public class ChangePriorityTodoListEndpoint(AppDbContext dbContext) : EndpointWithoutRequest
 {
 
     public override void Configure()

@@ -6,5 +6,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.command;
 
-public class CreatePlannerTaskEndpoint(AppCommandDbContext dbContext, PlannerTaskMapper mapper)
+public class CreatePlannerTaskEndpoint(AppDbContext dbContext, PlannerTaskMapper mapper)
     : BaseCreateEndpoint<PlannerTask, PlannerTaskRequest, PlannerTaskMapper>(dbContext, mapper);

@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activity.role.query;
 
 public class GetSelectOptionsActivityRoleEndpoint(
-    AppCommandDbContext appDbContext,
+    AppDbContext appDbContext,
     ActivityRoleMapper mapper)
     : BaseGetSelectOptionsEndpoint<ActivityRole, ActivityRoleMapper>(appDbContext, mapper)
 {

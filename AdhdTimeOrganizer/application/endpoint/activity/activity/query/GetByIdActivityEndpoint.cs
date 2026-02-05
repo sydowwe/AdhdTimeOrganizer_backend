@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.query;
 
 public class GetByIdActivityEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ActivityMapper mapper)
     : BaseGetByIdEndpoint<Activity, ActivityResponse, ActivityMapper>(dbContext, mapper)
 {

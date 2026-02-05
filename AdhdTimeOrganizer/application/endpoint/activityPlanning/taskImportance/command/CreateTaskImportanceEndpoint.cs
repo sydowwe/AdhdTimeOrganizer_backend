@@ -6,5 +6,5 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskImportance.command;
 
-public class CreateTaskImportanceEndpoint(AppCommandDbContext dbContext, TaskImportanceMapper mapper)
+public class CreateTaskImportanceEndpoint(AppDbContext dbContext, TaskImportanceMapper mapper)
     : BaseCreateEndpoint<TaskImportance, TaskImportanceRequest, TaskImportanceMapper>(dbContext, mapper);

@@ -7,7 +7,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 namespace AdhdTimeOrganizer.application.endpoint.activity.role.query;
 
 public class GetByIdActivityRoleEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ActivityRoleMapper mapper)
     : BaseGetByIdEndpoint<ActivityRole, ActivityRoleResponse, ActivityRoleMapper>(dbContext, mapper)
 {

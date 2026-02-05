@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class PlannerTaskSeeder(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     ILogger<PlannerTaskSeeder> logger) : IDevDatabaseSeeder, IScopedService
 {
     public string SeederName => "PlannerTask";

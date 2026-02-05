@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.query;
 
 public class GetAllGroupedRoutineTodoListEndpoint(
-    AppCommandDbContext dbContext,
+    AppDbContext dbContext,
     RoutineTimePeriodMapper routineTimePeriodMapper,
     RoutineTodoListMapper mapper) : EndpointWithoutRequest<IEnumerable<RoutineTodoListGroupedResponse>>
 {
