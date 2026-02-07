@@ -1,6 +1,6 @@
 ﻿using FastEndpoints;
 
-namespace AdhdTimeOrganizer.application.dto.request;
+namespace AdhdTimeOrganizer.application.dto.request.activityTracking;
 
 public record WebExtensionSummaryRequest
 {

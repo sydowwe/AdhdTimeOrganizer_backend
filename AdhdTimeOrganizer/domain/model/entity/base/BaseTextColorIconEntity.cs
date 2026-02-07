@@ -1,6 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.user;
-
-namespace AdhdTimeOrganizer.domain.model.entity.@base;
+﻿namespace AdhdTimeOrganizer.domain.model.entity.@base;
 
 public class BaseTextColorIconEntity : BaseTextColorEntity
 {

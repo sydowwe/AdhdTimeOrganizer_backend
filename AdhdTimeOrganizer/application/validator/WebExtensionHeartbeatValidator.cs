@@ -1,4 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.dto.request;
+using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using FastEndpoints;
 using FluentValidation;
 
@@ -12,11 +13,10 @@ public class WebExtensionHeartbeatValidator : Validator<WebExtensionHeartbeatReq
             .NotEmpty()
             .LessThanOrEqualTo(DateTime.UtcNow.AddMinutes(5));
 
-        RuleFor(x => x.Window).NotNull();
-        RuleFor(x => x.Window.WindowMinutes).Equal(5);
-        RuleFor(x => x.Window.Activities).NotNull();
+        RuleFor(x => x.WindowMinutes).Equal(5);
+        RuleFor(x => x.Activities).NotNull();
 
-        RuleForEach(x => x.Window.Activities).ChildRules(a =>
+        RuleForEach(x => x.Activities).ChildRules(a =>
         {
             a.RuleFor(x => x.Domain).NotEmpty().MaximumLength(255);
             a.RuleFor(x => x.Url).MaximumLength(2048);

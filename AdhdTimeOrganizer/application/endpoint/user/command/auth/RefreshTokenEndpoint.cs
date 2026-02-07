@@ -1,4 +1,3 @@
-using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using FastEndpoints;
 

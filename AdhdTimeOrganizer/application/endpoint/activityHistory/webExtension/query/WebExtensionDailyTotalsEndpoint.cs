@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request;
+using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -13,6 +14,7 @@ public class WebExtensionDailyTotalsEndpoint(AppDbContext dbContext)
     public override void Configure()
     {
         Get("/activity-tracking/web-extension/daily-totals");
+        Policies("ActivityTracking"); // Allow extension clients with ActivityTracking role
     }
 
     public override async Task HandleAsync(WebExtensionDailyTotalsRequest req, CancellationToken ct)

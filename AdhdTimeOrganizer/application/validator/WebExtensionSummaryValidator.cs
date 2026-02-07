@@ -1,4 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.dto.request;
+using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using FastEndpoints;
 using FluentValidation;
 

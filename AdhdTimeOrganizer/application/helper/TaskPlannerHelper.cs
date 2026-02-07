@@ -1,6 +1,5 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
 
 namespace AdhdTimeOrganizer.application.helper;
 

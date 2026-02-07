@@ -1,4 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.dto.request;
+using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
@@ -14,6 +15,7 @@ public class WebExtensionSummaryEndpoint(AppDbContext dbContext) : Endpoint<WebE
     public override void Configure()
     {
         Get("/activity-tracking/web-extension/summary");
+        Policies("ActivityTracking"); // Allow extension clients with ActivityTracking role
         Validator<WebExtensionSummaryValidator>();
     }
 
@@ -37,7 +39,7 @@ public class WebExtensionSummaryEndpoint(AppDbContext dbContext) : Endpoint<WebE
         // 4. Apply minimum seconds filter
         if (req.MinSeconds.HasValue && req.MinSeconds > 0)
         {
-            aggregated = FilterByMinSeconds(aggregated, req.MinSeconds.Value);
+            aggregated = FilterByMinSecondsWithOther(aggregated, req.MinSeconds.Value);
         }
 
         // 5. Build response

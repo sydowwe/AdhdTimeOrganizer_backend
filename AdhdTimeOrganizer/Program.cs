@@ -140,9 +140,17 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     services.AddCors(options =>
     {
         var pageUrl = Helper.GetEnvVar("PAGE_URL");
+        var extensionId = Helper.GetEnvVar("EXTENSION_ID"); // Chrome extension ID
         options.AddPolicy("AllowFrontend", corsBuilder =>
         {
             var origins = new List<string> { "https://localhost:3000", "https://localhost:5173", pageUrl };
+
+            // Add Chrome extension origin if configured
+            if (!string.IsNullOrEmpty(extensionId))
+            {
+                origins.Add($"chrome-extension://{extensionId}");
+            }
+
             corsBuilder.WithOrigins(origins.ToArray())
                 .AllowAnyHeader()
                 .AllowAnyMethod()

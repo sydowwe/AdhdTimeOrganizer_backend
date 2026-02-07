@@ -1,6 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
-
-namespace AdhdTimeOrganizer.application.dto.response.taskPlanner;
+﻿namespace AdhdTimeOrganizer.application.dto.response.taskPlanner;
 
 public record ApplyTemplatePlannerTaskResponse
 {

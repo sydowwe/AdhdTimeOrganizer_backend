@@ -1,23 +1,20 @@
-using System.Security.Claims;
 using AdhdTimeOrganizer.application.dto.request;
-using AdhdTimeOrganizer.application.dto.response.activityTracking;
+using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.infrastructure.security;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.command;
 
-[AllowExtensionClients]
 public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoint<WebExtensionHeartbeatRequest, int>
 {
     public override void Configure()
     {
         Post("/activity-tracking/web-extension/heartbeat");
-        AuthSchemes("ActivityTracking");
+        Policies("ActivityTracking"); // Allow extension clients with ActivityTracking role
         Validator<WebExtensionHeartbeatValidator>();
     }
 
@@ -26,13 +23,13 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
         var userId = User.GetId();
         var processedCount = 0;
 
-        foreach (var activity in req.Window.Activities.Where(activity => activity.ActiveSeconds != 0 || activity.BackgroundSeconds != 0))
+        foreach (var activity in req.Activities.Where(activity => activity.ActiveSeconds != 0 || activity.BackgroundSeconds != 0))
         {
             // Find existing record for this user + window + domain
             var existing = await dbContext.WebExtensionData
                 .FirstOrDefaultAsync(x =>
                         x.UserId == userId &&
-                        x.WindowStart == req.Window.WindowStart &&
+                        x.WindowStart == req.WindowStart &&
                         x.Domain == activity.Domain,
                     ct);
 
@@ -48,7 +45,7 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
                     existing.Url = activity.Url;
 
                 // Update final flag (once true, stays true)
-                if (req.Window.IsFinal)
+                if (req.IsFinal)
                     existing.IsFinal = true;
             }
             else
@@ -57,12 +54,12 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
                 var record = new WebExtensionData
                 {
                     UserId = userId,
-                    WindowStart = req.Window.WindowStart,
+                    WindowStart = req.WindowStart,
                     Domain = activity.Domain,
                     Url = activity.Url,
                     ActiveSeconds = activity.ActiveSeconds,
                     BackgroundSeconds = activity.BackgroundSeconds,
-                    IsFinal = req.Window.IsFinal,
+                    IsFinal = req.IsFinal,
                 };
 
                 dbContext.WebExtensionData.Add(record);

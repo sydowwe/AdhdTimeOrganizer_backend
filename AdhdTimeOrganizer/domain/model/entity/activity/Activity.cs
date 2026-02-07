@@ -20,7 +20,6 @@ public class Activity : BaseNameTextEntity
     public virtual ICollection<RoutineTodoList> RoutineTodoLists { get; set; } = [];
     public virtual ICollection<Alarm> AlarmList { get; set; } = new List<Alarm>();
     public virtual ICollection<ActivityHistory> ActivityHistoryList { get; set; } = new List<ActivityHistory>();
-    public virtual ICollection<WebExtensionData> WebExtensionDataList { get; set; } = new List<WebExtensionData>();
     public virtual ICollection<PlannerTask> PlannerTaskList { get; set; } = new List<PlannerTask>();
 
 

@@ -1,9 +1,9 @@
-﻿namespace AdhdTimeOrganizer.application.dto.dto;
+﻿namespace AdhdTimeOrganizer.application.dto.request.activityTracking;
 
 public record WebExtensionEntryDto
 {
-    public required string Domain { get; set; }
-    public required string Url { get; set; }
-    public required int ActiveSeconds { get; set; }
-    public required int BackgroundSeconds { get; set; }
+    public required string Domain { get; init; }
+    public required string Url { get; init; }
+    public required int ActiveSeconds { get; init; }
+    public required int BackgroundSeconds { get; init; }
 }

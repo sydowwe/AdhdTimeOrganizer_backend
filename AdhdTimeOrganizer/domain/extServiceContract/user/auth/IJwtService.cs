@@ -1,5 +1,4 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.user;
-using Microsoft.AspNetCore.Identity;
 
 namespace AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 
