@@ -111,7 +111,12 @@ public class WebExtensionSummaryEndpoint(AppDbContext dbContext) : Endpoint<WebE
                         Domain = domainGroup.Key,
                         // Sum up seconds from all 5-min windows that fall into this target window
                         ActiveSeconds = domainGroup.Sum(x => x.ActiveSeconds),
-                        BackgroundSeconds = domainGroup.Sum(x => x.BackgroundSeconds)
+                        BackgroundSeconds = domainGroup.Sum(x => x.BackgroundSeconds),
+                        Url = domainGroup
+                            .Where(x => !string.IsNullOrEmpty(x.Url))
+                            .GroupBy(x => x.Url)
+                            .OrderByDescending(g => g.Sum(x => x.ActiveSeconds + x.BackgroundSeconds))
+                            .FirstOrDefault()?.Key
                     })
                     // Order by total time descending within each window
                     .OrderByDescending(x => x.TotalSeconds)
