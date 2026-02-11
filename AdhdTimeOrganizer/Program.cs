@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface.manager;
 using AdhdTimeOrganizer.infrastructure.settings;
 using DotNetEnv;

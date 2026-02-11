@@ -4,14 +4,13 @@ using FluentValidation;
 
 namespace AdhdTimeOrganizer.application.validator;
 
-public class TopDomainsValidator : Validator<SummaryCardsRequest>
+public class PieChartValidator : Validator<PieChartRequest>
 {
-    public TopDomainsValidator()
+    public PieChartValidator()
     {
         RuleFor(x => x.Date).NotEmpty();
         RuleFor(x => x.From).NotEmpty();
         RuleFor(x => x.To).NotEmpty();
-        RuleFor(x => x.TopN).InclusiveBetween(1, 50).When(x => x.TopN.HasValue);
-        RuleFor(x => x.Baseline).IsInEnum();
+        RuleFor(x => x.MinPercent).InclusiveBetween(0.1, 50.0).When(x => x.MinPercent.HasValue);
     }
 }

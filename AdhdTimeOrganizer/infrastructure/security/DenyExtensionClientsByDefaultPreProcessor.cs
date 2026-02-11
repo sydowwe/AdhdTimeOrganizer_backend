@@ -6,14 +6,9 @@ namespace AdhdTimeOrganizer.infrastructure.security;
 /// Authorization requirement that checks if extension clients are allowed.
 /// By default, extension clients are denied unless the endpoint explicitly allows them.
 /// </summary>
-public class ExtensionClientRequirement : IAuthorizationRequirement
+public class ExtensionClientRequirement(bool allowExtensionClients = false) : IAuthorizationRequirement
 {
-    public bool AllowExtensionClients { get; }
-
-    public ExtensionClientRequirement(bool allowExtensionClients = false)
-    {
-        AllowExtensionClients = allowExtensionClients;
-    }
+    public bool AllowExtensionClients { get; } = allowExtensionClients;
 }
 
 /// <summary>

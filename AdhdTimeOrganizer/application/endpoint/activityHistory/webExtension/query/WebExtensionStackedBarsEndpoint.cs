@@ -1,6 +1,7 @@
 ﻿using AdhdTimeOrganizer.application.dto.request;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking;
+using AdhdTimeOrganizer.application.dto.response.activityTracking.stackedBars;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
@@ -10,51 +11,48 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.query;
 
-public class WebExtensionSummaryEndpoint(AppDbContext dbContext) : Endpoint<WebExtensionSummaryRequest, WebExtensionSummaryResponse>
+public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<WebExtensionStackedBarsRequest, IEnumerable<WebExtensionStackedBarsWindow>>
 {
     public override void Configure()
     {
-        Get("/activity-tracking/web-extension/summary");
-        Policies("ActivityTracking"); // Allow extension clients with ActivityTracking role
+        Post("/activity-tracking/web-extension/stacked-bars");
         Validator<WebExtensionSummaryValidator>();
     }
 
-    public override async Task HandleAsync(WebExtensionSummaryRequest req, CancellationToken ct)
+    public override async Task HandleAsync(WebExtensionStackedBarsRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
+
+        var (from, to) = req.ToDateTimeRange();
 
         // 1. Fetch raw 5-min window data from DB
         var rawData = await dbContext.WebExtensionData
             .Where(x => x.UserId == userId)
-            .Where(x => x.WindowStart >= req.From && x.WindowStart < req.To)
+            .Where(x => x.WindowStart >= from && x.WindowStart < to)
             .OrderBy(x => x.WindowStart)
             .ToListAsync(ct);
 
-        // 2. Determine target window size (default 5 min)
-        var windowMinutes = req.WindowMinutes ?? 5;
+        var windowMinutes = req.WindowMinutes;
 
         // 3. Re-aggregate into target window size
         var aggregated = AggregateIntoWindows(rawData, windowMinutes);
 
         // 4. Apply minimum seconds filter
-        if (req.MinSeconds.HasValue && req.MinSeconds > 0)
+        if (req.MinSeconds is > 0)
         {
             aggregated = FilterByMinSecondsWithOther(aggregated, req.MinSeconds.Value);
         }
 
         // 5. Build response
-        var response = new WebExtensionSummaryResponse
-        {
-            Windows = aggregated
-                .OrderBy(w => w.WindowStart)
-                .ToList()
-        };
+        var response = aggregated
+            .OrderBy(w => w.WindowStart)
+            .ToList();
 
         await SendAsync(response, cancellation: ct);
     }
 
-    private List<WebExtensionSummaryWindow> FilterByMinSecondsWithOther(
-        List<WebExtensionSummaryWindow> windows,
+    private List<WebExtensionStackedBarsWindow> FilterByMinSecondsWithOther(
+        List<WebExtensionStackedBarsWindow> windows,
         int minSeconds)
     {
         return windows
@@ -71,7 +69,7 @@ public class WebExtensionSummaryEndpoint(AppDbContext dbContext) : Endpoint<WebE
                 // Combine small activities into "Other" bucket
                 if (belowThreshold.Count > 0)
                 {
-                    aboveThreshold.Add(new WebExtensionSummaryEntry
+                    aboveThreshold.Add(new WebExtensionStackedBarsEntry
                     {
                         Domain = "_other",
                         ActiveSeconds = belowThreshold.Sum(x => x.ActiveSeconds),
@@ -79,7 +77,7 @@ public class WebExtensionSummaryEndpoint(AppDbContext dbContext) : Endpoint<WebE
                     });
                 }
 
-                return new WebExtensionSummaryWindow
+                return new WebExtensionStackedBarsWindow
                 {
                     WindowStart = w.WindowStart,
                     WindowEnd = w.WindowEnd,
@@ -92,21 +90,21 @@ public class WebExtensionSummaryEndpoint(AppDbContext dbContext) : Endpoint<WebE
             .ToList();
     }
 
-    private static List<WebExtensionSummaryWindow> AggregateIntoWindows(
+    private static List<WebExtensionStackedBarsWindow> AggregateIntoWindows(
         List<WebExtensionData> rawData,
         int targetWindowMinutes)
     {
         // Group raw records into target window buckets
         var grouped = rawData
             .GroupBy(x => AlignToWindow(x.WindowStart, targetWindowMinutes))
-            .Select(windowGroup => new WebExtensionSummaryWindow
+            .Select(windowGroup => new WebExtensionStackedBarsWindow
             {
                 WindowStart = windowGroup.Key,
                 WindowEnd = windowGroup.Key.AddMinutes(targetWindowMinutes),
                 Activities = windowGroup
                     // Group by domain within the window
                     .GroupBy(x => x.Domain)
-                    .Select(domainGroup => new WebExtensionSummaryEntry
+                    .Select(domainGroup => new WebExtensionStackedBarsEntry
                     {
                         Domain = domainGroup.Key,
                         // Sum up seconds from all 5-min windows that fall into this target window
@@ -137,12 +135,12 @@ public class WebExtensionSummaryEndpoint(AppDbContext dbContext) : Endpoint<WebE
         return time.Date.AddMinutes(alignedMinutes);
     }
 
-    private static List<WebExtensionSummaryWindow> FilterByMinSeconds(
-        List<WebExtensionSummaryWindow> windows,
+    private static List<WebExtensionStackedBarsWindow> FilterByMinSeconds(
+        List<WebExtensionStackedBarsWindow> windows,
         int minSeconds)
     {
         return windows
-            .Select(w => new WebExtensionSummaryWindow
+            .Select(w => new WebExtensionStackedBarsWindow
             {
                 WindowStart = w.WindowStart,
                 WindowEnd = w.WindowEnd,

@@ -1,6 +1,6 @@
-﻿namespace AdhdTimeOrganizer.application.dto.response.activityTracking;
+﻿namespace AdhdTimeOrganizer.application.dto.response.activityTracking.stackedBars;
 
-public class WebExtensionSummaryEntry
+public class WebExtensionStackedBarsEntry
 {
     public string Domain { get; set; } = string.Empty;
     public string? Url { get; set; }  // Most visited URL in this window

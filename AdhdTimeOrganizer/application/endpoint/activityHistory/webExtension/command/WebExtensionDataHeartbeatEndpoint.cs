@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
+using AdhdTimeOrganizer.application.dto.request.activityTracking.heartbeat;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;

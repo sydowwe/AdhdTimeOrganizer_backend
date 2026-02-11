@@ -1,5 +1,7 @@
+using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking;
+using AdhdTimeOrganizer.application.dto.response.activityTracking.summaryCards;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
@@ -9,35 +11,28 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.query;
 
-public class TopDomainsEndpoint(AppDbContext db) : Endpoint<TopDomainsRequest, TopDomainsResponse>
+public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCardsRequest, List<DomainSummaryDto>>
 {
     public override void Configure()
     {
-        Get("/activity-tracking/web-extension/top-domains");
-        Policies("ActivityTracking"); // Allow extension clients with ActivityTracking role
+        Post("/activity-tracking/web-extension/summary-cards");
         Validator<TopDomainsValidator>();
     }
 
-    public override async Task HandleAsync(TopDomainsRequest req, CancellationToken ct)
+    public override async Task HandleAsync(SummaryCardsRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
 
-        // 1. Get current period data
-        var currentPeriodData = await GetPeriodData(userId, req.From, req.To, ct);
+        // Construct DateTime from DateOnly and TimeDto
+        var (from, to) = req.ToDateTimeRange();
 
-        // 2. Calculate totals for the period
-        var totals = new DayTotalsDto
-        {
-            TotalSeconds = currentPeriodData.Sum(x => x.ActiveSeconds + x.BackgroundSeconds),
-            ActiveSeconds = currentPeriodData.Sum(x => x.ActiveSeconds),
-            BackgroundSeconds = currentPeriodData.Sum(x => x.BackgroundSeconds),
-            TotalDomains = currentPeriodData.Select(x => x.Domain).Distinct().Count(),
-            TotalPages = currentPeriodData.Where(x => x.Url != null).Select(x => x.Url).Distinct().Count(),
-            TotalEntries = currentPeriodData.Count
-        };
+        // 1. Get current period data
+        var currentPeriodData = await GetPeriodData(userId, from, to, ct);
+
+        var totalSeconds = currentPeriodData.Sum(x => x.ActiveSeconds + x.BackgroundSeconds);
 
         // 3. Calculate baseline period range
-        var (baselineFrom, baselineTo, baselineDays) = CalculateBaselineRange(req.From, req.To, req.Baseline);
+        var (baselineFrom, baselineTo, baselineDays) = CalculateBaselineRange(from, to, req.Baseline);
 
         // 4. Get baseline data (daily averages)
         var baselineData = await GetBaselineAverages(userId, baselineFrom, baselineTo, baselineDays, req.Baseline, ct);
@@ -63,12 +58,6 @@ public class TopDomainsEndpoint(AppDbContext db) : Endpoint<TopDomainsRequest, T
             // Original behavior: return top N
             filteredDomains = allDomains.Take(req.TopN.Value);
         }
-        else if (req.MinPercent.HasValue && totals.TotalSeconds > 0)
-        {
-            // New behavior: return all domains above percentage threshold
-            var minSeconds = (totals.TotalSeconds * req.MinPercent.Value) / 100.0;
-            filteredDomains = allDomains.Where(x => x.TotalSeconds >= minSeconds);
-        }
         else
         {
             // Default: return top 5
@@ -76,14 +65,7 @@ public class TopDomainsEndpoint(AppDbContext db) : Endpoint<TopDomainsRequest, T
         }
 
         // 7. Build response with comparisons
-        var response = new TopDomainsResponse
-        {
-            From = req.From,
-            To = req.To,
-            Baseline = req.Baseline,
-            Totals = totals,
-            Domains = filteredDomains.Select(d => BuildDomainSummary(d, baselineData)).ToList()
-        };
+        var response = filteredDomains.Select(d => BuildDomainSummary(d, baselineData)).ToList();
 
         await SendAsync(response, cancellation: ct);
     }

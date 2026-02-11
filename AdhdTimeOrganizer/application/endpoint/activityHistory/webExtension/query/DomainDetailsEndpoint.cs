@@ -13,7 +13,6 @@ public class DomainDetailsEndpoint(AppDbContext db) : Endpoint<DomainDetailsRequ
     public override void Configure()
     {
         Get("/activity-tracking/web-extension/domain-details");
-        Policies("ActivityTracking"); // Allow extension clients with ActivityTracking role
         Validator<DomainDetailsValidator>();
     }
 

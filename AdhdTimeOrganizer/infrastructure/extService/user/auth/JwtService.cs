@@ -128,7 +128,7 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
             Secure = true,
             SameSite = SameSiteMode.Strict,
             Expires = stayLoggedIn ? DateTime.UtcNow.AddDays(30) : null,
-            Path = "/api/user/refresh",
+            Path = "/api/auth/refresh",
             IsEssential = true
         });
     }

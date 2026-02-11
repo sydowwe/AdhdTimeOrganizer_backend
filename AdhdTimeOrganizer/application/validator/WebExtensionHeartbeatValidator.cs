@@ -1,5 +1,6 @@
 ﻿using AdhdTimeOrganizer.application.dto.request;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
+using AdhdTimeOrganizer.application.dto.request.activityTracking.heartbeat;
 using FastEndpoints;
 using FluentValidation;
 

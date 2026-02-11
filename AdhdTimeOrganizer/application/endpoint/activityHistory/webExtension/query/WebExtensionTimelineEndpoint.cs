@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking;
+using AdhdTimeOrganizer.application.dto.response.activityTracking.timeline;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
@@ -14,8 +15,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
 {
     public override void Configure()
     {
-        Get("/activity-tracking/web-extension/timeline");
-        Policies("ActivityTracking");
+        Post("/activity-tracking/web-extension/timeline");
         Validator<WebExtensionTimelineValidator>();
     }
 
@@ -23,10 +23,12 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
     {
         var userId = User.GetId();
 
+        var (from, to) = req.ToDateTimeRange();
+
         // 1. Fetch raw 5-min window data ordered by time
         var rawData = await dbContext.WebExtensionData
             .Where(x => x.UserId == userId)
-            .Where(x => x.WindowStart >= req.From && x.WindowStart < req.To)
+            .Where(x => x.WindowStart >= from && x.WindowStart < to)
             .OrderBy(x => x.WindowStart)
             .ThenBy(x => x.Domain)
             .ToListAsync(ct);
@@ -55,8 +57,6 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
 
         var response = new WebExtensionTimelineResponse
         {
-            From = req.From,
-            To = req.To,
             ActiveSessions = activeSessions,
             BackgroundSessions = backgroundSessions
         };
@@ -64,7 +64,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         await SendAsync(response, cancellation: ct);
     }
 
-    private List<TimelineSession> BuildSessions(List<WebExtensionData> rawData, bool isBackground)
+    private static List<TimelineSession> BuildSessions(List<WebExtensionData> rawData, bool isBackground)
     {
         var sessions = new List<TimelineSession>();
         TimelineSession? currentSession = null;
@@ -118,12 +118,13 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
 
                 currentSession = new TimelineSession
                 {
+                    Id = record.Id,
                     Domain = record.Domain,
                     Url = record.Url,
                     StartedAt = record.WindowStart,
                     EndedAt = windowEnd,
-                    DurationSeconds = 5 * 60,  // 5 minutes initially
-                    TotalSeconds = seconds
+                    DurationSeconds = 5 * 60, // 5 minutes initially
+                    TotalSeconds = seconds,
                 };
             }
 
