@@ -14,15 +14,15 @@ public class WebExtensionHeartbeatValidator : Validator<WebExtensionHeartbeatReq
             .NotEmpty()
             .LessThanOrEqualTo(DateTime.UtcNow.AddMinutes(5));
 
-        RuleFor(x => x.WindowMinutes).Equal(5);
+        RuleFor(x => x.WindowMinutes).Equal(1);
         RuleFor(x => x.Activities).NotNull();
 
         RuleForEach(x => x.Activities).ChildRules(a =>
         {
             a.RuleFor(x => x.Domain).NotEmpty().MaximumLength(255);
             a.RuleFor(x => x.Url).MaximumLength(2048);
-            a.RuleFor(x => x.ActiveSeconds).InclusiveBetween(0, 300);
-            a.RuleFor(x => x.BackgroundSeconds).InclusiveBetween(0, 300);
+            a.RuleFor(x => x.ActiveSeconds).InclusiveBetween(0, 60);
+            a.RuleFor(x => x.BackgroundSeconds).InclusiveBetween(0, 60);
         });
     }
 }

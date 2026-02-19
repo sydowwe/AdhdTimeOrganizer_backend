@@ -43,9 +43,10 @@
 
     <ItemGroup>
       <Folder Include="application\endpoint\activityHistory\activityHistory\command\" />
-      <Folder Include="application\endpoint\activityHistory\activityHistory\query\" />
+      <Folder Include="application\endpoint\activityHistory\activityHistory\query\dashboard\" />
       <Folder Include="application\endpoint\activityHistory\alarm\command\" />
       <Folder Include="application\endpoint\activityHistory\alarm\query\" />
+      <Folder Include="application\endpoint\activityTracking\" />
       <Folder Include="application\endpoint\activity\activity\query\" />
       <Folder Include="application\endpoint\activity\role\command\" />
       <Folder Include="application\endpoint\activity\role\query\" />

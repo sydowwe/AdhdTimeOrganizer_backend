@@ -25,7 +25,7 @@ public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<
 
         var (from, to) = req.ToDateTimeRange();
 
-        // 1. Fetch raw 5-min window data from DB
+        // 1. Fetch raw 1-min window data from DB
         var rawData = await dbContext.WebExtensionData
             .Where(x => x.UserId == userId)
             .Where(x => x.WindowStart >= from && x.WindowStart < to)
@@ -107,7 +107,7 @@ public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<
                     .Select(domainGroup => new WebExtensionStackedBarsEntry
                     {
                         Domain = domainGroup.Key,
-                        // Sum up seconds from all 5-min windows that fall into this target window
+                        // Sum up seconds from all 1-min windows that fall into this target window
                         ActiveSeconds = domainGroup.Sum(x => x.ActiveSeconds),
                         BackgroundSeconds = domainGroup.Sum(x => x.BackgroundSeconds),
                         Url = domainGroup

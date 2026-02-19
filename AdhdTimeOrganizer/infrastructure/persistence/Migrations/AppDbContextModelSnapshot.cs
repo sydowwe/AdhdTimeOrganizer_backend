@@ -358,6 +358,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
 
+                    b.Property<DateOnly>("RecordDate")
+                        .HasColumnType("date")
+                        .HasColumnName("record_date");
+
                     b.Property<int>("ActiveSeconds")
                         .HasColumnType("integer")
                         .HasColumnName("active_seconds");
@@ -401,23 +405,25 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("window_start");
 
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
+                    b.Property<long>("row_version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
 
-                    b.HasKey("Id")
+                    b.HasKey("Id", "RecordDate")
                         .HasName("pk_web_extension_data");
 
                     b.HasIndex("UserId", "WindowStart")
                         .HasDatabaseName("ix_web_extension_data_user_id_window_start");
 
-                    b.HasIndex("UserId", "WindowStart", "Domain")
+                    b.HasIndex("UserId", "WindowStart", "Domain", "RecordDate")
                         .IsUnique()
-                        .HasDatabaseName("ix_web_extension_data_user_id_window_start_domain");
+                        .HasDatabaseName("ix_web_extension_data_user_id_window_start_domain_record_date");
 
                     b.ToTable("web_extension_data", "public");
+
+                    b
+                        .HasAnnotation("Partitioning:Column", "record_date")
+                        .HasAnnotation("Partitioning:Partitions", "[{\"Name\":\"web_extension_data_y2026\",\"From\":\"2026-01-01\",\"To\":\"2027-01-01\",\"IsDefault\":false},{\"Name\":\"web_extension_data_y2027\",\"From\":\"2027-01-01\",\"To\":\"2028-01-01\",\"IsDefault\":false},{\"Name\":\"web_extension_data_y2028\",\"From\":\"2028-01-01\",\"To\":\"2029-01-01\",\"IsDefault\":false},{\"Name\":\"web_extension_data_y2029\",\"From\":\"2029-01-01\",\"To\":\"2030-01-01\",\"IsDefault\":false},{\"Name\":\"web_extension_data_y2030\",\"From\":\"2030-01-01\",\"To\":\"2031-01-01\",\"IsDefault\":false},{\"Name\":\"web_extension_data_default\",\"From\":null,\"To\":null,\"IsDefault\":true}]");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.Calendar", b =>

@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Serilog;
 
 try
@@ -80,6 +81,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly("MojaDigitalnaFirma.Sandbox.AdminPortal"))
             .UseSnakeCaseNamingConvention()
+            .ReplaceService<IMigrationsSqlGenerator, PartitionedNpgsqlMigrationsSqlGenerator>()
             .LogTo(Console.WriteLine));
 
     // Dependency injection
@@ -203,7 +205,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         var devSeeder = scopedServices.GetService<IDevSeederManager>();
         if (devSeeder != null && isDevelopment)
         {
-            // await devSeeder.SeedAllAsync();
+             // await devSeeder.SeedAllAsync();
         }
 
         logger.LogInformation("Database seeding completed.");

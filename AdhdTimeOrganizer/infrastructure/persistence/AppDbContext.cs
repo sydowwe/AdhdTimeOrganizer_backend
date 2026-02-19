@@ -16,6 +16,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence;
 public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILoggedUserService loggedUserService, ILogger<AppDbContext> logger)
     : IdentityDbContext<User, UserRole, long>(options)
 {
+    public DateOnly CurrentPartitionDate => DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-2);
+
     public DbSet<Activity> Activities { get; set; }
     public DbSet<Alarm> Alarms { get; set; }
     public DbSet<ActivityCategory> ActivityCategories { get; set; }
@@ -50,6 +52,9 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
 
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UserEntityConfiguration).Assembly);
+
+        modelBuilder.Entity<WebExtensionData>()
+            .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate);
 
         OnModelCreatingPartial(modelBuilder);
     }

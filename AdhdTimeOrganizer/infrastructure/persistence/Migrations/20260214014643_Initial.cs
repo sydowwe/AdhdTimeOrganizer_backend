@@ -382,20 +382,21 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    record_date = table.Column<DateOnly>(type: "date", nullable: false),
                     window_start = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     domain = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     url = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
                     active_seconds = table.Column<int>(type: "integer", nullable: false),
                     background_seconds = table.Column<int>(type: "integer", nullable: false),
                     is_final = table.Column<bool>(type: "boolean", nullable: false),
-                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    row_version = table.Column<long>(type: "bigint", nullable: false),
                     created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     user_id = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("pk_web_extension_data", x => x.id);
+                    table.PrimaryKey("pk_web_extension_data", x => new { x.id, x.record_date });
                     table.ForeignKey(
                         name: "fk_web_extension_data_user_user_id",
                         column: x => x.user_id,
@@ -1214,10 +1215,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 columns: new[] { "user_id", "window_start" });
 
             migrationBuilder.CreateIndex(
-                name: "ix_web_extension_data_user_id_window_start_domain",
+                name: "ix_web_extension_data_user_id_window_start_domain_record_date",
                 schema: "public",
                 table: "web_extension_data",
-                columns: new[] { "user_id", "window_start", "domain" },
+                columns: new[] { "user_id", "window_start", "domain", "record_date" },
                 unique: true);
         }
 
