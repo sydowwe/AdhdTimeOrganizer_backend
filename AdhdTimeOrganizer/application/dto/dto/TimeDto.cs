@@ -1,7 +1,16 @@
-﻿namespace AdhdTimeOrganizer.application.dto.dto;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace AdhdTimeOrganizer.application.dto.dto;
 
 public record TimeDto
 {
-    public int Hours { get; init; }
-    public int Minutes { get; init; }
+    public required int Hours { get; init; }
+    public required int Minutes { get; init; }
+
+    [SetsRequiredMembers]
+    public TimeDto(int hours, int minutes)
+    {
+        Hours = hours;
+        Minutes = minutes;
+    }
 }

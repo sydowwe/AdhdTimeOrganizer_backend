@@ -46,7 +46,7 @@ public class DevSeederManager(
         }
     }
 
-    private async Task<long?> GetRootAdminUserId()
+    public async Task<long?> GetRootAdminUserId()
     {
         // Get root admin user ID for user default seeders
         var rootAdminUsername = Helper.GetEnvVar("ROOT_ADMIN_USERNAME");
@@ -59,6 +59,21 @@ public class DevSeederManager(
         }
 
         return adminUser?.Id;
+    }
+
+    public async Task SeedAsync(string seederName, long userId)
+    {
+        var seeders = serviceProvider.GetServices<IDevDatabaseSeeder>();
+        var seeder = seeders.FirstOrDefault(s => s.SeederName == seederName);
+
+        if (seeder != null)
+        {
+            await seeder.SeedForUser(userId);
+        }
+        else
+        {
+            throw new InvalidOperationException($"Seeder with name '{seederName}' not found.");
+        }
     }
 
     public IEnumerable<string> GetAllSeederNames()

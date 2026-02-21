@@ -21,6 +21,6 @@ public partial class PlannerTaskMapper : IBaseSimpleCrudMapper<PlannerTask, Plan
     private static string MapStatus(TaskStatus status) => status.ToString();
     private static TaskStatus MapStatus(string status) => Enum.Parse<TaskStatus>(status);
     private static DateOnly MapCalendarToDate(Calendar calendar) => calendar.Date;
-    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new() { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
+    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new(timeOnly.Hour, timeOnly.Minute);
     private static TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new(timeDto.Hours, timeDto.Minutes);
 }

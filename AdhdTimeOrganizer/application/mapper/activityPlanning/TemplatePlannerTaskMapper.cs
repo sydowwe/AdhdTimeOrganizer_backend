@@ -18,6 +18,6 @@ public partial class TemplatePlannerTaskMapper : IBaseCrudMapper<TemplatePlanner
 
     public partial TemplatePlannerTask ToEntity(TemplatePlannerTaskRequest request, long userId);
     public partial IQueryable<TemplatePlannerTaskResponse> ProjectToResponse(IQueryable<TemplatePlannerTask> source);
-    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new() { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
+    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new(timeOnly.Hour, timeOnly.Minute);
     private static TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new(timeDto.Hours, timeDto.Minutes);
 }

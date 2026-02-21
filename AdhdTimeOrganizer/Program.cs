@@ -103,6 +103,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     {
         services.SwaggerDocument();
     }
+
     services.AddIdentityServices();
 
     // Background services
@@ -199,13 +200,13 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         var userDefaultsSeeder = scopedServices.GetService<IUserDefaultSeederManager>();
         if (userDefaultsSeeder != null && isDevelopment)
         {
-           // await userDefaultsSeeder.SeedAllForAllUsersAsync(true);
+            // await userDefaultsSeeder.SeedAllForAllUsersAsync(true);
         }
 
         var devSeeder = scopedServices.GetService<IDevSeederManager>();
         if (devSeeder != null && isDevelopment)
         {
-             // await devSeeder.SeedAllAsync();
+            // await devSeeder.SeedAllAsync(true);
         }
 
         logger.LogInformation("Database seeding completed.");

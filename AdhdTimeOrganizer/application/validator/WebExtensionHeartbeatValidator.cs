@@ -11,8 +11,7 @@ public class WebExtensionHeartbeatValidator : Validator<WebExtensionHeartbeatReq
     public WebExtensionHeartbeatValidator()
     {
         RuleFor(x => x.HeartbeatAt)
-            .NotEmpty()
-            .LessThanOrEqualTo(DateTime.UtcNow.AddMinutes(5));
+            .NotEmpty();
 
         RuleFor(x => x.WindowMinutes).Equal(1);
         RuleFor(x => x.Activities).NotNull();

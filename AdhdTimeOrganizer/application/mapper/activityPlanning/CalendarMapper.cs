@@ -17,6 +17,6 @@ public partial class CalendarMapper : IBaseReadMapper<Calendar, CalendarResponse
     public partial IQueryable<CalendarResponse> ProjectToResponse(IQueryable<Calendar> source);
 
 
-    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new() { Hours = timeOnly.Hour, Minutes = timeOnly.Minute };
+    private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new(timeOnly.Hour, timeOnly.Minute);
     private static TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new(timeDto.Hours, timeDto.Minutes);
 }
