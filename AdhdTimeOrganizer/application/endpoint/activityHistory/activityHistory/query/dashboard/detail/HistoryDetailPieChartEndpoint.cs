@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.application.dto.@enum;
-using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard;
+using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.detail;
 using AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
@@ -7,16 +7,16 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard;
+namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard.detail;
 
-public class HistoryPieChartEndpoint(AppDbContext db) : Endpoint<HistoryPieChartRequest, HistoryPieChartResponse>
+public class HistoryDetailPieChartEndpoint(AppDbContext db) : Endpoint<HistoryDetailPieChartRequest, HistoryPieChartResponse>
 {
     public override void Configure()
     {
-        Post("/activity-history/dashboard/pie-chart");
+        Post("/activity-history/dashboard/detail/pie-chart");
     }
 
-    public override async Task HandleAsync(HistoryPieChartRequest req, CancellationToken ct)
+    public override async Task HandleAsync(HistoryDetailPieChartRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
 
@@ -47,7 +47,7 @@ public class HistoryPieChartEndpoint(AppDbContext db) : Endpoint<HistoryPieChart
 
         List<HistoryPieChartItem> items;
         const double minPercentThreshold = 1.0; // Always use 1% threshold
-        var maxItems = req.TopN > 0 ? req.TopN : 20; // Use TopN from request, default to 20
+        var maxItems = req.MaxItems > 0 ? req.MaxItems : 20; // Use TopN from request, default to 20
 
         if (grandTotal > 0)
         {

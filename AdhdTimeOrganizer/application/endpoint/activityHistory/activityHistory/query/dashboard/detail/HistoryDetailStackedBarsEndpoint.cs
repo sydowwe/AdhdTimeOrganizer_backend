@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.application.dto.@enum;
-using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard;
+using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.detail;
 using AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
@@ -7,16 +7,16 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard;
+namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard.detail;
 
-public class HistoryStackedBarsEndpoint(AppDbContext db) : Endpoint<HistoryStackedBarsRequest, HistoryStackedBarsResponse>
+public class HistoryDetailStackedBarsEndpoint(AppDbContext db) : Endpoint<HistoryDetailStackedBarsRequest, HistoryStackedBarsResponse>
 {
     public override void Configure()
     {
-        Post("/activity-history/dashboard/stacked-bars");
+        Post("/activity-history/dashboard/detail/stacked-bars");
     }
 
-    public override async Task HandleAsync(HistoryStackedBarsRequest req, CancellationToken ct)
+    public override async Task HandleAsync(HistoryDetailStackedBarsRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
 

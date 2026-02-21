@@ -5,17 +5,18 @@ using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.infrastructure.security;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.command;
 
+[AllowExtensionClients]
 public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoint<WebExtensionHeartbeatRequest, int>
 {
     public override void Configure()
     {
         Post("/activity-tracking/web-extension/heartbeat");
-        Policies("ActivityTracking"); // Allow extension clients with ActivityTracking role
         Validator<WebExtensionHeartbeatValidator>();
     }
 

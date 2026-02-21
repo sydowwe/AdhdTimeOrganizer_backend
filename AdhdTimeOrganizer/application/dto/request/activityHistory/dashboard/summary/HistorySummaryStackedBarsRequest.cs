@@ -1,0 +1,3 @@
+namespace AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.summary;
+
+public record HistorySummaryStackedBarsRequest : HistorySummaryDateRangeRequest;

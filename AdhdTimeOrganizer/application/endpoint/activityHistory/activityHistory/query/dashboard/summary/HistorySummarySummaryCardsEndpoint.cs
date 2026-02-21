@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.application.dto.@enum;
-using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard;
+using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.summary;
 using AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
@@ -7,20 +7,22 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard;
+namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard.summary;
 
-public class HistorySummaryCardsEndpoint(AppDbContext db) : Endpoint<HistorySummaryCardsRequest, HistorySummaryCardsResponse>
+public class HistorySummarySummaryCardsEndpoint(AppDbContext db) : Endpoint<HistorySummarySummaryCardsRequest, HistorySummaryCardsResponse>
 {
     public override void Configure()
     {
-        Post("/activity-history/dashboard/summary-cards");
+        Post("/activity-history/dashboard/summary/summary-cards");
     }
 
-    public override async Task HandleAsync(HistorySummaryCardsRequest req, CancellationToken ct)
+    public override async Task HandleAsync(HistorySummarySummaryCardsRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange();
+        var (fromDate, toDate) = req.ToDateRange();
+        var from = fromDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var to = toDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var dayCount = (int)Math.Ceiling((to - from).TotalDays);
 
         var currentRecords = await db.ActivityHistories
@@ -45,9 +47,7 @@ public class HistorySummaryCardsEndpoint(AppDbContext db) : Endpoint<HistorySumm
             .ToList();
 
         // Step 2: Compute baseline range
-        var dateFrom = DateOnly.FromDateTime(from);
-        var dateTo = DateOnly.FromDateTime(to);
-        var (baselineFrom, baselineTo, baselineWeekdayFilter) = ComputeBaselineRange(from, dateFrom, dateTo, req.Baseline);
+        var (baselineFrom, baselineTo, baselineWeekdayFilter) = ComputeBaselineRange(from, fromDate, toDate, req.Baseline);
 
         var baselineRecords = await db.ActivityHistories
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
