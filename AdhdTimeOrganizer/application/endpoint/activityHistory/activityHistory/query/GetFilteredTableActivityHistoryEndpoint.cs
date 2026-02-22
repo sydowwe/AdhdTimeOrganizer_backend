@@ -12,9 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query;
 
-public class GetFilteredTableActivityHistoryEndpoint(
-    AppDbContext dbContext,
-    ActivityHistoryMapper mapper)
+public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext, ActivityHistoryMapper mapper)
     : Endpoint<BaseFilterSortPaginateRequest<ActivityHistoryFilterRequest>, List<ActivityHistoryListGroupedByDateResponse>>
 {
     public virtual string EndpointPath => "filtered-table";
@@ -23,7 +21,6 @@ public class GetFilteredTableActivityHistoryEndpoint(
     {
         return EndpointHelper.GetUserOrHigherRoles();
     }
-
 
     public override void Configure()
     {
