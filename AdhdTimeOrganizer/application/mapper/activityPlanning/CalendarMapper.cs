@@ -14,8 +14,25 @@ public partial class CalendarMapper : IBaseReadMapper<Calendar, CalendarResponse
     public partial CalendarResponse ToResponse(Calendar entity);
     public partial SelectOptionResponse ToSelectOptionResponse(Calendar entity);
     public partial void UpdateEntity(CalendarRequest request, Calendar entity);
-    public partial IQueryable<CalendarResponse> ProjectToResponse(IQueryable<Calendar> source);
 
+    public IQueryable<CalendarResponse> ProjectToResponse(IQueryable<Calendar> source) =>
+        source.Select(c => new CalendarResponse
+        {
+            Id = c.Id,
+            Date = c.Date,
+            DayIndex = c.Date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)c.Date.DayOfWeek,
+            DayType = c.DayType,
+            HolidayName = c.HolidayName,
+            Label = c.Label,
+            WakeUpTime = new TimeDto(c.WakeUpTime.Hour, c.WakeUpTime.Minute),
+            BedTime = new TimeDto(c.BedTime.Hour, c.BedTime.Minute),
+            AppliedTemplateId = c.AppliedTemplateId,
+            AppliedTemplateName = c.AppliedTemplateName,
+            Weather = c.Weather,
+            Notes = c.Notes,
+            TotalTasks = c.Tasks.Count(),
+            CompletedTasks = c.Tasks.Count(t => t.IsDone),
+        });
 
     private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new(timeOnly.Hour, timeOnly.Minute);
     private static TimeOnly MapTimeDtoToTimeOnly(TimeDto timeDto) => new(timeDto.Hours, timeDto.Minutes);

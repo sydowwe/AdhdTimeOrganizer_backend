@@ -14,12 +14,13 @@ public record DateRangeDto
     {
         var (from, to) = RangeType switch
         {
-            ActivityDateRangeType.OneDay => (Date, Date),
-            ActivityDateRangeType.OneWeek => (Date.AddDays(-7), Date),
-            ActivityDateRangeType.OneMonth => (Date.AddMonths(-1), Date),
-            ActivityDateRangeType.ThisMonth => (new DateOnly(Date.Year, Date.Month, 1), Date),
-            ActivityDateRangeType.ThisYear => (new DateOnly(Date.Year, 1, 1), Date),
-            ActivityDateRangeType.CustomRange => (Date, EndDate ?? Date),
+            ActivityDateRangeType.Day => (Date, Date),
+            ActivityDateRangeType.ThreeDays => (Date.AddDays(-3), Date),
+            ActivityDateRangeType.Week => (Date.AddDays(-7), Date),
+            ActivityDateRangeType.TwoWeeks => (Date.AddDays(-14), Date),
+            ActivityDateRangeType.Month => (Date.AddMonths(-1), Date),
+            ActivityDateRangeType.ThreeMonths => (Date.AddMonths(-3), Date),
+            ActivityDateRangeType.Year => (Date.AddYears(-1), Date),
             _ => (Date, Date)
         };
 
@@ -36,10 +37,6 @@ public record DateRangeDto
     {
         validator.RuleFor(x => selector(x).Date).NotEmpty();
         validator.RuleFor(x => selector(x).RangeType).IsInEnum();
-        validator.RuleFor(x => selector(x).EndDate)
-            .NotNull()
-            .When(x => selector(x).RangeType == ActivityDateRangeType.CustomRange)
-            .WithMessage("EndDate is required when RangeType is CustomRange");
         validator.RuleFor(x => selector(x).EndDate)
             .Must((root, endDate) => endDate >= selector(root).Date)
             .When(x => selector(x).EndDate.HasValue)

@@ -25,9 +25,4 @@ public class GetFilteredSortedCalendar(AppDbContext dbContext, CalendarMapper ma
             IsDesc = false
         }
     ];
-
-    protected override IQueryable<Calendar> WithIncludes(IQueryable<Calendar> query)
-    {
-        return query.Include(t => t.Tasks);
-    }
 }

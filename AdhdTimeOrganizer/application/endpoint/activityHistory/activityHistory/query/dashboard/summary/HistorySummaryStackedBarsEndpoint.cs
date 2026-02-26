@@ -32,15 +32,32 @@ public class HistorySummaryStackedBarsEndpoint(AppDbContext db) : Endpoint<Histo
             .ToListAsync(ct);
 
         var dayCount = (int)Math.Ceiling((to - from).TotalDays);
+        var windowMinutes = req.WindowMinutes;
 
-        var granularity = dayCount switch
+        HistoryGranularity granularity;
+        List<(DateTime Start, DateTime End)> windows;
+
+        if (windowMinutes.HasValue && windowMinutes.Value < 1440)
         {
-            1 => HistoryGranularity.Hourly,
-            <= 31 => HistoryGranularity.Daily,
-            _ => HistoryGranularity.Weekly
-        };
-
-        var windows = GenerateWindows(from, to, granularity);
+            granularity = HistoryGranularity.Hourly;
+            var startOffset = req.WindowStartTime != null
+                ? TimeSpan.FromHours(req.WindowStartTime.Hours).Add(TimeSpan.FromMinutes(req.WindowStartTime.Minutes))
+                : TimeSpan.Zero;
+            var endOffset = req.WindowEndTime != null
+                ? TimeSpan.FromHours(req.WindowEndTime.Hours).Add(TimeSpan.FromMinutes(req.WindowEndTime.Minutes))
+                : TimeSpan.FromDays(1);
+            windows = GenerateFixedWindows(from, to, windowMinutes.Value, startOffset, endOffset);
+        }
+        else
+        {
+            granularity = dayCount switch
+            {
+                1 => HistoryGranularity.Hourly,
+                <= 33 => HistoryGranularity.Daily,
+                _ => HistoryGranularity.Weekly
+            };
+            windows = GenerateWindows(from, to, granularity);
+        }
 
         var response = new HistoryStackedBarsResponse
         {
@@ -64,6 +81,33 @@ public class HistorySummaryStackedBarsEndpoint(AppDbContext db) : Endpoint<Histo
         };
 
         await SendAsync(response, cancellation: ct);
+    }
+
+    private static List<(DateTime Start, DateTime End)> GenerateFixedWindows(
+        DateTime from, DateTime to, int windowMinutes, TimeSpan startOffset, TimeSpan endOffset)
+    {
+        var windows = new List<(DateTime Start, DateTime End)>();
+        var day = from.Date;
+
+        while (day < to)
+        {
+            var dayStart = day.Add(startOffset);
+            var dayEnd = day.Add(endOffset);
+            if (dayEnd <= dayStart) dayEnd = dayEnd.AddDays(1);
+
+            var current = dayStart;
+            while (current < dayEnd)
+            {
+                var next = current.AddMinutes(windowMinutes);
+                if (next > dayEnd) next = dayEnd;
+                windows.Add((current, next));
+                current = current.AddMinutes(windowMinutes);
+            }
+
+            day = day.AddDays(1);
+        }
+
+        return windows;
     }
 
     private static List<(DateTime Start, DateTime End)> GenerateWindows(

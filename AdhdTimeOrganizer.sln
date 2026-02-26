@@ -1,5 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+#
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer", "AdhdTimeOrganizer\AdhdTimeOrganizer.csproj", "{427285EE-0B51-4ABD-8D9B-46BF9E654A94}"
 EndProject
 Global

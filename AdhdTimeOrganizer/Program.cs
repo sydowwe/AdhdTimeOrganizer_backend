@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.helper;
+using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface.manager;
@@ -17,6 +18,7 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Quartz;
 using Serilog;
 
 try
@@ -108,6 +110,18 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
 
     // Background services
     services.AddHostedService<AdhdTimeOrganizer.infrastructure.extService.RefreshTokenCleanupService>();
+
+    services.AddQuartz(q =>
+    {
+        q.AddJob<RoutineTodoListResetJob>(opts =>
+            opts.WithIdentity("routine-reset", "routine"));
+
+        q.AddTrigger(opts => opts
+            .ForJob("routine-reset", "routine")
+            .WithIdentity("routine-reset-trigger", "routine")
+            .WithCronSchedule("0 0 2 * * ?")); // 2:00 AM UTC daily
+    });
+    services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
     // Caching
     services.AddDistributedMemoryCache();

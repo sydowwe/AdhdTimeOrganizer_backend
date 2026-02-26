@@ -2,10 +2,11 @@
 
 public enum ActivityDateRangeType
 {
-    CustomRange,
-    OneDay,
-    OneWeek,
-    OneMonth,
-    ThisMonth,
-    ThisYear
+    Day,
+    ThreeDays,
+    Week,
+    TwoWeeks,
+    Month,
+    ThreeMonths,
+    Year
 }

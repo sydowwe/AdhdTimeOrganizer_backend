@@ -25,7 +25,7 @@ public class Calendar : BaseEntityWithUser
     public string? Notes { get; set; }
 
     // Collections - this groups everything for the day
-    public virtual ICollection<PlannerTask> Tasks { get; set; } = new List<PlannerTask>();
+    public virtual ICollection<PlannerTask> Tasks { get; set; } = [];
     // Future: Events, TodoLists, Habits, etc.
 
     public int DayIndex => Date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)Date.DayOfWeek;
