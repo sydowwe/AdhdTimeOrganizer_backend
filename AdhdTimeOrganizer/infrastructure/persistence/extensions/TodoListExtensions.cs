@@ -26,7 +26,7 @@ public static class TodoListExtensions
         return await dbSet.GetNextDisplayOrder(settings, userId, e => e.TimePeriodId == timePeriodId, ct);
     }
 
-    public static async Task<long> GetNextDisplayOrder(this DbSet<TodoList> dbSet, TodoListSettings settings, long userId, long timePeriodId, CancellationToken ct = default)
+    public static async Task<long> GetNextDisplayOrder(this DbSet<TodoListItem> dbSet, TodoListSettings settings, long userId, long timePeriodId, CancellationToken ct = default)
     {
         return await dbSet.GetNextDisplayOrder(settings, userId, e => e.TaskPriorityId == timePeriodId, ct);
     }

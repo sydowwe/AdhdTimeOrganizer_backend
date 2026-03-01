@@ -1,16 +1,16 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
 
-namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.command;
+namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.command;
 
-public class ChangePriorityTodoListEndpoint(AppDbContext dbContext) : EndpointWithoutRequest
+public class ChangePriorityTodoListItemEndpoint(AppDbContext dbContext) : EndpointWithoutRequest
 {
 
     public override void Configure()
     {
-        const string entityName = nameof(TodoList);
+        const string entityName = nameof(TodoListItem);
         Patch($"{entityName.Kebaberize()}/change-urgency/{{id:long:required}}/{{urgencyId:long:required}}");
         Summary(s =>
         {
@@ -23,7 +23,7 @@ public class ChangePriorityTodoListEndpoint(AppDbContext dbContext) : EndpointWi
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var entity = await dbContext.TodoLists.FindAsync([Route<long>("id")],ct);
+        var entity = await dbContext.TodoListItems.FindAsync([Route<long>("id")], ct);
 
         if (entity == null)
         {
@@ -34,7 +34,7 @@ public class ChangePriorityTodoListEndpoint(AppDbContext dbContext) : EndpointWi
 
         entity.TaskPriorityId = Route<long>("urgencyId");
 
-        dbContext.TodoLists.Update(entity);
+        dbContext.TodoListItems.Update(entity);
         await dbContext.SaveChangesAsync(ct);
 
         await SendNoContentAsync(ct);

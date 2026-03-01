@@ -7,17 +7,17 @@ using Microsoft.Extensions.Options;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
-public class TodoListSeeder(
+public class TodoListItemSeeder(
     AppDbContext dbContext,
     IOptions<TodoListSettings> settings,
-    ILogger<TodoListSeeder> logger) : IScopedService, IDevDatabaseSeeder
+    ILogger<TodoListItemSeeder> logger) : IScopedService, IDevDatabaseSeeder
 {
-    public string SeederName => "TodoList";
+    public string SeederName => "TodoListItem";
     public int Order => 10;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<TodoList>();
+        await dbContext.TruncateTableAsync<TodoListItem>();
     }
 
 
@@ -62,20 +62,30 @@ public class TodoListSeeder(
         var meditationActivity = activities.FirstOrDefault(a => a.Name == "Meditation");
         var sideProjectActivity = activities.FirstOrDefault(a => a.Name == "Side Project");
 
-        var todoLists = new List<TodoList>();
+        // Get or create default TodoList for this user
+        var defaultTodoList = await dbContext.TodoLists
+            .FirstOrDefaultAsync(tl => tl.UserId == userId && tl.Name == "Default");
+        if (defaultTodoList == null)
+        {
+            defaultTodoList = new TodoList { Name = "Default", UserId = userId };
+            await dbContext.TodoLists.AddAsync(defaultTodoList);
+            await dbContext.SaveChangesAsync();
+        }
+
+        var todoLists = new List<TodoListItem>();
 
         // Get initial display order for each priority (simulate GetNextDisplayOrder logic)
-        var lastOrderToday = await dbContext.TodoLists
+        var lastOrderToday = await dbContext.TodoListItems
             .Where(tl => tl.UserId == userId && tl.TaskPriorityId == (todayPriority != null ? todayPriority.Id : 0))
             .MinAsync(tl => (int?)tl.DisplayOrder) ?? 0;
         var nextOrderToday = lastOrderToday != 0 ? lastOrderToday - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
 
-        var lastOrderThisWeek = await dbContext.TodoLists
+        var lastOrderThisWeek = await dbContext.TodoListItems
             .Where(tl => tl.UserId == userId && tl.TaskPriorityId == (thisWeekPriority != null ? thisWeekPriority.Id : 0))
             .MinAsync(tl => (int?)tl.DisplayOrder) ?? 0;
         var nextOrderThisWeek = lastOrderThisWeek != 0 ? lastOrderThisWeek - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
 
-        var lastOrderThisMonth = await dbContext.TodoLists
+        var lastOrderThisMonth = await dbContext.TodoListItems
             .Where(tl => tl.UserId == userId && tl.TaskPriorityId == (thisMonthPriority != null ? thisMonthPriority.Id : 0))
             .MinAsync(tl => (int?)tl.DisplayOrder) ?? 0;
         var nextOrderThisMonth = lastOrderThisMonth != 0 ? lastOrderThisMonth - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
@@ -83,10 +93,11 @@ public class TodoListSeeder(
         // Today tasks
         if (todayPriority != null && bugFixingActivity != null)
         {
-            todoLists.Add(new TodoList
+            todoLists.Add(new TodoListItem
             {
                 ActivityId = bugFixingActivity.Id,
                 TaskPriorityId = todayPriority.Id,
+                TodoListId = defaultTodoList.Id,
                 IsDone = false,
                 DoneCount = 0,
                 TotalCount = 3,
@@ -98,10 +109,11 @@ public class TodoListSeeder(
 
         if (todayPriority != null && groceryActivity != null)
         {
-            todoLists.Add(new TodoList
+            todoLists.Add(new TodoListItem
             {
                 ActivityId = groceryActivity.Id,
                 TaskPriorityId = todayPriority.Id,
+                TodoListId = defaultTodoList.Id,
                 IsDone = false,
                 DisplayOrder = nextOrderToday,
                 UserId = userId
@@ -111,10 +123,11 @@ public class TodoListSeeder(
 
         if (todayPriority != null && exerciseActivity != null)
         {
-            todoLists.Add(new TodoList
+            todoLists.Add(new TodoListItem
             {
                 ActivityId = exerciseActivity.Id,
                 TaskPriorityId = todayPriority.Id,
+                TodoListId = defaultTodoList.Id,
                 IsDone = true,
                 DisplayOrder = nextOrderToday,
                 UserId = userId
@@ -125,10 +138,11 @@ public class TodoListSeeder(
         // This week tasks
         if (thisWeekPriority != null && codeReviewActivity != null)
         {
-            todoLists.Add(new TodoList
+            todoLists.Add(new TodoListItem
             {
                 ActivityId = codeReviewActivity.Id,
                 TaskPriorityId = thisWeekPriority.Id,
+                TodoListId = defaultTodoList.Id,
                 IsDone = false,
                 DoneCount = 2,
                 TotalCount = 5,
@@ -140,10 +154,11 @@ public class TodoListSeeder(
 
         if (thisWeekPriority != null && featureDevActivity != null)
         {
-            todoLists.Add(new TodoList
+            todoLists.Add(new TodoListItem
             {
                 ActivityId = featureDevActivity.Id,
                 TaskPriorityId = thisWeekPriority.Id,
+                TodoListId = defaultTodoList.Id,
                 IsDone = false,
                 DoneCount = 1,
                 TotalCount = 4,
@@ -155,10 +170,11 @@ public class TodoListSeeder(
 
         if (thisWeekPriority != null && onlineCourseActivity != null)
         {
-            todoLists.Add(new TodoList
+            todoLists.Add(new TodoListItem
             {
                 ActivityId = onlineCourseActivity.Id,
                 TaskPriorityId = thisWeekPriority.Id,
+                TodoListId = defaultTodoList.Id,
                 IsDone = false,
                 DoneCount = 0,
                 TotalCount = 2,
@@ -171,10 +187,11 @@ public class TodoListSeeder(
         // This month tasks
         if (thisMonthPriority != null && meditationActivity != null)
         {
-            todoLists.Add(new TodoList
+            todoLists.Add(new TodoListItem
             {
                 ActivityId = meditationActivity.Id,
                 TaskPriorityId = thisMonthPriority.Id,
+                TodoListId = defaultTodoList.Id,
                 IsDone = false,
                 DoneCount = 5,
                 TotalCount = 20,
@@ -186,10 +203,11 @@ public class TodoListSeeder(
 
         if (thisMonthPriority != null && sideProjectActivity != null)
         {
-            todoLists.Add(new TodoList
+            todoLists.Add(new TodoListItem
             {
                 ActivityId = sideProjectActivity.Id,
                 TaskPriorityId = thisMonthPriority.Id,
+                TodoListId = defaultTodoList.Id,
                 IsDone = false,
                 DisplayOrder = nextOrderThisMonth,
                 UserId = userId
@@ -197,7 +215,7 @@ public class TodoListSeeder(
             nextOrderThisMonth -= settings.Value.DisplayOrderGap;
         }
 
-        await dbContext.TodoLists.AddRangeAsync(todoLists);
+        await dbContext.TodoListItems.AddRangeAsync(todoLists);
         await dbContext.SaveChangesAsync();
 
         logger.LogInformation("Seeded {Count} todo lists for user {UserId}", todoLists.Count, userId);

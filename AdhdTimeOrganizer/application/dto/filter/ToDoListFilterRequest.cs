@@ -2,10 +2,9 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class TodoListFilterRequest : IFilterRequest
+public record TodoListFilterRequest : IFilterRequest
 {
-    public long? ActivityId { get; set; }
-    public long? TaskPriorityId { get; set; }
-    public bool? IsDone { get; set; }
-    public long? UserId { get; set; }
+    public string? Name { get; set; }
+    /// <summary>null = all, -1 = uncategorized, &gt;0 = specific category</summary>
+    public long? CategoryId { get; set; }
 }

@@ -32,7 +32,7 @@ public class PlannerTaskSeeder(
             .Where(a => a.UserId == userId)
             .ToListAsync();
 
-        var todoLists = await dbContext.TodoLists
+        var todoLists = await dbContext.TodoListItems
             .Where(tl => tl.UserId == userId)
             .ToListAsync();
 

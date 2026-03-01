@@ -5,14 +5,12 @@ using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.query;
+namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.query;
 
-public class GetAllTodoListEndpoint(
-    AppDbContext dbContext,
-    TodoListMapper mapper)
-    : BaseGetAllEndpoint<TodoList, TodoListResponse, TodoListMapper>(dbContext, mapper)
+public class GetByIdTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapper mapper)
+    : BaseGetByIdEndpoint<TodoListItem, TodoListItemResponse, TodoListItemMapper>(dbContext, mapper)
 {
-    protected override IQueryable<TodoList> WithIncludes(IQueryable<TodoList> query)
+    protected override IQueryable<TodoListItem> WithIncludes(IQueryable<TodoListItem> query)
     {
         return query
             .Include(tdl => tdl.Activity)
@@ -21,6 +19,4 @@ public class GetAllTodoListEndpoint(
                 .ThenInclude(a => a.Category)
             .Include(tdl => tdl.TaskPriority);
     }
-
-    protected override IQueryable<TodoList> Sort(IQueryable<TodoList> query) => query.OrderBy(td=>td.DisplayOrder);
 }

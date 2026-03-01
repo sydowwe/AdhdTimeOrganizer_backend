@@ -2,8 +2,8 @@ using System.ComponentModel.DataAnnotations;
 
 namespace AdhdTimeOrganizer.application.dto.request.toDoList;
 
-public record UpdateTodoListItemRequest : BaseUpdateTodoListRequest
+public record GetTodoListItemsByListRequest
 {
     [Required]
-    public long TaskPriorityId { get; init; }
+    public long TodoListId { get; init; }
 }

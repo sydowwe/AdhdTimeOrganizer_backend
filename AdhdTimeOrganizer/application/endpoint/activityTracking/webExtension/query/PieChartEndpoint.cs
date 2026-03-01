@@ -1,14 +1,12 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
-using AdhdTimeOrganizer.application.dto.response.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.pieChart;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
 public class PieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest, PieChartResponse>
 {

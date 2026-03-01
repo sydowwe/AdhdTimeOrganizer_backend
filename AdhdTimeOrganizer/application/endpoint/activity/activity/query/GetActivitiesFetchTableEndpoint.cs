@@ -39,9 +39,9 @@ public class GetActivitiesFetchTableEndpoint(
 
         if (filter.IsOnTodoList.HasValue)
         {
-            query = query.Include(a => a.TodoList);
+            query = query.Include(a => a.TodoListItem);
 
-           query = query.Where(a=> a.TodoList != null == filter.IsOnTodoList.Value );
+           query = query.Where(a=> a.TodoListItem != null == filter.IsOnTodoList.Value );
         }
 
         if (filter.IsOnRoutineTodoList.HasValue)

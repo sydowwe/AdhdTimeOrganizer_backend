@@ -1,5 +1,3 @@
-using AdhdTimeOrganizer.application.dto.request;
-using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.request.activityTracking.heartbeat;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
@@ -9,7 +7,7 @@ using AdhdTimeOrganizer.infrastructure.security;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.command;
+namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.command;
 
 [AllowExtensionClients]
 public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoint<WebExtensionHeartbeatRequest, int>

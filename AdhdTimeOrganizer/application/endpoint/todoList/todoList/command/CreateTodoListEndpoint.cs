@@ -1,28 +1,10 @@
 using AdhdTimeOrganizer.application.dto.request.toDoList;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.infrastructure.persistence.extensions;
-using AdhdTimeOrganizer.infrastructure.settings;
-using Microsoft.Extensions.Options;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.command;
 
-public class CreateTodoListEndpoint(AppDbContext dbContext, TodoListMapper mapper, IOptions<TodoListSettings> settings)
-    : BaseCreateEndpoint<TodoList, CreateTodoListRequest, TodoListMapper>(dbContext, mapper)
-{
-    private readonly AppDbContext _dbContext = dbContext;
-    private readonly TodoListSettings _settings = settings.Value;
-
-
-    protected override async Task AfterMapping(TodoList entity, CreateTodoListRequest req, CancellationToken ct = default)
-    {
-        entity.DisplayOrder = await _dbContext.TodoLists.GetNextDisplayOrder(_settings, User.GetId(), entity.TaskPriorityId, ct);
-        if (req.TotalCount.HasValue)
-        {
-            entity.DoneCount = 0;
-        }
-    }
-}
+public class CreateTodoListEndpoint(AppDbContext dbContext, TodoListMapper mapper)
+    : BaseCreateEndpoint<TodoList, TodoListRequest, TodoListMapper>(dbContext, mapper);

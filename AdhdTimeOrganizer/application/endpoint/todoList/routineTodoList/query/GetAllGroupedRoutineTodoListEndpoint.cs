@@ -32,13 +32,14 @@ public class GetAllGroupedRoutineTodoListEndpoint(
         var loggedUserId = User.GetId();
 
         var data = await dbContext.Set<RoutineTimePeriod>()
+            .Where(x => x.UserId == loggedUserId)
             .GroupJoin(
                 dbContext.Set<RoutineTodoList>()
                     .Include(r=>r.Activity)
                     .ThenInclude(r=>r.Role)
                     .Include(r=>r.Activity)
                     .ThenInclude(r=>r.Category)
-                    .Where(x => x.UserId == loggedUserId).OrderBy(e=>e.DisplayOrder),
+                    .OrderBy(e=>e.DisplayOrder),
                 tp => tp.Id,
                 rtd => rtd.TimePeriodId,
                 (tp, items) => new RoutineTodoListGroupedResponse

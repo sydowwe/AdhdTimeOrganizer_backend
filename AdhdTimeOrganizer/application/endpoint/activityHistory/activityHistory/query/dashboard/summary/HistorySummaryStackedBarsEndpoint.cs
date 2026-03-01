@@ -37,7 +37,12 @@ public class HistorySummaryStackedBarsEndpoint(AppDbContext db) : Endpoint<Histo
         HistoryGranularity granularity;
         List<(DateTime Start, DateTime End)> windows;
 
-        if (windowMinutes.HasValue && windowMinutes.Value < 1440)
+        if (windowMinutes.HasValue && req.RangeType > ActivityDateRangeType.Month && windowMinutes.Value >= 480)
+        {
+            granularity = HistoryGranularity.Weekly;
+            windows = GenerateWindows(from, to, granularity);
+        }
+        else if (windowMinutes.HasValue && windowMinutes.Value < 1440)
         {
             granularity = HistoryGranularity.Hourly;
             var startOffset = req.WindowStartTime != null
@@ -53,7 +58,7 @@ public class HistorySummaryStackedBarsEndpoint(AppDbContext db) : Endpoint<Histo
             granularity = dayCount switch
             {
                 1 => HistoryGranularity.Hourly,
-                <= 33 => HistoryGranularity.Daily,
+                <= 30 => HistoryGranularity.Daily,
                 _ => HistoryGranularity.Weekly
             };
             windows = GenerateWindows(from, to, granularity);

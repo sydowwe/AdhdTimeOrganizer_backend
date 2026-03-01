@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.application.dto.filter;
+using AdhdTimeOrganizer.application.dto.filter.history;
 using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.application.extensions;
@@ -95,12 +96,12 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext, Act
 
         if (filter.IsFromTodoList.HasValue)
         {
-            query = query.Include(ah => ah.Activity).ThenInclude(a => a.TodoList);
+            query = query.Include(ah => ah.Activity).ThenInclude(a => a.TodoListItem);
 
-            query = query.Where(ah => ah.Activity.TodoList != null == filter.IsFromTodoList.Value);
+            query = query.Where(ah => ah.Activity.TodoListItem != null == filter.IsFromTodoList.Value);
             if (filter.TaskPriorityId.HasValue && filter.IsFromTodoList.Value)
             {
-                query = query.Where(ah => ah.Activity.TodoList!.TaskPriorityId == filter.TaskPriorityId.Value);
+                query = query.Where(ah => ah.Activity.TodoListItem!.TaskPriorityId == filter.TaskPriorityId.Value);
             }
         }
 

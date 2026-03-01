@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.helper;
 
-namespace AdhdTimeOrganizer.application.dto.filter;
+namespace AdhdTimeOrganizer.application.dto.filter.history;
 
 public class ActivityHistoryFilterRequest : IFilterRequest
 {

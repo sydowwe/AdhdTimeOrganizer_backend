@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
 public class DomainDetailsEndpoint(AppDbContext db) : Endpoint<DomainDetailsRequest, DomainDetailsResponse>
 {

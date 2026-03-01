@@ -35,7 +35,9 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public ICollection<Alarm> AlarmList { get; set; } = new List<Alarm>();
     public ICollection<WebExtensionData> WebExtensionDataList { get; set; } = new List<WebExtensionData>();
 
+    public ICollection<TodoListItem> TodoListItemColl { get; set; } = new List<TodoListItem>();
     public ICollection<TodoList> TodoListColl { get; set; } = new List<TodoList>();
+    public ICollection<TodoListCategory> TodoListCategoryColl { get; set; } = new List<TodoListCategory>();
     public ICollection<TaskPriority> TaskPriorityList { get; set; } = new List<TaskPriority>();
     public ICollection<PlannerTask> PlannerTaskList { get; set; } = new List<PlannerTask>();
     public ICollection<RoutineTodoList> RoutineTodoListColl { get; set; } = new List<RoutineTodoList>();

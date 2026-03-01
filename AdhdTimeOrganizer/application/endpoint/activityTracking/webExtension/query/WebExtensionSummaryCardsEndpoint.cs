@@ -1,6 +1,5 @@
 using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
-using AdhdTimeOrganizer.application.dto.response.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.summaryCards;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
@@ -9,7 +8,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityHistory.webExtension.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
 public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCardsRequest, List<DomainSummaryDto>>
 {

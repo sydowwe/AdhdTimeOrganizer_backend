@@ -1,23 +1,23 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.todoList;
 
-public class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
+public class TodoListItemConfiguration : IEntityTypeConfiguration<TodoListItem>
 {
-    public void Configure(EntityTypeBuilder<TodoList> builder)
+    public void Configure(EntityTypeBuilder<TodoListItem> builder)
     {
         builder.BaseEntityConfigure();
 
         builder.BaseTodoListConfigure();
 
-        builder.IsManyWithOneUser(u => u.TodoListColl);
-        builder.IsOneWithOneActivity(a=>a.TodoList);
+        builder.IsManyWithOneUser(u => u.TodoListItemColl);
+        builder.IsOneWithOneActivity(a => a.TodoListItem);
 
         builder.HasOne(r => r.TaskPriority)
-            .WithMany(t=>t.TodoListColl)
+            .WithMany(t => t.TodoListColl)
             .HasForeignKey(r => r.TaskPriorityId)
             .OnDelete(DeleteBehavior.Restrict);
 
