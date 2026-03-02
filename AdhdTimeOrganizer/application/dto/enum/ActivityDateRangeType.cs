@@ -2,7 +2,6 @@
 
 public enum ActivityDateRangeType
 {
-    Day,
     ThreeDays,
     Week,
     TwoWeeks,

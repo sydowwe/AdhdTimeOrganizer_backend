@@ -4,7 +4,7 @@ namespace AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.su
 
 public record HistorySummaryStackedBarsRequest : HistorySummaryDateRangeRequest
 {
-    public int? WindowMinutes { get; init; }
-    public TimeDto? WindowStartTime { get; init; }
-    public TimeDto? WindowEndTime { get; init; }
+    public required int WindowMinutes { get; init; }
+    public required TimeDto WindowStartTime { get; init; }
+    public required TimeDto WindowEndTime { get; init; }
 }

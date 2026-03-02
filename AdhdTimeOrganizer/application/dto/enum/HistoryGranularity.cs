@@ -4,5 +4,6 @@ public enum HistoryGranularity
 {
     Hourly,
     Daily,
+    ThreeDays,
     Weekly
 }

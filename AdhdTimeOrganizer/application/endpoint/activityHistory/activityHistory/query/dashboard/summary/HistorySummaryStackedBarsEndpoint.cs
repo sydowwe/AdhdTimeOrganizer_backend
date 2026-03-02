@@ -31,42 +31,23 @@ public class HistorySummaryStackedBarsEndpoint(AppDbContext db) : Endpoint<Histo
             .Where(ah => ah.StartTimestamp >= from && ah.StartTimestamp < to)
             .ToListAsync(ct);
 
-        var dayCount = (int)Math.Ceiling((to - from).TotalDays);
         var windowMinutes = req.WindowMinutes;
 
-        HistoryGranularity granularity;
         List<(DateTime Start, DateTime End)> windows;
 
-        if (windowMinutes.HasValue && req.RangeType > ActivityDateRangeType.Month && windowMinutes.Value >= 480)
+        if (windowMinutes < 1440)
         {
-            granularity = HistoryGranularity.Weekly;
-            windows = GenerateWindows(from, to, granularity);
-        }
-        else if (windowMinutes.HasValue && windowMinutes.Value < 1440)
-        {
-            granularity = HistoryGranularity.Hourly;
-            var startOffset = req.WindowStartTime != null
-                ? TimeSpan.FromHours(req.WindowStartTime.Hours).Add(TimeSpan.FromMinutes(req.WindowStartTime.Minutes))
-                : TimeSpan.Zero;
-            var endOffset = req.WindowEndTime != null
-                ? TimeSpan.FromHours(req.WindowEndTime.Hours).Add(TimeSpan.FromMinutes(req.WindowEndTime.Minutes))
-                : TimeSpan.FromDays(1);
-            windows = GenerateFixedWindows(from, to, windowMinutes.Value, startOffset, endOffset);
+            var startOffset = TimeSpan.FromHours(req.WindowStartTime.Hours).Add(TimeSpan.FromMinutes(req.WindowStartTime.Minutes));
+            var endOffset = TimeSpan.FromHours(req.WindowEndTime.Hours).Add(TimeSpan.FromMinutes(req.WindowEndTime.Minutes));
+            windows = GenerateFixedWindows(from, to, windowMinutes, startOffset, endOffset);
         }
         else
         {
-            granularity = dayCount switch
-            {
-                1 => HistoryGranularity.Hourly,
-                <= 30 => HistoryGranularity.Daily,
-                _ => HistoryGranularity.Weekly
-            };
-            windows = GenerateWindows(from, to, granularity);
+            windows = GenerateWindows(from, to, windowMinutes / 1440);
         }
 
         var response = new HistoryStackedBarsResponse
         {
-            Granularity = granularity,
             Windows = windows.Select(w => new HistoryWindow
             {
                 WindowStart = w.Start,
@@ -115,46 +96,17 @@ public class HistorySummaryStackedBarsEndpoint(AppDbContext db) : Endpoint<Histo
         return windows;
     }
 
-    private static List<(DateTime Start, DateTime End)> GenerateWindows(
-        DateTime from, DateTime to, HistoryGranularity granularity)
+    private static List<(DateTime Start, DateTime End)> GenerateWindows(DateTime from, DateTime to, int windowDays)
     {
         var windows = new List<(DateTime Start, DateTime End)>();
-
-        switch (granularity)
+        var current = from;
+        while (current < to)
         {
-            case HistoryGranularity.Hourly:
-                for (var h = 0; h < 24; h++)
-                {
-                    var start = from.AddHours(h);
-                    windows.Add((start, start.AddHours(1)));
-                }
-
-                break;
-
-            case HistoryGranularity.Daily:
-                var current = from;
-                while (current < to)
-                {
-                    var next = current.AddDays(1);
-                    windows.Add((current, next));
-                    current = next;
-                }
-
-                break;
-
-            case HistoryGranularity.Weekly:
-                var weekStart = from;
-                while (weekStart < to)
-                {
-                    var weekEnd = weekStart.AddDays(7);
-                    if (weekEnd > to) weekEnd = to;
-                    windows.Add((weekStart, weekEnd));
-                    weekStart = weekEnd;
-                }
-
-                break;
+            var next = current.AddDays(windowDays);
+            if (next > to) next = to;
+            windows.Add((current, next));
+            current = current.AddDays(windowDays);
         }
-
         return windows;
     }
 

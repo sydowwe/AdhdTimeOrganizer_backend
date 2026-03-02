@@ -29,20 +29,11 @@ public class HistoryDetailStackedBarsEndpoint(AppDbContext db) : Endpoint<Histor
             .Where(ah => ah.StartTimestamp >= from && ah.StartTimestamp < to)
             .ToListAsync(ct);
 
-        var dayCount = (int)Math.Ceiling((to - from).TotalDays);
 
-        var granularity = dayCount switch
-        {
-            1 => HistoryGranularity.Hourly,
-            <= 31 => HistoryGranularity.Daily,
-            _ => HistoryGranularity.Weekly
-        };
-
-        var windows = GenerateWindows(from, to, granularity);
+        var windows = GenerateWindows(from, to);
 
         var response = new HistoryStackedBarsResponse
         {
-            Granularity = granularity,
             Windows = windows.Select(w => new HistoryWindow
             {
                 WindowStart = w.Start,
@@ -65,43 +56,14 @@ public class HistoryDetailStackedBarsEndpoint(AppDbContext db) : Endpoint<Histor
     }
 
     private static List<(DateTime Start, DateTime End)> GenerateWindows(
-        DateTime from, DateTime to, HistoryGranularity granularity)
+        DateTime from, DateTime to)
     {
         var windows = new List<(DateTime Start, DateTime End)>();
 
-        switch (granularity)
+        for (var h = 0; h < 24; h++)
         {
-            case HistoryGranularity.Hourly:
-                for (var h = 0; h < 24; h++)
-                {
-                    var start = from.AddHours(h);
-                    windows.Add((start, start.AddHours(1)));
-                }
-
-                break;
-
-            case HistoryGranularity.Daily:
-                var current = from;
-                while (current < to)
-                {
-                    var next = current.AddDays(1);
-                    windows.Add((current, next));
-                    current = next;
-                }
-
-                break;
-
-            case HistoryGranularity.Weekly:
-                var weekStart = from;
-                while (weekStart < to)
-                {
-                    var weekEnd = weekStart.AddDays(7);
-                    if (weekEnd > to) weekEnd = to;
-                    windows.Add((weekStart, weekEnd));
-                    weekStart = weekEnd;
-                }
-
-                break;
+            var start = from.AddHours(h);
+            windows.Add((start, start.AddHours(1)));
         }
 
         return windows;

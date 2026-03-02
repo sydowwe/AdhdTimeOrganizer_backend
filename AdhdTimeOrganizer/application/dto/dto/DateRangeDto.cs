@@ -14,7 +14,6 @@ public record DateRangeDto
     {
         var (from, to) = RangeType switch
         {
-            ActivityDateRangeType.Day => (Date, Date),
             ActivityDateRangeType.ThreeDays => (Date.AddDays(-3), Date),
             ActivityDateRangeType.Week => (Date.AddDays(-7), Date),
             ActivityDateRangeType.TwoWeeks => (Date.AddDays(-14), Date),
