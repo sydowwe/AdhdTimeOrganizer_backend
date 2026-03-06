@@ -2,6 +2,7 @@
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.domain.model.@enum;
@@ -33,7 +34,8 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
 
     public ICollection<ActivityHistory> ActivityHistoryList { get; set; } = new List<ActivityHistory>();
     public ICollection<Alarm> AlarmList { get; set; } = new List<Alarm>();
-    public ICollection<WebExtensionData> WebExtensionDataList { get; set; } = new List<WebExtensionData>();
+    public ICollection<WebExtensionActivityEntry> WebExtensionActivityEntryList { get; set; } = new List<WebExtensionActivityEntry>();
+    public ICollection<DesktopActivityEntry> DesktopActivityEntryList { get; set; } = new List<DesktopActivityEntry>();
 
     public ICollection<TodoListItem> TodoListItemColl { get; set; } = new List<TodoListItem>();
     public ICollection<TodoList> TodoListColl { get; set; } = new List<TodoList>();
@@ -43,6 +45,10 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public ICollection<RoutineTodoList> RoutineTodoListColl { get; set; } = new List<RoutineTodoList>();
     public ICollection<RoutineTimePeriod> RoutineTimePeriodList { get; set; } = new List<RoutineTimePeriod>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
+
+    public ICollection<ActivityTrackingSettingsDesktopEntryFormatting> ActivityTrackingSettingsDesktopEntryFormattingList { get; set; } = new List<ActivityTrackingSettingsDesktopEntryFormatting>();
+    public ICollection<ActivityTrackingSettingsDesktopIgnoredProcess> ActivityTrackingSettingsDesktopIgnoredProcessList { get; set; } = new List<ActivityTrackingSettingsDesktopIgnoredProcess>();
 
 
     public override string? Email

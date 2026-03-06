@@ -21,7 +21,7 @@ public class DomainDetailsEndpoint(AppDbContext db) : Endpoint<DomainDetailsRequ
         var userId = User.GetId();
 
         // 1. Get all records for this domain in the time range
-        var records = await db.WebExtensionData
+        var records = await db.WebExtensionActivityEntries
             .Where(x => x.UserId == userId)
             .Where(x => x.Domain == req.Domain)
             .Where(x => x.WindowStart >= req.From && x.WindowStart < req.To)

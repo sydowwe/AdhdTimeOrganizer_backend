@@ -69,13 +69,13 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
         await SendAsync(response, cancellation: ct);
     }
 
-    private async Task<List<WebExtensionData>> GetPeriodData(
+    private async Task<List<WebExtensionActivityEntry>> GetPeriodData(
         long userId,
         DateTime from,
         DateTime to,
         CancellationToken ct)
     {
-        return await db.WebExtensionData
+        return await db.WebExtensionActivityEntries
             .Where(x => x.UserId == userId)
             .Where(x => x.WindowStart >= from && x.WindowStart < to)
             .ToListAsync(ct);
@@ -128,7 +128,7 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
         BaselineType baseline,
         CancellationToken ct)
     {
-        var query = db.WebExtensionData
+        var query = db.WebExtensionActivityEntries
             .Where(x => x.UserId == userId)
             .Where(x => x.WindowStart >= from && x.WindowStart < to);
 

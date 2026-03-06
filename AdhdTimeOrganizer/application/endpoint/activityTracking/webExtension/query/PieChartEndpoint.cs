@@ -23,7 +23,7 @@ public class PieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest, PieCh
         var (from, to) = req.ToDateTimeRange();
 
         // Get all data for the period
-        var periodData = await db.WebExtensionData
+        var periodData = await db.WebExtensionActivityEntries
             .Where(x => x.UserId == userId)
             .Where(x => x.WindowStart >= from && x.WindowStart < to)
             .ToListAsync(ct);

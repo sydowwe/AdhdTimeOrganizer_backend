@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
-using AdhdTimeOrganizer.application.dto.response.activityTracking.timeline;
+using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
@@ -7,10 +7,10 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query;
 
-public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
-    : Endpoint<WebExtensionTimelineRequest, WebExtensionTimelineResponse>
+public class DesktopTimelineEndpoint(AppDbContext dbContext)
+    : Endpoint<WebExtensionTimelineRequest, DesktopTimelineResponse>
 {
     private const int ContextWindowRadius = 2;
     private const int ContextSwitchThresholdMinutes = 2;
@@ -18,7 +18,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
 
     public override void Configure()
     {
-        Post("/activity-tracking/web-extension/timeline");
+        Post("/activity-tracking/desktop/timeline");
         Validator<WebExtensionTimelineValidator>();
     }
 
@@ -27,11 +27,11 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         var userId = User.GetId();
         var (from, to) = req.ToDateTimeRange();
 
-        var rawData = await dbContext.WebExtensionActivityEntries
+        var rawData = await dbContext.DesktopActivityEntries
             .Where(x => x.UserId == userId)
             .Where(x => x.WindowStart >= from && x.WindowStart < to)
             .OrderBy(x => x.WindowStart)
-            .ThenBy(x => x.Domain)
+            .ThenBy(x => x.ProcessName)
             .ToListAsync(ct);
 
         var (primarySessions, detailSessions) = BuildTimeline(rawData, r => r.ActiveSeconds);
@@ -51,7 +51,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         foreach (var session in primarySessions.Concat(detailSessions).Concat(backgroundSessions))
             session.Id = id++;
 
-        var response = new WebExtensionTimelineResponse
+        var response = new DesktopTimelineResponse
         {
             PrimarySessions = primarySessions,
             DetailSessions = detailSessions,
@@ -61,16 +61,9 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         await SendAsync(response, cancellation: ct);
     }
 
-    /// <summary>
-    /// Builds a two-row timeline using sliding window context scoring:
-    /// - Primary: dominant domain per minute (decided by ±ContextWindowRadius context), with short switches absorbed
-    /// - Detail: secondary concurrent activity + absorbed context switches
-    /// Works for both active and background by passing the appropriate seconds selector.
-    /// </summary>
-    private static (List<TimelineSession> primary, List<TimelineSession> detail) BuildTimeline(
-        List<WebExtensionActivityEntry> rawData, Func<WebExtensionActivityEntry, int> secondsSelector)
+    private static (List<DesktopTimelineSession> primary, List<DesktopTimelineSession> detail) BuildTimeline(
+        List<DesktopActivityEntry> rawData, Func<DesktopActivityEntry, int> secondsSelector)
     {
-        // Step 1: Index records by minute, filtering to those with seconds > 0
         var minuteMap = rawData
             .GroupBy(r => r.WindowStart)
             .ToDictionary(
@@ -86,9 +79,6 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         var primaryMinutes = new List<MinuteEntry>();
         var secondaryMinutes = new List<MinuteEntry>();
 
-        // Step 2: For each minute, use ±ContextWindowRadius sliding window to score domains.
-        // The domain with the highest cumulative seconds across the window wins primary,
-        // so a 1-min context switch inside a longer session doesn't break it.
         for (var i = 0; i < sortedMinutes.Count; i++)
         {
             var currentMinute = sortedMinutes[i];
@@ -108,34 +98,31 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
 
                 foreach (var record in minuteMap[neighborMinute])
                 {
-                    contextScores.TryAdd(record.Domain, 0);
-                    contextScores[record.Domain] += secondsSelector(record);
+                    contextScores.TryAdd(record.ProcessName, 0);
+                    contextScores[record.ProcessName] += secondsSelector(record);
                 }
             }
 
             var ordered = currentRecords
-                .OrderByDescending(r => contextScores.GetValueOrDefault(r.Domain, 0))
+                .OrderByDescending(r => contextScores.GetValueOrDefault(r.ProcessName, 0))
                 .ThenByDescending(r => secondsSelector(r))
                 .ToList();
 
             var primary = ordered[0];
             primaryMinutes.Add(new MinuteEntry(
-                currentMinute, primary.Domain, primary.Url, secondsSelector(primary)));
+                currentMinute, primary.ProcessName, primary.ProductName, secondsSelector(primary)));
 
             foreach (var other in ordered.Skip(1))
             {
                 secondaryMinutes.Add(new MinuteEntry(
-                    other.WindowStart, other.Domain, other.Url, secondsSelector(other)));
+                    other.WindowStart, other.ProcessName, other.ProductName, secondsSelector(other)));
             }
         }
 
-        // Step 3: Build primary sessions chronologically (no overlaps since one domain per minute)
         var primarySessions = BuildSessionsFromMinutes(primaryMinutes);
 
-        // Step 4: Absorb remaining short context switches between same-domain primary sessions
         var absorbedSwitches = AbsorbContextSwitches(primarySessions, ContextSwitchThresholdMinutes);
 
-        // Step 5: Build detail sessions from secondary activity + absorbed switches
         var detailSessions = BuildSessionsFromMinutes(secondaryMinutes);
         detailSessions.AddRange(absorbedSwitches);
         detailSessions = MergeAdjacentSessions(detailSessions);
@@ -144,35 +131,31 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         return (primarySessions, detailSessions);
     }
 
-    /// <summary>
-    /// Merges chronologically adjacent same-domain minutes into sessions.
-    /// </summary>
-    private static List<TimelineSession> BuildSessionsFromMinutes(List<MinuteEntry> minutes)
+    private static List<DesktopTimelineSession> BuildSessionsFromMinutes(List<MinuteEntry> minutes)
     {
-        var sessions = new List<TimelineSession>();
-        TimelineSession? current = null;
+        var sessions = new List<DesktopTimelineSession>();
+        DesktopTimelineSession? current = null;
 
-        foreach (var min in minutes.OrderBy(m => m.WindowStart).ThenBy(m => m.Domain))
+        foreach (var min in minutes.OrderBy(m => m.WindowStart).ThenBy(m => m.ProcessName))
         {
             var windowEnd = min.WindowStart.AddMinutes(1);
 
-            if (current != null && current.Domain == min.Domain && min.WindowStart == current.EndedAt)
+            if (current != null && current.ProcessName == min.ProcessName && min.WindowStart == current.EndedAt)
             {
                 current.EndedAt = windowEnd;
                 current.DurationSeconds = (int)(current.EndedAt - current.StartedAt).TotalSeconds;
                 current.TotalSeconds += min.Seconds;
-                current.Url ??= min.Url;
             }
             else
             {
                 if (current != null)
                     sessions.Add(current);
 
-                current = new TimelineSession
+                current = new DesktopTimelineSession
                 {
                     Id = 0,
-                    Domain = min.Domain,
-                    Url = min.Url,
+                    ProcessName = min.ProcessName,
+                    ProductName = min.ProductName,
                     StartedAt = min.WindowStart,
                     EndedAt = windowEnd,
                     DurationSeconds = 60,
@@ -187,15 +170,10 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         return sessions;
     }
 
-    /// <summary>
-    /// Scans primary sessions and merges same-domain sessions separated by short interruptions.
-    /// The short interrupting sessions are returned as "absorbed" context switches for the detail row.
-    /// Looks up to 3 sessions ahead to handle multi-session gaps (A → B → C → A).
-    /// </summary>
-    private static List<TimelineSession> AbsorbContextSwitches(
-        List<TimelineSession> sessions, int thresholdMinutes)
+    private static List<DesktopTimelineSession> AbsorbContextSwitches(
+        List<DesktopTimelineSession> sessions, int thresholdMinutes)
     {
-        var absorbed = new List<TimelineSession>();
+        var absorbed = new List<DesktopTimelineSession>();
         bool merged;
 
         do
@@ -205,7 +183,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
             {
                 for (var j = i + 1; j < Math.Min(i + 4, sessions.Count); j++)
                 {
-                    if (sessions[j].Domain != sessions[i].Domain) continue;
+                    if (sessions[j].ProcessName != sessions[i].ProcessName) continue;
 
                     var gapDuration = 0;
                     for (var k = i + 1; k < j; k++)
@@ -213,20 +191,16 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
 
                     if (gapDuration > thresholdMinutes * 60) continue;
 
-                    // Move gap sessions to detail
                     for (var k = i + 1; k < j; k++)
                         absorbed.Add(sessions[k]);
 
-                    // Merge sessions[j] into sessions[i]
                     sessions[i] = sessions[i] with
                     {
                         EndedAt = sessions[j].EndedAt,
                         DurationSeconds = (int)(sessions[j].EndedAt - sessions[i].StartedAt).TotalSeconds,
                         TotalSeconds = sessions[i].TotalSeconds + sessions[j].TotalSeconds,
-                        Url = sessions[i].Url ?? sessions[j].Url,
                     };
 
-                    // Remove gap sessions and sessions[j]
                     sessions.RemoveRange(i + 1, j - i);
                     merged = true;
                     break;
@@ -239,22 +213,19 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         return absorbed;
     }
 
-    /// <summary>
-    /// Merges overlapping or adjacent same-domain sessions into single sessions.
-    /// </summary>
-    private static List<TimelineSession> MergeAdjacentSessions(List<TimelineSession> sessions)
+    private static List<DesktopTimelineSession> MergeAdjacentSessions(List<DesktopTimelineSession> sessions)
     {
         if (sessions.Count == 0) return sessions;
 
-        sessions = sessions.OrderBy(s => s.StartedAt).ThenBy(s => s.Domain).ToList();
-        var result = new List<TimelineSession> { sessions[0] };
+        sessions = sessions.OrderBy(s => s.StartedAt).ThenBy(s => s.ProcessName).ToList();
+        var result = new List<DesktopTimelineSession> { sessions[0] };
 
         for (var i = 1; i < sessions.Count; i++)
         {
             var last = result[^1];
             var current = sessions[i];
 
-            if (last.Domain == current.Domain && current.StartedAt <= last.EndedAt)
+            if (last.ProcessName == current.ProcessName && current.StartedAt <= last.EndedAt)
             {
                 var newEnd = current.EndedAt > last.EndedAt ? current.EndedAt : last.EndedAt;
                 result[^1] = last with
@@ -262,7 +233,6 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
                     EndedAt = newEnd,
                     DurationSeconds = (int)(newEnd - last.StartedAt).TotalSeconds,
                     TotalSeconds = last.TotalSeconds + current.TotalSeconds,
-                    Url = last.Url ?? current.Url,
                 };
             }
             else
@@ -274,24 +244,25 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         return result;
     }
 
-    /// <summary>
-    /// Builds background sessions grouped per domain (allowing overlap between domains),
-    /// with short gaps within a single domain's activity bridged into continuous sessions.
-    /// </summary>
-    private static List<TimelineSession> BuildBackgroundTimeline(List<WebExtensionActivityEntry> rawData)
+    private static List<DesktopTimelineSession> BuildBackgroundTimeline(List<DesktopActivityEntry> rawData)
     {
-        var sessions = new List<TimelineSession>();
+        var sessions = new List<DesktopTimelineSession>();
 
-        var byDomain = rawData
+        var byProcess = rawData
             .Where(r => r.BackgroundSeconds > 0)
-            .GroupBy(r => r.Domain);
+            .GroupBy(r => r.ProcessName);
 
-        foreach (var domainGroup in byDomain)
+        foreach (var processGroup in byProcess)
         {
-            var domainSessions = new List<TimelineSession>();
-            TimelineSession? current = null;
+            var processSessions = new List<DesktopTimelineSession>();
+            DesktopTimelineSession? current = null;
 
-            foreach (var record in domainGroup.OrderBy(r => r.WindowStart))
+            var productName = processGroup
+                .Where(x => !string.IsNullOrEmpty(x.ProductName))
+                .Select(x => x.ProductName)
+                .FirstOrDefault() ?? processGroup.Key;
+
+            foreach (var record in processGroup.OrderBy(r => r.WindowStart))
             {
                 var windowEnd = record.WindowStart.AddMinutes(1);
 
@@ -300,18 +271,17 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
                     current.EndedAt = windowEnd;
                     current.DurationSeconds = (int)(current.EndedAt - current.StartedAt).TotalSeconds;
                     current.TotalSeconds += record.BackgroundSeconds;
-                    current.Url ??= record.Url;
                 }
                 else
                 {
                     if (current != null)
-                        domainSessions.Add(current);
+                        processSessions.Add(current);
 
-                    current = new TimelineSession
+                    current = new DesktopTimelineSession
                     {
                         Id = 0,
-                        Domain = record.Domain,
-                        Url = record.Url,
+                        ProcessName = processGroup.Key,
+                        ProductName = productName,
                         StartedAt = record.WindowStart,
                         EndedAt = windowEnd,
                         DurationSeconds = 60,
@@ -321,27 +291,23 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
             }
 
             if (current != null)
-                domainSessions.Add(current);
+                processSessions.Add(current);
 
-            // Bridge short gaps within this domain's sessions
-            sessions.AddRange(BridgeGaps(domainSessions));
+            sessions.AddRange(BridgeGaps(processSessions));
         }
 
         return sessions
             .Where(s => s.TotalSeconds >= MinDetailSeconds)
             .OrderBy(s => s.StartedAt)
-            .ThenBy(s => s.Domain)
+            .ThenBy(s => s.ProcessName)
             .ToList();
     }
 
-    /// <summary>
-    /// Merges sessions of the same domain separated by gaps ≤ threshold into continuous sessions.
-    /// </summary>
-    private static List<TimelineSession> BridgeGaps(List<TimelineSession> sessions)
+    private static List<DesktopTimelineSession> BridgeGaps(List<DesktopTimelineSession> sessions)
     {
         if (sessions.Count <= 1) return sessions;
 
-        var result = new List<TimelineSession> { sessions[0] };
+        var result = new List<DesktopTimelineSession> { sessions[0] };
 
         for (var i = 1; i < sessions.Count; i++)
         {
@@ -356,7 +322,6 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
                     EndedAt = current.EndedAt,
                     DurationSeconds = (int)(current.EndedAt - last.StartedAt).TotalSeconds,
                     TotalSeconds = last.TotalSeconds + current.TotalSeconds,
-                    Url = last.Url ?? current.Url,
                 };
             }
             else
@@ -368,5 +333,5 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
         return result;
     }
 
-    private record MinuteEntry(DateTime WindowStart, string Domain, string? Url, int Seconds);
+    private record MinuteEntry(DateTime WindowStart, string ProcessName, string ProductName, int Seconds);
 }

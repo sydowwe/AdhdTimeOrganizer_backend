@@ -2,6 +2,7 @@
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.entity.timer;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.entity.user;
@@ -35,7 +36,10 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<TodoList> TodoLists { get; set; }
     public DbSet<TodoListCategory> TodoListCategories { get; set; }
     public DbSet<TaskPriority> TaskUrgencies { get; set; }
-    public DbSet<WebExtensionData> WebExtensionData { get; set; }
+    public DbSet<WebExtensionActivityEntry> WebExtensionActivityEntries { get; set; }
+    public DbSet<DesktopActivityEntry> DesktopActivityEntries { get; set; }
+    public DbSet<ActivityTrackingSettingsDesktopEntryFormatting> ActivityTrackingDesktopSettingsEntryFormattings { get; set; }
+    public DbSet<ActivityTrackingSettingsDesktopIgnoredProcess> ActivityTrackingDesktopSettingsIgnoredProcesses { get; set; }
     public DbSet<TimerPreset> TimerPresets { get; set; }
     public DbSet<PomodoroTimerPreset> PomodoroTimerPresets { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
@@ -55,7 +59,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UserEntityConfiguration).Assembly);
 
-        modelBuilder.Entity<WebExtensionData>()
+        modelBuilder.Entity<WebExtensionActivityEntry>()
             .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate);
 
         OnModelCreatingPartial(modelBuilder);

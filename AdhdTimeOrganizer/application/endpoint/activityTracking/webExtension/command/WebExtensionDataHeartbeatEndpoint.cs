@@ -26,7 +26,7 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
         foreach (var activity in req.Activities.Where(activity => activity.ActiveSeconds != 0 || activity.BackgroundSeconds != 0))
         {
             // Find existing record for this user + window + domain
-            var existing = await dbContext.WebExtensionData
+            var existing = await dbContext.WebExtensionActivityEntries
                 .FirstOrDefaultAsync(x =>
                         x.UserId == userId &&
                         x.WindowStart == req.WindowStart &&
@@ -51,7 +51,7 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
             else
             {
                 // INSERT new record
-                var record = new WebExtensionData
+                var record = new WebExtensionActivityEntry
                 {
                     UserId = userId,
                     RecordDate = DateOnly.FromDateTime(req.WindowStart),
@@ -63,7 +63,7 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
                     IsFinal = req.IsFinal,
                 };
 
-                dbContext.WebExtensionData.Add(record);
+                dbContext.WebExtensionActivityEntries.Add(record);
             }
 
             processedCount++;

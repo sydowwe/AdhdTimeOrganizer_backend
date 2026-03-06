@@ -24,7 +24,7 @@ public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<
         var (from, to) = req.ToDateTimeRange();
 
         // 1. Fetch raw 1-min window data from DB
-        var rawData = await dbContext.WebExtensionData
+        var rawData = await dbContext.WebExtensionActivityEntries
             .Where(x => x.UserId == userId)
             .Where(x => x.WindowStart >= from && x.WindowStart < to)
             .OrderBy(x => x.WindowStart)
@@ -89,7 +89,7 @@ public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<
     }
 
     private static List<WebExtensionStackedBarsWindow> AggregateIntoWindows(
-        List<WebExtensionData> rawData,
+        List<WebExtensionActivityEntry> rawData,
         int targetWindowMinutes)
     {
         // Group raw records into target window buckets

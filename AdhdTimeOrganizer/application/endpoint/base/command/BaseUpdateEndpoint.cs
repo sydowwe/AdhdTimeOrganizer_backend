@@ -22,10 +22,12 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
         return EndpointHelper.GetUserOrHigherRoles();
     }
 
+    public virtual string Route => typeof(TEntity).Name.Kebaberize();
+
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Put($"/{entityName.Kebaberize()}/{{id}}");
+        Put(Route+"/{id:long}");
         Roles(AllowedRoles());
         Summary(s =>
         {

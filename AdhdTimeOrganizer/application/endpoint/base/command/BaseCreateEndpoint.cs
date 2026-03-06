@@ -1,4 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.@interface;
+using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.@interface;
@@ -21,10 +22,12 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
         return EndpointHelper.GetUserOrHigherRoles();
     }
 
+    public virtual string Route => typeof(TEntity).Name.Kebaberize();
+
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Post($"/{entityName.Kebaberize()}");
+        Post(Route);
         Roles(AllowedRoles());
         Summary(s =>
         {

@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityHistory;
 
-public class WebExtensionDataConfiguration : IEntityTypeConfiguration<WebExtensionData>
+public class WebExtensionActivityEntryConfiguration : IEntityTypeConfiguration<WebExtensionActivityEntry>
 {
-    public void Configure(EntityTypeBuilder<WebExtensionData> builder)
+    public void Configure(EntityTypeBuilder<WebExtensionActivityEntry> builder)
     {
         builder.BaseEntityConfigure();
 
@@ -19,22 +19,22 @@ public class WebExtensionDataConfiguration : IEntityTypeConfiguration<WebExtensi
             .IsConcurrencyToken(false)
             .ValueGeneratedNever();
 
-        builder.IsManyWithOneUser(u => u.WebExtensionDataList);
-
         builder.Property(x => x.Domain).HasMaxLength(255);
         builder.Property(x => x.Url).HasMaxLength(2048);
+
+        builder.IsManyWithOneUser(u => u.WebExtensionActivityEntryList);
 
         builder.HasIndex(x => new { x.UserId, x.WindowStart, x.Domain, x.RecordDate }).IsUnique();
         builder.HasIndex(x => new { x.UserId, x.WindowStart });
 
         builder.IsPartitionedByRange("record_date",
         [
-            new PartitionDefinition("web_extension_data_y2026", "2026-01-01", "2027-01-01"),
-            new PartitionDefinition("web_extension_data_y2027", "2027-01-01", "2028-01-01"),
-            new PartitionDefinition("web_extension_data_y2028", "2028-01-01", "2029-01-01"),
-            new PartitionDefinition("web_extension_data_y2029", "2029-01-01", "2030-01-01"),
-            new PartitionDefinition("web_extension_data_y2030", "2030-01-01", "2031-01-01"),
-            new PartitionDefinition("web_extension_data_default", null, null)
+            new PartitionDefinition("web_extension_activity_entry_y2026", "2026-01-01", "2027-01-01"),
+            new PartitionDefinition("web_extension_activity_entry_y2027", "2027-01-01", "2028-01-01"),
+            new PartitionDefinition("web_extension_activity_entry_y2028", "2028-01-01", "2029-01-01"),
+            new PartitionDefinition("web_extension_activity_entry_y2029", "2029-01-01", "2030-01-01"),
+            new PartitionDefinition("web_extension_activity_entry_y2030", "2030-01-01", "2031-01-01"),
+            new PartitionDefinition("web_extension_activity_entry_default", null, null)
         ]);
     }
 }

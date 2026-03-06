@@ -14,20 +14,20 @@ public class WebExtensionDataSeeder(
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<WebExtensionData>();
+        await dbContext.TruncateTableAsync<WebExtensionActivityEntry>();
     }
 
     public async Task SeedForUser(long userId)
     {
         // Skip if already seeded (guard against duplicate DI resolution)
-        if (await dbContext.WebExtensionData.IgnoreQueryFilters().AnyAsync(x => x.UserId == userId))
+        if (await dbContext.WebExtensionActivityEntries.IgnoreQueryFilters().AnyAsync(x => x.UserId == userId))
             return;
 
         var now = DateTime.UtcNow;
         var today = now.Date;
 
         // Create data for the last 7 days
-        List<WebExtensionData> records = [];
+        List<WebExtensionActivityEntry> records = [];
 
         for (int daysAgo = 6; daysAgo >= 0; daysAgo--)
         {
@@ -59,19 +59,19 @@ public class WebExtensionDataSeeder(
                 ]));
         }
 
-        await dbContext.WebExtensionData.AddRangeAsync(records);
+        await dbContext.WebExtensionActivityEntries.AddRangeAsync(records);
         await dbContext.SaveChangesAsync();
 
         logger.LogInformation("Seeded {Count} web extension data records for user {UserId}", records.Count, userId);
     }
 
-    private static List<WebExtensionData> CreateSessionData(
+    private static List<WebExtensionActivityEntry> CreateSessionData(
         long userId,
         DateTime sessionStart,
         int durationHours,
         List<(string Domain, string Url, int ActiveWeight, int BackgroundWeight)> activities)
     {
-        var records = new List<WebExtensionData>();
+        var records = new List<WebExtensionActivityEntry>();
         var windowCount = durationHours * 60; // 1-minute windows
         var totalActiveWeight = activities.Sum(a => a.ActiveWeight);
         var lastActiveDomainIndex = -1;
@@ -105,7 +105,7 @@ public class WebExtensionDataSeeder(
             var primaryActive = Random.Shared.Next(25, 56);
             remainingActive -= primaryActive;
 
-            records.Add(new WebExtensionData
+            records.Add(new WebExtensionActivityEntry
             {
                 UserId = userId,
                 RecordDate = DateOnly.FromDateTime(windowStart),
@@ -127,7 +127,7 @@ public class WebExtensionDataSeeder(
                 var secondActive = Random.Shared.Next(5, Math.Min(remainingActive + 1, 25));
                 usedIndices.Add(secondIndex);
 
-                records.Add(new WebExtensionData
+                records.Add(new WebExtensionActivityEntry
                 {
                     UserId = userId,
                     RecordDate = DateOnly.FromDateTime(windowStart),
@@ -150,7 +150,7 @@ public class WebExtensionDataSeeder(
 
             foreach (var bg in bgCandidates)
             {
-                records.Add(new WebExtensionData
+                records.Add(new WebExtensionActivityEntry
                 {
                     UserId = userId,
                     RecordDate = DateOnly.FromDateTime(windowStart),

@@ -7,7 +7,7 @@ using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
-public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endpoint<IdRequest>
+public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : EndpointWithoutRequest
     where TEntity : class, IEntityWithId
 {
     public virtual string[] AllowedRoles()
@@ -15,10 +15,12 @@ public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endp
         return EndpointHelper.GetAdminOrHigherRoles();
     }
 
+    public virtual string Route => typeof(TEntity).Name.Kebaberize();
+
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Delete($"/{entityName.Kebaberize()}/{{id}}");
+        Delete(Route+"/{id:long}");
         Roles(AllowedRoles());
         Summary(s =>
         {
@@ -29,11 +31,11 @@ public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endp
         });
     }
 
-    public override async Task HandleAsync(IdRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
         try
         {
-            var entity = await dbContext.Set<TEntity>().FindAsync([req.Id], ct);
+            var entity = await dbContext.Set<TEntity>().FindAsync([Route<long>("id")], ct);
             if (entity == null)
             {
                 await SendNotFoundAsync(ct);
