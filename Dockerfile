@@ -1,4 +1,4 @@
-﻿FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+﻿FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY ["AdhdTimeOrganizer.sln", "."]
@@ -9,10 +9,10 @@ COPY . .
 WORKDIR "/src/AdhdTimeOrganizer"
 RUN dotnet publish "AdhdTimeOrganizer.csproj" -c Release -o /app/publish --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-RUN adduser -u 5000 --disabled-password --gecos "" appuser && chown -R appuser /app
+RUN useradd -u 5000 -M -s /sbin/nologin appuser && chown -R appuser /app
 USER appuser
 
 RUN mkdir -p /app/secrets && chmod 700 /app/secrets

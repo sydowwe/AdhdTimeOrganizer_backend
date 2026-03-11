@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.security;
 using FastEndpoints;

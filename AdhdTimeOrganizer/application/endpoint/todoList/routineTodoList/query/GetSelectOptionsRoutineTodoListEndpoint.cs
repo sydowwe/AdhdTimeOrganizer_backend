@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using RoutineTodoListMapper = AdhdTimeOrganizer.application.mapper.todoList.RoutineTodoListMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.query;
 

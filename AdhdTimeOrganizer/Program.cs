@@ -41,7 +41,7 @@ try
 
     // Configure Serilog
     builder.Logging.ClearProviders();
-    SerilogConfig.ConfigureSerilog(builder.Configuration, builder.Host, "a" ?? DatabaseStringsHelper.GetLogDatabaseConnectionString);
+    SerilogConfig.ConfigureSerilog(builder.Configuration, builder.Host, DatabaseStringsHelper.GetLogDatabaseConnectionString);
 
     // Configure services
     ConfigureServices(builder.Configuration, builder.Services, builder.Environment.IsDevelopment());
@@ -81,7 +81,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
 
     // Database configuration
     services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly("MojaDigitalnaFirma.Sandbox.AdminPortal"))
+        options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly(typeof(Program).Assembly.FullName))
             .UseSnakeCaseNamingConvention()
             .ReplaceService<IMigrationsSqlGenerator, PartitionedNpgsqlMigrationsSqlGenerator>()
             .LogTo(Console.WriteLine));

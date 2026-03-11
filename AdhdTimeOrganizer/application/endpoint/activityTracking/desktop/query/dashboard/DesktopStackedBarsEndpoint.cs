@@ -1,13 +1,13 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
-using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
+using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
-namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query;
+namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query.dashboard;
 
 public class DesktopStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<WebExtensionStackedBarsRequest, IEnumerable<DesktopStackedBarsWindow>>
 {
