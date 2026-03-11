@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.domain.model.entity.user;
 
-namespace AdhdTimeOrganizer.domain.model.entity.activityHistory;
+namespace AdhdTimeOrganizer.domain.model.entity.activityTracking;
 
 public class WebExtensionActivityEntry : BaseEntityWithUser
 {

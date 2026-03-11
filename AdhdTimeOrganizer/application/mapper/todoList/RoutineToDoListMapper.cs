@@ -1,4 +1,3 @@
-
 using AdhdTimeOrganizer.application.dto.request.toDoList;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.dto.response.toDoList;
@@ -6,7 +5,7 @@ using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Riok.Mapperly.Abstractions;
 
-namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
+namespace AdhdTimeOrganizer.application.mapper.todoList;
 
 [Mapper]
 public partial class RoutineTodoListMapper : IBaseSimpleCrudMapper<RoutineTodoList, UpdateRoutineTodoListRequest, RoutineTodoListResponse>

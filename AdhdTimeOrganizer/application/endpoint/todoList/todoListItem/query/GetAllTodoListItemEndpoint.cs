@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using TodoListItemMapper = AdhdTimeOrganizer.application.mapper.todoList.TodoListItemMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.query;
 

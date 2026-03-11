@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.application.dto.response.activityTracking.summaryCards;
 
-namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
+namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard;
 
 public record DesktopProcessSummaryDto
 {

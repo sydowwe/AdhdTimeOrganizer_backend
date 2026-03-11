@@ -1,4 +1,3 @@
-using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.@base;
 
 namespace AdhdTimeOrganizer.domain.model.entity.todoList;
