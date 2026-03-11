@@ -5,7 +5,7 @@ public sealed record DesktopActivityEntryDto
     public required string ProcessName { get; init; }
     public required string ProductName { get; init; }
 
-    public required string WindowTitle { get; init; }
+    public string? WindowTitle { get; init; }
     public string? ExecutablePath { get; init; }
 
 

@@ -17,3 +17,8 @@ public class ActivityTrackingDesktopSettingsGroup : Group
 {
     public ActivityTrackingDesktopSettingsGroup() => Configure("/activity-tracking/desktop/settings", ep => ep.Description(x => x.AutoTagOverride("ActivityTracking/Desktop/Settings")));
 }
+
+public class ActivityTrackingAndroidGroup : Group
+{
+    public ActivityTrackingAndroidGroup() => Configure("/activity-tracking/android", ep => ep.Description(x => x.AutoTagOverride("ActivityTracking/Android")));
+}

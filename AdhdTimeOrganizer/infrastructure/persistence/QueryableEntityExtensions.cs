@@ -67,7 +67,6 @@ public static class QueryableEntityExtensions
     }
 
     public static IQueryable<TEntity> SortByMany<TEntity>(this IQueryable<TEntity> query, SortByRequest[] sortByList)
-        where TEntity : IEntity
     {
         //WARMING: Can fail with views without id
         if (sortByList.Length == 0)
@@ -89,7 +88,6 @@ public static class QueryableEntityExtensions
 
 
     public static IQueryable<TEntity> SortByManyAndPaginate<TEntity>(this IQueryable<TEntity> query, SortByRequest[] sortByList, int itemsPerPage, int page)
-        where TEntity : IEntity
     {
         return query.SortByMany(sortByList).Skip((page - 1) * itemsPerPage).Take(itemsPerPage);
     }
@@ -116,6 +114,35 @@ public static class QueryableEntityExtensions
 
         // Execute query and map results
         var items = await mapper.ProjectToResponse(paginatedQuery).ToListAsync(cancellationToken);
+
+        return new BaseTableResponse<TResponse>
+        {
+            Items = items,
+            ItemsCount = itemsCount,
+            PageCount = pageCount
+        };
+    }
+
+    public static async Task<BaseTableResponse<TResponse>> GetTableDataAsync<TResponse, TEntity>(
+        this IQueryable<TEntity> query,
+        SortByRequest[] sortBy,
+        int itemsPerPage,
+        int page,
+        Expression<Func<TEntity, TResponse>> map,
+        CancellationToken cancellationToken = default
+    )
+        where TEntity : class, IEntityWithId
+        where TResponse : class, IIdResponse
+    {
+        // Get total count before pagination
+        var itemsCount = await query.CountAsync(cancellationToken);
+        var pageCount = (int)Math.Ceiling((double)itemsCount / itemsPerPage);
+
+        // Apply sorting and pagination using your existing extension
+        var paginatedQuery = query.SortByManyAndPaginate(sortBy, itemsPerPage, page);
+
+        // Execute query and map results
+        var items = await paginatedQuery.Select(map).ToListAsync(cancellationToken);
 
         return new BaseTableResponse<TResponse>
         {
@@ -156,6 +183,46 @@ public static class QueryableEntityExtensions
         var lambda = Expression.Lambda<Func<TEntity, bool>>(comparison, parameter);
         return query.Where(lambda);
     }
+
+    public static IQueryable<TEntity> ApplyStringMatchFilter<TEntity>(
+        this IQueryable<TEntity> query,
+        Expression<Func<TEntity, string?>> field,
+        string value,
+        PatternMatchType matchType)
+        where TEntity : class
+    {
+        var parameter = field.Parameters[0];
+        var fieldBody = field.Body;
+
+        Expression predicate = matchType switch
+        {
+            PatternMatchType.Contains => Expression.Call(
+                fieldBody,
+                typeof(string).GetMethod(nameof(string.Contains), [typeof(string)])!,
+                Expression.Constant(value)),
+            PatternMatchType.Wildcard => BuildLikeExpression(fieldBody, ToWildcardSqlPattern(value)),
+            PatternMatchType.Regex => BuildLikeExpression(fieldBody, value),
+            _ => Expression.Equal(fieldBody, Expression.Constant(value, typeof(string)))
+        };
+
+        return query.Where(Expression.Lambda<Func<TEntity, bool>>(predicate, parameter));
+    }
+
+    private static MethodCallExpression BuildLikeExpression(Expression fieldBody, string pattern)
+    {
+        var likeMethod = typeof(DbFunctionsExtensions).GetMethod(
+            nameof(DbFunctionsExtensions.Like),
+            [typeof(DbFunctions), typeof(string), typeof(string)])!;
+
+        return Expression.Call(
+            likeMethod,
+            Expression.Property(null, typeof(EF), nameof(EF.Functions)),
+            fieldBody,
+            Expression.Constant(pattern));
+    }
+
+    private static string ToWildcardSqlPattern(string pattern) =>
+        pattern.Replace("%", "\\%").Replace("_", "\\_").Replace("*", "%").Replace("?", "_");
 
     public static async Task ReplaceCollectionAsync<TEntity, TRelatedEntity>(
         this DbContext dbContext,

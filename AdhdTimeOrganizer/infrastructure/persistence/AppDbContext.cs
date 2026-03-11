@@ -38,8 +38,8 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<TaskPriority> TaskUrgencies { get; set; }
     public DbSet<WebExtensionActivityEntry> WebExtensionActivityEntries { get; set; }
     public DbSet<DesktopActivityEntry> DesktopActivityEntries { get; set; }
-    public DbSet<ActivityTrackingSettingsDesktopEntryFormatting> ActivityTrackingDesktopSettingsEntryFormattings { get; set; }
-    public DbSet<ActivityTrackingSettingsDesktopIgnoredProcess> ActivityTrackingDesktopSettingsIgnoredProcesses { get; set; }
+    public DbSet<AndroidSessionData> AndroidSessionDataEntries { get; set; }
+    public DbSet<TrackerDesktopMappingByPattern> TrackerDesktopMappingByPattern { get; set; }
     public DbSet<TimerPreset> TimerPresets { get; set; }
     public DbSet<PomodoroTimerPreset> PomodoroTimerPresets { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }

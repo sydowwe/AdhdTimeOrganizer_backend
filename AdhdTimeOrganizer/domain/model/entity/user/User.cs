@@ -36,6 +36,7 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public ICollection<Alarm> AlarmList { get; set; } = new List<Alarm>();
     public ICollection<WebExtensionActivityEntry> WebExtensionActivityEntryList { get; set; } = new List<WebExtensionActivityEntry>();
     public ICollection<DesktopActivityEntry> DesktopActivityEntryList { get; set; } = new List<DesktopActivityEntry>();
+    public ICollection<AndroidSessionData> AndroidSessionDataList { get; set; } = new List<AndroidSessionData>();
 
     public ICollection<TodoListItem> TodoListItemColl { get; set; } = new List<TodoListItem>();
     public ICollection<TodoList> TodoListColl { get; set; } = new List<TodoList>();
@@ -47,8 +48,7 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 
 
-    public ICollection<ActivityTrackingSettingsDesktopEntryFormatting> ActivityTrackingSettingsDesktopEntryFormattingList { get; set; } = new List<ActivityTrackingSettingsDesktopEntryFormatting>();
-    public ICollection<ActivityTrackingSettingsDesktopIgnoredProcess> ActivityTrackingSettingsDesktopIgnoredProcessList { get; set; } = new List<ActivityTrackingSettingsDesktopIgnoredProcess>();
+    public ICollection<TrackerDesktopMappingByPattern> TrackerDesktopMappingByPatternList { get; set; } = new List<TrackerDesktopMappingByPattern>();
 
 
     public override string? Email
