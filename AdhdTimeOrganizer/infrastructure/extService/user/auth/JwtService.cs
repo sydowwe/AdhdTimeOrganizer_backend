@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.infrastructure.extService.user.auth;
 
 public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService refreshTokenService, UserManager<User> userManager) : IJwtService, IScopedService
 {
-    private readonly DateTime _accessTokenExpiry = DateTime.UtcNow.AddMinutes(15);
+    private static DateTime AccessTokenExpiry => DateTime.UtcNow.AddMinutes(15);
 
     public async Task<(string AccessToken, string RefreshToken, bool IsStayLoggedIn)> RefreshTokensAsync(
         string refreshToken, bool isExtensionClient, HttpContext httpContext)
@@ -73,7 +73,7 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
-            Expires = _accessTokenExpiry,
+            Expires = AccessTokenExpiry,
             Issuer = Helper.GetEnvVar("JWT_ISSUER"),
             Audience = Helper.GetEnvVar("JWT_AUDIENCE"),
             SigningCredentials = signingCredentials
@@ -116,7 +116,7 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Strict,
-            Expires = _accessTokenExpiry,
+            Expires = AccessTokenExpiry,
             Path = "/",
             IsEssential = true
         });

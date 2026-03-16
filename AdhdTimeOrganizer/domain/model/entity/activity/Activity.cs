@@ -17,7 +17,7 @@ public class Activity : BaseNameTextEntity
 
 
     // Navigation properties
-    public virtual TodoListItem? TodoListItem { get; set; }
+    public virtual ICollection<TodoListItem> TodoListItems { get; set; } = [];
     public virtual ICollection<RoutineTodoList> RoutineTodoLists { get; set; } = [];
     public virtual ICollection<Alarm> AlarmList { get; set; } = new List<Alarm>();
     public virtual ICollection<ActivityHistory> ActivityHistoryList { get; set; } = new List<ActivityHistory>();

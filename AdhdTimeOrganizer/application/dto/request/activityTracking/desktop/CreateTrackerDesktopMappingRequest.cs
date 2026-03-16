@@ -14,7 +14,7 @@ public record CreateTrackerDesktopMappingRequest : ICreateRequest
     public string? WindowTitle { get; init; }
     public PatternMatchType? WindowTitleMatchType { get; init; }
 
-    public required bool IsActive { get; init; }
+    public bool IsActive { get; init; } = true;
 
     // Exactly one target group must be set:
     // - IsIgnored = true

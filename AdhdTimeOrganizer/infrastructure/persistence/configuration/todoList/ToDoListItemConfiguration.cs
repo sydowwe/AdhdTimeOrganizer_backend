@@ -14,7 +14,7 @@ public class TodoListItemConfiguration : IEntityTypeConfiguration<TodoListItem>
         builder.BaseTodoListConfigure();
 
         builder.IsManyWithOneUser(u => u.TodoListItemColl);
-        builder.IsOneWithOneActivity(a => a.TodoListItem);
+        builder.IsManyWithOneActivity(a => a.TodoListItems);
 
         builder.HasOne(r => r.TaskPriority)
             .WithMany(t => t.TodoListColl)

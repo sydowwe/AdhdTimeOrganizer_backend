@@ -1,4 +1,6 @@
+using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.domain.model.@enum;
 
 namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
@@ -19,7 +21,7 @@ public record TrackerDesktopMappingResponse : IIdResponse
     public bool IsActive { get; set; }
 
     public bool? IsIgnored { get; set; }
-    public long? ActivityId { get; set; }
+    public ActivityFilterFormResponse? Activity { get; set; }
     public long? RoleId { get; set; }
     public long? CategoryId { get; set; }
 }

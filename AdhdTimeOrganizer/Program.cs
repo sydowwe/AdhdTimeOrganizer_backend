@@ -20,6 +20,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Quartz;
 using Serilog;
+using Serilog.Events;
 
 try
 {
@@ -277,8 +278,73 @@ static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
         app.UseSwaggerGen(); // FastEndpoints Swagger
     }
 
+    // Middleware to capture and log response body for errors
+    app.Use(async (context, next) =>
+    {
+        var originalBodyStream = context.Response.Body;
+        using var responseBody = new MemoryStream();
+        context.Response.Body = responseBody;
+
+        await next();
+
+        responseBody.Seek(0, SeekOrigin.Begin);
+        
+        // Log response body for 4xx and 5xx errors
+        if (context.Response.StatusCode >= 400)
+        {
+            var responseText = await new StreamReader(responseBody).ReadToEndAsync();
+            responseBody.Seek(0, SeekOrigin.Begin);
+
+            var logLevel = context.Response.StatusCode >= 500 ? LogLevel.Error : LogLevel.Warning;
+            logger.Log(logLevel, 
+                "HTTP {Method} {Path} {StatusCode} - Response: {ResponseBody}", 
+                context.Request.Method, 
+                context.Request.Path, 
+                context.Response.StatusCode,
+                responseText.Length > 2000 ? responseText.Substring(0, 2000) + "... (truncated)" : responseText);
+            responseBody.Seek(0, SeekOrigin.Begin);
+        }
+
+        await responseBody.CopyToAsync(originalBodyStream);
+    });
+
     // Request pipeline configuration
-    app.UseSerilogRequestLogging();
+    app.UseSerilogRequestLogging(options =>
+    {
+        options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+        options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+        {
+            diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
+            diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+            diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
+            diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
+            
+            // Log request body for non-GET requests (be careful with sensitive data)
+            if (httpContext.Request.Method != "GET" && httpContext.Request.ContentLength > 0)
+            {
+                httpContext.Request.EnableBuffering();
+                httpContext.Request.Body.Position = 0;
+                using var reader = new StreamReader(httpContext.Request.Body, leaveOpen: true);
+                var body = reader.ReadToEndAsync().Result;
+                httpContext.Request.Body.Position = 0;
+                
+                // Truncate large bodies
+                if (body.Length > 1000)
+                {
+                    body = body.Substring(0, 1000) + "... (truncated)";
+                }
+                diagnosticContext.Set("RequestBody", body);
+            }
+        };
+        options.GetLevel = (httpContext, elapsed, ex) =>
+        {
+            if (ex != null || httpContext.Response.StatusCode >= 500)
+                return LogEventLevel.Error;
+            if (httpContext.Response.StatusCode >= 400)
+                return LogEventLevel.Warning;
+            return LogEventLevel.Information;
+        };
+    });
     app.UseForwardedHeaders();
     app.UseHttpsRedirection();
 

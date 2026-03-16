@@ -17,6 +17,4 @@ public class CreateTrackerDesktopMappingEndpoint(AppDbContext dbContext, Tracker
         Validator<CreateTrackerDesktopMappingValidator>();
         Group<ActivityTrackingDesktopSettingsGroup>();
     }
-
-
 }
