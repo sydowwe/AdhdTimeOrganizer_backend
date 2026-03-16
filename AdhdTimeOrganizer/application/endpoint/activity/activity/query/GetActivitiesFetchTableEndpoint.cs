@@ -37,18 +37,14 @@ public class GetActivitiesFetchTableEndpoint(
             query = query.Where(a => a.IsUnavoidable == filter.IsUnavoidable.Value);
         }
 
-        if (filter.IsOnTodoList.HasValue)
+        if (!string.IsNullOrWhiteSpace(filter.RoleName))
         {
-            query = query.Include(a => a.TodoListItem);
-
-           query = query.Where(a=> a.TodoListItem != null == filter.IsOnTodoList.Value );
+            query = query.Where(a => a.Role.Name.Contains(filter.RoleName));
         }
 
-        if (filter.IsOnRoutineTodoList.HasValue)
+        if (!string.IsNullOrWhiteSpace(filter.CategoryName))
         {
-            query = query.Include(a => a.RoutineTodoLists);
-
-            query = query.Where(a => a.RoutineTodoLists.Any() == filter.IsOnRoutineTodoList.Value);
+            query = query.Where(a => a.Category != null && a.Category.Name.Contains(filter.CategoryName));
         }
 
         if (filter.RoleId.HasValue)
@@ -59,11 +55,6 @@ public class GetActivitiesFetchTableEndpoint(
         if (filter.CategoryId.HasValue)
         {
             query = query.Where(a => a.CategoryId == filter.CategoryId.Value);
-        }
-
-        if (filter.UserId.HasValue)
-        {
-            query = query.Where(a => a.UserId == filter.UserId.Value);
         }
 
         return query;

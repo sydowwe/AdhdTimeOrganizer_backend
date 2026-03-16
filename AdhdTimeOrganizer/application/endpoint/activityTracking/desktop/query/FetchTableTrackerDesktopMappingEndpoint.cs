@@ -1,51 +1,28 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
-using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
-using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.activityTracking;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query;
 
 public class FetchTableTrackerDesktopMappingEndpoint(AppDbContext dbContext, TrackerDesktopMappingMapper mapper)
-    : Endpoint<BaseFilterSortPaginateRequest<TrackerDesktopMappingFilter>, BaseTableResponse<TrackerDesktopMappingResponse>>
+    : BaseFetchTableEndpoint<TrackerDesktopMappingByPattern, TrackerDesktopMappingResponse, TrackerDesktopMappingFilter, TrackerDesktopMappingMapper>(dbContext, mapper)
 {
     public override void Configure()
     {
-        Post("/tracker-desktop-mapping-by-pattern/filtered-table");
+        base.Configure();
         Validator<FetchTableTrackerDesktopMappingValidator>();
-        Roles(EndpointHelper.GetUserOrHigherRoles());
-        Summary(s =>
-        {
-            s.Summary = "Get filtered and paginated TrackerDesktopMappingByPattern list";
-            s.Response<BaseTableResponse<TrackerDesktopMappingResponse>>(200, "Success");
-            s.Response(400, "Bad request");
-        });
         Group<ActivityTrackingDesktopSettingsGroup>();
     }
 
-    public override async Task HandleAsync(BaseFilterSortPaginateRequest<TrackerDesktopMappingFilter> req, CancellationToken ct)
-    {
-        var query = dbContext.TrackerDesktopMappingByPattern.AsNoTracking()
-            .FilteredByUser(User.GetId());
-
-        if (req is { UseFilter: true, Filter: not null })
-            query = ApplyFilter(query, req.Filter);
-
-        var result = await query.GetTableDataAsync<TrackerDesktopMappingResponse, TrackerDesktopMappingByPattern, TrackerDesktopMappingMapper>(req.SortBy, req.ItemsPerPage, req.Page, mapper, ct);
-
-        await SendOkAsync(result, ct);
-    }
-
-    private static IQueryable<TrackerDesktopMappingByPattern> ApplyFilter(
+    protected override IQueryable<TrackerDesktopMappingByPattern> ApplyCustomFiltering(
         IQueryable<TrackerDesktopMappingByPattern> query, TrackerDesktopMappingFilter filter)
     {
         query = filter.Type switch
@@ -83,5 +60,10 @@ public class FetchTableTrackerDesktopMappingEndpoint(AppDbContext dbContext, Tra
             query = query.Where(e => e.CategoryId == filter.CategoryId.Value);
 
         return query;
+    }
+
+    protected override IQueryable<TrackerDesktopMappingByPattern> WithIncludes(IQueryable<TrackerDesktopMappingByPattern> query)
+    {
+        return query.Include(e => e.Activity);
     }
 }

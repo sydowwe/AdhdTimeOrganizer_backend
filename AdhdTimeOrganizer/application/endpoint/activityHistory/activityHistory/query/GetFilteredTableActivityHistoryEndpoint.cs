@@ -96,12 +96,12 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext, Act
 
         if (filter.IsFromTodoList.HasValue)
         {
-            query = query.Include(ah => ah.Activity).ThenInclude(a => a.TodoListItem);
+            query = query.Include(ah => ah.Activity).ThenInclude(a => a.TodoListItems);
 
-            query = query.Where(ah => ah.Activity.TodoListItem != null == filter.IsFromTodoList.Value);
+            query = query.Where(ah => ah.Activity.TodoListItems != null == filter.IsFromTodoList.Value);
             if (filter.TaskPriorityId.HasValue && filter.IsFromTodoList.Value)
             {
-                query = query.Where(ah => ah.Activity.TodoListItem!.TaskPriorityId == filter.TaskPriorityId.Value);
+                query = query.Where(ah => ah.Activity.TodoListItems.Any(tli => tli.TaskPriorityId == filter.TaskPriorityId.Value));
             }
         }
 

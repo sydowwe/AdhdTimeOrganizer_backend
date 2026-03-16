@@ -82,4 +82,5 @@ public abstract class BaseFetchTableEndpoint<TEntity, TResponse, TFilter, TMappe
     {
         return query;
     }
+
 }
