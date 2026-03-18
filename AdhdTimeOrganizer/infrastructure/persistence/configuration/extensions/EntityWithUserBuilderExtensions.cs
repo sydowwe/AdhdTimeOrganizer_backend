@@ -38,7 +38,7 @@ public static class EntityWIthUserBuilderExtensions
     {
         builder.BaseEntityConfigure();
         builder.Property(r => r.Text).HasMaxLength(100).IsUnicode().IsRequired();
-        builder.Property(r => r.Color).HasMaxLength(7).IsRequired();
+        builder.Property(r => r.Color).HasMaxLength(100).IsRequired();
         if (isTextUnique)
         {
             builder.HasIndex(r => new { r.UserId, r.Text })

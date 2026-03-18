@@ -333,5 +333,5 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
         return result;
     }
 
-    private record MinuteEntry(DateTime WindowStart, string ProcessName, string ProductName, int Seconds);
+    private record MinuteEntry(DateTime WindowStart, string ProcessName, string? ProductName, int Seconds);
 }

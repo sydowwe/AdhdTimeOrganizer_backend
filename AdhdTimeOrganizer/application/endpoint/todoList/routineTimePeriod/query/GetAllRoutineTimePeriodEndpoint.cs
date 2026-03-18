@@ -11,4 +11,8 @@ public class GetAllRoutineTimePeriodEndpoint(
     RoutineTimePeriodMapper mapper)
     : BaseGetAllEndpoint<RoutineTimePeriod, RoutineTimePeriodResponse, RoutineTimePeriodMapper>(dbContext, mapper)
 {
+    protected override IQueryable<RoutineTimePeriod> Sort(IQueryable<RoutineTimePeriod> query)
+    {
+        return query.OrderBy(x => x.LengthInDays);
+    }
 }

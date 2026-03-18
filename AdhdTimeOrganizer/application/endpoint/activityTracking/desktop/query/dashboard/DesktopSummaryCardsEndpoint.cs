@@ -155,8 +155,8 @@ public class DesktopSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCard
 
 internal class DesktopProcessTimeData
 {
-    public string ProcessName { get; set; } = string.Empty;
-    public string ProductName { get; set; } = string.Empty;
+    public required string ProcessName { get; set; }
+    public string? ProductName { get; set; }
     public int ActiveSeconds { get; set; }
     public int BackgroundSeconds { get; set; }
     public int TotalSeconds { get; set; }

@@ -2,8 +2,8 @@ namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.da
 
 public record DesktopProcessDetailsResponse
 {
-    public string ProcessName { get; set; } = string.Empty;
-    public string ProductName { get; set; } = string.Empty;
+    public required string ProcessName { get; set; }
+    public string? ProductName { get; set; }
     public int TotalSeconds { get; set; }
     public int ActiveSeconds { get; set; }
     public int BackgroundSeconds { get; set; }

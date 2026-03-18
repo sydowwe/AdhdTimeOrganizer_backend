@@ -120,7 +120,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
         q.AddTrigger(opts => opts
             .ForJob("routine-reset", "routine")
             .WithIdentity("routine-reset-trigger", "routine")
-            .WithCronSchedule("0 0 2 * * ?")); // 2:00 AM UTC daily
+            .WithCronSchedule("0 0 2 * * ?")); // 2:00 AM daily
     });
     services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 

@@ -3,7 +3,7 @@ namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.da
 public record DesktopPieDataDto
 {
     public required string ProcessName { get; init; }
-    public required string ProductName { get; init; }
+    public string? ProductName { get; init; }
     public required int ActiveSeconds { get; init; }
     public required int BackgroundSeconds { get; init; }
     public required int TotalSeconds { get; init; }

@@ -13,12 +13,19 @@ public class RoutineTodoListConfiguration : IEntityTypeConfiguration<RoutineTodo
 
         builder.BaseTodoListConfigure();
 
+        builder.ToTable(t => t.HasCheckConstraint(
+            "CK_RoutineTodoList_Streak_NonNegative",
+            "\"streak\" >= 0"));
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "CK_RoutineTodoList_BestStreak_NonNegative",
+            "\"best_streak\" >= 0"));
 
         builder.IsManyWithOneUser(u => u.RoutineTodoListColl);
-        builder.IsManyWithOneActivity(a=>a.RoutineTodoLists);
+        builder.IsManyWithOneActivity(a => a.RoutineTodoLists);
 
         builder.HasOne(r => r.RoutineTimePeriod)
-            .WithMany(t=>t.RoutineTodoListColl)
+            .WithMany(t => t.RoutineTodoListColl)
             .HasForeignKey(r => r.TimePeriodId)
             .OnDelete(DeleteBehavior.Restrict);
 

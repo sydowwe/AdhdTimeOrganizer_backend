@@ -8,7 +8,7 @@ public sealed class DesktopActivityEntry : BaseEntityWithUser
     public required DateTime WindowStart { get; set; }
 
     public required string ProcessName { get; set; }
-    public required string ProductName { get; init; }
+    public string? ProductName { get; init; }
     public string? WindowTitle { get; set; }
     public string? ExecutablePath { get; set; }
 

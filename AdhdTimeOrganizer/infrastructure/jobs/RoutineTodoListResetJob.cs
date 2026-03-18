@@ -1,3 +1,5 @@
+using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.service;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
@@ -14,34 +16,28 @@ public class RoutineTodoListResetJob(IServiceScopeFactory scopeFactory, ILogger<
         await using var scope = scopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        var allItems = await dbContext.RoutineTodoLists
-            .Include(rtl => rtl.RoutineTimePeriod)
+        var periods = await dbContext.Set<RoutineTimePeriod>()
+            .Include(tp => tp.RoutineTodoListColl)
             .ToListAsync(context.CancellationToken);
 
-        var toReset = allItems
-            .Where(rtl =>
-            {
-                var lastReset = rtl.LastResetDate ?? DateOnly.FromDateTime(rtl.CreatedTimestamp);
-                return lastReset.AddDays(rtl.RoutineTimePeriod.LengthInDays) <= today;
-            })
-            .ToList();
+        var now = DateTime.UtcNow;
+        var totalReset = 0;
 
-        if (toReset.Count == 0)
+        foreach (var period in periods)
         {
-            logger.LogInformation("No items to reset today");
+            var items = period.RoutineTodoListColl.ToList();
+            RoutineResetService.CheckGrace(period, now);
+            if (RoutineResetService.TryReset(period, items, now))
+                totalReset += items.Count;
+        }
+
+        if (totalReset == 0)
+        {
+            logger.LogInformation("No items to reset");
             return;
         }
 
-        foreach (var item in toReset)
-        {
-            item.IsDone = false;
-            item.DoneCount = null;
-            item.LastResetDate = today;
-        }
-
         await dbContext.SaveChangesAsync(context.CancellationToken);
-        logger.LogInformation("Reset {Count} routine todo list items", toReset.Count);
+        logger.LogInformation("Reset {Count} routine todo list items", totalReset);
     }
 }
