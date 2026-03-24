@@ -9,4 +9,7 @@ public record CreateTodoListItemRequest : BaseCreateTodoListRequest
 
     [Required]
     public long TodoListId { get; init; }
+
+    public DateOnly? DueDate { get; init; }
+    public TimeOnly? DueTime { get; init; }
 }

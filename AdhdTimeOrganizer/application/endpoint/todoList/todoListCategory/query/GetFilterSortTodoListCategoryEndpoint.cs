@@ -31,25 +31,21 @@ public class GetFilterSortTodoListCategoryEndpoint(AppDbContext dbContext, TodoL
     public override async Task HandleAsync(BaseFilterSortRequest<TodoListCategoryFilterRequest> req, CancellationToken ct)
     {
         var userId = User.GetId();
+        var hideEmpty = req is { UseFilter: true, Filter.HideEmpty: true };
 
-        var usedCategoryIds = await dbContext.TodoLists
-            .Where(tl => tl.UserId == userId && tl.CategoryId != null)
-            .Select(tl => tl.CategoryId!.Value)
-            .Distinct()
-            .ToListAsync(ct);
+        var query = dbContext.TodoListCategories
+            .Where(c => c.UserId == userId);
+
+        if (hideEmpty)
+            query = query.Where(c => dbContext.TodoLists.Any(tl => tl.UserId == userId && tl.CategoryId == c.Id));
+
+        if (req is { UseFilter: true, Filter: not null } && !string.IsNullOrWhiteSpace(req.Filter.Name))
+            query = query.Where(c => c.Name.Contains(req.Filter.Name));
+
+        var result = await mapper.ProjectToResponse(query.SortByMany(req.SortBy)).ToListAsync(ct);
 
         var hasUncategorized = await dbContext.TodoLists
             .AnyAsync(tl => tl.UserId == userId && tl.CategoryId == null, ct);
-
-        IQueryable<TodoListCategory> query = dbContext.TodoListCategories
-            .Where(c => c.UserId == userId && usedCategoryIds.Contains(c.Id));
-
-        if (req is { UseFilter: true, Filter: not null } && !string.IsNullOrWhiteSpace(req.Filter.Name))
-        {
-            query = query.Where(c => c.Name.Contains(req.Filter.Name));
-        }
-
-        var result = await mapper.ProjectToResponse(query.SortByMany(req.SortBy)).ToListAsync(ct);
 
         if (hasUncategorized)
         {

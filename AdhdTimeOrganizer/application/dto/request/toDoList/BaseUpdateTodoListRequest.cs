@@ -8,4 +8,5 @@ public record BaseUpdateTodoListRequest : WithIsDoneRequest
 
     public int? DoneCount { get; set; }
     public int? TotalCount { get; set; }
+    public string? Note { get; set; }
 }

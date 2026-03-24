@@ -77,4 +77,9 @@ public abstract class BaseFilterSortEndpoint<TEntity, TResponse, TFilter, TMappe
     {
         return query;
     }
+
+    protected virtual IQueryable<TResponse> ProjectToResponse(IQueryable<TEntity> query)
+    {
+        return mapper.ProjectToResponse(query);
+    }
 }

@@ -21,9 +21,12 @@ public class TodoListItemConfiguration : IEntityTypeConfiguration<TodoListItem>
             .HasForeignKey(r => r.TaskPriorityId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(t => new { userId = t.UserId, activityId = t.ActivityId })
+        builder.Property(t => t.DueDate).IsRequired(false);
+        builder.Property(t => t.DueTime).IsRequired(false);
+
+        builder.HasIndex(t => new { t.UserId, t.ActivityId, t.TodoListId })
             .IsUnique();
 
-        builder.HasIndex(t => new { userId = t.UserId, TaskPriorityId = t.TaskPriorityId });
+        builder.HasIndex(t => new { t.UserId, t.TaskPriorityId });
     }
 }

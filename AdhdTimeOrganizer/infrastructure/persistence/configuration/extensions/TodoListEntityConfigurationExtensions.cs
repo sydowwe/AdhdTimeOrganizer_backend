@@ -16,8 +16,9 @@ public static class TodoListEntityConfigurationExtensions
             t.HasCheckConstraint($"CK_{entityName}_DoneCount_LessOrEqual_TotalCount", "done_count <= total_count");
         });
 
-        builder.Property(e=> e.DisplayOrder).IsRequired();
+        builder.Property(e => e.DisplayOrder).IsRequired();
         builder.Property(p => p.IsDone).HasDefaultValue(false).IsRequired();
+        builder.Property(e => e.Note).HasMaxLength(1000);
 
         return builder;
     }

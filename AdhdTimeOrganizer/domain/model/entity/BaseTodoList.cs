@@ -8,4 +8,5 @@ public abstract class BaseTodoList : BaseEntityWithIsDone, IEntityWithDoneAndTot
     public int? DoneCount { get; set; }
     public int? TotalCount { get; set; }
     public long DisplayOrder { get; set; }
+    public string? Note { get; set; }
 }
