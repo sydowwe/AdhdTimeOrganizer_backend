@@ -16,6 +16,8 @@ public class TaskPlannerDayTemplate : BaseEntityWithUser
 
     // Template customization
     public required DayType SuggestedForDayType { get; set; } // Workday, Weekend, etc.
+    public List<DayOfWeek> ScheduledDays { get; set; } = []; // Days of the week this template is intended for
+    public Location? SuggestedLocation { get; set; } // Home, Office, Travel
     public List<string> Tags { get; set; } = []; // ["productive", "relaxed", "minimal"]
 
     // Usage tracking

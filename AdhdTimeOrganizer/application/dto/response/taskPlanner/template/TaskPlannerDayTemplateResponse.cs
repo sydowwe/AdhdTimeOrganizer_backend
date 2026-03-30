@@ -15,5 +15,7 @@ public record TaskPlannerDayTemplateResponse : IdResponse
     public required int UsageCount { get; init; }
     public DateTimeOffset? LastUsedAt { get; init; }
     public required DayType SuggestedForDayType { get; init; }
+    public required List<DayOfWeek> ScheduledDays { get; init; }
+    public Location? SuggestedLocation { get; init; }
     public required List<string> Tags { get; init; }
 }

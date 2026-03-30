@@ -32,6 +32,23 @@ public class TaskPlannerDayTemplateConfiguration : IEntityTypeConfiguration<Task
                 )
             );
 
+        builder.Property(t => t.ScheduledDays)
+            .HasConversion(
+                v => string.Join(',', v.Select(d => d.ToString())),
+                v => v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                       .Select(d => Enum.Parse<DayOfWeek>(d))
+                       .ToList()
+            )
+            .Metadata.SetValueComparer(
+                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<DayOfWeek>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()
+                )
+            );
+
+        builder.EnumColumn(t => t.SuggestedLocation);
+
         builder.HasIndex(t => new { t.UserId, t.Name });
         builder.HasIndex(t => t.SuggestedForDayType);
     }

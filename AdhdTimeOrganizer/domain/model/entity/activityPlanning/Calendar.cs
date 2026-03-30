@@ -20,6 +20,9 @@ public class Calendar : BaseEntityWithUser
     public long? AppliedTemplateId { get; set; }
     public string? AppliedTemplateName { get; set; }
 
+    // Location
+    public Location? Location { get; set; }
+
     // Day-specific notes
     public string? Weather { get; set; }
     public string? Notes { get; set; }

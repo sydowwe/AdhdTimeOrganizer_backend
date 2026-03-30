@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.@enum;
 using Riok.Mapperly.Abstractions;
 
 namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
@@ -28,6 +29,7 @@ public partial class CalendarMapper : IBaseReadMapper<Calendar, CalendarResponse
             BedTime = new TimeDto(c.BedTime.Hour, c.BedTime.Minute),
             AppliedTemplateId = c.AppliedTemplateId,
             AppliedTemplateName = c.AppliedTemplateName,
+            Location = c.Location,
             Weather = c.Weather,
             Notes = c.Notes,
             TotalTasks = c.Tasks.Count(),

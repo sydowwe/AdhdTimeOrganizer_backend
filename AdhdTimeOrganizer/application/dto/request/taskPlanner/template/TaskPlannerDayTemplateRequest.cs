@@ -26,5 +26,9 @@ public record TaskPlannerDayTemplateRequest : IMyRequest
     [Required]
     public required DayType SuggestedForDayType { get; init; }
 
+    public List<DayOfWeek> ScheduledDays { get; init; } = new();
+
+    public Location? SuggestedLocation { get; init; }
+
     public List<string> Tags { get; init; } = new();
 }

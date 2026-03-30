@@ -19,6 +19,8 @@ public record CalendarResponse : IdResponse
     public long? AppliedTemplateId { get; init; }
     public string? AppliedTemplateName { get; init; }
 
+    public Location? Location { get; init; }
+
     public string? Weather { get; init; }
     public string? Notes { get; init; }
 

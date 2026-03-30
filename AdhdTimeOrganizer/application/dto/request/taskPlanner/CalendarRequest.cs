@@ -12,6 +12,8 @@ public record CalendarRequest : IUpdateRequest
     public required TimeDto WakeUpTime { get; init; }
     public required TimeDto BedTime { get; init; }
 
+    public Location? Location { get; init; }
+
     public string? Weather { get; init; }
     public string? Notes { get; init; }
 

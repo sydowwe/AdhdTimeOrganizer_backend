@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/jakub/RiderProjects/AdhdTimeOrganizer -name *TaskPlannerDayTemplate* -o -name *Calendar* -o -name *DayOfWeek* -o -name *Location*)"
+    ]
+  }
+}
