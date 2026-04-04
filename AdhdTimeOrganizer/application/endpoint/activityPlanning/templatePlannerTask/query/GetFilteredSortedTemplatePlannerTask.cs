@@ -57,6 +57,6 @@ public class GetFilterSortedTemplatePlannerTask(AppDbContext dbContext, Template
 
     protected override IQueryable<TemplatePlannerTask> WithIncludes(IQueryable<TemplatePlannerTask> query)
     {
-        return query.Include(t => t.Activity);
+        return query.Include(t => t.Activity).ThenInclude(a => a.Role);
     }
 }

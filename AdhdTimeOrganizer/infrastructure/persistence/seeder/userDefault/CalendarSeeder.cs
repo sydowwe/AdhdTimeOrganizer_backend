@@ -72,7 +72,6 @@ public class CalendarSeeder(
             // Check if it's a holiday (holidays override weekends)
             if (holidays.TryGetValue(date, out var holiday))
             {
-                dayType = DayType.Holiday;
                 holidayName = holiday;
             }
 

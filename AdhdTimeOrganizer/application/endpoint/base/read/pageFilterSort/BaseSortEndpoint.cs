@@ -13,15 +13,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 
-public abstract class BaseFilterSortEndpoint<TEntity, TResponse, TFilter, TMapper>(
+public abstract class BaseSortEndpoint<TEntity, TResponse, TMapper>(
     AppDbContext dbContext,
-    TMapper mapper) : Endpoint<BaseFilterSortRequest<TFilter>, List<TResponse>>
+    TMapper mapper) : Endpoint<BaseSortRequest, List<TResponse>>
     where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
-    where TFilter : class, IFilterRequest
     where TMapper : class, IBaseReadMapper<TEntity, TResponse>
 {
-    public virtual string EndpointPath => "filter-sort";
+    public virtual string EndpointPath => "sort";
 
     public virtual string[] AllowedRoles()
     {
@@ -36,8 +35,8 @@ public abstract class BaseFilterSortEndpoint<TEntity, TResponse, TFilter, TMappe
         Post($"/{entityName.Kebaberize()}/{EndpointPath}");
         Summary(s =>
         {
-            s.Summary = $"Get filtered and paginated {entityName} list";
-            s.Description = $"Retrieves a filtered, paginated and sorted list of {entityName}";
+            s.Summary = $"Get sorted {entityName} list";
+            s.Description = $"Retrieves a sorted of {entityName}";
             Roles(AllowedRoles());
 
             s.Response<BaseTableResponse<TResponse>>(200, "Success");
@@ -45,7 +44,7 @@ public abstract class BaseFilterSortEndpoint<TEntity, TResponse, TFilter, TMappe
         });
     }
 
-    public override async Task HandleAsync(BaseFilterSortRequest<TFilter> req, CancellationToken ct)
+    public override async Task HandleAsync(BaseSortRequest req, CancellationToken ct)
     {
         try
         {
@@ -54,11 +53,6 @@ public abstract class BaseFilterSortEndpoint<TEntity, TResponse, TFilter, TMappe
             if (FilteredByUser)
             {
                 query = query.FilteredByUser(User.GetId());
-            }
-
-            if (req is { UseFilter: true, Filter: not null })
-            {
-                query = ApplyCustomFiltering(query, req.Filter);
             }
 
             var sortBy = AlwaysSortBy.Concat(req.SortBy).ToArray();
@@ -75,8 +69,6 @@ public abstract class BaseFilterSortEndpoint<TEntity, TResponse, TFilter, TMappe
     }
 
     public virtual SortByRequest[] AlwaysSortBy => [];
-
-    protected abstract IQueryable<TEntity> ApplyCustomFiltering(IQueryable<TEntity> query, TFilter filter);
 
     protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query)
     {

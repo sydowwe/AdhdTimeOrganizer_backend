@@ -20,9 +20,6 @@ public class UpdateCalendarEndpoint(AppDbContext dbContext, CalendarMapper mappe
     {
         switch (entity.DayType)
         {
-            case DayType.Holiday when string.IsNullOrWhiteSpace(entity.HolidayName):
-                ThrowError("DayType 'Holiday' requires HolidayName to be set");
-                break;
             case DayType.Weekend when !entity.IsWeekend:
                 ThrowError($"DayType 'Weekend' is only valid on Saturday or Sunday, but date {entity.Date} is a {entity.Date.DayOfWeek}");
                 break;
