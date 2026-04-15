@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,10 +15,10 @@ public class TaskPrioritySeeder(
 
     private static List<TaskPriority> Defaults(long userId) =>
     [
-        new() { UserId = userId, Text = "Today", Color = "#FF5252", Priority = 1 }, // Red
-        new() { UserId = userId, Text = "This week", Color = "#FFA726", Priority = 2 }, // Orange
-        new() { UserId = userId, Text = "This month", Color = "#FFD600", Priority = 3 }, // Yellow
-        new() { UserId = userId, Text = "This year", Color = "#4CAF50", Priority = 4 } // Green
+        new() { UserId = userId, Text = "Today", Color = ColorPalette.Red, Priority = 1 },
+        new() { UserId = userId, Text = "This week", Color = ColorPalette.Orange, Priority = 2 },
+        new() { UserId = userId, Text = "This month", Color = ColorPalette.Yellow, Priority = 3 },
+        new() { UserId = userId, Text = "This year", Color = ColorPalette.Emerald, Priority = 4 }
     ];
 
     public async Task SetupDefaults(long userId, CancellationToken ct = default)

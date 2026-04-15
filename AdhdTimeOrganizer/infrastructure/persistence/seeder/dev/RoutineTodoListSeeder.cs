@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
+using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using AdhdTimeOrganizer.infrastructure.settings;
@@ -81,6 +82,9 @@ public class RoutineTodoListSeeder(
             .MinAsync(rtl => (int?)rtl.DisplayOrder) ?? 0;
         var nextOrderMonthly = lastOrderMonthly != 0 ? lastOrderMonthly - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
 
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var now = DateTime.UtcNow;
+
         // Daily routines
         if (dailyPeriod != null && exerciseActivity != null)
         {
@@ -90,7 +94,18 @@ public class RoutineTodoListSeeder(
                 TimePeriodId = dailyPeriod.Id,
                 IsDone = true,
                 DisplayOrder = nextOrderDaily,
-                UserId = userId
+                UserId = userId,
+                SuggestedTime = new MyIntTime(7, 0),
+                LastResetDate = today,
+                Streak = 12,
+                BestStreak = 21,
+                LastCompletedAt = now,
+                Steps =
+                [
+                    new TodoListStep { Name = "10 min warm-up", Order = 1, IsDone = true },
+                    new TodoListStep { Name = "20 min cardio", Order = 2, IsDone = true },
+                    new TodoListStep { Name = "Stretching", Order = 3, IsDone = true }
+                ]
             });
             nextOrderDaily -= settings.Value.DisplayOrderGap;
         }
@@ -103,7 +118,12 @@ public class RoutineTodoListSeeder(
                 TimePeriodId = dailyPeriod.Id,
                 IsDone = false,
                 DisplayOrder = nextOrderDaily,
-                UserId = userId
+                UserId = userId,
+                SuggestedTime = new MyIntTime(7, 30),
+                LastResetDate = today,
+                Streak = 5,
+                BestStreak = 14,
+                LastCompletedAt = now.AddDays(-1)
             });
             nextOrderDaily -= settings.Value.DisplayOrderGap;
         }
@@ -116,7 +136,12 @@ public class RoutineTodoListSeeder(
                 TimePeriodId = dailyPeriod.Id,
                 IsDone = false,
                 DisplayOrder = nextOrderDaily,
-                UserId = userId
+                UserId = userId,
+                Note = "3 things I'm grateful for",
+                LastResetDate = today,
+                Streak = 3,
+                BestStreak = 9,
+                LastCompletedAt = now.AddDays(-1)
             });
             nextOrderDaily -= settings.Value.DisplayOrderGap;
         }
@@ -131,7 +156,17 @@ public class RoutineTodoListSeeder(
                 DoneCount = 3,
                 TotalCount = 3,
                 DisplayOrder = nextOrderDaily,
-                UserId = userId
+                UserId = userId,
+                LastResetDate = today,
+                Streak = 8,
+                BestStreak = 15,
+                LastCompletedAt = now,
+                Steps =
+                [
+                    new TodoListStep { Name = "Breakfast", Order = 1, IsDone = true },
+                    new TodoListStep { Name = "Lunch", Order = 2, IsDone = true },
+                    new TodoListStep { Name = "Dinner", Order = 3, IsDone = true }
+                ]
             });
             nextOrderDaily -= settings.Value.DisplayOrderGap;
         }
@@ -147,7 +182,11 @@ public class RoutineTodoListSeeder(
                 DoneCount = 0,
                 TotalCount = 2,
                 DisplayOrder = nextOrderWeekly,
-                UserId = userId
+                UserId = userId,
+                LastResetDate = today.AddDays(-(int)today.DayOfWeek),
+                Streak = 4,
+                BestStreak = 10,
+                LastCompletedAt = now.AddDays(-7)
             });
             nextOrderWeekly -= settings.Value.DisplayOrderGap;
         }
@@ -162,7 +201,19 @@ public class RoutineTodoListSeeder(
                 DoneCount = 1,
                 TotalCount = 4,
                 DisplayOrder = nextOrderWeekly,
-                UserId = userId
+                UserId = userId,
+                SuggestedTime = new MyIntTime(11, 0),
+                LastResetDate = today.AddDays(-(int)today.DayOfWeek),
+                Streak = 6,
+                BestStreak = 12,
+                LastCompletedAt = now.AddDays(-7),
+                Steps =
+                [
+                    new TodoListStep { Name = "Living room", Order = 1, IsDone = true },
+                    new TodoListStep { Name = "Kitchen", Order = 2, IsDone = false },
+                    new TodoListStep { Name = "Bathroom", Order = 3, IsDone = false },
+                    new TodoListStep { Name = "Bedroom", Order = 4, IsDone = false }
+                ]
             });
             nextOrderWeekly -= settings.Value.DisplayOrderGap;
         }
@@ -175,7 +226,12 @@ public class RoutineTodoListSeeder(
                 TimePeriodId = weeklyPeriod.Id,
                 IsDone = true,
                 DisplayOrder = nextOrderWeekly,
-                UserId = userId
+                UserId = userId,
+                Note = "Check pantry before going",
+                LastResetDate = today.AddDays(-(int)today.DayOfWeek),
+                Streak = 7,
+                BestStreak = 18,
+                LastCompletedAt = now
             });
             nextOrderWeekly -= settings.Value.DisplayOrderGap;
         }
@@ -188,7 +244,11 @@ public class RoutineTodoListSeeder(
                 TimePeriodId = weeklyPeriod.Id,
                 IsDone = false,
                 DisplayOrder = nextOrderWeekly,
-                UserId = userId
+                UserId = userId,
+                LastResetDate = today.AddDays(-(int)today.DayOfWeek),
+                Streak = 2,
+                BestStreak = 8,
+                LastCompletedAt = now.AddDays(-7)
             });
             nextOrderWeekly -= settings.Value.DisplayOrderGap;
         }
@@ -204,7 +264,13 @@ public class RoutineTodoListSeeder(
                 DoneCount = 1,
                 TotalCount = 4,
                 DisplayOrder = nextOrderMonthly,
-                UserId = userId
+                UserId = userId,
+                SuggestedTime = new MyIntTime(20, 0),
+                Note = "At least 30 pages per session",
+                LastResetDate = new DateOnly(today.Year, today.Month, 1),
+                Streak = 3,
+                BestStreak = 7,
+                LastCompletedAt = now.AddDays(-5)
             });
             nextOrderMonthly -= settings.Value.DisplayOrderGap;
         }

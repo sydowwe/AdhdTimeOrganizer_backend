@@ -8,8 +8,6 @@ namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 public record PlannerTaskRequest : BasePlannerTaskRequest, IMyRequest
 {
     [Required]
-    public required bool IsDone { get; init; }
-    [Required]
     public required PlannerTaskStatus Status { get; init; }
     [Required]
     public required long CalendarId { get; init; }

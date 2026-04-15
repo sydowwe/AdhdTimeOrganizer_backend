@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
+using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using AdhdTimeOrganizer.infrastructure.settings;
@@ -90,6 +91,8 @@ public class TodoListItemSeeder(
             .MinAsync(tl => (int?)tl.DisplayOrder) ?? 0;
         var nextOrderThisMonth = lastOrderThisMonth != 0 ? lastOrderThisMonth - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
 
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
         // Today tasks
         if (todayPriority != null && bugFixingActivity != null)
         {
@@ -102,7 +105,17 @@ public class TodoListItemSeeder(
                 DoneCount = 0,
                 TotalCount = 3,
                 DisplayOrder = nextOrderToday,
-                UserId = userId
+                UserId = userId,
+                SuggestedTime = new MyIntTime(10, 0),
+                Note = "Fix login timeout and null ref on dashboard",
+                DueDate = today,
+                DueTime = new TimeOnly(17, 0),
+                Steps =
+                [
+                    new TodoListStep { Name = "Reproduce login timeout locally", Order = 1, IsDone = true },
+                    new TodoListStep { Name = "Fix null ref on dashboard", Order = 2, IsDone = false },
+                    new TodoListStep { Name = "Write regression tests", Order = 3, IsDone = false }
+                ]
             });
             nextOrderToday -= settings.Value.DisplayOrderGap;
         }
@@ -116,7 +129,14 @@ public class TodoListItemSeeder(
                 TodoListId = defaultTodoList.Id,
                 IsDone = false,
                 DisplayOrder = nextOrderToday,
-                UserId = userId
+                UserId = userId,
+                DueDate = today,
+                Steps =
+                [
+                    new TodoListStep { Name = "Milk & eggs", Order = 1, IsDone = false },
+                    new TodoListStep { Name = "Vegetables", Order = 2, IsDone = false },
+                    new TodoListStep { Name = "Chicken", Order = 3, IsDone = true }
+                ]
             });
             nextOrderToday -= settings.Value.DisplayOrderGap;
         }
@@ -130,7 +150,8 @@ public class TodoListItemSeeder(
                 TodoListId = defaultTodoList.Id,
                 IsDone = true,
                 DisplayOrder = nextOrderToday,
-                UserId = userId
+                UserId = userId,
+                SuggestedTime = new MyIntTime(7, 0)
             });
             nextOrderToday -= settings.Value.DisplayOrderGap;
         }
@@ -147,7 +168,9 @@ public class TodoListItemSeeder(
                 DoneCount = 2,
                 TotalCount = 5,
                 DisplayOrder = nextOrderThisWeek,
-                UserId = userId
+                UserId = userId,
+                Note = "Auth module PRs from the team",
+                DueDate = today.AddDays(7 - (int)today.DayOfWeek)
             });
             nextOrderThisWeek -= settings.Value.DisplayOrderGap;
         }
@@ -163,7 +186,14 @@ public class TodoListItemSeeder(
                 DoneCount = 1,
                 TotalCount = 4,
                 DisplayOrder = nextOrderThisWeek,
-                UserId = userId
+                UserId = userId,
+                SuggestedTime = new MyIntTime(9, 0),
+                Steps =
+                [
+                    new TodoListStep { Name = "Design settings screen layout", Order = 1, IsDone = true },
+                    new TodoListStep { Name = "Implement notification toggle", Order = 2, IsDone = false },
+                    new TodoListStep { Name = "Hook up to backend API", Order = 3, IsDone = false }
+                ]
             });
             nextOrderThisWeek -= settings.Value.DisplayOrderGap;
         }
@@ -210,7 +240,9 @@ public class TodoListItemSeeder(
                 TodoListId = defaultTodoList.Id,
                 IsDone = false,
                 DisplayOrder = nextOrderThisMonth,
-                UserId = userId
+                UserId = userId,
+                Note = "Implement export to PDF feature",
+                DueDate = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month))
             });
             nextOrderThisMonth -= settings.Value.DisplayOrderGap;
         }

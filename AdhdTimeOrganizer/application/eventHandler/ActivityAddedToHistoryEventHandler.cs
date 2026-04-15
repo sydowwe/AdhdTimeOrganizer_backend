@@ -1,14 +1,17 @@
-﻿using AdhdTimeOrganizer.application.@event;
+using AdhdTimeOrganizer.application.@event;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.eventHandler;
 
-public class ActivityAddedToHistoryEventHandler(AppDbContext dbContext, ILogger<ActivityAddedToHistoryEventHandler> logger) : IEventHandler<ActivityAddedToHistoryEvent>
+public class ActivityAddedToHistoryEventHandler(IServiceScopeFactory scopeFactory, ILogger<ActivityAddedToHistoryEventHandler> logger) : IEventHandler<ActivityAddedToHistoryEvent>
 {
     public async Task HandleAsync(ActivityAddedToHistoryEvent eventModel, CancellationToken ct)
     {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         var historyRecord = new ActivityHistory
         {
             UserId = eventModel.UserId,

@@ -1,3 +1,5 @@
+using AdhdTimeOrganizer.domain.helper;
+
 namespace AdhdTimeOrganizer.application.dto.response.toDoList;
 
 public record RoutineTodoListResponse : BaseTodoListResponse
@@ -6,4 +8,5 @@ public record RoutineTodoListResponse : BaseTodoListResponse
     public int Streak { get; init; }
     public int BestStreak { get; init; }
     public DateTime LastCompletedAt { get; init; }
+    public MyIntTime? SuggestedTime { get; init; }
 }

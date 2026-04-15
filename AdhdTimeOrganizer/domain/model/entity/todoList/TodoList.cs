@@ -10,4 +10,7 @@ public class TodoList : BaseNameTextEntity
     public TodoListCategory? Category { get; set; }
 
     public ICollection<TodoListItem> TodoListItemColl { get; set; } = new List<TodoListItem>();
+
+    public int ItemCount => TodoListItemColl.Count;
+    public int CompletedCount => TodoListItemColl.Count(i => i.IsDone);
 }

@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
@@ -18,78 +19,76 @@ public class ActivityCategorySeeder(
 
     public async Task SeedForUser(long userId)
     {
-        // Note: TruncateTable already removed existing data for this user
-
         var activityCategories = new List<ActivityCategory>
         {
             new()
             {
                 Name = "Urgent & Important",
                 Text = "Critical tasks that need immediate attention",
-                Color = "#D32F2F", // Red
+                Color = ColorPalette.Red,
                 UserId = userId
             },
             new()
             {
                 Name = "Important Not Urgent",
                 Text = "Important tasks that can be scheduled",
-                Color = "#1976D2", // Blue
+                Color = ColorPalette.Blue,
                 UserId = userId
             },
             new()
             {
                 Name = "Urgent Not Important",
                 Text = "Tasks that need quick action but are less critical",
-                Color = "#FFA000", // Amber
+                Color = ColorPalette.Amber,
                 UserId = userId
             },
             new()
             {
                 Name = "Neither Urgent Nor Important",
                 Text = "Low priority tasks to do when time permits",
-                Color = "#757575", // Grey
+                Color = ColorPalette.Zinc,
                 UserId = userId
             },
             new()
             {
                 Name = "Deep Work",
                 Text = "Tasks requiring focused, uninterrupted concentration",
-                Color = "#7B1FA2", // Purple
+                Color = ColorPalette.Purple,
                 UserId = userId
             },
             new()
             {
                 Name = "Quick Tasks",
                 Text = "Tasks that can be completed in under 15 minutes",
-                Color = "#00897B", // Teal
+                Color = ColorPalette.Teal,
                 UserId = userId
             },
             new()
             {
                 Name = "Creative Work",
                 Text = "Tasks involving creativity and brainstorming",
-                Color = "#E91E63", // Pink
+                Color = ColorPalette.Pink,
                 UserId = userId
             },
             new()
             {
                 Name = "Administrative",
                 Text = "Routine administrative and organizational tasks",
-                Color = "#546E7A", // Blue Grey
+                Color = ColorPalette.Slate,
                 UserId = userId
             },
             new()
             {
                 Name = "Maintenance",
                 Text = "Regular upkeep and maintenance activities",
-                Color = "#795548", // Brown
+                Color = ColorPalette.Brown,
                 UserId = userId
             },
             new()
             {
                 Name = "Learning",
                 Text = "Educational and skill development activities",
-                Color = "#5E35B1", // Deep Purple
+                Color = ColorPalette.Violet,
                 UserId = userId
             }
         };

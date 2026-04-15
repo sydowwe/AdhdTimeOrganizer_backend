@@ -11,7 +11,6 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
     {
         builder.BaseEntityConfigure();
 
-        builder.Property(p => p.IsDone).HasDefaultValue(false).IsRequired();
         builder.IsManyWithOneUser(u => u.PlannerTaskList);
         builder.IsManyWithOneActivity(a => a.PlannerTaskList);
 
@@ -19,7 +18,6 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
         builder.Property(p => p.EndTime).IsRequired();
         builder.Property(p => p.IsBackground).IsRequired();
         builder.Property(p => p.Status).IsRequired();
-        builder.Property(p => p.IsFromTemplate).HasDefaultValue(false).IsRequired();
 
         builder.Property(p => p.Location).HasMaxLength(200);
         builder.Property(p => p.Notes).HasMaxLength(1000);
@@ -35,9 +33,9 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
             .HasForeignKey(p => p.ImportanceId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasOne(p => p.Todolist)
+        builder.HasOne(p => p.TodolistItem)
             .WithMany()
-            .HasForeignKey(p => p.TodolistId)
+            .HasForeignKey(p => p.TodolistItemId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(p => new { p.UserId, p.CalendarId, p.StartTime });

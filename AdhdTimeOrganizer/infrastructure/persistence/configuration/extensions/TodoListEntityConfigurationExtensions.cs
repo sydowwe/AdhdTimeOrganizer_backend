@@ -6,7 +6,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 
 public static class TodoListEntityConfigurationExtensions
 {
-    public static EntityTypeBuilder<TEntity> BaseTodoListConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder) where TEntity : BaseTodoList
+    public static EntityTypeBuilder<TEntity> BaseTodoListConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder) where TEntity : BaseTodoListItem
     {
         var entityName = typeof(TEntity).Name;
         builder.ToTable(t =>
@@ -19,6 +19,14 @@ public static class TodoListEntityConfigurationExtensions
         builder.Property(e => e.DisplayOrder).IsRequired();
         builder.Property(p => p.IsDone).HasDefaultValue(false).IsRequired();
         builder.Property(e => e.Note).HasMaxLength(1000);
+
+        builder.OwnsMany(e => e.Steps, s =>
+        {
+            s.ToJson();
+            s.Property(x => x.Id).ValueGeneratedNever();
+            s.Property(x => x.Name).HasMaxLength(255).IsRequired();
+            s.Property(x => x.Note).HasMaxLength(1000);
+        });
 
         return builder;
     }

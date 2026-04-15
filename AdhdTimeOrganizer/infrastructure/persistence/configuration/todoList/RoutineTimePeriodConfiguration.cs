@@ -11,6 +11,7 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
     {
         builder.BaseTextColorEntityConfigure();
 
+        builder.Property(t => t.HistoryDepth).IsRequired();
         builder.Property(t => t.ResetAnchorDay).IsRequired();
         builder.Property(t => t.LengthInDays).IsRequired();
         builder.Property(t => t.Streak).IsRequired();
@@ -42,6 +43,10 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_routine_time_period_streak_grace_days_range",
             "\"streak_grace_days\" >= 0 AND \"streak_grace_days\" <= \"length_in_days\" - 1"));
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_routine_time_period_history_depth_range",
+            "\"history_depth\" >= 1 AND \"history_depth\" <= 100"));
 
         builder.HasMany(r => r.RoutineTodoListColl)
             .WithOne(t => t.RoutineTimePeriod)

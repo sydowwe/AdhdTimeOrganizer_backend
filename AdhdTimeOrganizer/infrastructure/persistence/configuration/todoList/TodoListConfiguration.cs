@@ -17,6 +17,6 @@ public class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
         builder.HasMany(r => r.TodoListItemColl)
             .WithOne(t => t.TodoList)
             .HasForeignKey(t => t.TodoListId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

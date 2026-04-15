@@ -1,6 +1,7 @@
+
 namespace AdhdTimeOrganizer.domain.model.entity.todoList;
 
-public class RoutineTodoList : BaseTodoList
+public class RoutineTodoList : BaseTodoListItem
 {
     public required long TimePeriodId { get; set; }
     public RoutineTimePeriod RoutineTimePeriod { get; set; } = null!;

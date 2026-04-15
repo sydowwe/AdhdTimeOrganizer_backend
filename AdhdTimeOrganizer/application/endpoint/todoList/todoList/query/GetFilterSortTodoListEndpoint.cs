@@ -14,7 +14,7 @@ public class GetFilterSortTodoListEndpoint(AppDbContext dbContext, TodoListMappe
     : BaseFilterSortEndpoint<TodoList, TodoListResponse, TodoListFilterRequest, TodoListMapper>(dbContext, mapper)
 {
     protected override IQueryable<TodoList> WithIncludes(IQueryable<TodoList> query)
-        => query.Include(tl => tl.Category);
+        => query.Include(tl => tl.Category).Include(tl => tl.TodoListItemColl);
 
     protected override IQueryable<TodoList> ApplyCustomFiltering(IQueryable<TodoList> query, TodoListFilterRequest filter)
     {

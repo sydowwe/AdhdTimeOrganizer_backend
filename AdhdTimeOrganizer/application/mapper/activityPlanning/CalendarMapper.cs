@@ -33,7 +33,7 @@ public partial class CalendarMapper : IBaseReadMapper<Calendar, CalendarResponse
             Weather = c.Weather,
             Notes = c.Notes,
             TotalTasks = c.Tasks.Count(),
-            CompletedTasks = c.Tasks.Count(t => t.IsDone),
+            CompletedTasks = c.Tasks.Count(t => t.Status == PlannerTaskStatus.Completed),
         });
 
     private static TimeDto MapTimeOnlyToTimeDto(TimeOnly timeOnly) => new(timeOnly.Hour, timeOnly.Minute);

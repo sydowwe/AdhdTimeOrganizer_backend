@@ -13,4 +13,5 @@ public record TimeDto
         Hours = hours;
         Minutes = minutes;
     }
+    public TimeOnly ToTimeOnly() => new(Hours, Minutes);
 }

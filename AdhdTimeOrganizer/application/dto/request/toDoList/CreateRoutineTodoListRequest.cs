@@ -1,10 +1,9 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace AdhdTimeOrganizer.application.dto.request.toDoList;
 
-public record CreateRoutineTodoListRequest : BaseUpdateTodoListRequest
+public record CreateRoutineTodoListRequest : BaseCreateTodoListRequest
 {
-
     [Required]
     public long TimePeriodId { get; init; }
 }

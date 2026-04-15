@@ -12,6 +12,17 @@ public class UpdateTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapp
 {
     protected override Task AfterMapping(TodoListItem entity, UpdateTodoListItemRequest req, CancellationToken ct = default)
     {
+        if (req.Steps is not null)
+        {
+            entity.Steps = req.Steps.Select(s => new TodoListStep
+            {
+                Name = s.Name,
+                Order = s.Order,
+                Note = s.Note,
+                IsDone = s.Id.HasValue && entity.Steps.FirstOrDefault(e => e.Id == s.Id.Value)?.IsDone == true
+            }).ToList();
+        }
+
         if (req is { TotalCount: not null, DoneCount: null })
         {
             entity.DoneCount = 0;

@@ -115,11 +115,9 @@ public class PlannerTaskSeeder(
                     IsBackground = false,
 
                     ImportanceId = mediumImportance.Id,
-                    IsDone = false,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
                     Notes = "Morning workout",
-                    IsFromTemplate = false,
                     UserId = userId
                 });
             }
@@ -137,11 +135,9 @@ public class PlannerTaskSeeder(
                         EndTime = new TimeOnly(9, 15),
                         IsBackground = false,
                         ImportanceId = criticalImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Daily team sync - Mandatory",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -156,11 +152,9 @@ public class PlannerTaskSeeder(
                         EndTime = new TimeOnly(11, 30),
                         IsBackground = false,
                         ImportanceId = criticalImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Meeting Room",
                         Notes = "Weekly sprint planning",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -175,11 +169,9 @@ public class PlannerTaskSeeder(
                         EndTime = new TimeOnly(13, 0),
                         IsBackground = false,
                         ImportanceId = highImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Deep work session - new features",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -190,16 +182,14 @@ public class PlannerTaskSeeder(
                     {
                         CalendarId = calendar.Id,
                         ActivityId = bugFixing.Id,
-                        TodolistId = bugFixingTodo?.Id,
+                        TodolistItemId = bugFixingTodo?.Id,
                         StartTime = new TimeOnly(14, 0),
                         EndTime = new TimeOnly(16, 0),
                         IsBackground = false,
                         ImportanceId = highImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Fix critical bugs",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -215,11 +205,9 @@ public class PlannerTaskSeeder(
                         IsBackground = false,
 
                         ImportanceId = mediumImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Review team PRs",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -234,11 +222,9 @@ public class PlannerTaskSeeder(
                         EndTime = new TimeOnly(18, 0),
                         IsBackground = true,
                         ImportanceId = optionalImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Do some laundry",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -256,11 +242,9 @@ public class PlannerTaskSeeder(
                         EndTime = new TimeOnly(12, 0),
                         IsBackground = false,
                         ImportanceId = mediumImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Weekly cleaning",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -275,11 +259,9 @@ public class PlannerTaskSeeder(
                         EndTime = new TimeOnly(14, 30),
                         IsBackground = false,
                         ImportanceId = highImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Supermarket",
                         Notes = "Buy food for the week",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -295,11 +277,9 @@ public class PlannerTaskSeeder(
                         IsBackground = false,
 
                         ImportanceId = mediumImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Learning time",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -315,11 +295,9 @@ public class PlannerTaskSeeder(
                         IsBackground = false,
 
                         ImportanceId = optionalImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Personal project work",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -335,11 +313,9 @@ public class PlannerTaskSeeder(
                         IsBackground = false,
 
                         ImportanceId = optionalImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Gaming session for fun",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -354,11 +330,9 @@ public class PlannerTaskSeeder(
                         EndTime = new TimeOnly(22, 0),
                         IsBackground = false,
                         ImportanceId = optionalImportance.Id,
-                        IsDone = false,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Relaxing with a movie",
-                        IsFromTemplate = false,
                         UserId = userId
                     });
                 }
@@ -375,11 +349,9 @@ public class PlannerTaskSeeder(
                     EndTime = new TimeOnly(19, 30),
                     IsBackground = false,
                     ImportanceId = criticalImportance.Id,
-                    IsDone = false,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
                     Notes = "Family time - Important",
-                    IsFromTemplate = false,
                     UserId = userId
                 });
             }
@@ -395,11 +367,9 @@ public class PlannerTaskSeeder(
                     IsBackground = false,
 
                     ImportanceId = mediumImportance.Id,
-                    IsDone = false,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
                     Notes = "Evening meditation",
-                    IsFromTemplate = false,
                     UserId = userId
                 });
             }
@@ -414,11 +384,9 @@ public class PlannerTaskSeeder(
                     EndTime = new TimeOnly(23, 0),
                     IsBackground = false,
                     ImportanceId = highImportance.Id,
-                    IsDone = false,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
                     Notes = "Wind down for sleep",
-                    IsFromTemplate = false,
                     UserId = userId
                 });
             }

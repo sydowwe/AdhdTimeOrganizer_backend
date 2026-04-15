@@ -21,7 +21,13 @@ public class CreateTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapp
     {
         entity.DisplayOrder = await _dbContext.TodoListItems.GetNextDisplayOrder(_settings, User.GetId(), entity.TaskPriorityId, ct);
         entity.TodoListId = req.TodoListId;
-        if (req.TotalCount.HasValue)
+
+        if (req.Steps is { Count: > 0 })
+        {
+            entity.Steps = req.Steps.Select(s => new TodoListStep { Name = s.Name, Order = s.Order, Note = s.Note }).ToList();
+            entity.DoneCount = 0;
+        }
+        else if (req.TotalCount.HasValue)
         {
             entity.DoneCount = 0;
         }

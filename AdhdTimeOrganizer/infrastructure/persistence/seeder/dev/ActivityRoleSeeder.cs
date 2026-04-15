@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
@@ -24,7 +25,7 @@ public class ActivityRoleSeeder(
             {
                 Name = "Work",
                 Text = "Professional and career-related activities",
-                Color = "#1976D2", // Blue
+                Color = ColorPalette.Blue,
                 Icon = "fas fa-briefcase",
                 UserId = userId
             },
@@ -32,7 +33,7 @@ public class ActivityRoleSeeder(
             {
                 Name = "Personal Development",
                 Text = "Learning, growth, and self-improvement",
-                Color = "#7B1FA2", // Purple
+                Color = ColorPalette.Purple,
                 Icon = "fas fa-book",
                 UserId = userId
             },
@@ -40,7 +41,7 @@ public class ActivityRoleSeeder(
             {
                 Name = "Health & Fitness",
                 Text = "Physical health, exercise, and wellness",
-                Color = "#388E3C", // Green
+                Color = ColorPalette.Green,
                 Icon = "fas fa-dumbbell",
                 UserId = userId
             },
@@ -48,7 +49,7 @@ public class ActivityRoleSeeder(
             {
                 Name = "Social",
                 Text = "Family, friends, and social interactions",
-                Color = "#F57C00", // Orange
+                Color = ColorPalette.Orange,
                 Icon = "fas fa-users",
                 UserId = userId
             },
@@ -56,7 +57,7 @@ public class ActivityRoleSeeder(
             {
                 Name = "Hobbies & Leisure",
                 Text = "Recreation, entertainment, and enjoyment",
-                Color = "#E91E63", // Pink
+                Color = ColorPalette.Pink,
                 Icon = "fas fa-gamepad",
                 UserId = userId
             },
@@ -64,7 +65,7 @@ public class ActivityRoleSeeder(
             {
                 Name = "Household",
                 Text = "Home maintenance, chores, and errands",
-                Color = "#795548", // Brown
+                Color = ColorPalette.Brown,
                 Icon = "fas fa-house",
                 UserId = userId
             },
@@ -72,7 +73,7 @@ public class ActivityRoleSeeder(
             {
                 Name = "Finance",
                 Text = "Money management and financial planning",
-                Color = "#4CAF50", // Light Green
+                Color = ColorPalette.Emerald,
                 Icon = "fas fa-money-bill-wave",
                 UserId = userId
             },
@@ -80,7 +81,7 @@ public class ActivityRoleSeeder(
             {
                 Name = "Self-Care",
                 Text = "Rest, relaxation, and mental well-being",
-                Color = "#00BCD4", // Cyan
+                Color = ColorPalette.Cyan,
                 Icon = "fas fa-spa",
                 UserId = userId
             }

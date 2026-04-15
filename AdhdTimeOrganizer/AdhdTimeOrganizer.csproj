@@ -55,6 +55,7 @@
       <Folder Include="application\mapper\activity\" />
       <Folder Include="application\preprocessor\" />
       <Folder Include="domain\" />
+      <Folder Include="infrastructure\persistence\Migrations\" />
     </ItemGroup>
 
 

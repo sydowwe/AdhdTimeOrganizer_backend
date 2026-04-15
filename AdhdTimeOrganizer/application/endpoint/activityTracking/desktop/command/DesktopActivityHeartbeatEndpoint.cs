@@ -1,12 +1,16 @@
 using System.Text.RegularExpressions;
 using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.application.endpointGroups;
+using AdhdTimeOrganizer.application.@event;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.domain.service;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +30,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
     {
         var userId = User.GetId();
         var processedCount = 0;
+        var activitySecondsInBatch = new Dictionary<long, int>();
 
         var mappings = await dbContext.TrackerDesktopMappingByPattern
             .Where(m => m.UserId == userId && m.IsActive)
@@ -59,6 +64,8 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
 
             if (match?.ActivityId is { } activityId)
             {
+                activitySecondsInBatch[activityId] = activitySecondsInBatch.GetValueOrDefault(activityId) + entry.ActiveSeconds;
+
                 var windowEnd = req.WindowStart.AddSeconds(entry.ActiveSeconds);
 
                 var existing = await dbContext.ActivityHistories
@@ -86,7 +93,84 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
 
         await dbContext.SaveChangesAsync(ct);
 
+        await AutomateActivityStatusAsync(userId, req.WindowStart, activitySecondsInBatch, ct);
+
         await SendAsync(processedCount, StatusCodes.Status201Created, ct);
+    }
+
+    private async Task AutomateActivityStatusAsync(long userId, DateTime windowStart, Dictionary<long, int> activitySecondsInBatch, CancellationToken ct)
+    {
+        if (activitySecondsInBatch.Count == 0)
+            return;
+
+        var today = DateOnly.FromDateTime(windowStart);
+        var todayStart = today.ToDateTime(TimeOnly.MinValue);
+        var todayEnd = today.ToDateTime(TimeOnly.MaxValue);
+
+        foreach (var (activityId, _) in activitySecondsInBatch)
+        {
+            var histories = await dbContext.ActivityHistories
+                .Where(h => h.UserId == userId && h.ActivityId == activityId
+                         && h.StartTimestamp >= todayStart && h.StartTimestamp <= todayEnd)
+                .ToListAsync(ct);
+
+            var totalSecondsToday = histories.Sum(h => h.Length.TotalSeconds);
+
+            var plannerTask = await dbContext.PlannerTasks
+                .Include(pt => pt.Calendar)
+                .Where(pt => pt.UserId == userId && pt.ActivityId == activityId
+                          && pt.Calendar.Date == today
+                          && pt.Status != PlannerTaskStatus.Completed
+                          && pt.Status != PlannerTaskStatus.Cancelled)
+                .FirstOrDefaultAsync(ct);
+
+            if (plannerTask != null)
+            {
+                var durationSeconds = (int)(plannerTask.EndTime - plannerTask.StartTime).TotalSeconds;
+                var wasCompleted = durationSeconds > 0 && totalSecondsToday >= durationSeconds;
+
+                plannerTask.Status = wasCompleted ? PlannerTaskStatus.Completed : PlannerTaskStatus.InProgress;
+                await dbContext.SaveChangesAsync(ct);
+
+                if (wasCompleted)
+                {
+                    await new PlannerTaskIsDoneChangedEvent(activityId, userId, true, plannerTask.TodolistItemId)
+                        .PublishAsync(Mode.WaitForAll, ct);
+                }
+            }
+            else
+            {
+                await AutomateWithoutPlannerTaskAsync(userId, activityId, totalSecondsToday, ct);
+            }
+        }
+    }
+
+    private async Task AutomateWithoutPlannerTaskAsync(long userId, long activityId, int totalSecondsToday, CancellationToken ct)
+    {
+        var todoItem = await dbContext.TodoListItems
+            .FirstOrDefaultAsync(i => i.UserId == userId && i.ActivityId == activityId
+                                   && !i.IsDone && i.SuggestedTime != null, ct);
+
+        if (todoItem != null && totalSecondsToday >= todoItem.SuggestedTime!.TotalSeconds)
+        {
+            todoItem.IsDone = true;
+            if (todoItem.TotalCount.HasValue)
+                todoItem.DoneCount = todoItem.TotalCount;
+            await dbContext.SaveChangesAsync(ct);
+        }
+
+        var routineItem = await dbContext.RoutineTodoLists
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.ActivityId == activityId
+                                   && !r.IsDone && r.SuggestedTime != null, ct);
+
+        if (routineItem != null && totalSecondsToday >= routineItem.SuggestedTime!.TotalSeconds)
+        {
+            routineItem.IsDone = true;
+            if (routineItem.TotalCount.HasValue)
+                routineItem.DoneCount = routineItem.TotalCount;
+            RoutineResetService.UpdateItemStreak(routineItem, DateTime.UtcNow);
+            await dbContext.SaveChangesAsync(ct);
+        }
     }
 
     private static bool MatchesPattern(TrackerDesktopMappingByPattern mapping, DesktopActivityEntryDto entry)

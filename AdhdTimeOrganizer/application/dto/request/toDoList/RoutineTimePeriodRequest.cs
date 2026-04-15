@@ -18,4 +18,7 @@ public record RoutineTimePeriodRequest : TextColorRequest
 
     /// <summary>0 to LengthInDays-1 — extra days after the period ends before the streak breaks.</summary>
     public int StreakGraceDays { get; init; }
+
+    /// <summary>1–100 — how many past periods to include in completion history.</summary>
+    public int HistoryDepth { get; init; } = 16;
 }

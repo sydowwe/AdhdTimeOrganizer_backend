@@ -12,16 +12,21 @@ using RoutineTodoListMapper = AdhdTimeOrganizer.application.mapper.todoList.Rout
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.command;
 
 public class CreateRoutineToDoListEndpoint(AppDbContext dbContext, RoutineTodoListMapper mapper, IOptions<TodoListSettings> settings)
-    : BaseCreateEndpoint<RoutineTodoList, UpdateRoutineTodoListRequest, RoutineTodoListMapper>(dbContext, mapper)
+    : BaseCreateEndpoint<RoutineTodoList, CreateRoutineTodoListRequest, RoutineTodoListMapper>(dbContext, mapper)
 {
     private readonly AppDbContext _dbContext = dbContext;
     private readonly TodoListSettings _settings = settings.Value;
 
-    protected override async Task AfterMapping(RoutineTodoList entity, UpdateRoutineTodoListRequest req, CancellationToken ct = default)
+    protected override async Task AfterMapping(RoutineTodoList entity, CreateRoutineTodoListRequest req, CancellationToken ct = default)
     {
         entity.DisplayOrder = await _dbContext.RoutineTodoLists.GetNextDisplayOrder(_settings, User.GetId(), entity.TimePeriodId, ct);
 
-        if (req is { TotalCount: not null, DoneCount: null })
+        if (req.Steps is { Count: > 0 })
+        {
+            entity.Steps = req.Steps.Select(s => new TodoListStep { Name = s.Name, Order = s.Order, Note = s.Note }).ToList();
+            entity.DoneCount = 0;
+        }
+        else if (entity.TotalCount.HasValue)
         {
             entity.DoneCount = 0;
         }

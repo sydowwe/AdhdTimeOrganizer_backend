@@ -12,7 +12,12 @@ public partial class TodoListItemMapper : IBaseCrudMapper<TodoListItem, CreateTo
 {
     public partial TodoListItemResponse ToResponse(TodoListItem entity);
     public partial SelectOptionResponse ToSelectOptionResponse(TodoListItem entity);
+
+    [MapperIgnoreTarget(nameof(TodoListItem.Steps))]
     public partial TodoListItem ToEntity(CreateTodoListItemRequest request, long userId);
+
+    [MapperIgnoreTarget(nameof(TodoListItem.Steps))]
     public partial void UpdateEntity(UpdateTodoListItemRequest request, TodoListItem entity);
+
     public partial IQueryable<TodoListItemResponse> ProjectToResponse(IQueryable<TodoListItem> source);
 }

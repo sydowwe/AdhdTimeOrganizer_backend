@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,9 +15,9 @@ public class DefaultActivityRoleSeeder(
 
     private static List<ActivityRole> Defaults(long userId) =>
     [
-        new() { UserId = userId, Name = "Planner task", Text = "Quickly created activities in task planner", Color = "#007bff", Icon = "fas fa-calendar-days" },
-        new() { UserId = userId, Name = "To-do list task", Text = "Quickly created activities in to-do list", Color = "#009BCC", Icon = "fas fa-list-check" },
-        new() { UserId = userId, Name = "Routine task", Text = "Quickly created activities in routine to-do list", Color = "#008080", Icon = "fas fa-recycle" }
+        new() { UserId = userId, Name = "Planner task", Text = "Quickly created activities in task planner", Color = ColorPalette.Blue, Icon = "fas fa-calendar-days" },
+        new() { UserId = userId, Name = "To-do list task", Text = "Quickly created activities in to-do list", Color = ColorPalette.Sky, Icon = "fas fa-list-check" },
+        new() { UserId = userId, Name = "Routine task", Text = "Quickly created activities in routine to-do list", Color = ColorPalette.Teal, Icon = "fas fa-recycle" }
     ];
 
     public async Task SetupDefaults(long userId, CancellationToken ct = default)

@@ -12,4 +12,7 @@ public record RoutineTimePeriodResponse : TextColorResponse
     public int Streak { get; init; }
     public int BestStreak { get; init; }
     public DateTime? LastResetAt { get; init; }
+    public int HistoryDepth { get; init; }
+    public DateTime NextResetAt { get; init; }
+    public List<PeriodCompletionRecord> CompletionHistory { get; init; } = [];
 }

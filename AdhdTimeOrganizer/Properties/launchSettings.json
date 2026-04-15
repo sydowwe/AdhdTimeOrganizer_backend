@@ -28,6 +28,22 @@
         "MAIL_FROM_EMAIL": "info@adhdTimeOrganizer.com"
 
       }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "launchUrl": "swagger",
+      "applicationUrl": "http://localhost:8081;http://0.0.0.0:8081",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "LOGGING_LEVEL": "Information",
+        "PAGE_URL": "http://localhost:3000",
+        "API_URL": "http://localhost:8081",
+        "MAIL_SMTP_SERVER": "smtp.gmail.com",
+        "MAIL_SMTP_PORT": "587",
+        "MAIL_FROM_EMAIL": "info@adhdTimeOrganizer.com"
+      }
     }
   }
 }

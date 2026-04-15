@@ -12,7 +12,7 @@ public static class RoutineResetService
     public static DateTime ComputeNextReset(RoutineTimePeriod period)
     {
         var lastReset = period.LastResetAt ?? period.CreatedTimestamp;
-        var earliest = lastReset.AddDays(period.LengthInDays).Date;
+        var earliest = DateTime.SpecifyKind(lastReset.AddDays(period.LengthInDays).Date, DateTimeKind.Utc);
 
         if (period.ResetAnchorDay == 0)
             return earliest;
@@ -28,19 +28,37 @@ public static class RoutineResetService
         }
         else
         {
-            // Day-of-month anchor: find next occurrence of that day on or after earliest
             var targetDay = period.ResetAnchorDay; // 1–28
-            var year = earliest.Year;
-            var month = earliest.Month;
+            int year, month;
 
-            if (earliest.Day > targetDay)
+            if (period.LengthInDays == 30)
             {
-                month++;
+                // Calendar-month aligned: next reset is targetDay of the next calendar month
+                month = lastReset.Month + 1;
+                year = lastReset.Year;
                 if (month > 12) { month = 1; year++; }
+            }
+            else if (period.LengthInDays == 365)
+            {
+                // Calendar-year aligned: next reset is targetDay of the same month next year
+                month = lastReset.Month;
+                year = lastReset.Year + 1;
+            }
+            else
+            {
+                // Day-of-month anchor: find next occurrence of that day on or after earliest
+                year = earliest.Year;
+                month = earliest.Month;
+
+                if (earliest.Day > targetDay)
+                {
+                    month++;
+                    if (month > 12) { month = 1; year++; }
+                }
             }
 
             var day = Math.Min(targetDay, DateTime.DaysInMonth(year, month));
-            return new DateTime(year, month, day);
+            return new DateTime(year, month, day, 2, 0, 0, DateTimeKind.Utc);
         }
     }
 
@@ -59,18 +77,40 @@ public static class RoutineResetService
     }
 
     /// <summary>
-    /// Resets items if the period has elapsed. Evaluates period streak before clearing.
-    /// Returns true if a reset occurred.
+    /// Resets a single item if the period has elapsed. Does not evaluate period streak.
+    /// Use when only one item is in context (e.g. step toggle). Returns true if a reset occurred.
     /// </summary>
-    public static bool TryReset(RoutineTimePeriod period, IList<RoutineTodoList> items, DateTime now)
+    public static bool TryReset(RoutineTimePeriod period, RoutineTodoList item, DateTime now)
     {
         var nextReset = ComputeNextReset(period);
         if (now < nextReset)
             return false;
 
+        var today = DateOnly.FromDateTime(now);
+        item.IsDone = false;
+        item.DoneCount = 0;
+        item.LastResetDate = today;
+        foreach (var step in item.Steps)
+            step.IsDone = false;
+
+        period.LastResetAt = nextReset;
+        return true;
+    }
+
+    /// <summary>
+    /// Resets items if the period has elapsed. Evaluates period streak before clearing.
+    /// Returns a <see cref="RoutinePeriodCompletion"/> record if a reset occurred, otherwise null.
+    /// </summary>
+    public static RoutinePeriodCompletion? TryReset(RoutineTimePeriod period, IList<RoutineTodoList> items, DateTime now)
+    {
+        var nextReset = ComputeNextReset(period);
+        if (now < nextReset)
+            return null;
+
+        var completedCount = 0;
         if (items.Count > 0)
         {
-            var completedCount = items.Count(i => i.IsDone);
+            completedCount = items.Count(i => i.IsDone);
             var completionPercent = (double)completedCount / items.Count * 100.0;
 
             if (completionPercent >= period.StreakThreshold)
@@ -97,10 +137,22 @@ public static class RoutineResetService
             item.IsDone = false;
             item.DoneCount = 0;
             item.LastResetDate = today;
+            foreach (var step in item.Steps)
+                step.IsDone = false;
         }
 
+        var periodEnd = DateOnly.FromDateTime(nextReset);
         period.LastResetAt = nextReset;
-        return true;
+
+        return new RoutinePeriodCompletion
+        {
+            TimePeriodId = period.Id,
+            PeriodStart = periodEnd.AddDays(-period.LengthInDays),
+            PeriodEnd = periodEnd,
+            CompletedCount = completedCount,
+            TotalCount = items.Count,
+            CreatedAt = now
+        };
     }
 
     /// <summary>

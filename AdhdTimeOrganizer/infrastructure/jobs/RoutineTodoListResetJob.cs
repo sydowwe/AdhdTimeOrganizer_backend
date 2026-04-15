@@ -22,13 +22,18 @@ public class RoutineTodoListResetJob(IServiceScopeFactory scopeFactory, ILogger<
 
         var now = DateTime.UtcNow;
         var totalReset = 0;
+        var completionRecords = new List<RoutinePeriodCompletion>();
 
         foreach (var period in periods)
         {
             var items = period.RoutineTodoListColl.ToList();
             RoutineResetService.CheckGrace(period, now);
-            if (RoutineResetService.TryReset(period, items, now))
+            var completion = RoutineResetService.TryReset(period, items, now);
+            if (completion != null)
+            {
+                completionRecords.Add(completion);
                 totalReset += items.Count;
+            }
         }
 
         if (totalReset == 0)
@@ -37,6 +42,7 @@ public class RoutineTodoListResetJob(IServiceScopeFactory scopeFactory, ILogger<
             return;
         }
 
+        dbContext.Set<RoutinePeriodCompletion>().AddRange(completionRecords);
         await dbContext.SaveChangesAsync(context.CancellationToken);
         logger.LogInformation("Reset {Count} routine todo list items", totalReset);
     }

@@ -214,11 +214,9 @@ public class ApplyTemplatePlannerTaskEndpoint(
             ImportanceId = original.ImportanceId,
             ActivityId = original.ActivityId,
             CalendarId = original.CalendarId,
-            IsDone = original.IsDone,
             Status = original.Status,
-            IsFromTemplate = original.IsFromTemplate,
             SourceTemplateTaskId = original.SourceTemplateTaskId,
-            TodolistId = original.TodolistId,
+            TodolistItemId = original.TodolistItemId,
             UserId = original.UserId
         };
     }

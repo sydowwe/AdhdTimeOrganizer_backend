@@ -42,26 +42,62 @@ public class GetAllGroupedRoutineTodoListEndpoint(
             .Include(tp => tp.RoutineTodoListColl)
                 .ThenInclude(rtl => rtl.Activity)
                 .ThenInclude(a => a.Category)
+            .Include(tp => tp.RoutineTodoListColl)
+                .ThenInclude(rtl => rtl.Steps)
             .ToListAsync(ct);
 
         var changed = false;
+        var newCompletions = new List<RoutinePeriodCompletion>();
         foreach (var period in periods)
         {
             var items = period.RoutineTodoListColl.ToList();
             changed |= RoutineResetService.CheckGrace(period, now);
-            changed |= RoutineResetService.TryReset(period, items, now);
+            var completion = RoutineResetService.TryReset(period, items, now);
+            if (completion != null)
+            {
+                changed = true;
+                newCompletions.Add(completion);
+            }
         }
 
         if (changed)
+        {
+            dbContext.Set<RoutinePeriodCompletion>().AddRange(newCompletions);
             await dbContext.SaveChangesAsync(ct);
+        }
+
+        var periodIds = periods.Select(p => p.Id).ToList();
+        var completions = await dbContext.RoutinePeriodCompletions
+            .Where(c => periodIds.Contains(c.TimePeriodId))
+            .OrderBy(c => c.TimePeriodId)
+            .ThenByDescending(c => c.PeriodStart)
+            .ToListAsync(ct);
+
+        var completionsByPeriod = completions
+            .GroupBy(c => c.TimePeriodId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var depth = periods.First(p => p.Id == g.Key).HistoryDepth;
+                    return g.Take(depth)
+                        .Reverse()
+                        .Select(c => new PeriodCompletionRecord(c.PeriodStart, c.PeriodEnd, c.CompletedCount, c.TotalCount))
+                        .ToList();
+                }
+            );
 
         var data = periods
             .Select(tp => new RoutineTodoListGroupedResponse
             {
-                RoutineTimePeriod = routineTimePeriodMapper.ToResponse(tp),
+                RoutineTimePeriod = routineTimePeriodMapper.ToResponse(tp) with
+                {
+                    NextResetAt = RoutineResetService.ComputeNextReset(tp),
+                    CompletionHistory = completionsByPeriod.GetValueOrDefault(tp.Id, [])
+                },
                 Items = tp.RoutineTodoListColl
                     .OrderBy(e => e.IsDone).ThenBy(e => e.DisplayOrder)
-                    .Select(rtd => mapper.ToResponse(rtd))
+                    .Select(mapper.ToResponse)
                     .ToList()
             })
             .ToList();

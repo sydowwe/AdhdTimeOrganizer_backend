@@ -1,5 +1,6 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
+using AdhdTimeOrganizer.infrastructure.persistence.converter;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -12,6 +13,9 @@ public class RoutineTodoListConfiguration : IEntityTypeConfiguration<RoutineTodo
         builder.BaseEntityConfigure();
 
         builder.BaseTodoListConfigure();
+
+        builder.Property(r => r.SuggestedTime)
+            .HasConversion(new MyIntTimeConverter());
 
         builder.ToTable(t => t.HasCheckConstraint(
             "CK_RoutineTodoList_Streak_NonNegative",

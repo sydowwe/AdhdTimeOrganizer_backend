@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,25 +17,25 @@ public class TaskImportanceSeeder(
     [
         new() { UserId = userId,
             Text = "Critical",
-            Color = "#FF5252", // Red
+            Color = ColorPalette.Red,
             Icon = "fas fa-exclamation-triangle",
             Importance = 999
         },
         new() { UserId = userId,
             Text = "High",
-            Color = "#FFA726", // Orange
+            Color = ColorPalette.Orange,
             Icon = "fas fa-star",
             Importance = 888
         },
         new() { UserId = userId,
             Text = "Normal",
-            Color = "#4287f5", // Blue
+            Color = ColorPalette.Blue,
             Icon = "fas fa-bell",
             Importance = 777
         },
         new() { UserId = userId,
             Text = "Optional",
-            Color = "#666", // Gray
+            Color = ColorPalette.Zinc,
             Icon = "fas fa-question-circle",
             Importance = 666
         }

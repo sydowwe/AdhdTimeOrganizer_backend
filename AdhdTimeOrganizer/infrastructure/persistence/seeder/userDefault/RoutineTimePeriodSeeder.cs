@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,10 +15,10 @@ public class RoutineTimePeriodSeeder(
 
     private static List<RoutineTimePeriod> Defaults(long userId) =>
     [
-        new() { UserId = userId, Text = "Daily", Color = "#92F58C", LengthInDays = 1 }, // Green
-        new() { UserId = userId, Text = "Weekly", Color = "#936AF1", LengthInDays = 7 }, // Purple
-        new() { UserId = userId, Text = "Monthly", Color = "#2C7EF4", LengthInDays = 30 }, // Blue
-        new() { UserId = userId, Text = "Yearly", Color = "#A5CCF3", LengthInDays = 365 } // Light Blue
+        new() { UserId = userId, Text = "Daily", Color = ColorPalette.Lime, LengthInDays = 1, StreakThreshold = 100, StreakGraceDays = 0, ResetAnchorDay = 0 },
+        new() { UserId = userId, Text = "Weekly", Color = ColorPalette.Violet, LengthInDays = 7, StreakThreshold = 90, StreakGraceDays = 0, ResetAnchorDay = 1 },
+        new() { UserId = userId, Text = "Monthly", Color = ColorPalette.Blue, LengthInDays = 30, StreakThreshold = 80, StreakGraceDays = 3, ResetAnchorDay = 1 },
+        new() { UserId = userId, Text = "Yearly", Color = ColorPalette.Sky, LengthInDays = 365, StreakThreshold = 80, StreakGraceDays = 10, ResetAnchorDay = 1 }
     ];
 
     public async Task SetupDefaults(long userId, CancellationToken ct = default)
@@ -61,6 +62,9 @@ public class RoutineTimePeriodSeeder(
             existing[i].Text = defaults[i].Text;
             existing[i].Color = defaults[i].Color;
             existing[i].LengthInDays = defaults[i].LengthInDays;
+            existing[i].ResetAnchorDay = defaults[i].ResetAnchorDay;
+            existing[i].StreakThreshold = defaults[i].StreakThreshold;
+            existing[i].StreakGraceDays = defaults[i].StreakGraceDays;
         }
 
         dbContext.RoutineTimePeriods.UpdateRange(existing);

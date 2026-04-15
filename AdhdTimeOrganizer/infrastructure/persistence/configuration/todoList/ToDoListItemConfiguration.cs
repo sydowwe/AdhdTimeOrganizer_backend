@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
+using AdhdTimeOrganizer.infrastructure.persistence.converter;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -12,6 +13,9 @@ public class TodoListItemConfiguration : IEntityTypeConfiguration<TodoListItem>
         builder.BaseEntityConfigure();
 
         builder.BaseTodoListConfigure();
+
+        builder.Property(t => t.SuggestedTime)
+            .HasConversion(new MyIntTimeConverter());
 
         builder.IsManyWithOneUser(u => u.TodoListItemColl);
         builder.IsManyWithOneActivity(a => a.TodoListItems);
