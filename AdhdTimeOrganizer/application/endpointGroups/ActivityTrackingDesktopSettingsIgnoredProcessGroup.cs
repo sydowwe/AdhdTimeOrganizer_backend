@@ -22,3 +22,8 @@ public class ActivityTrackingAndroidGroup : Group
 {
     public ActivityTrackingAndroidGroup() => Configure("/activity-tracking/android", ep => ep.Description(x => x.AutoTagOverride("ActivityTracking/Android")));
 }
+
+public class ActivityTrackingAndroidSettingsGroup : Group
+{
+    public ActivityTrackingAndroidSettingsGroup() => Configure("/activity-tracking/android/settings", ep => ep.Description(x => x.AutoTagOverride("ActivityTracking/Android/Settings")));
+}

@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.entity.@base;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
@@ -24,6 +25,7 @@ public class Activity : BaseNameTextEntity
     public virtual ICollection<PlannerTask> PlannerTaskList { get; set; } = new List<PlannerTask>();
 
     public TrackerDesktopMappingByPattern? TrackerDesktopMappingByPattern { get; set; }
+    public TrackerAndroidMappingByPattern? TrackerAndroidMappingByPattern { get; set; }
 
     public Activity Clone()
     {

@@ -16,8 +16,8 @@ public class TaskPrioritySeeder(
     private static List<TaskPriority> Defaults(long userId) =>
     [
         new() { UserId = userId, Text = "Today", Color = ColorPalette.Red, Priority = 1 },
-        new() { UserId = userId, Text = "This week", Color = ColorPalette.Orange, Priority = 2 },
-        new() { UserId = userId, Text = "This month", Color = ColorPalette.Yellow, Priority = 3 },
+        new() { UserId = userId, Text = "This week", Color = ColorPalette.Yellow, Priority = 2 },
+        new() { UserId = userId, Text = "This month", Color = ColorPalette.Blue, Priority = 3 },
         new() { UserId = userId, Text = "This year", Color = ColorPalette.Emerald, Priority = 4 }
     ];
 

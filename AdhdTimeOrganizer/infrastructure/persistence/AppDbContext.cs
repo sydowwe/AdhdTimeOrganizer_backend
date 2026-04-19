@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.entity.timer;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
@@ -42,6 +43,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<DesktopActivityEntry> DesktopActivityEntries { get; set; }
     public DbSet<AndroidSessionData> AndroidSessionDataEntries { get; set; }
     public DbSet<TrackerDesktopMappingByPattern> TrackerDesktopMappingByPattern { get; set; }
+    public DbSet<TrackerAndroidMappingByPattern> TrackerAndroidMappingByPattern { get; set; }
     public DbSet<TimerPreset> TimerPresets { get; set; }
     public DbSet<PomodoroTimerPreset> PomodoroTimerPresets { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
