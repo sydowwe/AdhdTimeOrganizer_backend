@@ -2,16 +2,16 @@ using System.Text.Json.Serialization;
 
 namespace AdhdTimeOrganizer.domain.helper;
 
-public record MyIntTime
+public record IntTime
 {
     [JsonConstructor]
-    public MyIntTime(int hours, int minutes)
+    public IntTime(int hours, int minutes)
     {
         Hours = hours;
         Minutes = minutes;
     }
 
-    public MyIntTime(int seconds)
+    public IntTime(int seconds)
     {
         Hours = seconds / 3600;
         Minutes = seconds % 3600 / 60;
@@ -23,37 +23,37 @@ public record MyIntTime
     public int TotalSeconds => Hours * 3600 + Minutes * 60 ;
 
     // Addition operator
-    public static MyIntTime operator +(MyIntTime left, MyIntTime right)
+    public static IntTime operator +(IntTime left, IntTime right)
     {
-        return new MyIntTime(left.TotalSeconds + right.TotalSeconds);
+        return new IntTime(left.TotalSeconds + right.TotalSeconds);
     }
     
     // Subtraction operator
-    public static MyIntTime operator -(MyIntTime left, MyIntTime right)
+    public static IntTime operator -(IntTime left, IntTime right)
     {
-        return new MyIntTime(left.TotalSeconds - right.TotalSeconds);
+        return new IntTime(left.TotalSeconds - right.TotalSeconds);
     }
     
     // Greater than operator
-    public static bool operator >(MyIntTime left, MyIntTime right)
+    public static bool operator >(IntTime left, IntTime right)
     {
         return left.TotalSeconds > right.TotalSeconds;
     }
     
     // Less than operator
-    public static bool operator <(MyIntTime left, MyIntTime right)
+    public static bool operator <(IntTime left, IntTime right)
     {
         return left.TotalSeconds < right.TotalSeconds;
     }
     
     // Greater than or equal operator
-    public static bool operator >=(MyIntTime left, MyIntTime right)
+    public static bool operator >=(IntTime left, IntTime right)
     {
         return left.TotalSeconds >= right.TotalSeconds;
     }
     
     // Less than or equal operator
-    public static bool operator <=(MyIntTime left, MyIntTime right)
+    public static bool operator <=(IntTime left, IntTime right)
     {
         return left.TotalSeconds <= right.TotalSeconds;
     }
@@ -61,10 +61,10 @@ public record MyIntTime
 
 public static class MyIntTimeExtensions
 {
-    public static MyIntTime ToMyIntTime(this TimeSpan timeSpan)
+    public static IntTime ToMyIntTime(this TimeSpan timeSpan)
     {
-        return new MyIntTime(timeSpan.Hours, timeSpan.Minutes);
+        return new IntTime(timeSpan.Hours, timeSpan.Minutes);
     }
 
-    public static bool IsNullOrZero(this MyIntTime? time) => time is null || time.TotalSeconds == 0;
+    public static bool IsNullOrZero(this IntTime? time) => time is null || time.TotalSeconds == 0;
 }

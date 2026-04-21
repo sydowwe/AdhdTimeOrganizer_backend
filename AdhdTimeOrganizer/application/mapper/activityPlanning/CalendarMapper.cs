@@ -10,10 +10,9 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
 
 [Mapper]
-public partial class CalendarMapper : IBaseReadMapper<Calendar, CalendarResponse>, IBaseUpdateMapper<Calendar,CalendarRequest>
+public partial class CalendarMapper : IBaseResponseMapper<Calendar, CalendarResponse>, IBaseUpdateMapper<Calendar,CalendarRequest>
 {
     public partial CalendarResponse ToResponse(Calendar entity);
-    public partial SelectOptionResponse ToSelectOptionResponse(Calendar entity);
     public partial void UpdateEntity(CalendarRequest request, Calendar entity);
 
     public IQueryable<CalendarResponse> ProjectToResponse(IQueryable<Calendar> source) =>

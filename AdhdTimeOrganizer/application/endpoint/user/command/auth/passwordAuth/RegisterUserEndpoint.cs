@@ -35,7 +35,7 @@ public class RegisterUserEndpoint(
         if (recaptchaResult.Failed)
         {
             AddError("Recaptcha failed.");
-            await SendErrorsAsync(403, ct);
+            await Send.ErrorsAsync(403, ct);
             return;
         }
 
@@ -43,7 +43,7 @@ public class RegisterUserEndpoint(
         if (existing is not null)
         {
             AddError("User already exists with this email.");
-            await SendErrorsAsync(409, ct);
+            await Send.ErrorsAsync(409, ct);
             return;
         }
 
@@ -58,14 +58,14 @@ public class RegisterUserEndpoint(
                 ? $"User already exists with EMAIL: {newUser.Email}"
                 : "Failed to register user: " + string.Join(", ", identityResult.Errors.Select(e => e.Description));
             AddError(msg);
-            await SendErrorsAsync(duplicate ? 409 : 400, ct);
+            await Send.ErrorsAsync(duplicate ? 409 : 400, ct);
             return;
         }
         identityResult = await userManager.AddToRoleAsync(newUser, "User");
         if (!identityResult.Succeeded)
         {
             AddError("Failed to add user to role: " + string.Join(", ", identityResult.Errors.Select(e => e.Description)));
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
             return;
         }
         try
@@ -75,7 +75,7 @@ public class RegisterUserEndpoint(
             if (twoFaResult.Failed)
             {
                 AddError(twoFaResult.ErrorMessage!);
-                await SendErrorsAsync(500, ct);
+                await Send.ErrorsAsync(500, ct);
                 return;
             }
 
@@ -83,18 +83,18 @@ public class RegisterUserEndpoint(
             if (setDefaultsResult.Failed)
             {
                 AddError(setDefaultsResult.ErrorMessage!);
-                await SendErrorsAsync(500, ct);
+                await Send.ErrorsAsync(500, ct);
                 return;
             }
 
             await tx.CommitAsync(ct);
-            await SendOkAsync(twoFaResult.Data, ct);
+            await Send.OkAsync(twoFaResult.Data, ct);
         }
         catch (Exception ex)
         {
             await tx.RollbackAsync(ct);
             AddError(ex.Message);
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
         }
     }
 

@@ -61,7 +61,7 @@ public class FetchTableDistinctDesktopEntry(AppDbContext dbContext)
 
             var items = await distinctQuery.SortByManyAndPaginate(req.SortBy, req.ItemsPerPage, req.Page).ToListAsync(ct);
 
-            await SendOkAsync(new BaseTableResponse<TrackerDesktopDistinctEntriesResponse>
+            await Send.OkAsync(new BaseTableResponse<TrackerDesktopDistinctEntriesResponse>
             {
                 Items = items,
                 ItemsCount = itemsCount,
@@ -71,7 +71,7 @@ public class FetchTableDistinctDesktopEntry(AppDbContext dbContext)
         catch (Exception ex)
         {
             AddError($"An error occurred while retrieving filtered data: {ex.Message}");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
         }
     }
 

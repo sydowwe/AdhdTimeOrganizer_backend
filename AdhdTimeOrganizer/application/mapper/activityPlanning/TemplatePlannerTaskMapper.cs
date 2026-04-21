@@ -12,7 +12,6 @@ namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
 public partial class TemplatePlannerTaskMapper : IBaseCrudMapper<TemplatePlannerTask, TemplatePlannerTaskRequest, TemplatePlannerTaskRequest, TemplatePlannerTaskResponse>
 {
     public partial TemplatePlannerTaskResponse ToResponse(TemplatePlannerTask entity);
-    public partial SelectOptionResponse ToSelectOptionResponse(TemplatePlannerTask entity);
 
     public partial void UpdateEntity(TemplatePlannerTaskRequest request, TemplatePlannerTask entity);
 

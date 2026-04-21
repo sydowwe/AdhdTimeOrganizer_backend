@@ -7,6 +7,8 @@ namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.steps;
 public class CreateStepRoutineTodoListEndpoint(AppDbContext dbContext)
     : BaseCreateStepEndpoint<RoutineTodoList>(dbContext)
 {
+    private readonly AppDbContext _dbContext = dbContext;
+
     protected override IQueryable<RoutineTodoList> GetParentQuery(long itemId, long userId) =>
-        dbContext.Set<RoutineTodoList>().Where(e => e.Id == itemId && e.UserId == userId);
+        _dbContext.Set<RoutineTodoList>().Where(e => e.Id == itemId && e.UserId == userId);
 }

@@ -12,6 +12,8 @@ public class PlannerTask : BasePlannerTask
     public string? SkipReason { get; set; }
     public long? SourceTemplateTaskId { get; set; } // Track which template task this came from
 
+    public string? GoogleEventId { get; set; }
+
     public required long CalendarId { get; set; }
     public long? TodolistItemId { get; set; }
 

@@ -102,6 +102,6 @@ public class GetAllGroupedRoutineTodoListEndpoint(
             })
             .ToList();
 
-        await SendOkAsync(data, ct);
+        await Send.OkAsync(data, ct);
     }
 }

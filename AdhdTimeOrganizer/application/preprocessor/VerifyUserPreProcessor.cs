@@ -27,7 +27,7 @@ public class VerifyUserPreProcessor<TRequest> : IPreProcessor<TRequest>
             return;
         }
 
-        var req = context.Request;
+        var req = context.Request!;
 
         // Verify password
         var isPasswordValid = await userManager.CheckPasswordAsync(user, req.Password);

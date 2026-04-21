@@ -68,7 +68,7 @@ public class AndroidSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCard
             };
         }).ToList();
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private static (DateTime from, DateTime to, int days) CalculateBaselineRange(

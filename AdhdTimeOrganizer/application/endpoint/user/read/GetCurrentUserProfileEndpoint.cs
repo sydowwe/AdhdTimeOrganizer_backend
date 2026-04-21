@@ -23,11 +23,11 @@ public class GetCurrentUserEndpoint(UserManager<User> userManager, UserMapper ma
         var user = await userManager.GetUserAsync(User);
         if (user is null)
         {
-            await SendUnauthorizedAsync(ct);
+            await Send.UnauthorizedAsync(ct);
             return;
         }
 
         var response = mapper.ToResponse(user);
-        await SendOkAsync(response, ct);
+        await Send.OkAsync(response, ct);
     }
 }

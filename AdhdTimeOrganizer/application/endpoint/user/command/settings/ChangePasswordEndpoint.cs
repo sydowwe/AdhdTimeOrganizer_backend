@@ -27,7 +27,7 @@ public class ChangePasswordEndpoint(
         var user = await userManager.GetUserAsync(User);
         if (user is null)
         {
-            await SendUnauthorizedAsync(ct);
+            await Send.UnauthorizedAsync(ct);
             return;
         }
 
@@ -36,7 +36,7 @@ public class ChangePasswordEndpoint(
         if (twoFactorResult.Failed)
         {
             AddError("Invalid two-factor authentication token");
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 
@@ -57,7 +57,7 @@ public class ChangePasswordEndpoint(
                     AddError(error.Description);
                 }
             }
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -68,6 +68,6 @@ public class ChangePasswordEndpoint(
         // Sign out from current session
         await signInManager.SignOutAsync();
 
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

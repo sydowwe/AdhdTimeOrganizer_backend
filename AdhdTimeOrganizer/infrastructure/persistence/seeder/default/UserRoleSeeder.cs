@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
 
-public class UserRoleSeeder(RoleManager<UserRole> roleManager, AppDbContext dbContext, ILogger<UserRoleSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
+public class UserRoleSeeder(RoleManager<UserRole> roleManager, ILogger<UserRoleSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
 {
     public string SeederName => "UserRole";
     public int Order => 4;
@@ -45,7 +45,7 @@ public class UserRoleSeeder(RoleManager<UserRole> roleManager, AppDbContext dbCo
         {
             try
             {
-                var existingRole = await roleManager.FindByNameAsync(role.Name);
+                var existingRole = await roleManager.FindByNameAsync(role.Name!);
                     
                 if (existingRole != null)
                 {
@@ -69,7 +69,7 @@ public class UserRoleSeeder(RoleManager<UserRole> roleManager, AppDbContext dbCo
                 var result = await roleManager.CreateAsync(role);
                 if (result.Succeeded)
                 {
-                    await roleManager.AddClaimAsync(role, new Claim(ClaimTypes.Role, role.Name));
+                    await roleManager.AddClaimAsync(role, new Claim(ClaimTypes.Role, role.Name!));
                     logger.LogInformation($"Role '{role.Name}' created.");
                 }
             }

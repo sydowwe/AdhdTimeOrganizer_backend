@@ -19,14 +19,14 @@ public class ConfirmEmailEndpoint(UserManager<User> userManager) : EndpointWitho
 
         if (userId <= 0 || string.IsNullOrEmpty(token))
         {
-            await SendAsync("UserId and token must be supplied", 400, ct);
+            await Send.ResponseAsync("UserId and token must be supplied", 400, ct);
             return;
         }
 
         var user = await userManager.FindByIdAsync(userId.ToString());
         if (user == null)
         {
-            await SendAsync("User not found", 404, ct);
+            await Send.ResponseAsync("User not found", 404, ct);
             return;
         }
 
@@ -34,12 +34,12 @@ public class ConfirmEmailEndpoint(UserManager<User> userManager) : EndpointWitho
 
         if (result.Succeeded)
         {
-            await SendOkAsync("Email confirmed successfully", ct);
+            await Send.OkAsync("Email confirmed successfully", ct);
         }
         else
         {
             var errorMessages = string.Join(", ", result.Errors.Select(e => e.Description));
-            await SendAsync($"Failed to confirm email: {errorMessages}", 422, ct);
+            await Send.ResponseAsync($"Failed to confirm email: {errorMessages}", 422, ct);
         }
     }
 }

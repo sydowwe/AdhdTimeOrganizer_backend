@@ -39,7 +39,7 @@ public abstract class BaseBatchDeleteEndpoint<TEntity>(AppDbContext dbContext) :
                 var entity = await dbContext.Set<TEntity>().FindAsync([idRequest], ct);
                 if (entity == null)
                 {
-                    await SendNotFoundAsync(ct);
+                    await Send.NotFoundAsync(ct);
                     return;
                 }
                 entities.Add(entity);
@@ -48,13 +48,13 @@ public abstract class BaseBatchDeleteEndpoint<TEntity>(AppDbContext dbContext) :
             dbContext.Set<TEntity>().RemoveRange(entities);
             await dbContext.SaveChangesAsync(ct);
 
-            await SendNoContentAsync(ct);
+            await Send.NoContentAsync(ct);
         }
         catch (Exception ex)
         {
             var result = DbUtils.HandleException(ex, nameof(HandleAsync));
             AddError(result.ErrorMessage!);
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
         }
     }
 }

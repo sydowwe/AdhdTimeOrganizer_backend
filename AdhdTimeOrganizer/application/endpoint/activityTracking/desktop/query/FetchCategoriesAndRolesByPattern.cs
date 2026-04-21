@@ -66,7 +66,7 @@ public class FetchCategoriesAndRolesByPattern(AppDbContext dbContext)
                 .DistinctBy(e => e.Id)
                 .ToList();
 
-            await SendOkAsync(new DesktopCategoriesAndRolesByPattern
+            await Send.OkAsync(new DesktopCategoriesAndRolesByPattern
             {
                 Categories = categories,
                 Roles = roles
@@ -75,7 +75,7 @@ public class FetchCategoriesAndRolesByPattern(AppDbContext dbContext)
         catch (Exception ex)
         {
             AddError($"An error occurred while retrieving filtered data: {ex.Message}");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
         }
     }
 

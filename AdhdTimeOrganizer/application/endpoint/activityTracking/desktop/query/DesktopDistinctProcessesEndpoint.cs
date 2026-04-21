@@ -30,6 +30,6 @@ public class DesktopDistinctProcessesEndpoint(AppDbContext db) : EndpointWithout
             .OrderBy(x => x.Title)
             .ToListAsync(ct);
 
-        await SendAsync(result, cancellation: ct);
+        await Send.ResponseAsync(result, cancellation: ct);
     }
 }

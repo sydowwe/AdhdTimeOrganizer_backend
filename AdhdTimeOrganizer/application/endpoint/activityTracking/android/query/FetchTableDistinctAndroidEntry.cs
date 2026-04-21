@@ -59,7 +59,7 @@ public class FetchTableDistinctAndroidEntry(AppDbContext dbContext)
 
             var items = await distinctQuery.SortByManyAndPaginate(req.SortBy, req.ItemsPerPage, req.Page).ToListAsync(ct);
 
-            await SendOkAsync(new BaseTableResponse<AndroidDistinctEntriesResponse>
+            await Send.OkAsync(new BaseTableResponse<AndroidDistinctEntriesResponse>
             {
                 Items = items,
                 ItemsCount = itemsCount,
@@ -69,7 +69,7 @@ public class FetchTableDistinctAndroidEntry(AppDbContext dbContext)
         catch (Exception ex)
         {
             AddError($"An error occurred while retrieving filtered data: {ex.Message}");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
         }
     }
 

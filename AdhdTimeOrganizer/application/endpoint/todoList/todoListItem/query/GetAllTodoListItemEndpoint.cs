@@ -41,6 +41,6 @@ public class GetAllTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapp
             .OrderBy(td => td.DisplayOrder);
 
         var items = await mapper.ProjectToResponse(query).ToListAsync(ct);
-        await SendOkAsync(items, ct);
+        await Send.OkAsync(items, ct);
     }
 }

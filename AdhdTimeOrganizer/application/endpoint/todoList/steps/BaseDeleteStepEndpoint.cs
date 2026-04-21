@@ -36,12 +36,12 @@ public abstract class BaseDeleteStepEndpoint<TParent>(AppDbContext dbContext)
         var step = parent?.Steps.FirstOrDefault(s => s.Id == req.StepId);
         if (step is null)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
         parent!.Steps.Remove(step);
         await dbContext.SaveChangesAsync(ct);
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

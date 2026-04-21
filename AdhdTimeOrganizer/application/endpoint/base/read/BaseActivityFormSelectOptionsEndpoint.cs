@@ -67,7 +67,7 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(AppDbContex
             })
             .ToList();
 
-        await SendOkAsync(options, ct);
+        await Send.OkAsync(options, ct);
     }
 
     protected abstract IQueryable<Activity> GetBaseQuery(long userId);

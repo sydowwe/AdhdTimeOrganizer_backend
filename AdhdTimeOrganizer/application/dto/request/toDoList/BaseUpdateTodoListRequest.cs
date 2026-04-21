@@ -10,6 +10,6 @@ public record BaseUpdateTodoListRequest : WithIsDoneRequest
     public int? DoneCount { get; set; }
     public int? TotalCount { get; set; }
     public string? Note { get; set; }
-    public MyIntTime? SuggestedTime { get; set; }
+    public IntTime? SuggestedTime { get; set; }
     public List<TodoListStepRequest>? Steps { get; init; }
 }

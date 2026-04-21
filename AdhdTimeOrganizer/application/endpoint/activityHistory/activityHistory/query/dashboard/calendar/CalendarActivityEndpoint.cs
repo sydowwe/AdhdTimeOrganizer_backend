@@ -72,6 +72,6 @@ public class CalendarActivityEndpoint(AppDbContext db) : Endpoint<CalendarActivi
             };
         }).OrderBy(s => s.Date).ToList();
 
-        await SendAsync(result, cancellation: ct);
+        await Send.ResponseAsync(result, cancellation: ct);
     }
 }

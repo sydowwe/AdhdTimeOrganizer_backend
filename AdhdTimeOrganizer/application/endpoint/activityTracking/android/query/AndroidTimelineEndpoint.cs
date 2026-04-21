@@ -53,6 +53,6 @@ public class AndroidTimelineEndpoint(AppDbContext db) : Endpoint<AndroidTimeline
         foreach (var session in sessions)
             session.Id = id++;
 
-        await SendAsync(new AndroidTimelineResponse { Sessions = sessions }, cancellation: ct);
+        await Send.ResponseAsync(new AndroidTimelineResponse { Sessions = sessions }, cancellation: ct);
     }
 }

@@ -18,7 +18,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("public")
-                .HasAnnotation("ProductVersion", "10.0.5")
+                .HasAnnotation("ProductVersion", "10.0.6")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -477,6 +477,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Property<TimeOnly>("EndTime")
                         .HasColumnType("time without time zone")
                         .HasColumnName("end_time");
+
+                    b.Property<string>("GoogleEventId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("google_event_id");
 
                     b.Property<long>("ImportanceId")
                         .HasColumnType("bigint")
@@ -2093,6 +2098,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean")
                         .HasColumnName("email_confirmed");
+
+                    b.Property<string>("GoogleCalendarRefreshToken")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("google_calendar_refresh_token");
 
                     b.Property<string>("GoogleOAuthUserId")
                         .HasMaxLength(50)

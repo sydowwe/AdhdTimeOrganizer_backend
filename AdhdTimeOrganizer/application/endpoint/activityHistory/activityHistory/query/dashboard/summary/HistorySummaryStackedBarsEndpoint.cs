@@ -66,7 +66,7 @@ public class HistorySummaryStackedBarsEndpoint(AppDbContext db) : Endpoint<Histo
             }).ToList()
         };
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private static List<(DateTime Start, DateTime End)> GenerateFixedWindows(

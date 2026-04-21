@@ -36,7 +36,7 @@ public abstract class BaseUpdateStepEndpoint<TParent>(AppDbContext dbContext)
         var step = parent?.Steps.FirstOrDefault(s => s.Id == req.StepId);
         if (step is null)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
@@ -45,6 +45,6 @@ public abstract class BaseUpdateStepEndpoint<TParent>(AppDbContext dbContext)
         step.Note = req.Note;
 
         await dbContext.SaveChangesAsync(ct);
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

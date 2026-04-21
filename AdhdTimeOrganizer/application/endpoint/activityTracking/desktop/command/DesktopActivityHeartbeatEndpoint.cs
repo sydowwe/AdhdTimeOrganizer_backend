@@ -75,7 +75,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
                 if (existing != null)
                 {
                     existing.EndTimestamp = windowEnd;
-                    existing.Length = new MyIntTime(existing.Length.TotalSeconds + entry.ActiveSeconds);
+                    existing.Length = new IntTime(existing.Length.TotalSeconds + entry.ActiveSeconds);
                 }
                 else
                 {
@@ -85,7 +85,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
                         ActivityId = activityId,
                         StartTimestamp = req.WindowStart,
                         EndTimestamp = windowEnd,
-                        Length = new MyIntTime(entry.ActiveSeconds),
+                        Length = new IntTime(entry.ActiveSeconds),
                     });
                 }
             }
@@ -95,7 +95,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
 
         await AutomateActivityStatusAsync(userId, req.WindowStart, activitySecondsInBatch, ct);
 
-        await SendAsync(processedCount, StatusCodes.Status201Created, ct);
+        await Send.ResponseAsync(processedCount, StatusCodes.Status201Created, ct);
     }
 
     private async Task AutomateActivityStatusAsync(long userId, DateTime windowStart, Dictionary<long, int> activitySecondsInBatch, CancellationToken ct)

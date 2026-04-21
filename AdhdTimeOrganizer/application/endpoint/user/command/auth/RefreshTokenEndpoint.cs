@@ -19,7 +19,7 @@ public class RefreshTokenEndpoint(IJwtService jwtService) : EndpointWithoutReque
         if (string.IsNullOrEmpty(refreshToken))
         {
             AddError("Refresh token not provided");
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 
@@ -30,12 +30,12 @@ public class RefreshTokenEndpoint(IJwtService jwtService) : EndpointWithoutReque
 
             jwtService.SetTokenCookies(HttpContext, accessToken, newRefreshToken, isStayLoggedIn);
 
-            await SendNoContentAsync(ct);
+            await Send.NoContentAsync(ct);
         }
         catch (UnauthorizedAccessException ex)
         {
             AddError(ex.Message);
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
         }
     }
 }

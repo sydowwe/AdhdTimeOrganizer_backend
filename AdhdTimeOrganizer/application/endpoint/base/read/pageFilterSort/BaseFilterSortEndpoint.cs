@@ -19,7 +19,7 @@ public abstract class BaseFilterSortEndpoint<TEntity, TResponse, TFilter, TMappe
     where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
     where TFilter : class, IFilterRequest
-    where TMapper : class, IBaseReadMapper<TEntity, TResponse>
+    where TMapper : class, IBaseResponseMapper<TEntity, TResponse>
 {
     public virtual string EndpointPath => "filter-sort";
 
@@ -65,12 +65,12 @@ public abstract class BaseFilterSortEndpoint<TEntity, TResponse, TFilter, TMappe
 
             var response = await mapper.ProjectToResponse(query.SortByMany(sortBy)).ToListAsync(ct);
 
-            await SendOkAsync(response, ct);
+            await Send.OkAsync(response, ct);
         }
         catch (Exception ex)
         {
             AddError($"An error occurred while retrieving filtered data: {ex.Message}");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
         }
     }
 

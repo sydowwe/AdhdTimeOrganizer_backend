@@ -33,7 +33,7 @@ public class PatchPlannerTaskStatusEndpoint(AppDbContext dbContext) : Endpoint<P
 
         if (entity is null)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
@@ -68,6 +68,6 @@ public class PatchPlannerTaskStatusEndpoint(AppDbContext dbContext) : Endpoint<P
                 .PublishAsync(Mode.WaitForAll, ct);
         }
 
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

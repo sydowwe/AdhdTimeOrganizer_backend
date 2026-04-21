@@ -48,7 +48,7 @@ public abstract class BaseWithoutUserGetAllEndpoint<TEntity, TResponse, TMapper>
         var entities = await query.ToListAsync(ct);
         var responses = entities.Select(MapToResponse).ToList();
 
-        await SendOkAsync(responses, ct);
+        await Send.OkAsync(responses, ct);
     }
 
     protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;

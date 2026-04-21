@@ -8,8 +8,8 @@ public class ActivityHistoryFilterRequest : IFilterRequest
     public long? ActivityId { get; set; }
     public long? RoleId { get; set; }
     public long? CategoryId { get; set; }
-    public MyIntTime? MinLength { get; set; }
-    public MyIntTime? MaxLength { get; set; }
+    public IntTime? MinLength { get; set; }
+    public IntTime? MaxLength { get; set; }
     public long? UserId { get; set; }
     public int? HoursBack { get; set; }
     public DateTime? DateFrom { get; set; }

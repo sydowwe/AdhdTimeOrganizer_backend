@@ -15,7 +15,7 @@ public abstract class BaseWithoutUserPaginatedEndpoint<TEntity, TResponse, TMapp
     TMapper mapper) : Endpoint<SortPaginateRequest, BaseTableResponse<TResponse>>
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse
-    where TMapper : class, IBaseReadMapper<TEntity, TResponse>
+    where TMapper : class, IBaseResponseMapper<TEntity, TResponse>
 {
 
     public virtual string[] AllowedRoles()
@@ -51,12 +51,12 @@ public abstract class BaseWithoutUserPaginatedEndpoint<TEntity, TResponse, TMapp
                 mapper,
                 ct);
 
-            await SendOkAsync(response, ct);
+            await Send.OkAsync(response, ct);
         }
         catch (Exception ex)
         {
             AddError($"An error occurred while retrieving data: {ex.Message}");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
         }
     }
 }

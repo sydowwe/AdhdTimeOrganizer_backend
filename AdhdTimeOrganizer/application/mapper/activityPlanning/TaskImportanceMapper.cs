@@ -8,7 +8,7 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
 
 [Mapper]
-public partial class TaskImportanceMapper : IBaseSimpleCrudMapper<TaskImportance, TaskImportanceRequest, TaskImportanceResponse>
+public partial class TaskImportanceMapper : IBaseSimpleCrudMapper<TaskImportance, TaskImportanceRequest, TaskImportanceResponse>, IBaseSelectOptionMapper<TaskImportance>
 {
     public partial TaskImportanceResponse ToResponse(TaskImportance entity);
     public partial SelectOptionResponse ToSelectOptionResponse(TaskImportance entity);

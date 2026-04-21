@@ -59,6 +59,6 @@ public class GetFilterSortTodoListCategoryEndpoint(AppDbContext dbContext, TodoL
             });
         }
 
-        await SendOkAsync(result, ct);
+        await Send.OkAsync(result, ct);
     }
 }

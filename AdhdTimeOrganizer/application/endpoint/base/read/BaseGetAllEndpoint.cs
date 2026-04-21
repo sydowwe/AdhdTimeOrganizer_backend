@@ -13,7 +13,7 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<List<TResponse>>
     where TEntity : class, IEntityWithUser
     where TResponse : class, IIdResponse
-    where TMapper : IBaseReadMapper<TEntity, TResponse>
+    where TMapper : IBaseResponseMapper<TEntity, TResponse>
 {
 
     public virtual string[] AllowedRoles()
@@ -53,7 +53,7 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppDbConte
         query = Sort(query);
 
         var items = await mapper.ProjectToResponse(query).ToListAsync(ct);
-        await SendOkAsync(items, ct);
+        await Send.OkAsync(items, ct);
     }
 
     protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;

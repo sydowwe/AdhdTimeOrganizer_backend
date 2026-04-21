@@ -62,12 +62,12 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext, Act
                 .OrderBy(response => response.Date)
                 .ToListAsync(ct);
 
-            await SendOkAsync(history, ct);
+            await Send.OkAsync(history, ct);
         }
         catch (Exception ex)
         {
             AddError($"An error occurred while retrieving filtered data: {ex.Message}");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
         }
     }
 

@@ -46,7 +46,7 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
             var entity = await dbContext.Set<TEntity>().FindAsync([Route<long>("id")], ct);
             if (entity == null)
             {
-                await SendNotFoundAsync(ct);
+                await Send.NotFoundAsync(ct);
                 return;
             }
 
@@ -59,17 +59,17 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
             if (affectedRows == 0)
             {
                 AddError("No rows were updated. Entity may not exist.");
-                await SendErrorsAsync(400, ct);
+                await Send.ErrorsAsync(400, ct);
                 return;
             }
 
-            await SendNoContentAsync(ct);
+            await Send.NoContentAsync(ct);
         }
         catch (Exception ex)
         {
             var result = DbUtils.HandleException(ex, nameof(HandleAsync));
             AddError(result.ErrorMessage!);
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
         }
     }
 

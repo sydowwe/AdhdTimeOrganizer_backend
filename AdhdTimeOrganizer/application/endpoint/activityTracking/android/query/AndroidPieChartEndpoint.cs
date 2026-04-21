@@ -63,6 +63,6 @@ public class AndroidPieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest
             TotalSessions = totalSessions
         };
 
-        await SendAsync(new AndroidPieChartResponse { Apps = result, Totals = totals }, cancellation: ct);
+        await Send.ResponseAsync(new AndroidPieChartResponse { Apps = result, Totals = totals }, cancellation: ct);
     }
 }

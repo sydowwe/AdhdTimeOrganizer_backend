@@ -16,6 +16,4 @@ public record ActivityRequest : NameTextRequest
 
     public long? CategoryId { get; init; }
 
-    // public long? TodoListUrgencyId { get; init; }
-
 }

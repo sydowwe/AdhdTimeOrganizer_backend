@@ -33,7 +33,7 @@ public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickE
             var entity = await dbContext.Activities.FindAsync([Route<long>("id")], ct);
             if (entity == null)
             {
-                await SendNotFoundAsync(ct);
+                await Send.NotFoundAsync(ct);
                 return;
             }
 
@@ -49,7 +49,7 @@ public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickE
                 if (result.Failed)
                 {
                     AddError(result.ErrorMessage!);
-                    await SendErrorsAsync(400, ct);
+                    await Send.ErrorsAsync(400, ct);
                 }
             }
             else if (mode == "Clone")
@@ -64,22 +64,22 @@ public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickE
                 if (result.Failed)
                 {
                     AddError(result.ErrorMessage!);
-                    await SendErrorsAsync(400, ct);
+                    await Send.ErrorsAsync(400, ct);
                     return;
                 }
-                await SendOkAsync(clonedEntity.Id, ct);
+                await Send.OkAsync(clonedEntity.Id, ct);
             }
             else
             {
                 AddError("Invalid mode.");
-                await SendErrorsAsync(400, ct);
+                await Send.ErrorsAsync(400, ct);
             }
         }
         catch (Exception ex)
         {
             var result = DbUtils.HandleException(ex, nameof(HandleAsync));
             AddError(result.ErrorMessage!);
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
         }
     }
 }

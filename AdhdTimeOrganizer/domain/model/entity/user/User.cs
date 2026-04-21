@@ -19,6 +19,7 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public required AvailableLocales CurrentLocale { get; set; }
     public required TimeZoneInfo Timezone { get; set; }
     public string? GoogleOAuthUserId { get; set; }
+    public string? GoogleCalendarRefreshToken { get; set; }
     public bool HasExtensionAccess { get; set; } = false;
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
     public bool HasPassword => PasswordHash != null;
@@ -35,7 +36,6 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public ICollection<ActivityRole> RoleList { get; set; } = new List<ActivityRole>();
 
     public ICollection<ActivityHistory> ActivityHistoryList { get; set; } = new List<ActivityHistory>();
-    public ICollection<Alarm> AlarmList { get; set; } = new List<Alarm>();
     public ICollection<WebExtensionActivityEntry> WebExtensionActivityEntryList { get; set; } = new List<WebExtensionActivityEntry>();
     public ICollection<DesktopActivityEntry> DesktopActivityEntryList { get; set; } = new List<DesktopActivityEntry>();
     public ICollection<AndroidSessionData> AndroidSessionDataList { get; set; } = new List<AndroidSessionData>();

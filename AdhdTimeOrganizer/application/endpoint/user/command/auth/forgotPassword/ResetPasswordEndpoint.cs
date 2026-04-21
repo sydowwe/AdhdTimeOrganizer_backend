@@ -22,7 +22,7 @@ public class ResetPasswordEndpoint(UserManager<User> userManager)
         if (user is null)
         {
             AddError("Invalid or expired reset token");
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -34,10 +34,10 @@ public class ResetPasswordEndpoint(UserManager<User> userManager)
             {
                 AddError(error.Description);
             }
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

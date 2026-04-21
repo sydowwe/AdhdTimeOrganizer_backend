@@ -44,7 +44,7 @@ public abstract class BaseWithoutUserGetSelectOptionsEndpoint<TEntity, TMapper>(
         var entities = await query.ToListAsync(ct);
         var options = entities.Select(e => _mapper.ToSelectOptionResponse(e)).ToList();
 
-        await SendOkAsync(options, ct);
+        await Send.OkAsync(options, ct);
     }
 
     public virtual IQueryable<TEntity> Filter(IQueryable<TEntity> query) => query;

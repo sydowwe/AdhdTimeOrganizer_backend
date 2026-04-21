@@ -28,7 +28,7 @@ public class DesktopProcessDetailsEndpoint(AppDbContext db) : Endpoint<DesktopPr
 
         if (records.Count == 0)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
@@ -76,6 +76,6 @@ public class DesktopProcessDetailsEndpoint(AppDbContext db) : Endpoint<DesktopPr
             WindowTitles = windowTitles
         };
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 }

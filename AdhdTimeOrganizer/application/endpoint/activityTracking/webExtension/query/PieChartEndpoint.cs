@@ -105,6 +105,6 @@ public class PieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest, PieCh
             Totals = totals
         };
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 }

@@ -53,7 +53,7 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppDbContex
 
         var options = await query.Select(e => _mapper.ToSelectOptionResponse(e)).ToListAsync(ct);
 
-        await SendOkAsync(options, ct);
+        await Send.OkAsync(options, ct);
     }
 
     public virtual IQueryable<TEntity> Filter(IQueryable<TEntity> query) => query;

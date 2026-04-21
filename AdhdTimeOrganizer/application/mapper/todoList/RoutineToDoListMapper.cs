@@ -11,7 +11,6 @@ namespace AdhdTimeOrganizer.application.mapper.todoList;
 public partial class RoutineTodoListMapper : IBaseCrudMapper<RoutineTodoList, CreateRoutineTodoListRequest, UpdateRoutineTodoListRequest, RoutineTodoListResponse>
 {
     public partial RoutineTodoListResponse ToResponse(RoutineTodoList entity);
-    public partial SelectOptionResponse ToSelectOptionResponse(RoutineTodoList entity);
 
     [MapperIgnoreTarget(nameof(RoutineTodoList.Steps))]
     public partial RoutineTodoList ToEntity(CreateRoutineTodoListRequest request, long userId);

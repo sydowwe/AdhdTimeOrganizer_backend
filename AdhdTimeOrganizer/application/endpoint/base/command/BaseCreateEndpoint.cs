@@ -48,13 +48,13 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
             await dbContext.Set<TEntity>().AddAsync(entity, ct);
             await dbContext.SaveChangesAsync(ct);
 
-            await SendAsync(entity.Id, 201, ct);
+            await Send.ResponseAsync(entity.Id, 201, ct);
         }
         catch (Exception ex)
         {
             var result = DbUtils.HandleException(ex, "Create");
             AddError(result.ErrorMessage!);
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
         }
     }
     protected virtual Task BeforeMapping(TRequest req, CancellationToken ct = default)

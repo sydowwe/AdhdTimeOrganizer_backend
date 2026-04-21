@@ -8,7 +8,7 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.todoList;
 
 [Mapper]
-public partial class TodoListCategoryMapper : IBaseSimpleCrudMapper<TodoListCategory, TodoListCategoryRequest, TodoListCategoryResponse>
+public partial class TodoListCategoryMapper : IBaseSimpleCrudMapper<TodoListCategory, TodoListCategoryRequest, TodoListCategoryResponse>, IBaseSelectOptionMapper<TodoListCategory>
 {
     public partial TodoListCategoryResponse ToResponse(TodoListCategory entity);
     public partial TodoListCategory ToEntity(TodoListCategoryRequest request, long userId);

@@ -45,7 +45,7 @@ public class DeleteUserAccountEndpoint(
             {
                 AddError(error.Description);
             }
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -53,6 +53,6 @@ public class DeleteUserAccountEndpoint(
         // TODO: Add cleanup of related data (user content, files, etc.)
         // TODO: Send confirmation email that account was deleted
 
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

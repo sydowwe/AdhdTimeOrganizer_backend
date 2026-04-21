@@ -13,7 +13,7 @@ public static class SeederExtensions
         if (!string.IsNullOrEmpty(tableName))
         {
             // PostgreSQL TRUNCATE with RESTART IDENTITY to reset sequences
-            await context.Database.ExecuteSqlRawAsync($"TRUNCATE TABLE \"{tableName}\" RESTART IDENTITY CASCADE");
+            await context.Database.ExecuteSqlAsync($"TRUNCATE TABLE \"{tableName}\" RESTART IDENTITY CASCADE");
         }
     }
 }

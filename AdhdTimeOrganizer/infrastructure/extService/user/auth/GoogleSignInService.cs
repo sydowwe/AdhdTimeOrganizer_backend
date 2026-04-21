@@ -72,12 +72,12 @@ public static class GoogleSignInService
 
 public class GoogleUserInfo
 {
-    public string Email { get; set; }
-    public string UserId { get; set; }
-    public string Name { get; set; }
-    public string Picture { get; set; }
-    public string Locale { get; set; }
-    public bool EmailVerified { get; set; }
-    public DateTime TokenIssuedAt { get; set; }
-    public DateTime TokenExpiresAt { get; set; }
+    public required string Email { get; set; }
+    public required string UserId { get; set; }
+    public required string Name { get; set; }
+    public required string Picture { get; set; }
+    public required string Locale { get; set; }
+    public required bool EmailVerified { get; set; }
+    public required DateTime TokenIssuedAt { get; set; }
+    public required DateTime TokenExpiresAt { get; set; }
 }

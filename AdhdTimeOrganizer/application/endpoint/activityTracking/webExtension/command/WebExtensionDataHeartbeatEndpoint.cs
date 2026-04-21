@@ -72,6 +72,6 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
 
         await dbContext.SaveChangesAsync(ct);
 
-        await SendAsync(processedCount, cancellation: ct);
+        await Send.ResponseAsync(processedCount, cancellation: ct);
     }
 }

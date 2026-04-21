@@ -32,14 +32,14 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(AppDbContext dbConte
         var item = await FetchItem(ItemId, ct);
         if (item is null)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
         var step = item.Steps.FirstOrDefault(s => s.Id == StepId);
         if (step is null)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
@@ -51,7 +51,7 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(AppDbContext dbConte
         await dbContext.SaveChangesAsync(ct);
 
         await PublishEvent(item, ct);
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 
     protected abstract Task<TEntity?> FetchItem(long itemId, CancellationToken ct);

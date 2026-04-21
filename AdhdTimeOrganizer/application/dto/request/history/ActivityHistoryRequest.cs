@@ -10,7 +10,7 @@ public record ActivityHistoryRequest : ActivityIdRequest
     public required DateTime StartTimestamp { get; init; }
 
     [Required]
-    public required MyIntTime Length { get; init; }
+    public required IntTime Length { get; init; }
     // [Required]
     // public required DateTime EndTimestamp { get; init; }
 }

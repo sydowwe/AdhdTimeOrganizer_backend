@@ -45,7 +45,7 @@ public class ApplyTemplatePlannerTaskEndpoint(
             if (calendar == null)
             {
                 AddError("Calendar not found");
-                await SendErrorsAsync(404, ct);
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 
@@ -53,7 +53,7 @@ public class ApplyTemplatePlannerTaskEndpoint(
             if (template == null)
             {
                 AddError("Template not found");
-                await SendErrorsAsync(404, ct);
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 
@@ -89,7 +89,6 @@ public class ApplyTemplatePlannerTaskEndpoint(
             dbContext.PlannerTasks.AddRange(newTasks);
             await dbContext.SaveChangesAsync(ct);
 
-            calendar = await dbContext.Calendars.FindAsync([calendar.Id], ct);
             var updatedTasks = await plannerTaskMapper.ProjectToResponse(dbContext.PlannerTasks.Where(t => t.CalendarId == calendar.Id).WithIncludes().OrderBy(t => t.StartTime)).ToListAsync(ct);
 
             var response = new ApplyTemplatePlannerTaskResponse
@@ -98,17 +97,17 @@ public class ApplyTemplatePlannerTaskEndpoint(
                 Tasks = updatedTasks
             };
 
-            await SendAsync(response, 200, ct);
+            await Send.ResponseAsync(response, 200, ct);
         }
         catch (Exception ex)
         {
             var result = DbUtils.HandleException(ex, "Create");
             AddError(result.ErrorMessage!);
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
         }
     }
 
-    private void UpdateCalendar(TaskPlannerDayTemplate template, Calendar calendar)
+    private static void UpdateCalendar(TaskPlannerDayTemplate template, Calendar calendar)
     {
         calendar.AppliedTemplateId = template.Id;
         calendar.AppliedTemplateName = template.Name;
@@ -127,9 +126,8 @@ public class ApplyTemplatePlannerTaskEndpoint(
     {
         var result = new List<PlannerTask>();
 
-        foreach (var newTask in newTasks)
+        foreach (var segments in newTasks.Select(newTask => CarveTaskAroundBlockers(newTask, existingTasks)))
         {
-            var segments = CarveTaskAroundBlockers(newTask, existingTasks);
             result.AddRange(segments);
         }
 
@@ -151,7 +149,7 @@ public class ApplyTemplatePlannerTaskEndpoint(
             var overlappingNewTasks = newTasks.Where(nt =>
                 existingTask.TasksOverlap(nt.StartTime, nt.EndTime)).ToList();
 
-            if (!overlappingNewTasks.Any())
+            if (overlappingNewTasks.Count == 0)
                 continue;
 
             tasksToRemove.Add(existingTask);
@@ -174,7 +172,7 @@ public class ApplyTemplatePlannerTaskEndpoint(
             .OrderBy(b => b.StartTime)
             .ToList();
 
-        if (!overlappingBlockers.Any())
+        if (overlappingBlockers.Count == 0)
             return [task];
 
         var result = new List<PlannerTask>();

@@ -63,7 +63,7 @@ public class AndroidSyncEndpoint(AppDbContext dbContext) : Endpoint<AndroidSyncR
 
         if (validSessions.Count == 0)
         {
-            await SendAsync(new AndroidSyncResponse
+            await Send.ResponseAsync(new AndroidSyncResponse
             {
                 Accepted = 0,
                 DuplicatesSkipped = 0,
@@ -112,7 +112,7 @@ public class AndroidSyncEndpoint(AppDbContext dbContext) : Endpoint<AndroidSyncR
             await dbContext.SaveChangesAsync(ct);
         }
 
-        await SendAsync(new AndroidSyncResponse
+        await Send.ResponseAsync(new AndroidSyncResponse
         {
             Accepted = accepted,
             DuplicatesSkipped = duplicatesSkipped,

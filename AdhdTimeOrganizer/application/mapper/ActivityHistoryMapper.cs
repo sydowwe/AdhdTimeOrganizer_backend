@@ -11,6 +11,7 @@ namespace AdhdTimeOrganizer.application.mapper;
 public partial class ActivityHistoryMapper : IBaseSimpleCrudMapper<ActivityHistory, ActivityHistoryRequest, ActivityHistoryResponse>
 {
     public partial ActivityHistoryResponse ToResponse(ActivityHistory entity);
+    [MapProperty(nameof(ActivityHistory.Activity.Name), nameof(SelectOptionResponse.Text))]
     public partial SelectOptionResponse ToSelectOptionResponse(ActivityHistory entity);
 
     public partial void UpdateEntity(ActivityHistoryRequest request, ActivityHistory entity);
@@ -26,5 +27,4 @@ public partial class ActivityHistoryMapper : IBaseSimpleCrudMapper<ActivityHisto
     }
 
     public partial IQueryable<ActivityHistoryResponse> ProjectToResponse(IQueryable<ActivityHistory> source);
-
 }

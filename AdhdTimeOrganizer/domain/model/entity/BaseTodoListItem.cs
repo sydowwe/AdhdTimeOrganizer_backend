@@ -11,6 +11,6 @@ public abstract class BaseTodoListItem : BaseEntityWithIsDone, IEntityWithDoneAn
     public int? TotalCount { get; set; }
     public long DisplayOrder { get; set; }
     public string? Note { get; set; }
-    public MyIntTime? SuggestedTime { get; set; }
+    public IntTime? SuggestedTime { get; set; }
     public ICollection<TodoListStep> Steps { get; set; } = [];
 }

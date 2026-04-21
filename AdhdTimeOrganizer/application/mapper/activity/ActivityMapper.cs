@@ -9,7 +9,7 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.activity;
 
 [Mapper]
-public partial class ActivityMapper : IBaseSimpleCrudMapper<Activity, ActivityRequest, ActivityResponse>
+public partial class ActivityMapper : IBaseSimpleCrudMapper<Activity, ActivityRequest, ActivityResponse>, IBaseSelectOptionMapper<Activity>
 {
     public partial ActivityResponse ToResponse(Activity entity);
     public partial Activity ToEntity(ActivityRequest request, long userId);

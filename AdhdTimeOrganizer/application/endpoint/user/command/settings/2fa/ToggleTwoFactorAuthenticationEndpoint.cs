@@ -39,7 +39,7 @@ public class ToggleTwoFactorAuthEndpoint(
             {
                 AddError(error.Description);
             }
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -50,16 +50,16 @@ public class ToggleTwoFactorAuthEndpoint(
             if (setupResult.Failed)
             {
                 AddError("Failed to generate 2FA setup data");
-                await SendErrorsAsync(500, ct);
+                await Send.ErrorsAsync(500, ct);
                 return;
             }
 
-            await SendOkAsync(setupResult.Data, ct);
+            await Send.OkAsync(setupResult.Data, ct);
         }
         else
         {
             // 2FA disabled successfully
-            await SendOkAsync(new TwoFactorAuthResponse { TwoFactorEnabled = false }, ct);
+            await Send.OkAsync(new TwoFactorAuthResponse { TwoFactorEnabled = false }, ct);
         }
     }
 }

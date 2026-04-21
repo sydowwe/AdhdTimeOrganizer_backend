@@ -49,7 +49,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
         if (itemToMove is null)
         {
             AddError("The item to be moved could not be found.");
-            await SendErrorsAsync(404, ct);
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 
@@ -63,7 +63,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
             {
                 AddError(newOrderResult.ErrorMessage ?? "An error occurred during order calculation.");
                 var statusCode = MapErrorTypeToStatusCode(newOrderResult.ErrorType);
-                await SendErrorsAsync(statusCode, ct);
+                await Send.ErrorsAsync(statusCode, ct);
                 return;
             }
 
@@ -73,14 +73,14 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
             if (result.Failed)
             {
                 AddError(result.ErrorMessage ?? "An error occurred during update.");
-                await SendErrorsAsync(500, ct);
+                await Send.ErrorsAsync(500, ct);
                 return;
             }
 
             await tx.CommitAsync(ct);
         }
 
-        await SendOkAsync(ct);
+        await Send.OkAsync(ct);
     }
 
     /// <summary>

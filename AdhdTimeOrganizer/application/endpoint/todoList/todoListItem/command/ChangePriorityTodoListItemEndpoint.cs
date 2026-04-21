@@ -11,7 +11,7 @@ public class ChangePriorityTodoListItemEndpoint(AppDbContext dbContext) : Endpoi
     public override void Configure()
     {
         const string entityName = nameof(TodoListItem);
-        Patch($"{entityName.Kebaberize()}/change-urgency/{{id:long:required}}/{{urgencyId:long:required}}");
+        Patch($"{entityName.Kebaberize()}/change-priority/{{id:long:required}}/{{priorityId:long:required}}");
         Summary(s =>
         {
             s.Summary = $"Toggles {entityName} IsDone status";
@@ -28,15 +28,15 @@ public class ChangePriorityTodoListItemEndpoint(AppDbContext dbContext) : Endpoi
         if (entity == null)
         {
             AddError("Entity not found");
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
-        entity.TaskPriorityId = Route<long>("urgencyId");
+        entity.TaskPriorityId = Route<long>("priorityId");
 
         dbContext.TodoListItems.Update(entity);
         await dbContext.SaveChangesAsync(ct);
 
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

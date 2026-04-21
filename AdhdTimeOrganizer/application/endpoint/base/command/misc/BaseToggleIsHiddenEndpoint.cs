@@ -37,7 +37,7 @@ public class BaseToggleIsHiddenEndpoint<TEntity>(AppDbContext dbContext) : Endpo
 
         if (entities.Count < 1)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
@@ -49,6 +49,6 @@ public class BaseToggleIsHiddenEndpoint<TEntity>(AppDbContext dbContext) : Endpo
         dbContext.Set<TEntity>().UpdateRange(entities);
         await dbContext.SaveChangesAsync(ct);
 
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

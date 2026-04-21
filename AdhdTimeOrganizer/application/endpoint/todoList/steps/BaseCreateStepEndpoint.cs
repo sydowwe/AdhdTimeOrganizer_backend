@@ -36,7 +36,7 @@ public abstract class BaseCreateStepEndpoint<TParent>(AppDbContext dbContext)
 
         if (parent is null)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
@@ -47,6 +47,6 @@ public abstract class BaseCreateStepEndpoint<TParent>(AppDbContext dbContext)
             parent.DoneCount = 0;
 
         await dbContext.SaveChangesAsync(ct);
-        await SendAsync(step.Id, 201, ct);
+        await Send.ResponseAsync(step.Id, 201, ct);
     }
 }

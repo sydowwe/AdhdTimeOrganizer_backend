@@ -17,6 +17,4 @@ public partial class PomodoroTimerPresetMapper : IBaseSimpleCrudMapper<PomodoroT
     public partial void UpdateEntity(PomodoroTimerPresetRequest request, PomodoroTimerPreset entity);
 
     public partial IQueryable<PomodoroTimerPresetResponse> ProjectToResponse(IQueryable<PomodoroTimerPreset> query);
-
-    public partial SelectOptionResponse ToSelectOptionResponse(PomodoroTimerPreset entity);
 }

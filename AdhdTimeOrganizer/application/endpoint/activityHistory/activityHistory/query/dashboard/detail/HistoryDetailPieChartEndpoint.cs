@@ -99,7 +99,7 @@ public class HistoryDetailPieChartEndpoint(AppDbContext db) : Endpoint<HistoryDe
             }
         };
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private static (string Name, string? Color) ResolveGroupKey(ActivityHistory ah, HistoryGroupBy groupBy)

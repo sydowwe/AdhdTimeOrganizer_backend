@@ -22,7 +22,6 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DateOnly CurrentPartitionDate => DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-2);
 
     public DbSet<Activity> Activities { get; set; }
-    public DbSet<Alarm> Alarms { get; set; }
     public DbSet<ActivityCategory> ActivityCategories { get; set; }
     public DbSet<ActivityRole> ActivityRoles { get; set; }
     public DbSet<ActivityHistory> ActivityHistories { get; set; }
@@ -31,7 +30,6 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<PlannerTask> PlannerTasks { get; set; }
     public DbSet<TemplatePlannerTask> TemplatePlannerTasks { get; set; }
     public DbSet<TaskPlannerDayTemplate> TaskPlannerDayTemplates { get; set; }
-
     public DbSet<RoutineTodoList> RoutineTodoLists { get; set; }
     public DbSet<RoutineTimePeriod> RoutineTimePeriods { get; set; }
     public DbSet<RoutinePeriodCompletion> RoutinePeriodCompletions { get; set; }

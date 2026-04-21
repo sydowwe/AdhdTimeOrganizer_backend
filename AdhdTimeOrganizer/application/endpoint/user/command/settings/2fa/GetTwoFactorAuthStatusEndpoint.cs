@@ -21,10 +21,10 @@ public class GetTwoFactorAuthStatusEndpoint(UserManager<User> userManager)
         var user = await userManager.GetUserAsync(User);
         if (user is null)
         {
-            await SendUnauthorizedAsync(ct);
+            await Send.UnauthorizedAsync(ct);
             return;
         }
 
-        await SendOkAsync(user.TwoFactorEnabled, ct);
+        await Send.OkAsync(user.TwoFactorEnabled, ct);
     }
 }

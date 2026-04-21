@@ -18,7 +18,7 @@ public class LogoutAllEndpoint(IRefreshTokenService refreshTokenService) : Endpo
         if (string.IsNullOrEmpty(userIdClaim) || !long.TryParse(userIdClaim, out var userId))
         {
             AddError("User not authenticated");
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 
@@ -42,6 +42,6 @@ public class LogoutAllEndpoint(IRefreshTokenService refreshTokenService) : Endpo
             Path = "/api/auth"
         });
 
-        await SendOkAsync(ct);
+        await Send.OkAsync(ct);
     }
 }

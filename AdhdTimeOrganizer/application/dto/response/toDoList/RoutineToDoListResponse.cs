@@ -8,5 +8,5 @@ public record RoutineTodoListResponse : BaseTodoListResponse
     public int Streak { get; init; }
     public int BestStreak { get; init; }
     public DateTime LastCompletedAt { get; init; }
-    public MyIntTime? SuggestedTime { get; init; }
+    public IntTime? SuggestedTime { get; init; }
 }

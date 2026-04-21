@@ -44,12 +44,12 @@ public abstract class BaseGetByIdEndpoint<TEntity, TResponse, TMapper>(AppDbCont
         var entity = await query.FirstOrDefaultAsync(e => e.Id == req.Id, ct);
         if (entity == null)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
         var response = _mapper.ToResponse(entity);
-        await SendOkAsync(response, ct);
+        await Send.OkAsync(response, ct);
     }
 
     protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;

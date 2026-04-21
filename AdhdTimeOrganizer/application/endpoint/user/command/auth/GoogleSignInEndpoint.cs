@@ -34,7 +34,7 @@ public class GoogleSignInEndpoint(
         if (googleSignInResult.Failed)
         {
             AddError("Failed to verify Google sign-in code.");
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -61,13 +61,13 @@ public class GoogleSignInEndpoint(
         else if (!user.HasGoogleOAuth)
         {
             AddError("A password is already associated with this email. Log in and link Google in account settings.");
-            await SendErrorsAsync(409, ct);
+            await Send.ErrorsAsync(409, ct);
             return;
         }
         else if (user.GoogleOAuthUserId != googleUserId)
         {
             AddError("User already exists with a different Google account.");
-            await SendErrorsAsync(409, ct);
+            await Send.ErrorsAsync(409, ct);
             return;
         }
 
@@ -79,7 +79,7 @@ public class GoogleSignInEndpoint(
             // CurrentLocale = user.CurrentLocale
         };
 
-        await SendOkAsync(response, ct);
+        await Send.OkAsync(response, ct);
     }
 
     private async Task<User?> Register(GoogleAuthRegistrationRequest req, CancellationToken ct)
@@ -95,7 +95,7 @@ public class GoogleSignInEndpoint(
                 ? $"User already exists with EMAIL: {newUser.Email}"
                 : "Failed to register user: " + string.Join(", ", identityResult.Errors.Select(e => e.Description));
             AddError(msg);
-            await SendErrorsAsync(duplicate ? 409 : 400, ct);
+            await Send.ErrorsAsync(duplicate ? 409 : 400, ct);
             return null;
         }
 
@@ -105,7 +105,7 @@ public class GoogleSignInEndpoint(
             if (setDefaultsResult.Failed)
             {
                 AddError(setDefaultsResult.ErrorMessage!);
-                await SendErrorsAsync(500, ct);
+                await Send.ErrorsAsync(500, ct);
                 return null;
             }
 
@@ -116,7 +116,7 @@ public class GoogleSignInEndpoint(
         {
             await tx.RollbackAsync(ct);
             AddError(ex.Message);
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
             return null;
         }
     }

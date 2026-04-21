@@ -39,6 +39,6 @@ public class LogoutEndpoint(IRefreshTokenService refreshTokenService) : Endpoint
             Path = "/api/auth"
         });
 
-        await SendOkAsync(ct);
+        await Send.OkAsync(ct);
     }
 }

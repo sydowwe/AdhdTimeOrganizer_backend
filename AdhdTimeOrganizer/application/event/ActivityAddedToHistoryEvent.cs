@@ -8,5 +8,5 @@ public record ActivityAddedToHistoryEvent : IEvent
     public required long UserId { get; init; }
     public required long ActivityId { get; init; }
     public required DateTime StartTimestamp { get; init; }
-    public required MyIntTime Length { get; init; }
+    public required IntTime Length { get; init; }
 }

@@ -58,7 +58,7 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
             BackgroundSessions = backgroundSessions
         };
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private static (List<DesktopTimelineSession> primary, List<DesktopTimelineSession> detail) BuildTimeline(

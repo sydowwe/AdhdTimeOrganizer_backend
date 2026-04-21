@@ -15,7 +15,7 @@ public class TodoListItemConfiguration : IEntityTypeConfiguration<TodoListItem>
         builder.BaseTodoListConfigure();
 
         builder.Property(t => t.SuggestedTime)
-            .HasConversion(new MyIntTimeConverter());
+            .HasConversion(new NullableIntTimeConverter());
 
         builder.IsManyWithOneUser(u => u.TodoListItemColl);
         builder.IsManyWithOneActivity(a => a.TodoListItems);

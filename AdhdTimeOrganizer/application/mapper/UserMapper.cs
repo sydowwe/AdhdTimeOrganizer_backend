@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.application.mapper;
 // Example DTOs
 
 [Mapper]
-public partial class UserMapper : IBaseCreateWithoutUserMapper<User, UserRequest>, IBaseUpdateMapper<User, UserRequest>, IBaseReadMapper<User, UserResponse>
+public partial class UserMapper : IBaseCreateWithoutUserMapper<User, UserRequest>, IBaseUpdateMapper<User, UserRequest>, IBaseResponseMapper<User, UserResponse>
 {
     public partial UserResponse ToResponse(User entity);
 
@@ -20,9 +20,6 @@ public partial class UserMapper : IBaseCreateWithoutUserMapper<User, UserRequest
 
     [MapProperty(nameof(UserRequest.Timezone), nameof(User.Timezone), Use = nameof(ToTimeZoneInfo))]
     public partial void UpdateEntity(UserRequest request, User entity);
-
-    public SelectOptionResponse ToSelectOptionResponse(User entity)
-        => new(entity.Id, entity.UserName); // Assuming User has Name property
 
     public partial IQueryable<UserResponse> ProjectToResponse(IQueryable<User> query);
 

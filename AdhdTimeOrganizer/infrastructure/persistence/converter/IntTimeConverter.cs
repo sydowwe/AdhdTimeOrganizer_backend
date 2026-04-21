@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.converter;
 
-public class MyIntTimeConverter() : ValueConverter<MyIntTime, int>(
+public class IntTimeConverter() : ValueConverter<IntTime, int>(
     myIntTime => myIntTime.TotalSeconds,
-    seconds => new MyIntTime(seconds)
+    seconds => new IntTime(seconds)
 );

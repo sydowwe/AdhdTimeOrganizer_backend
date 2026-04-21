@@ -47,7 +47,7 @@ public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<
             .OrderBy(w => w.WindowStart)
             .ToList();
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private List<WebExtensionStackedBarsWindow> FilterByMinSecondsWithOther(

@@ -9,9 +9,10 @@ using Riok.Mapperly.Abstractions;
 namespace AdhdTimeOrganizer.application.mapper.activityPlanning;
 
 [Mapper]
-public partial class TaskPlannerDayTemplateMapper : IBaseSimpleCrudMapper<TaskPlannerDayTemplate, TaskPlannerDayTemplateRequest, TaskPlannerDayTemplateResponse>
+public partial class TaskPlannerDayTemplateMapper : IBaseSimpleCrudMapper<TaskPlannerDayTemplate, TaskPlannerDayTemplateRequest, TaskPlannerDayTemplateResponse>, IBaseSelectOptionMapper<TaskPlannerDayTemplate>
 {
     public partial TaskPlannerDayTemplateResponse ToResponse(TaskPlannerDayTemplate entity);
+    [MapProperty(nameof(entity.Name), nameof(SelectOptionResponse.Text))]
     public partial SelectOptionResponse ToSelectOptionResponse(TaskPlannerDayTemplate entity);
 
     public partial void UpdateEntity(TaskPlannerDayTemplateRequest request, TaskPlannerDayTemplate entity);

@@ -7,6 +7,8 @@ namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.steps;
 public class UpdateStepTodoListItemEndpoint(AppDbContext dbContext)
     : BaseUpdateStepEndpoint<TodoListItem>(dbContext)
 {
+    private readonly AppDbContext _dbContext = dbContext;
+
     protected override IQueryable<TodoListItem> GetParentQuery(long itemId, long userId) =>
-        dbContext.Set<TodoListItem>().Where(e => e.Id == itemId && e.UserId == userId);
+        _dbContext.Set<TodoListItem>().Where(e => e.Id == itemId && e.UserId == userId);
 }

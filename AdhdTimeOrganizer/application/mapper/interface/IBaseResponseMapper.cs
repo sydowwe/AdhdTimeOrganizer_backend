@@ -9,4 +9,5 @@ public interface IBaseResponseMapper<in TEntity, out TResponse> : IMapperService
     where TResponse : class, IMyResponse
 {
     public TResponse ToResponse(TEntity entity);
+    public IQueryable<TResponse> ProjectToResponse(IQueryable<TEntity> query);
 }

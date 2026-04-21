@@ -46,7 +46,7 @@ public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbC
         if (string.IsNullOrEmpty(value))
         {
             AddError($"The value parameter is required and cannot be empty. /{typeof(TEntity).Name.Kebaberize()}/by-{FieldName}/{{value}}");
-            await SendErrorsAsync(cancellation: ct);
+            await Send.ErrorsAsync(cancellation: ct);
             return;
         }
 
@@ -61,12 +61,12 @@ public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbC
         var entity = await query.FirstOrDefaultAsync(FilterQuery(value), ct);
         if (entity == null)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
         var response = _mapper.ToResponse(entity);
-        await SendOkAsync(response, ct);
+        await Send.OkAsync(response, ct);
     }
 
     protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;

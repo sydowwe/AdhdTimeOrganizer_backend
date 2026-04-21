@@ -27,7 +27,7 @@ public class ConfirmEmailChangeEndpoint(
         if (user is null)
         {
             AddError("Invalid or expired confirmation link");
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -38,7 +38,7 @@ public class ConfirmEmailChangeEndpoint(
             {
                 AddError(error.Description);
             }
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -52,6 +52,6 @@ public class ConfirmEmailChangeEndpoint(
         // Sign out the user from current session
         await signInManager.SignOutAsync();
 
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

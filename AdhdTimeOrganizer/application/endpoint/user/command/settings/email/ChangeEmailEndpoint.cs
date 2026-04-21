@@ -16,7 +16,6 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.settings.email;
 public class ChangeEmailEndpoint(
     UserManager<User> userManager,
     IUserEmailSenderService emailSender,
-    IConfiguration configuration,
     ITwoFactorAuthService twoFactorAuthService)
     : Endpoint<ChangeEmailRequest, EmptyResponse>
 {
@@ -36,7 +35,7 @@ public class ChangeEmailEndpoint(
         if (existingUser is not null)
         {
             AddError(r => r.NewEmail, "Email address is already in use");
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -45,6 +44,6 @@ public class ChangeEmailEndpoint(
 
         await emailSender.SendEmailChangeConfirmationAsync(user, req.NewEmail, token);
 
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

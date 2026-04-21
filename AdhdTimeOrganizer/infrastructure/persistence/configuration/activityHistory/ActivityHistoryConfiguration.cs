@@ -18,7 +18,7 @@ public class ActivityHistoryConfiguration : IEntityTypeConfiguration<ActivityHis
         builder.Property(a => a.StartTimestamp).IsRequired();
         builder.Property(a => a.EndTimestamp).IsRequired();
         builder.Property(h => h.Length)
-            .HasConversion(new MyIntTimeConverter()).IsRequired();
+            .HasConversion(new IntTimeConverter()).IsRequired();
 
         builder.HasIndex(a => new { a.UserId, a.ActivityId, a.StartTimestamp }).IsUnique();
     }

@@ -35,7 +35,7 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbC
 
         if (itemsToToggle.Count == 0)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
@@ -51,7 +51,7 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbC
         foreach (var entity in itemsToToggle)
             await PublishEvent(entity, ct);
 
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 
     /// <summary>

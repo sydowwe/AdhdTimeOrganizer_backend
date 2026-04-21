@@ -106,7 +106,7 @@ public class TodoListItemSeeder(
                 TotalCount = 3,
                 DisplayOrder = nextOrderToday,
                 UserId = userId,
-                SuggestedTime = new MyIntTime(10, 0),
+                SuggestedTime = new IntTime(10, 0),
                 Note = "Fix login timeout and null ref on dashboard",
                 DueDate = today,
                 DueTime = new TimeOnly(17, 0),
@@ -151,7 +151,7 @@ public class TodoListItemSeeder(
                 IsDone = true,
                 DisplayOrder = nextOrderToday,
                 UserId = userId,
-                SuggestedTime = new MyIntTime(7, 0)
+                SuggestedTime = new IntTime(7, 0)
             });
             nextOrderToday -= settings.Value.DisplayOrderGap;
         }
@@ -187,7 +187,7 @@ public class TodoListItemSeeder(
                 TotalCount = 4,
                 DisplayOrder = nextOrderThisWeek,
                 UserId = userId,
-                SuggestedTime = new MyIntTime(9, 0),
+                SuggestedTime = new IntTime(9, 0),
                 Steps =
                 [
                     new TodoListStep { Name = "Design settings screen layout", Order = 1, IsDone = true },

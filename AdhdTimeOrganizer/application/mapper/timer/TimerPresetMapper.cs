@@ -17,5 +17,4 @@ public partial class TimerPresetMapper : IBaseSimpleCrudMapper<TimerPreset, Time
     public partial void UpdateEntity(TimerPresetRequest request, TimerPreset entity);
 
     public partial IQueryable<TimerPresetResponse> ProjectToResponse(IQueryable<TimerPreset> query);
-    public partial SelectOptionResponse ToSelectOptionResponse(TimerPreset entity);
 }

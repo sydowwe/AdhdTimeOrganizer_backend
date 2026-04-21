@@ -15,7 +15,7 @@ public class RoutineTodoListConfiguration : IEntityTypeConfiguration<RoutineTodo
         builder.BaseTodoListConfigure();
 
         builder.Property(r => r.SuggestedTime)
-            .HasConversion(new MyIntTimeConverter());
+            .HasConversion(new NullableIntTimeConverter());
 
         builder.ToTable(t => t.HasCheckConstraint(
             "CK_RoutineTodoList_Streak_NonNegative",

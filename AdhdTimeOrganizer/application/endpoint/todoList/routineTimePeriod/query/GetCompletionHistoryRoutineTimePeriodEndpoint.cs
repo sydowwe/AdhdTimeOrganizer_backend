@@ -37,7 +37,7 @@ public class GetCompletionHistoryRoutineTimePeriodEndpoint(AppDbContext dbContex
 
         if (period == null)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
@@ -49,6 +49,6 @@ public class GetCompletionHistoryRoutineTimePeriodEndpoint(AppDbContext dbContex
             .ToListAsync(ct);
 
         completions.Reverse();
-        await SendOkAsync(completions, ct);
+        await Send.OkAsync(completions, ct);
     }
 }

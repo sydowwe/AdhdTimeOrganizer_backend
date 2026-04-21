@@ -4,11 +4,10 @@ using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
-using UserMapper = AdhdTimeOrganizer.application.mapper.UserMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
 
-public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> userManager, IJwtService jwtService, IGoogleRecaptchaService googleRecaptchaService, UserMapper mapper)
+public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> userManager, IJwtService jwtService, IGoogleRecaptchaService googleRecaptchaService)
     : Endpoint<PasswordLoginRequest, LoginResponse>
 {
     public override void Configure()
@@ -25,7 +24,7 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
         if (recaptchaResult.Failed)
         {
             AddError("Recaptcha verification failed.");
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -34,7 +33,7 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
         {
             // Generic error to prevent user enumeration
             AddError("Invalid email or password");
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 
@@ -42,7 +41,7 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
         if (!user.EmailConfirmed)
         {
             AddError("Email not confirmed");
-            await SendErrorsAsync(403, ct);
+            await Send.ErrorsAsync(403, ct);
             return;
         }
 
@@ -54,7 +53,7 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
             var minutes = (int)lockoutDuration.TotalMinutes;
             var seconds = lockoutDuration.Seconds;
             AddError($"Too many failed login attempts. Try again in {minutes}m {seconds}s");
-            await SendErrorsAsync(403, ct);
+            await Send.ErrorsAsync(403, ct);
             return;
         }
 
@@ -65,7 +64,7 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
                 RequiresTwoFactor = true,
                 Email = user.Email!
             };
-            await SendOkAsync(response, ct);
+            await Send.OkAsync(response, ct);
             return;
         }
 
@@ -73,7 +72,7 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
         {
             // Generic error to prevent user enumeration
             AddError("Invalid email or password");
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 
@@ -86,6 +85,6 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
             Email = user.Email!
         };
 
-        await SendOkAsync(successResponse, ct);
+        await Send.OkAsync(successResponse, ct);
     }
 }

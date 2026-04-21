@@ -28,7 +28,7 @@ public class ExtensionLoginEndpoint(
         // if (recaptchaResult.Failed)
         // {
         //     AddError("Recaptcha verification failed.");
-        //     await SendErrorsAsync(400, ct);
+        //     await Send.ErrorsAsync(400, ct);
         //     return;
         // }
 
@@ -36,7 +36,7 @@ public class ExtensionLoginEndpoint(
         if (user is null)
         {
             AddError("Invalid email or password");
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 
@@ -44,14 +44,14 @@ public class ExtensionLoginEndpoint(
         if (!user.HasExtensionAccess)
         {
             AddError("Extension access not enabled for this account");
-            await SendErrorsAsync(403, ct);
+            await Send.ErrorsAsync(403, ct);
             return;
         }
 
         if (!user.EmailConfirmed)
         {
             AddError("Email not confirmed");
-            await SendErrorsAsync(403, ct);
+            await Send.ErrorsAsync(403, ct);
             return;
         }
 
@@ -63,7 +63,7 @@ public class ExtensionLoginEndpoint(
             var minutes = (int)lockoutDuration.TotalMinutes;
             var seconds = lockoutDuration.Seconds;
             AddError($"Too many failed login attempts. Try again in {minutes}m {seconds}s");
-            await SendErrorsAsync(403, ct);
+            await Send.ErrorsAsync(403, ct);
             return;
         }
 
@@ -74,14 +74,14 @@ public class ExtensionLoginEndpoint(
                 RequiresTwoFactor = true,
                 Email = user.Email!
             };
-            await SendOkAsync(response, ct);
+            await Send.OkAsync(response, ct);
             return;
         }
 
         if (!result.Succeeded)
         {
             AddError("Invalid email or password");
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 
@@ -97,6 +97,6 @@ public class ExtensionLoginEndpoint(
             RefreshToken = refreshToken
         };
 
-        await SendOkAsync(successResponse, ct);
+        await Send.OkAsync(successResponse, ct);
     }
 }

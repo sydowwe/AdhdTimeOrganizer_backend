@@ -17,7 +17,7 @@ public abstract class BaseWithoutUserFilteredPaginatedEndpoint<TEntity, TRespons
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse
     where TFilter : class, IFilterRequest
-    where TMapper : class, IBaseReadMapper<TEntity, TResponse>
+    where TMapper : class, IBaseResponseMapper<TEntity, TResponse>
 {
     public virtual string EndpointPath => "filtered-table";
 
@@ -60,12 +60,12 @@ public abstract class BaseWithoutUserFilteredPaginatedEndpoint<TEntity, TRespons
                 mapper,
                 ct);
 
-            await SendOkAsync(response, ct);
+            await Send.OkAsync(response, ct);
         }
         catch (Exception ex)
         {
             AddError($"An error occurred while retrieving filtered data: {ex.Message}");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
         }
     }
 

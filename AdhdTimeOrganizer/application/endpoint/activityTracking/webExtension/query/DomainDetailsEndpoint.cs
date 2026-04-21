@@ -29,7 +29,7 @@ public class DomainDetailsEndpoint(AppDbContext db) : Endpoint<DomainDetailsRequ
 
         if (records.Count == 0)
         {
-            await SendNotFoundAsync(ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
@@ -64,7 +64,7 @@ public class DomainDetailsEndpoint(AppDbContext db) : Endpoint<DomainDetailsRequ
             Pages = pages
         };
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private string ExtractPath(string url)

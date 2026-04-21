@@ -52,7 +52,7 @@ public class HistoryDetailStackedBarsEndpoint(AppDbContext db) : Endpoint<Histor
             }).ToList()
         };
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private static List<(DateTime Start, DateTime End)> GenerateWindows(

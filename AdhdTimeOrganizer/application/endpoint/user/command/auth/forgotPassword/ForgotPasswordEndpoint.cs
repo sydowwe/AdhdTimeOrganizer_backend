@@ -25,7 +25,7 @@ public class ForgotPasswordEndpoint(UserManager<User> userManager, IUserEmailSen
         // Don't reveal if email exists or not
         if (user is null || !user.EmailConfirmed)
         {
-            await SendNoContentAsync(ct);
+            await Send.NoContentAsync(ct);
             return;
         }
 
@@ -35,6 +35,6 @@ public class ForgotPasswordEndpoint(UserManager<User> userManager, IUserEmailSen
         
         await emailSender.SendPasswordResetLinkAsync(user, resetLink);
         
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

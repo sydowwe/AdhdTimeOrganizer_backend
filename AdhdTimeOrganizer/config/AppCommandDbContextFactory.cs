@@ -16,6 +16,6 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
             .UseSnakeCaseNamingConvention()
             .ReplaceService<IMigrationsSqlGenerator, PartitionedNpgsqlMigrationsSqlGenerator>();
 
-        return new AppDbContext(optionsBuilder.Options, null, null);
+        return new AppDbContext(optionsBuilder.Options, null!, null!);
     }
 }

@@ -44,7 +44,7 @@ public class DesktopStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<WebEx
             .OrderBy(w => w.WindowStart)
             .ToList();
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private static List<DesktopStackedBarsWindow> FilterByMinSecondsWithOther(

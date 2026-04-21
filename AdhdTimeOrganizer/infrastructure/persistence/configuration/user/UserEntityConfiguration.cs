@@ -12,6 +12,7 @@ public class UserEntityConfiguration : IEntityTypeConfiguration<User>
         builder.BaseEntityConfigure();
         builder.EnumColumn(u => u.CurrentLocale);
         builder.Property(u => u.GoogleOAuthUserId).HasMaxLength(50);
+        builder.Property(u => u.GoogleCalendarRefreshToken).HasMaxLength(500);
         builder.Property(u => u.Timezone).IsRequired()
             .HasConversion(
                 tz => tz.Id,

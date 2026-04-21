@@ -35,7 +35,7 @@ public class AndroidStackedBarsEndpoint(AppDbContext db) : Endpoint<AndroidStack
             windows = FilterByMinSeconds(windows, req.MinSeconds.Value);
         }
 
-        await SendAsync(windows.OrderBy(w => w.WindowStart), cancellation: ct);
+        await Send.ResponseAsync(windows.OrderBy(w => w.WindowStart), cancellation: ct);
     }
 
     private static List<AndroidStackedBarsWindow> BuildWindows(

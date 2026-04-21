@@ -67,7 +67,7 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
         // 7. Build response with comparisons
         var response = filteredDomains.Select(d => BuildDomainSummary(d, baselineData)).ToList();
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private async Task<List<WebExtensionActivityEntry>> GetPeriodData(
@@ -172,7 +172,7 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
         DomainTimeData currentData,
         Dictionary<string, BaselineStats> baselineData)
     {
-        var hasBaseline = baselineData.TryGetValue(currentData.Domain, out BaselineStats baseline);
+        var hasBaseline = baselineData.TryGetValue(currentData.Domain, out var baseline);
         var isNew = !hasBaseline;
 
         return new DomainSummaryDto
@@ -183,8 +183,8 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
             Active = currentData.ActiveSeconds > 0 ? new ActivityStatDto
             {
                 Seconds = currentData.ActiveSeconds,
-                AverageSeconds = isNew ? null : baseline.AverageActiveSeconds,
-                PercentChange = isNew || baseline.AverageActiveSeconds == 0
+                AverageSeconds = isNew ? null : baseline!.AverageActiveSeconds,
+                PercentChange = isNew || baseline!.AverageActiveSeconds == 0
                     ? null
                     : CalculatePercentChange(currentData.ActiveSeconds, baseline.AverageActiveSeconds)
             } : null,
@@ -192,15 +192,15 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
             Background = currentData.BackgroundSeconds > 0 ? new ActivityStatDto
             {
                 Seconds = currentData.BackgroundSeconds,
-                AverageSeconds = isNew ? null : baseline.AverageBackgroundSeconds,
-                PercentChange = isNew || baseline.AverageBackgroundSeconds == 0
+                AverageSeconds = isNew ? null : baseline!.AverageBackgroundSeconds,
+                PercentChange = isNew || baseline!.AverageBackgroundSeconds == 0
                     ? null
                     : CalculatePercentChange(currentData.BackgroundSeconds, baseline.AverageBackgroundSeconds)
             } : null
         };
     }
 
-    private double CalculatePercentChange(int current, int average)
+    private static double CalculatePercentChange(int current, int average)
     {
         if (average == 0) return current > 0 ? 100.0 : 0.0;
         return Math.Round(((double)(current - average) / average) * 100, 1);
@@ -210,7 +210,7 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
 // Helper classes
 internal class DomainTimeData
 {
-    public string Domain { get; set; }
+    public required string Domain { get; set; }
     public int ActiveSeconds { get; set; }
     public int BackgroundSeconds { get; set; }
     public int TotalSeconds { get; set; }

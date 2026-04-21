@@ -127,7 +127,7 @@ public class HistorySummarySummaryCardsEndpoint(AppDbContext db) : Endpoint<Hist
             }
         };
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private static (DateTime BaselineFrom, DateTime BaselineTo, HashSet<DayOfWeek>? WeekdayFilter) ComputeBaselineRange(

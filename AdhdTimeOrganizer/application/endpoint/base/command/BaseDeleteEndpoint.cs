@@ -38,20 +38,20 @@ public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endp
             var entity = await dbContext.Set<TEntity>().FindAsync([Route<long>("id")], ct);
             if (entity == null)
             {
-                await SendNotFoundAsync(ct);
+                await Send.NotFoundAsync(ct);
                 return;
             }
 
             dbContext.Set<TEntity>().Remove(entity);
             await dbContext.SaveChangesAsync(ct);
 
-            await SendNoContentAsync(ct);
+            await Send.NoContentAsync(ct);
         }
         catch (Exception ex)
         {
             var result = DbUtils.HandleException(ex, nameof(HandleAsync));
             AddError(result.ErrorMessage!);
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
         }
     }
 }

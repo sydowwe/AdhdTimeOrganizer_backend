@@ -4,38 +4,38 @@ namespace AdhdTimeOrganizer.infrastructure.extension;
 
 public static class OrderQueryableExtensions
 {
-
-
-    public static IOrderedQueryable<TSource> OrderByWithDirection<TSource, TKey>
-    (this IQueryable<TSource> source,
-        Expression<Func<TSource, TKey>> keySelector,
-        bool descending = false)
+    extension<TSource>(IQueryable<TSource> source)
     {
-        return descending
-            ? source.SmartOrderByDescending(keySelector)
-            : source.SmartOrderBy(keySelector);
-    }
+        public IOrderedQueryable<TSource> OrderByWithDirection<TKey>
+        (Expression<Func<TSource, TKey>> keySelector,
+            bool descending = false)
+        {
+            return descending
+                ? source.SmartOrderByDescending(keySelector)
+                : source.SmartOrderBy(keySelector);
+        }
 
-    private static bool IsOrdered<T>(this IQueryable<T> queryable)
-    {
-        ArgumentNullException.ThrowIfNull(queryable);
+        private bool IsOrdered()
+        {
+            ArgumentNullException.ThrowIfNull(source);
 
-        return queryable.Expression.Type == typeof(IOrderedQueryable<T>);
-    }
+            return source.Expression.Type == typeof(IOrderedQueryable<TSource>);
+        }
 
-    private static IOrderedQueryable<T> SmartOrderBy<T, TKey>(this IQueryable<T> queryable, Expression<Func<T, TKey>> keySelector)
-    {
-        if (!queryable.IsOrdered())
-            return queryable.OrderBy(keySelector);
-        var orderedQuery = queryable as IOrderedQueryable<T>;
-        return orderedQuery.ThenBy(keySelector);
-    }
+        private IOrderedQueryable<TSource> SmartOrderBy<TKey>(Expression<Func<TSource, TKey>> keySelector)
+        {
+            if (!source.IsOrdered())
+                return source.OrderBy(keySelector);
+            var orderedQuery = source as IOrderedQueryable<TSource>;
+            return ((IOrderedQueryable<TSource>)source).ThenBy(keySelector);
+        }
 
-    private static IOrderedQueryable<T> SmartOrderByDescending<T, TKey>(this IQueryable<T> queryable, Expression<Func<T, TKey>> keySelector)
-    {
-        if (!queryable.IsOrdered())
-            return queryable.OrderByDescending(keySelector);
-        var orderedQuery = queryable as IOrderedQueryable<T>;
-        return orderedQuery.ThenByDescending(keySelector);
+        private IOrderedQueryable<TSource> SmartOrderByDescending<TKey>(Expression<Func<TSource, TKey>> keySelector)
+        {
+            if (!source.IsOrdered())
+                return source.OrderByDescending(keySelector);
+            var orderedQuery = source as IOrderedQueryable<TSource>;
+            return ((IOrderedQueryable<TSource>)source).ThenByDescending(keySelector);
+        }
     }
 }

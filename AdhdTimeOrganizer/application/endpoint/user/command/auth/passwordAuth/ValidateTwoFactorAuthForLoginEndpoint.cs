@@ -20,19 +20,19 @@ public class ValidateTwoFactorAuthForLoginEndpoint(UserManager<User> userManager
         var user = await userManager.FindByEmailAsync(request.Email);
         if (user is null)
         {
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
         var twoFactorResult = await twoFactorAuthService.ValidateToken(user, request.Token);
         if (twoFactorResult.Failed)
         {
             AddError("Invalid two-factor authentication token");
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 
         await jwtService.GenerateJwtAndSetAuthCookie(request.StayLoggedIn, AuthMethodEnum.Password, user, HttpContext);
 
-        await SendOkAsync(ct);
+        await Send.OkAsync(ct);
     }
 }

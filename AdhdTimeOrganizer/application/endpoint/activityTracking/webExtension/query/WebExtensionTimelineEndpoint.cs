@@ -59,7 +59,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
             BackgroundSessions = backgroundSessions
         };
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     /// <summary>

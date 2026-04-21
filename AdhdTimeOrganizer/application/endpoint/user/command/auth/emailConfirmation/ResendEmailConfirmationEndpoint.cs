@@ -19,20 +19,20 @@ public class ResendConfirmationEmailEndpoint(IUserEmailSenderService emailSender
 
         if (userId <= 0)
         {
-            await SendAsync("UserId must be supplied", 400, ct);
+            await Send.ResponseAsync("UserId must be supplied", 400, ct);
             return;
         }
 
         var user = await userManager.FindByIdAsync(userId.ToString());
         if (user == null)
         {
-            await SendAsync("User not found", 404, ct);
+            await Send.ResponseAsync("User not found", 404, ct);
             return;
         }
 
         if (await userManager.IsEmailConfirmedAsync(user))
         {
-            await SendAsync("Email is already confirmed", 422, ct);
+            await Send.ResponseAsync("Email is already confirmed", 422, ct);
             return;
         }
 
@@ -40,6 +40,6 @@ public class ResendConfirmationEmailEndpoint(IUserEmailSenderService emailSender
         
         await emailSender.SendConfirmationLinkAsync(user, token);
         
-        await SendOkAsync("Confirmation email has been resent successfully", ct);
+        await Send.OkAsync("Confirmation email has been resent successfully", ct);
     }
 }

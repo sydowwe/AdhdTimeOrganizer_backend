@@ -20,7 +20,7 @@ public class ExtensionRefreshTokenEndpoint(IJwtService jwtService)
         if (string.IsNullOrEmpty(req.RefreshToken))
         {
             AddError("Refresh token not provided");
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 
@@ -34,12 +34,12 @@ public class ExtensionRefreshTokenEndpoint(IJwtService jwtService)
                 AccessToken = accessToken,
                 RefreshToken = newRefreshToken
             };
-            await SendOkAsync(response, ct);
+            await Send.OkAsync(response, ct);
         }
         catch (UnauthorizedAccessException ex)
         {
             AddError(ex.Message);
-            await SendErrorsAsync(401, ct);
+            await Send.ErrorsAsync(401, ct);
         }
     }
 }

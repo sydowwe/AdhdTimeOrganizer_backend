@@ -89,6 +89,6 @@ public class DesktopPieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest
             TotalEntries = periodData.Count
         };
 
-        await SendAsync(new DesktopPieChartResponse { Processes = result, Totals = totals }, cancellation: ct);
+        await Send.ResponseAsync(new DesktopPieChartResponse { Processes = result, Totals = totals }, cancellation: ct);
     }
 }

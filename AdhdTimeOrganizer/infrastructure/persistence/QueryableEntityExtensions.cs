@@ -58,7 +58,7 @@ public static class QueryableEntityExtensions
     }
 
     public static IQueryable<TEntity> SortBySingleAndPaginate<TEntity>(this IQueryable<TEntity> query, SortByRequest sortBy, int showPerPage, int currentPage)
-        where TEntity : IEntity
+        where TEntity : class, IEntity
     {
         Expression<Func<TEntity, object>> orderBy = p => EF.Property<TEntity>(p, sortBy.Key);
         query = query.OrderByWithDirection(orderBy, sortBy.IsDesc);
@@ -67,6 +67,7 @@ public static class QueryableEntityExtensions
     }
 
     public static IQueryable<TEntity> SortByMany<TEntity>(this IQueryable<TEntity> query, SortByRequest[] sortByList)
+        where TEntity : class
     {
         //WARMING: Can fail with views without id
         if (sortByList.Length == 0)
@@ -88,6 +89,7 @@ public static class QueryableEntityExtensions
 
 
     public static IQueryable<TEntity> SortByManyAndPaginate<TEntity>(this IQueryable<TEntity> query, SortByRequest[] sortByList, int itemsPerPage, int page)
+        where TEntity : class
     {
         return query.SortByMany(sortByList).Skip((page - 1) * itemsPerPage).Take(itemsPerPage);
     }
@@ -103,7 +105,7 @@ public static class QueryableEntityExtensions
     )
         where TEntity : class, IEntityWithId
         where TResponse : class, IIdResponse
-        where TMapper : class, IBaseReadMapper<TEntity, TResponse>
+        where TMapper : class, IBaseResponseMapper<TEntity, TResponse>
     {
         // Get total count before pagination
         var itemsCount = await query.CountAsync(cancellationToken);

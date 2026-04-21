@@ -6,7 +6,7 @@ using AdhdTimeOrganizer.domain.model.entity;
 
 namespace AdhdTimeOrganizer.application.mapper;
 
-public class SelectOptionMapper<TEntity> : IBaseCreateMapper<TEntity, SelectOptionRequest>, IBaseUpdateMapper<TEntity, SelectOptionRequest>, IBaseReadMapper<TEntity, SelectOptionResponse>
+public class SelectOptionMapper<TEntity> : IBaseCreateMapper<TEntity, SelectOptionRequest>, IBaseUpdateMapper<TEntity, SelectOptionRequest>, IBaseResponseMapper<TEntity, SelectOptionResponse>
     where TEntity : SelectOptionBase
 {
     public SelectOptionResponse ToResponse(TEntity entity)

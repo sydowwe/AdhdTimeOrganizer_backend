@@ -33,7 +33,7 @@ public class ResetTwoFactorAuthEndpoint(ITwoFactorAuthService twoFactorAuthServi
         if (!user.TwoFactorEnabled)
         {
             AddError("Two-factor authentication is not enabled");
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -41,7 +41,7 @@ public class ResetTwoFactorAuthEndpoint(ITwoFactorAuthService twoFactorAuthServi
         if (qrResult.Failed)
         {
             AddError("Failed to generate QR code");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
             return;
         }
 
@@ -50,11 +50,11 @@ public class ResetTwoFactorAuthEndpoint(ITwoFactorAuthService twoFactorAuthServi
         if (recoveryResult.Failed)
         {
             AddError("Failed to generate recovery codes");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
             return;
         }
 
-        await SendOkAsync(new AuthenticatorSetupResponse
+        await Send.OkAsync(new AuthenticatorSetupResponse
         {
             QrCode = qrResult.Data,
             RecoveryCodes = recoveryResult.Data.ToList()

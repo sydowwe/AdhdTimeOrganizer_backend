@@ -13,7 +13,7 @@ namespace AdhdTimeOrganizer.application.mapper.activityTracking;
 public partial class TrackerDesktopMappingMapper :
     IBaseCreateMapper<TrackerDesktopMappingByPattern, CreateTrackerDesktopMappingRequest>,
     IBaseUpdateMapper<TrackerDesktopMappingByPattern, UpdateTrackerDesktopMappingRequest>,
-    IBaseReadMapper<TrackerDesktopMappingByPattern, TrackerDesktopMappingResponse>
+    IBaseResponseMapper<TrackerDesktopMappingByPattern, TrackerDesktopMappingResponse>
 {
     public partial TrackerDesktopMappingResponse ToResponse(TrackerDesktopMappingByPattern entity);
 
@@ -24,7 +24,6 @@ public partial class TrackerDesktopMappingMapper :
 
     public partial IQueryable<TrackerDesktopMappingResponse> ProjectToResponse(IQueryable<TrackerDesktopMappingByPattern> query);
 
-    public partial SelectOptionResponse ToSelectOptionResponse(TrackerDesktopMappingByPattern entity);
 
     private static ActivityFilterFormResponse MapActivity(Activity activity) => new()
     {

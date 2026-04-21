@@ -32,7 +32,7 @@ public class RegenerateRecoveryCodesEndpoint(ITwoFactorAuthService twoFactorAuth
         if (!user.TwoFactorEnabled)
         {
             AddError("Two-factor authentication is not enabled");
-            await SendErrorsAsync(400, ct);
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -40,10 +40,10 @@ public class RegenerateRecoveryCodesEndpoint(ITwoFactorAuthService twoFactorAuth
         if (result.Failed)
         {
             AddError("Failed to generate recovery codes");
-            await SendErrorsAsync(500, ct);
+            await Send.ErrorsAsync(500, ct);
             return;
         }
 
-        await SendOkAsync(result.Data.ToList(), ct);
+        await Send.OkAsync(result.Data.ToList(), ct);
     }
 }

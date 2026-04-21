@@ -52,7 +52,7 @@ public class DesktopSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCard
 
         var response = filteredProcesses.Select(p => BuildProcessSummary(p, baselineData)).ToList();
 
-        await SendAsync(response, cancellation: ct);
+        await Send.ResponseAsync(response, cancellation: ct);
     }
 
     private async Task<List<DesktopActivityEntry>> GetPeriodData(

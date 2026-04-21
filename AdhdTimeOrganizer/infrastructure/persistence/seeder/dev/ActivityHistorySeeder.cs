@@ -46,7 +46,7 @@ public class ActivityHistorySeeder(
             {
                 var activity = activities[random.Next(activities.Count)];
                 var durationMinutes = random.Next(1, 5) * 15; // 15, 30, 45, or 60 minutes
-                var length = new MyIntTime(0, durationMinutes);
+                var length = new IntTime(0, durationMinutes);
 
                 var startTimestamp = currentTime;
                 var endTimestamp = startTimestamp.AddMinutes(durationMinutes);

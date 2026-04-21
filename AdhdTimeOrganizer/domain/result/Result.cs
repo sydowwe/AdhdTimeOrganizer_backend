@@ -71,7 +71,7 @@ public interface IResult<out T> : IResult
 public class Result<T> : Result, IResult<T>
     where T : notnull
 {
-    public T Data { get; private init; }
+    public T Data { get; private init; } = default!;
 
     public Result<TR> To<TR>(Func<T, TR> mappingFunc)
         where TR : notnull
