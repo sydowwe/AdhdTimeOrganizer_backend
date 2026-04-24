@@ -371,3 +371,5 @@ static void LoadSettingsFromConfiguration(IConfiguration configuration, IService
         configuration.GetSection("TodoListSettings")
     );
 }
+
+public partial class Program { }

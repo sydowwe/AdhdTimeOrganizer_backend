@@ -25,6 +25,10 @@ public class RoutineTodoListConfiguration : IEntityTypeConfiguration<RoutineTodo
             "CK_RoutineTodoList_BestStreak_NonNegative",
             "\"best_streak\" >= 0"));
 
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_routine_todo_list_suggested_day_range",
+            "\"suggested_day\" IS NULL OR (\"suggested_day\" BETWEEN 1 AND 30)"));
+
         builder.IsManyWithOneUser(u => u.RoutineTodoListColl);
         builder.IsManyWithOneActivity(a => a.RoutineTodoLists);
 

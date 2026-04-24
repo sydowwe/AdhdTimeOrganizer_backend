@@ -9,4 +9,5 @@ public class RoutineTodoList : BaseTodoListItem
     public int Streak { get; set; }
     public int BestStreak { get; set; }
     public DateTime LastCompletedAt { get; set; }
+    public int? SuggestedDay { get; set; }
 }

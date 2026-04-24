@@ -1,4 +1,5 @@
-﻿using AdhdTimeOrganizer.application.dto.response.@base;
+﻿using System.Linq.Expressions;
+using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.@interface;
@@ -50,6 +51,7 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppDbConte
         {
             query = query.FilteredByUser(User.GetId());
         }
+        query = query.Where(FilterQuery);
         query = Sort(query);
 
         var items = await mapper.ProjectToResponse(query).ToListAsync(ct);
@@ -60,4 +62,5 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppDbConte
 
     protected virtual IQueryable<TEntity> Sort(IQueryable<TEntity> query) => query.OrderBy(e => e.Id);
 
+    protected virtual Expression<Func<TEntity, bool>> FilterQuery => e=> true;
 }

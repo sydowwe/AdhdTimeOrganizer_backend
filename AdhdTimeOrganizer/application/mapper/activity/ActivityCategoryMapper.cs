@@ -8,7 +8,7 @@ using AdhdTimeOrganizer.application.mapper.@interface;
 namespace AdhdTimeOrganizer.application.mapper.activity;
 
 [Mapper]
-public partial class ActivityCategoryMapper :  IBaseSimpleCrudMapper<ActivityCategory, NameTextColorIconRequest, ActivityCategoryResponse>
+public partial class ActivityCategoryMapper :  IBaseSimpleCrudMapper<ActivityCategory, NameTextColorIconRequest, ActivityCategoryResponse>, IBaseSelectOptionMapper<ActivityCategory>
 {
     public partial ActivityCategoryResponse ToResponse(ActivityCategory entity);
     public partial ActivityCategory ToEntity(NameTextColorIconRequest request, long userId);

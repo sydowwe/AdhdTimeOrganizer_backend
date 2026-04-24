@@ -7,4 +7,5 @@ public record UpdateRoutineTodoListRequest : BaseUpdateTodoListRequest
 {
     [Required]
     public long TimePeriodId { get; init; }
+    public int? SuggestedDay { get; init; }
 }
