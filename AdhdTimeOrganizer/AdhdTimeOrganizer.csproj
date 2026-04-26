@@ -52,7 +52,6 @@
       <Folder Include="application\endpoint\activityTracking\desktop\" />
       <Folder Include="application\endpoint\activity\activity\query\" />
       <Folder Include="application\endpoint\activity\role\command\" />
-      <Folder Include="application\endpoint\activity\role\query\" />
       <Folder Include="application\mapper\activityTracking\desktop\" />
       <Folder Include="application\mapper\activity\" />
       <Folder Include="application\preprocessor\" />

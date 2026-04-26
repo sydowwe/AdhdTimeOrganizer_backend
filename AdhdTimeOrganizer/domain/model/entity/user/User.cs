@@ -21,6 +21,8 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public string? GoogleOAuthUserId { get; set; }
     public string? GoogleCalendarRefreshToken { get; set; }
     public bool HasExtensionAccess { get; set; } = false;
+
+
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
     public bool HasPassword => PasswordHash != null;
 
@@ -62,7 +64,7 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
             base.Email = value;
             if (value != null)
             {
-                UserName = value.Split(['@'], StringSplitOptions.None)[0];
+                UserName = value;
             }
         }
     }

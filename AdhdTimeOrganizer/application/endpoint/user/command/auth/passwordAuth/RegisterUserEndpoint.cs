@@ -68,6 +68,7 @@ public class RegisterUserEndpoint(
             await Send.ErrorsAsync(500, ct);
             return;
         }
+
         try
         {
             await SendConfirmationEmail(newUser);

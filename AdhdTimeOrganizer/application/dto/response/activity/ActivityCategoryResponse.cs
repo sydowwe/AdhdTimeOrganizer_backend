@@ -4,5 +4,5 @@ namespace AdhdTimeOrganizer.application.dto.response;
 
 public record ActivityCategoryResponse : NameTextColorIconResponse
 {
-
+    public string? Role { get; init; }
 }

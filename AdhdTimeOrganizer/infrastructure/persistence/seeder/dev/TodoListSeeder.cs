@@ -31,7 +31,7 @@ public class TodoListItemSeeder(
             .Where(a => a.UserId == userId)
             .ToListAsync();
 
-        var taskPriorities = await dbContext.TaskUrgencies
+        var taskPriorities = await dbContext.TaskPriorities
             .Where(tp => tp.UserId == userId)
             .OrderBy(tp => tp.Priority)
             .ToListAsync();

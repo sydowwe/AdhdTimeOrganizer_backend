@@ -6,14 +6,12 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
 public class UserDefaultSeederManager(
-    IServiceProvider serviceProvider,
+    IEnumerable<IUserDefaultSeeder> seeders,
     AppDbContext dbContext,
     ILogger<UserDefaultSeederManager> logger) : IScopedService, IUserDefaultSeederManager
 {
     public async Task SeedAllForUserAsync(long userId, bool overrideData = false, CancellationToken ct = default)
     {
-        var seeders = serviceProvider.GetServices<IUserDefaultSeeder>().ToList();
-
         var sortedSeeders = seeders.OrderBy(s => s.Order).ToList();
 
         foreach (var seeder in sortedSeeders)

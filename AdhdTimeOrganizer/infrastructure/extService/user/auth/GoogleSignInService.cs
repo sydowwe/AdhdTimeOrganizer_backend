@@ -21,11 +21,10 @@ public static class GoogleSignInService
                 },
                 Scopes = ["openid", "email"]
             });
-            var url = Helper.GetPageUri().ToString();
             var tokenResponse = await flow.ExchangeCodeForTokenAsync(
                 userId: "user",
                 code: code,
-                redirectUri: url,
+                redirectUri: "postmessage",
                 taskCancellationToken: CancellationToken.None
             );
 

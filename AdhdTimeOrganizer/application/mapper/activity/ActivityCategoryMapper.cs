@@ -10,13 +10,23 @@ namespace AdhdTimeOrganizer.application.mapper.activity;
 [Mapper]
 public partial class ActivityCategoryMapper :  IBaseSimpleCrudMapper<ActivityCategory, NameTextColorIconRequest, ActivityCategoryResponse>, IBaseSelectOptionMapper<ActivityCategory>
 {
-    public partial ActivityCategoryResponse ToResponse(ActivityCategory entity);
+    [MapperIgnoreTarget(nameof(ActivityCategoryResponse.Role))]
+    private partial ActivityCategoryResponse ToResponseBase(ActivityCategory entity);
+
+    public ActivityCategoryResponse ToResponse(ActivityCategory entity)
+    {
+        var response = ToResponseBase(entity);
+        return response with { Role = GetRole(entity) };
+    }
+
     public partial ActivityCategory ToEntity(NameTextColorIconRequest request, long userId);
     public partial void UpdateEntity(NameTextColorIconRequest request, ActivityCategory entity);
 
     [MapProperty(nameof(ActivityCategory.Name), nameof(SelectOptionResponse.Text))]
     public partial SelectOptionResponse ToSelectOptionResponse(ActivityCategory entity);
 
+    [MapperIgnoreTarget(nameof(ActivityCategoryResponse.Role))]
     public partial IQueryable<ActivityCategoryResponse> ProjectToResponse(IQueryable<ActivityCategory> source);
 
+    private string? GetRole(ActivityCategory entity) => entity.Activities.FirstOrDefault()?.Role?.Name;
 }

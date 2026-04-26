@@ -1,7 +1,9 @@
 using AdhdTimeOrganizer.application.dto.request.history;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.application.dto.response.generic;
+using AdhdTimeOrganizer.application.mapper.activity;
 using AdhdTimeOrganizer.application.mapper.@interface;
+using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using Riok.Mapperly.Abstractions;
 

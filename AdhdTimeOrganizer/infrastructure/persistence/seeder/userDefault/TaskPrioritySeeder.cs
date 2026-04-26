@@ -25,7 +25,7 @@ public class TaskPrioritySeeder(
     {
         var defaults = Defaults(userId);
 
-        var existingCount = await dbContext.TaskUrgencies
+        var existingCount = await dbContext.TaskPriorities
             .Where(tu => tu.UserId == userId)
             .CountAsync(ct);
 
@@ -35,7 +35,7 @@ public class TaskPrioritySeeder(
             return;
         }
 
-        await dbContext.TaskUrgencies.AddRangeAsync(defaults, ct);
+        await dbContext.TaskPriorities.AddRangeAsync(defaults, ct);
 
         await dbContext.SaveChangesAsync(ct);
 
@@ -46,7 +46,7 @@ public class TaskPrioritySeeder(
     {
         var defaults = Defaults(userId);
 
-        var existing = await dbContext.TaskUrgencies
+        var existing = await dbContext.TaskPriorities
             .Where(tu => tu.UserId == userId)
             .OrderBy(tu => tu.Id)
             .Take(defaults.Count)
@@ -64,7 +64,7 @@ public class TaskPrioritySeeder(
             existing[i].Priority = defaults[i].Priority;
         }
 
-        dbContext.TaskUrgencies.UpdateRange(existing);
+        dbContext.TaskPriorities.UpdateRange(existing);
         await dbContext.SaveChangesAsync(ct);
 
         return true;

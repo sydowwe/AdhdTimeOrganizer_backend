@@ -48,11 +48,10 @@ public class GoogleSignInEndpoint(
             {
                 Email = googleInfo.Email,
                 Timezone = req.Timezone,
-                TwoFactorEnabled = true,
-                CurrentLocale = AvailableLocales.Sk,
+                TwoFactorEnabled = false,
+                CurrentLocale = AvailableLocales.En,
                 GoogleOAuthUserId = googleUserId
             };
-
 
             user = await Register(registrationRequest, ct);
             if (user is null)
@@ -76,7 +75,7 @@ public class GoogleSignInEndpoint(
         var response = new GoogleSignInResponse
         {
             Email = googleInfo.Email,
-            // CurrentLocale = user.CurrentLocale
+            CurrentLocale = user.CurrentLocale
         };
 
         await Send.OkAsync(response, ct);
@@ -85,6 +84,8 @@ public class GoogleSignInEndpoint(
     private async Task<User?> Register(GoogleAuthRegistrationRequest req, CancellationToken ct)
     {
         var newUser = mapper.ToEntityWithGoogleId(req);
+
+        newUser.EmailConfirmed = true;
 
         await using var tx = await dbContext.Database.BeginTransactionAsync(ct);
         var identityResult = await userManager.CreateAsync(newUser);
@@ -96,6 +97,14 @@ public class GoogleSignInEndpoint(
                 : "Failed to register user: " + string.Join(", ", identityResult.Errors.Select(e => e.Description));
             AddError(msg);
             await Send.ErrorsAsync(duplicate ? 409 : 400, ct);
+            return null;
+        }
+
+        identityResult = await userManager.AddToRoleAsync(newUser, "User");
+        if (!identityResult.Succeeded)
+        {
+            AddError("Failed to add user to role: " + string.Join(", ", identityResult.Errors.Select(e => e.Description)));
+            await Send.ErrorsAsync(500, ct);
             return null;
         }
 

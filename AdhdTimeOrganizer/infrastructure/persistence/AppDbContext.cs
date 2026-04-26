@@ -36,7 +36,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<TodoListItem> TodoListItems { get; set; }
     public DbSet<TodoList> TodoLists { get; set; }
     public DbSet<TodoListCategory> TodoListCategories { get; set; }
-    public DbSet<TaskPriority> TaskUrgencies { get; set; }
+    public DbSet<TaskPriority> TaskPriorities { get; set; }
     public DbSet<WebExtensionActivityEntry> WebExtensionActivityEntries { get; set; }
     public DbSet<DesktopActivityEntry> DesktopActivityEntries { get; set; }
     public DbSet<AndroidSessionData> AndroidSessionDataEntries { get; set; }
