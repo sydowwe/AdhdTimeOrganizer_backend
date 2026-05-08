@@ -14,7 +14,7 @@ public class PlannerTask : BasePlannerTask
 
     public string? GoogleEventId { get; set; }
 
-    public required long CalendarId { get; set; }
+    public long CalendarId { get; set; }
     public long? TodolistItemId { get; set; }
 
     public virtual Calendar Calendar { get; set; } = null!;

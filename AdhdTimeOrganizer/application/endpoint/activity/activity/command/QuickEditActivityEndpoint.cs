@@ -45,7 +45,7 @@ public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickE
                 entity.Text = req.Text;
                 entity.CategoryId = req.CategoryId;
 
-                var result = await dbContext.UpdateEntityAsync(entity,ct);
+                var result = await dbContext.UpdateEntityAsync(entity, ct);
                 if (result.Failed)
                 {
                     AddError(result.ErrorMessage!);
@@ -56,7 +56,7 @@ public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickE
             {
                 var clonedEntity = entity.Clone();
 
-                clonedEntity.Name = req.Name;
+                clonedEntity.Name = clonedEntity.Name == req.Name ? $"{req.Name} (copy)" : req.Name;
                 clonedEntity.Text = req.Text;
                 clonedEntity.CategoryId = req.CategoryId;
 
@@ -67,6 +67,7 @@ public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickE
                     await Send.ErrorsAsync(400, ct);
                     return;
                 }
+
                 await Send.OkAsync(clonedEntity.Id, ct);
             }
             else

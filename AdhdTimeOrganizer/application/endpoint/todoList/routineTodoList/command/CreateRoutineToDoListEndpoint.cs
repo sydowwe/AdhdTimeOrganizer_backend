@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.infrastructure.settings;
@@ -17,7 +18,7 @@ public class CreateRoutineToDoListEndpoint(AppDbContext dbContext, RoutineTodoLi
     private readonly AppDbContext _dbContext = dbContext;
     private readonly TodoListSettings _settings = settings.Value;
 
-    protected override async Task AfterMapping(RoutineTodoList entity, CreateRoutineTodoListRequest req, CancellationToken ct = default)
+    protected override async Task<Result> AfterMapping(RoutineTodoList entity, CreateRoutineTodoListRequest req, CancellationToken ct = default)
     {
         entity.DisplayOrder = await _dbContext.RoutineTodoLists.GetNextDisplayOrder(_settings, User.GetId(), entity.TimePeriodId, ct);
 
@@ -30,5 +31,7 @@ public class CreateRoutineToDoListEndpoint(AppDbContext dbContext, RoutineTodoLi
         {
             entity.DoneCount = 0;
         }
+
+        return Result.Successful();
     }
 }

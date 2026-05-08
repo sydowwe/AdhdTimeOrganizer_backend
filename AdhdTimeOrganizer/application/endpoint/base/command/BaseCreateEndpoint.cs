@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
@@ -44,7 +45,22 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
         {
             await BeforeMapping(req, ct);
             var entity = mapper.ToEntity(req, User.GetId());
-            await AfterMapping(entity, req, ct);
+
+            var result = await AfterMapping(entity, req, ct);
+            if (result.Failed)
+            {
+                if (result.ErrorType == ResultErrorType.NotFound)
+                {
+                    AddError($"Entity not found");
+                    await Send.ErrorsAsync(404, ct);
+                    return;
+                }
+
+                AddError(result.ErrorMessage!);
+                await Send.ErrorsAsync(400, ct);
+                return;
+            }
+
             await dbContext.Set<TEntity>().AddAsync(entity, ct);
             await dbContext.SaveChangesAsync(ct);
 
@@ -57,13 +73,14 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
             await Send.ErrorsAsync(400, ct);
         }
     }
+
     protected virtual Task BeforeMapping(TRequest req, CancellationToken ct = default)
     {
         return Task.CompletedTask;
     }
 
-    protected virtual Task AfterMapping(TEntity entity, TRequest req, CancellationToken ct = default)
+    protected virtual Task<Result> AfterMapping(TEntity entity, TRequest req, CancellationToken ct = default)
     {
-        return Task.CompletedTask;
+        return Task.FromResult(Result.Successful());
     }
 }
