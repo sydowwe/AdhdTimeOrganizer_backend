@@ -29,6 +29,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<TaskImportance> TaskImportances { get; set; }
     public DbSet<PlannerTask> PlannerTasks { get; set; }
     public DbSet<TemplatePlannerTask> TemplatePlannerTasks { get; set; }
+    public DbSet<RepeatingPlannerTask> RepeatingPlannerTasks { get; set; }
     public DbSet<TaskPlannerDayTemplate> TaskPlannerDayTemplates { get; set; }
     public DbSet<RoutineTodoList> RoutineTodoLists { get; set; }
     public DbSet<RoutineTimePeriod> RoutineTimePeriods { get; set; }
