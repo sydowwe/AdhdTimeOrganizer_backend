@@ -4,4 +4,5 @@ public record ExtensionLoginResponse : LoginResponse
 {
     public string? AccessToken { get; init; }
     public string? RefreshToken { get; init; }
+    public string? PendingAuthToken { get; init; }
 }

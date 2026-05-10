@@ -20,13 +20,19 @@ public class GoogleRecaptchaService(HttpClient httpClient) : IGoogleRecaptchaSer
         //TODO fix recaptcha
         var response =
             await httpClient.PostAsync(
-                $"{RecaptchaApiUrl}?secret={Helper.GetEnvVar("RECAPTCHA_SECRET")}&response={token}", null);
+                $"{RecaptchaApiUrl}?secret={Uri.EscapeDataString(Helper.GetEnvVar("RECAPTCHA_SECRET"))}&response={Uri.EscapeDataString(token)}", null);
         var json = await response.Content.ReadAsStringAsync();
         var result = JsonSerializer.Deserialize<RecaptchaResponse>(json);
         if (result is null)
         {
             return Result.Error(ResultErrorType.RecaptchaTokenInvalid,
                 "The verify recaptcha call failed because the token was invalid");
+        }
+
+        if (!result.success)
+        {
+            return Result.Error(ResultErrorType.RecaptchaTokenInvalid,
+                "reCAPTCHA verification failed");
         }
 
         if (!expectedAction.Equals(result.action))

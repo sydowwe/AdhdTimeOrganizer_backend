@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.extension;
@@ -11,29 +12,21 @@ public class ExtensionLoginEndpoint(
     SignInManager<User> signInManager,
     UserManager<User> userManager,
     IJwtService jwtService,
-    IGoogleRecaptchaService googleRecaptchaService)
+    IDataProtectionProvider dataProtectionProvider)
     : Endpoint<ExtensionLoginRequest, ExtensionLoginResponse>
 {
     public override void Configure()
     {
         Post("auth/extension/login");
         AllowAnonymous();
-        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
+        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Forwarded-For");
         Summary(s => { s.Summary = "Login for browser extension clients"; });
     }
 
     public override async Task HandleAsync(ExtensionLoginRequest req, CancellationToken ct)
     {
-        // var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(req.RecaptchaToken, "extension_login");
-        // if (recaptchaResult.Failed)
-        // {
-        //     AddError("Recaptcha verification failed.");
-        //     await Send.ErrorsAsync(400, ct);
-        //     return;
-        // }
-
         var user = await userManager.FindByEmailAsync(req.Email);
-        if (user is null)
+        if (user is null || !user.EmailConfirmed)
         {
             AddError("Invalid email or password");
             await Send.ErrorsAsync(401, ct);
@@ -44,13 +37,6 @@ public class ExtensionLoginEndpoint(
         if (!user.HasExtensionAccess)
         {
             AddError("Extension access not enabled for this account");
-            await Send.ErrorsAsync(403, ct);
-            return;
-        }
-
-        if (!user.EmailConfirmed)
-        {
-            AddError("Email not confirmed");
             await Send.ErrorsAsync(403, ct);
             return;
         }
@@ -67,17 +53,6 @@ public class ExtensionLoginEndpoint(
             return;
         }
 
-        if (user.TwoFactorEnabled)
-        {
-            var response = new ExtensionLoginResponse
-            {
-                RequiresTwoFactor = true,
-                Email = user.Email!
-            };
-            await Send.OkAsync(response, ct);
-            return;
-        }
-
         if (!result.Succeeded)
         {
             AddError("Invalid email or password");
@@ -85,18 +60,30 @@ public class ExtensionLoginEndpoint(
             return;
         }
 
+        if (user.TwoFactorEnabled)
+        {
+            var protector = dataProtectionProvider.CreateProtector("2fa-pending").ToTimeLimitedDataProtector();
+            var pendingToken = protector.Protect(user.Id.ToString(), TimeSpan.FromMinutes(5));
+
+            await Send.OkAsync(new ExtensionLoginResponse
+            {
+                RequiresTwoFactor = true,
+                Email = user.Email!,
+                PendingAuthToken = pendingToken
+            }, ct);
+            return;
+        }
+
         // Generate tokens for extension
         var (accessToken, refreshToken) = await jwtService.GenerateTokensForExtensionAsync(
             AuthMethodEnum.Password, user);
 
-        var successResponse = new ExtensionLoginResponse
+        await Send.OkAsync(new ExtensionLoginResponse
         {
             RequiresTwoFactor = false,
             Email = user.Email!,
             AccessToken = accessToken,
             RefreshToken = refreshToken
-        };
-
-        await Send.OkAsync(successResponse, ct);
+        }, ct);
     }
 }

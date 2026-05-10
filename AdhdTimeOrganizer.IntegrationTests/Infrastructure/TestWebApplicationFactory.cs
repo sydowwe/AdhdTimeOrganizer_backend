@@ -31,11 +31,19 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         Environment.SetEnvironmentVariable("PAGE_URL", "https://localhost");
         Environment.SetEnvironmentVariable("DB_HOST", "localhost");
         Environment.SetEnvironmentVariable("DB_PORT", "5432");
-        Environment.SetEnvironmentVariable("DB_USER", "test");
-        Environment.SetEnvironmentVariable("DB_PASSWORD", "test");
-        Environment.SetEnvironmentVariable("DB_NAME", "test");
+        Environment.SetEnvironmentVariable("DB_USER", "postgres");
+        Environment.SetEnvironmentVariable("DB_PASSWORD", "P@$$w0rd");
+        Environment.SetEnvironmentVariable("DB_NAME", "postgres");
         Environment.SetEnvironmentVariable("LOG_DB_USER", "test");
         Environment.SetEnvironmentVariable("LOG_DB_PASSWORD", "test");
+        Environment.SetEnvironmentVariable("API_URL", "localhost:8080");
+
+        Environment.SetEnvironmentVariable("EXTENSION_ID", "test");
+        Environment.SetEnvironmentVariable("MAIL_FROM_EMAIL", "test");
+        Environment.SetEnvironmentVariable("MAIL_SMTP_PASSWORD", "test");
+        Environment.SetEnvironmentVariable("MAIL_SMTP_PORT", "123");
+        Environment.SetEnvironmentVariable("MAIL_SMTP_SERVER", "test");
+        Environment.SetEnvironmentVariable("MAIL_SMTP_USERNAME", "test");
 
         Directory.CreateDirectory("secrets");
         using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -85,10 +93,18 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
 
     public async Task InitializeAsync()
     {
-        await _postgres.StartAsync();
-        using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Database.MigrateAsync();
+        try
+        {
+            await _postgres.StartAsync();
+            using var scope = Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Database.MigrateAsync();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
     }
 
     public new async Task DisposeAsync()

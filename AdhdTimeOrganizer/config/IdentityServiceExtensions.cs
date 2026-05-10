@@ -21,10 +21,11 @@ public static class IdentityServiceExtensions
                 options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
                 options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
             })
-            .AddJwtBearer(options =>
+            .AddJwtBearer();
+
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<IEcdsaKeyProvider>((options, keyProvider) =>
             {
-                var serviceProvider = services.BuildServiceProvider();
-                var keyProvider = serviceProvider.GetRequiredService<IEcdsaKeyProvider>();
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidIssuer = Helper.GetEnvVar("JWT_ISSUER"),
@@ -120,26 +121,6 @@ public static class IdentityServiceExtensions
             .AddSignInManager<SignInManager<User>>()
             .AddRoleManager<RoleManager<UserRole>>()
             .AddUserManager<UserManager<User>>();
-
-        services.ConfigureApplicationCookie(options =>
-        {
-            // options.Cookie.SameSite = SameSiteMode.None;
-            options.ExpireTimeSpan = TimeSpan.FromMinutes(60); // Cookie expiration time
-            options.Cookie.Path = "/";
-            options.Cookie.HttpOnly = true;
-            options.Cookie.SameSite = SameSiteMode.Strict;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-            options.Events.OnRedirectToLogin = context =>
-            {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return Task.CompletedTask;
-            };
-            options.Events.OnRedirectToAccessDenied = context =>
-            {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                return Task.CompletedTask;
-            };
-        });
 
         services.Configure<IdentityOptions>(options =>
         {

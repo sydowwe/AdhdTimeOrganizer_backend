@@ -2,21 +2,15 @@
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.preprocessor;
 using AdhdTimeOrganizer.domain.extServiceContract.user;
-using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.settings.email;
 
-/// <summary>
-/// Initiates email change process by sending a confirmation link to the new email address.
-/// Requires password and optionally 2FA token for verification.
-/// </summary>
 public class ChangeEmailEndpoint(
     UserManager<User> userManager,
-    IUserEmailSenderService emailSender,
-    ITwoFactorAuthService twoFactorAuthService)
+    IUserEmailSenderService emailSender)
     : Endpoint<ChangeEmailRequest, EmptyResponse>
 {
     public override void Configure()

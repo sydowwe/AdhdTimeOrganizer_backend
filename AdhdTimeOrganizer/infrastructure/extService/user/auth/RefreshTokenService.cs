@@ -19,7 +19,7 @@ public class RefreshTokenService(AppDbContext dbContext, ILogger<RefreshTokenSer
 
         var tokenHash = HashToken(token);
 
-        var expiresAt = isExtensionClient | stayLoggedIn
+        var expiresAt = isExtensionClient || stayLoggedIn
             ? DateTime.UtcNow.AddDays(30)
             : DateTime.UtcNow.AddDays(1);
 

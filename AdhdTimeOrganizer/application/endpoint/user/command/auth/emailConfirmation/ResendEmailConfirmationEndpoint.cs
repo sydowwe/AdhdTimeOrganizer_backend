@@ -24,22 +24,18 @@ public class ResendConfirmationEmailEndpoint(IUserEmailSenderService emailSender
         }
 
         var user = await userManager.FindByIdAsync(userId.ToString());
-        if (user == null)
-        {
-            await Send.ResponseAsync("User not found", 404, ct);
-            return;
-        }
 
-        if (await userManager.IsEmailConfirmedAsync(user))
+        // Return the same response whether the user exists or is already confirmed to prevent enumeration
+        if (user == null || await userManager.IsEmailConfirmedAsync(user))
         {
-            await Send.ResponseAsync("Email is already confirmed", 422, ct);
+            await Send.OkAsync("Confirmation email sent if applicable", ct);
             return;
         }
 
         var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        
+
         await emailSender.SendConfirmationLinkAsync(user, token);
-        
-        await Send.OkAsync("Confirmation email has been resent successfully", ct);
+
+        await Send.OkAsync("Confirmation email sent if applicable", ct);
     }
 }

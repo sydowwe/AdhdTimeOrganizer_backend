@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
@@ -92,6 +93,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         request.Headers.Add("X-Client-Id", Guid.NewGuid().ToString());
         request.Content = JsonContent.Create(payload);
         var response = await Client.SendAsync(request);
+
         response.EnsureSuccessStatusCode();
     }
 

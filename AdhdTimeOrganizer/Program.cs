@@ -67,6 +67,7 @@ catch (Exception ex)
 {
     Console.WriteLine("Host terminated unexpectedly: \n " + ex.Message);
     Log.Fatal(ex, "Host terminated unexpectedly");
+    throw;
 }
 finally
 {
@@ -243,6 +244,19 @@ static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
         Console.WriteLine(Environment.StackTrace);
     });
 
+    // Swallow client-disconnect cancellations — not a server error
+    app.Use(async (context, next) =>
+    {
+        try
+        {
+            await next(context);
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            context.Response.StatusCode = 499;
+        }
+    });
+
     // Culture middleware
     app.Use(async (context, next) =>
     {
@@ -338,6 +352,8 @@ static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
         };
         options.GetLevel = (httpContext, elapsed, ex) =>
         {
+            if (ex is OperationCanceledException && httpContext.RequestAborted.IsCancellationRequested)
+                return LogEventLevel.Debug;
             if (ex != null || httpContext.Response.StatusCode >= 500)
                 return LogEventLevel.Error;
             if (httpContext.Response.StatusCode >= 400)

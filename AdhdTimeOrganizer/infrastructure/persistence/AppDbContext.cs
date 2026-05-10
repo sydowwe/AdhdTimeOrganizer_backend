@@ -46,6 +46,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<TimerPreset> TimerPresets { get; set; }
     public DbSet<PomodoroTimerPreset> PomodoroTimerPresets { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<UserPlannerSettings> UserPlannerSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

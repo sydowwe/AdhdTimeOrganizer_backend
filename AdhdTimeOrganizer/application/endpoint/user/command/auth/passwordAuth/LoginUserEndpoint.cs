@@ -3,11 +3,17 @@ using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
 
-public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> userManager, IJwtService jwtService, IGoogleRecaptchaService googleRecaptchaService)
+public class LoginEndpoint(
+    SignInManager<User> signInManager,
+    UserManager<User> userManager,
+    IJwtService jwtService,
+    IGoogleRecaptchaService googleRecaptchaService,
+    IDataProtectionProvider dataProtectionProvider)
     : Endpoint<PasswordLoginRequest, LoginResponse>
 {
     public override void Configure()
@@ -29,19 +35,11 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
         }
 
         var user = await userManager.FindByEmailAsync(req.Email);
-        if (user is null)
+        if (user is null || !user.EmailConfirmed)
         {
             // Generic error to prevent user enumeration
             AddError("Invalid email or password");
             await Send.ErrorsAsync(401, ct);
-            return;
-        }
-
-        // Check email confirmation first
-        if (!user.EmailConfirmed)
-        {
-            AddError("Email not confirmed");
-            await Send.ErrorsAsync(403, ct);
             return;
         }
 
@@ -57,17 +55,6 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
             return;
         }
 
-        if (user.TwoFactorEnabled)
-        {
-            var response = new LoginResponse
-            {
-                RequiresTwoFactor = true,
-                Email = user.Email!
-            };
-            await Send.OkAsync(response, ct);
-            return;
-        }
-
         if (!result.Succeeded)
         {
             // Generic error to prevent user enumeration
@@ -76,15 +63,28 @@ public class LoginEndpoint(SignInManager<User> signInManager, UserManager<User> 
             return;
         }
 
+        if (user.TwoFactorEnabled)
+        {
+            var protector = dataProtectionProvider.CreateProtector("2fa-pending").ToTimeLimitedDataProtector();
+            var pendingToken = protector.Protect(user.Id.ToString(), TimeSpan.FromMinutes(5));
+
+            HttpContext.Response.Cookies.Append("pending-2fa", pendingToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Path = "/api/auth/login/2fa",
+                MaxAge = TimeSpan.FromMinutes(5),
+                IsEssential = true
+            });
+
+            await Send.OkAsync(new LoginResponse { RequiresTwoFactor = true, Email = user.Email! }, ct);
+            return;
+        }
+
         // Successful login - generate JWT and set cookie
         await jwtService.GenerateJwtAndSetAuthCookie(req.StayLoggedIn, AuthMethodEnum.Password, user, HttpContext);
 
-        var successResponse = new LoginResponse
-        {
-            RequiresTwoFactor = false,
-            Email = user.Email!
-        };
-
-        await Send.OkAsync(successResponse, ct);
+        await Send.OkAsync(new LoginResponse { RequiresTwoFactor = false, Email = user.Email! }, ct);
     }
 }

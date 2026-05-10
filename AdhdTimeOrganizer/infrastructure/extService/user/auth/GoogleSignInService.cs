@@ -31,12 +31,11 @@ public static class GoogleSignInService
             if (string.IsNullOrEmpty(tokenResponse.IdToken))
                 return Result<GoogleUserInfo>.Error(ResultErrorType.BadRequest, "Invalid Google login code");
 
-            var payload = await GoogleJsonWebSignature.ValidateAsync(tokenResponse.IdToken
-            //     ,new GoogleJsonWebSignature.ValidationSettings{
-            //     Audience = [Helper.GetEnvVar("OAUTH2_GOOGLE_CLIENT_ID")],
-            //     HostedDomain = null // Set to your domain if you want to restrict to specific domains
-            // }
-                );
+            var payload = await GoogleJsonWebSignature.ValidateAsync(tokenResponse.IdToken,
+                new GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = [Helper.GetEnvVar("OAUTH2_GOOGLE_CLIENT_ID")]
+                });
 
             if (payload == null)
                 return Result<GoogleUserInfo>.Error(ResultErrorType.BadRequest, "Invalid token payload");

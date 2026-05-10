@@ -49,10 +49,12 @@ public class ExtensionClientAuthorizationHandler : AuthorizationHandler<Extensio
 }
 
 /// <summary>
-/// Attribute to mark endpoints that should allow extension clients.
-/// Apply this to endpoints like activity-tracking that should be accessible via extension.
+/// Marker attribute indicating this endpoint is intended to be accessible by extension clients.
+/// This attribute has no enforcement effect on its own — authorization is controlled by
+/// the policy applied in the endpoint's <c>Configure()</c> method (e.g. "ActivityTracking").
 /// </summary>
 [AttributeUsage(AttributeTargets.Class)]
 public class AllowExtensionClientsAttribute : Attribute
 {
 }
+

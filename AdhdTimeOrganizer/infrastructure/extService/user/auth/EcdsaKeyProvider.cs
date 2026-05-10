@@ -7,15 +7,15 @@ namespace AdhdTimeOrganizer.infrastructure.extService.user.auth;
 
 public class EcdsaKeyProvider : IEcdsaKeyProvider, ISingletonService, IDisposable
 {
-    private const string EcdsaPrivateKeyPath = "secrets/ec_private.pem";
     private readonly ECDsa _ecdsa;
     private readonly ECDsaSecurityKey _signingKey;
 
     public string SecurityAlgorithm => SecurityAlgorithms.EcdsaSha256;
 
-    public EcdsaKeyProvider()
+    public EcdsaKeyProvider(IConfiguration configuration)
     {
-        var ecdsaPrivatePem = File.ReadAllText(EcdsaPrivateKeyPath);
+        var keyPath = configuration["ECDSA_PRIVATE_KEY_PATH"] ?? "secrets/ec_private.pem";
+        var ecdsaPrivatePem = File.ReadAllText(keyPath);
         _ecdsa = ECDsa.Create();
         _ecdsa.ImportFromPem(ecdsaPrivatePem);
         _signingKey = new ECDsaSecurityKey(_ecdsa)

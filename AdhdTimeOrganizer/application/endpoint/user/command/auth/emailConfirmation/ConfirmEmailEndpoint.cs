@@ -8,7 +8,7 @@ public class ConfirmEmailEndpoint(UserManager<User> userManager) : EndpointWitho
 {
     public override void Configure()
     {
-        Post("auth/confirm-email");
+        Get("auth/confirm-email");
         AllowAnonymous();
     }
 
@@ -26,7 +26,7 @@ public class ConfirmEmailEndpoint(UserManager<User> userManager) : EndpointWitho
         var user = await userManager.FindByIdAsync(userId.ToString());
         if (user == null)
         {
-            await Send.ResponseAsync("User not found", 404, ct);
+            await Send.ResponseAsync("Invalid or expired confirmation link", 400, ct);
             return;
         }
 
