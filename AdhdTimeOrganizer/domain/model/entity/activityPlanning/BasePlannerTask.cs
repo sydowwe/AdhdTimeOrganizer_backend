@@ -13,8 +13,8 @@ public abstract class BasePlannerTask : BaseEntityWithActivity
     public string? Location { get; set; } // "Home", "Gym", "Office"
     public string? Notes { get; set; }
 
-    public long ImportanceId { get; set; }
-    public TaskImportance Importance { get; set; } = null!;
+    public long? ImportanceId { get; set; }
+    public TaskImportance? Importance { get; set; } = null!;
 
-    public bool IsOptional => Importance.Importance == 666;
+    public bool IsOptional => Importance?.Importance == 666;
 }

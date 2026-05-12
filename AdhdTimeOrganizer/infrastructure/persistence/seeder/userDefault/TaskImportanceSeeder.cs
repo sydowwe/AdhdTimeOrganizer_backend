@@ -22,18 +22,6 @@ public class TaskImportanceSeeder(
             Importance = 999
         },
         new() { UserId = userId,
-            Text = "High",
-            Color = ColorPalette.Orange,
-            Icon = "fas fa-star",
-            Importance = 888
-        },
-        new() { UserId = userId,
-            Text = "Normal",
-            Color = ColorPalette.Blue,
-            Icon = "fas fa-bell",
-            Importance = 777
-        },
-        new() { UserId = userId,
             Text = "Optional",
             Color = ColorPalette.Zinc,
             Icon = "fas fa-question-circle",

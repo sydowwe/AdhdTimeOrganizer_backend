@@ -3,6 +3,7 @@ using System;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260510221842_AddSuggestionMaterializedViews")]
+    partial class AddSuggestionMaterializedViews
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1412,36 +1415,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("mv_planner_task_pattern", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.suggestion.TemplateSuggestionPattern", b =>
-                {
-                    b.Property<int>("OccurrenceCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("occurrence_count");
-
-                    b.Property<int>("PatternType")
-                        .HasColumnType("integer")
-                        .HasColumnName("pattern_type");
-
-                    b.Property<int>("PatternValue")
-                        .HasColumnType("integer")
-                        .HasColumnName("pattern_value");
-
-                    b.Property<long>("TemplateId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("template_id");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.HasIndex("TemplateId")
-                        .HasDatabaseName("ix_template_suggestion_patterns_template_id");
-
-                    b.ToTable((string)null);
-
-                    b.ToView("mv_template_suggestion_pattern", "public");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.timer.PomodoroTimerPreset", b =>
@@ -2996,18 +2969,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("Activity");
 
                     b.Navigation("Importance");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.suggestion.TemplateSuggestionPattern", b =>
-                {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskPlannerDayTemplate", "Template")
-                        .WithMany()
-                        .HasForeignKey("TemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_template_suggestion_patterns_task_planner_day_templates_template_id");
-
-                    b.Navigation("Template");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.timer.PomodoroTimerPreset", b =>

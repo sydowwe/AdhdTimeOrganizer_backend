@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.domain.model.entity.suggestion;
 using AdhdTimeOrganizer.domain.model.entity.timer;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.entity.user;
@@ -47,6 +48,9 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<PomodoroTimerPreset> PomodoroTimerPresets { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<UserPlannerSettings> UserPlannerSettings { get; set; }
+    public DbSet<PlannerTaskPattern> PlannerTaskPatterns { get; set; }
+    public DbSet<ActivityHistoryPattern> ActivityHistoryPatterns { get; set; }
+    public DbSet<TemplateSuggestionPattern> TemplateSuggestionPatterns { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

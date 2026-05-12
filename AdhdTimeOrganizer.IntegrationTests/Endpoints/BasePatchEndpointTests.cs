@@ -29,7 +29,7 @@ public class BasePatchEndpointTests(TestWebApplicationFactory factory) : Integra
         db.Activities.Add(activity);
         await db.SaveChangesAsync();
 
-        var importance = new TaskImportance { Text = "Normal", Importance = 5, UserId = userId };
+        var importance = new TaskImportance { Text = "Required", Importance = 5, UserId = userId };
         db.TaskImportances.Add(importance);
         await db.SaveChangesAsync();
 

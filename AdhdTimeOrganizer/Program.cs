@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface.manager;
 using AdhdTimeOrganizer.infrastructure.settings;
@@ -81,11 +82,15 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     // HTTP context accessor
     services.AddHttpContextAccessor();
 
+    // Interceptors
+    services.AddScoped<SuggestionPatternRefreshInterceptor>();
+
     // Database configuration
-    services.AddDbContext<AppDbContext>(options =>
+    services.AddDbContext<AppDbContext>((sp, options) =>
         options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly(typeof(Program).Assembly.FullName))
             .UseSnakeCaseNamingConvention()
             .ReplaceService<IMigrationsSqlGenerator, PartitionedNpgsqlMigrationsSqlGenerator>()
+            .AddInterceptors(sp.GetRequiredService<SuggestionPatternRefreshInterceptor>())
             .LogTo(Console.WriteLine));
 
     // Dependency injection
