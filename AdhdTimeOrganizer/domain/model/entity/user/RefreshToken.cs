@@ -13,4 +13,6 @@ public class RefreshToken : BaseEntityWithUser
     public string? ReplacedByTokenHash { get; set; }
     public DateTime? RevokedAt { get; set; }
     public string? RevokedByIp { get; set; }
+    public string? UserAgent { get; set; }
+    public string? IpAddress { get; set; }
 }

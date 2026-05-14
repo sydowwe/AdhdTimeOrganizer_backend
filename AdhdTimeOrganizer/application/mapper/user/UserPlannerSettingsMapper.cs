@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.config.dependencyInjection;
+using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using Riok.Mapperly.Abstractions;
 

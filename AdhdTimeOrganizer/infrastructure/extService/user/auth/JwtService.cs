@@ -1,5 +1,6 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.helper;
@@ -21,13 +22,14 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
         if (!isValid || user == null)
             throw new UnauthorizedAccessException(errorMessage ?? "Invalid refresh token");
 
-        // Revoke old token
         var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = httpContext.Request.Headers.UserAgent.ToString();
+
         await refreshTokenService.RevokeRefreshTokenAsync(refreshToken, ipAddress);
 
         var accessToken = await CreateEcdsaJwtToken(user, authMethod, ClientTypeEnum.Web);
         var newRefreshToken = await refreshTokenService.GenerateRefreshTokenAsync(
-            user.Id, isExtensionClient, authMethod, isStayLoggedIn, ipAddress);
+            user.Id, isExtensionClient, authMethod, isStayLoggedIn, ipAddress, userAgent);
 
         return (accessToken, newRefreshToken, isStayLoggedIn);
     }
@@ -37,6 +39,9 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
         var (accessToken, refreshToken) = await GenerateTokensForWebAsync(
             stayLoggedIn, authMethod, user, httpContext);
 
+        user.LastLoginAt = DateTime.UtcNow;
+        await userManager.UpdateAsync(user);
+
         SetTokenCookies(httpContext, accessToken, refreshToken, stayLoggedIn);
     }
 
@@ -45,9 +50,11 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
     {
         var accessToken = await CreateEcdsaJwtToken(user, authMethod, ClientTypeEnum.Extension);
 
-        // Extension tokens always 30 days
         var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync(
             user.Id, isExtensionClient: true, authMethod);
+
+        user.LastLoginAt = DateTime.UtcNow;
+        await userManager.UpdateAsync(user);
 
         return (accessToken, refreshToken);
     }
@@ -57,10 +64,10 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
     {
         var accessToken = await CreateEcdsaJwtToken(user, authMethod, ClientTypeEnum.Web);
 
-        // Long-lived refresh token
         var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = httpContext.Request.Headers.UserAgent.ToString();
         var refreshToken = await refreshTokenService.GenerateRefreshTokenAsync(
-            user.Id, isExtensionClient: false, authMethod, stayLoggedIn, ipAddress);
+            user.Id, isExtensionClient: false, authMethod, stayLoggedIn, ipAddress, userAgent);
 
         return (accessToken, refreshToken);
     }
@@ -99,7 +106,6 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
         var userRoles = await userManager.GetRolesAsync(user);
         claims.AddRange(userRoles.Select(role => new Claim(ClaimTypes.Role, role)));
 
-        // Add ActivityTracking role claim for extension clients (not persisted to database)
         if (clientType == ClientTypeEnum.Extension)
         {
             claims.Add(new Claim(ClaimTypes.Role, "ActivityTracking"));
@@ -110,7 +116,6 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
 
     public void SetTokenCookies(HttpContext httpContext, string accessToken, string refreshToken, bool stayLoggedIn)
     {
-        // Access token cookie
         httpContext.Response.Cookies.Append("auth-token", accessToken, new CookieOptions
         {
             HttpOnly = true,
@@ -121,7 +126,6 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
             IsEssential = true
         });
 
-        // Refresh token cookie (restricted path)
         httpContext.Response.Cookies.Append("refresh-token", refreshToken, new CookieOptions
         {
             HttpOnly = true,
@@ -129,6 +133,18 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
             SameSite = SameSiteMode.Strict,
             Expires = stayLoggedIn ? DateTime.UtcNow.AddDays(30) : null,
             Path = "/api/auth",
+            IsEssential = true
+        });
+
+        // Identifies the current session for /user/sessions (hash only, not the raw token)
+        var sessionHash = Convert.ToBase64String(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(refreshToken)));
+        httpContext.Response.Cookies.Append("session-hash", sessionHash, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = stayLoggedIn ? DateTime.UtcNow.AddDays(30) : null,
+            Path = "/api",
             IsEssential = true
         });
     }

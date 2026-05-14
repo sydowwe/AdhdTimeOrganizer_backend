@@ -41,5 +41,8 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
 
         builder.HasIndex(rt => rt.ExpiresAt)
             .HasDatabaseName("ix_refresh_token_expires_at");
+
+        builder.Property(rt => rt.UserAgent).HasMaxLength(512);
+        builder.Property(rt => rt.IpAddress).HasMaxLength(45);
     }
 }

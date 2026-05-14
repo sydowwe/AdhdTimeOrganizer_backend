@@ -4,7 +4,7 @@ namespace AdhdTimeOrganizer.application.dto.request.user;
 
 public record ConfirmEmailChangeRequest : IMyRequest
 {
-    public string UserId { get; set; } = string.Empty;
-    public string NewEmail { get; set; } = string.Empty;
-    public string Token { get; set; } = string.Empty;
+    public required long UserId { get; set; }
+    public required string NewEmail { get; set; }
+    public required string Token { get; set; }
 }

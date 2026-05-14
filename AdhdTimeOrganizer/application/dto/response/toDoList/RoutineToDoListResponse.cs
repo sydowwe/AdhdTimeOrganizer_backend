@@ -9,5 +9,6 @@ public record RoutineTodoListResponse : BaseTodoListResponse
     public int BestStreak { get; init; }
     public DateTime LastCompletedAt { get; init; }
     public IntTime? SuggestedTime { get; init; }
-    public int? SuggestedDay { get; init; }
+    public List<DayOfWeek> SuggestedDays { get; init; } = [];
+    public int? SuggestedDayOfMonth { get; init; }
 }

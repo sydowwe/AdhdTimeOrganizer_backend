@@ -1,7 +1,9 @@
 ﻿using System.Linq.Expressions;
 using AdhdTimeOrganizer.application.dto.request.@base;
 using AdhdTimeOrganizer.application.extensions;
+using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entity;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.extensions;
@@ -20,18 +22,20 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
     private readonly TodoListSettings _settings = settings.Value;
 
 
+    public virtual string[] AllowedRoles() => EndpointHelper.GetUserOrHigherRoles();
+
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
 
         Patch($"{entityName.Kebaberize()}/change-display-order");
-        AllowAnonymous();
+        Roles(AllowedRoles());
 
         Summary(s =>
         {
             s.Summary = $"Reorders a single {entityName} item within a list.";
             s.Description = "This endpoint calculates a new 'DisplayOrder' for an item based on its preceding and following siblings.";
-            s.Responses[200] = "The item was successfully reordered.";
+            s.Responses[204] = "The item was successfully reordered.";
             s.Responses[404] = "The item to move, or a sibling item, could not be found.";
             s.Responses[409] = "A conflict occurred, requiring a full list re-index.";
             s.Responses[400] = "A bad request or other validation error occurred.";
@@ -80,7 +84,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
             await tx.CommitAsync(ct);
         }
 
-        await Send.OkAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 
     /// <summary>

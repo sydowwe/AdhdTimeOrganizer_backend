@@ -1,6 +1,6 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.user;
 
-namespace AdhdTimeOrganizer.domain.model.entity;
+namespace AdhdTimeOrganizer.domain.model.entity.@base.core;
 
 public abstract class SelectOptionBase : BaseEntityWithUser
 {

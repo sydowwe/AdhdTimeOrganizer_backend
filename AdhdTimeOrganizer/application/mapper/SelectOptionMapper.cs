@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity;
+using AdhdTimeOrganizer.domain.model.entity.@base.core;
 
 namespace AdhdTimeOrganizer.application.mapper;
 

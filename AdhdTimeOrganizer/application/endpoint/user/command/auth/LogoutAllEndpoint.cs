@@ -42,6 +42,14 @@ public class LogoutAllEndpoint(IRefreshTokenService refreshTokenService) : Endpo
             Path = "/api/auth"
         });
 
+        HttpContext.Response.Cookies.Delete("session-hash", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/api"
+        });
+
         await Send.OkAsync(ct);
     }
 }

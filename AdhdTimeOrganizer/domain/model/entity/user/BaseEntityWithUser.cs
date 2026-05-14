@@ -1,4 +1,6 @@
-﻿namespace AdhdTimeOrganizer.domain.model.entity.user;
+﻿using AdhdTimeOrganizer.domain.model.entity.@base.core;
+
+namespace AdhdTimeOrganizer.domain.model.entity.user;
 
 public abstract class BaseEntityWithUser : BaseTableEntity, IEntityWithUser
 {

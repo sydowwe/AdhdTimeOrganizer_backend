@@ -1,9 +1,8 @@
 ﻿using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.@base;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 
-namespace AdhdTimeOrganizer.domain.model.entity;
+namespace AdhdTimeOrganizer.domain.model.entity.todoList;
 
 public abstract class BaseTodoListItem : BaseEntityWithIsDone, IEntityWithDoneAndTotalCount
 {

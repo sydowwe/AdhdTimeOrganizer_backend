@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.infrastructure.extService.user.auth;
 public class RefreshTokenService(AppDbContext dbContext, ILogger<RefreshTokenService> logger)
     : IRefreshTokenService, IScopedService
 {
-    public async Task<string> GenerateRefreshTokenAsync(long userId, bool isExtensionClient, AuthMethodEnum authMethod, bool stayLoggedIn = true, string? ipAddress = null)
+    public async Task<string> GenerateRefreshTokenAsync(long userId, bool isExtensionClient, AuthMethodEnum authMethod, bool stayLoggedIn = true, string? ipAddress = null, string? userAgent = null)
     {
         var tokenBytes = new byte[32];
         using var rng = RandomNumberGenerator.Create();
@@ -30,7 +30,9 @@ public class RefreshTokenService(AppDbContext dbContext, ILogger<RefreshTokenSer
             ExpiresAt = expiresAt,
             IsExtensionClient = isExtensionClient,
             StayLoggedIn = stayLoggedIn,
-            AuthMethod = authMethod // Add this property
+            AuthMethod = authMethod,
+            IpAddress = ipAddress,
+            UserAgent = userAgent
         };
 
         dbContext.RefreshTokens.Add(refreshToken);
@@ -118,7 +120,57 @@ public class RefreshTokenService(AppDbContext dbContext, ILogger<RefreshTokenSer
         return count;
     }
 
-    private static string HashToken(string token)
+    public async Task<IList<RefreshTokenSessionData>> GetUserSessionsAsync(long userId)
+    {
+        return await dbContext.RefreshTokens
+            .Where(rt => rt.UserId == userId && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(rt => rt.CreatedTimestamp)
+            .Select(rt => new RefreshTokenSessionData(
+                rt.Id,
+                rt.TokenHash,
+                rt.UserAgent,
+                rt.IpAddress,
+                rt.CreatedTimestamp))
+            .ToListAsync();
+    }
+
+    public async Task<(bool Found, bool IsCurrent)> RevokeSessionByIdAsync(long sessionId, long userId, string? currentTokenHash, string? ipAddress)
+    {
+        var token = await dbContext.RefreshTokens
+            .FirstOrDefaultAsync(rt => rt.Id == sessionId && rt.UserId == userId && !rt.IsRevoked);
+
+        if (token is null)
+            return (false, false);
+
+        if (token.TokenHash == currentTokenHash)
+            return (true, true);
+
+        token.IsRevoked = true;
+        token.RevokedAt = DateTime.UtcNow;
+        token.RevokedByIp = ipAddress;
+        await dbContext.SaveChangesAsync();
+
+        return (true, false);
+    }
+
+    public async Task RevokeAllExceptCurrentAsync(long userId, string? currentTokenHash, string? ipAddress)
+    {
+        var tokens = await dbContext.RefreshTokens
+            .Where(rt => rt.UserId == userId && !rt.IsRevoked && rt.TokenHash != currentTokenHash)
+            .ToListAsync();
+
+        foreach (var token in tokens)
+        {
+            token.IsRevoked = true;
+            token.RevokedAt = DateTime.UtcNow;
+            token.RevokedByIp = ipAddress;
+        }
+
+        await dbContext.SaveChangesAsync();
+        logger.LogInformation("Revoked {Count} sessions for user {UserId} except current", tokens.Count, userId);
+    }
+
+    internal static string HashToken(string token)
     {
         var hashBytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
         return Convert.ToBase64String(hashBytes);

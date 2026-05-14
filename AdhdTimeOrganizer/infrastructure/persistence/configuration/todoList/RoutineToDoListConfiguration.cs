@@ -2,6 +2,7 @@
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence.converter;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.todoList;
@@ -25,9 +26,19 @@ public class RoutineTodoListConfiguration : IEntityTypeConfiguration<RoutineTodo
             "CK_RoutineTodoList_BestStreak_NonNegative",
             "\"best_streak\" >= 0"));
 
+        builder.Property(r => r.SuggestedDays)
+            .HasConversion(
+                v => v.Select(d => (int)d).ToArray(),
+                v => v.Select(i => (DayOfWeek)i).ToList(),
+                new ValueComparer<List<DayOfWeek>>(
+                    (a, b) => a != null && b != null && a.SequenceEqual(b),
+                    v => v.Aggregate(0, (h, d) => HashCode.Combine(h, d.GetHashCode())),
+                    v => v.ToList()))
+            .HasColumnType("integer[]");
+
         builder.ToTable(t => t.HasCheckConstraint(
-            "ck_routine_todo_list_suggested_day_range",
-            "\"suggested_day\" IS NULL OR (\"suggested_day\" BETWEEN 1 AND 30)"));
+            "CK_RoutineTodoList_SuggestedDayOfMonth_Range",
+            "\"suggested_day_of_month\" IS NULL OR (\"suggested_day_of_month\" BETWEEN 1 AND 31)"));
 
         builder.IsManyWithOneUser(u => u.RoutineTodoListColl);
         builder.IsManyWithOneActivity(a => a.RoutineTodoLists);

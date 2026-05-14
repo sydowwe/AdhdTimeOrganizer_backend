@@ -1,4 +1,6 @@
 
+using AdhdTimeOrganizer.domain.model.entity.@base.core;
+
 namespace AdhdTimeOrganizer.domain.model.entity.todoList;
 
 public class RoutinePeriodCompletion : BaseEntity

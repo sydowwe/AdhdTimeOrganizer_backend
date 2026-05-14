@@ -9,13 +9,13 @@ namespace AdhdTimeOrganizer.application.endpoint.user.read;
 /// <summary>
 /// Returns the currently logged-in user's profile data.
 /// </summary>
-public class GetCurrentUserEndpoint(UserManager<User> userManager, UserMapper mapper)
-    : EndpointWithoutRequest<UserResponse>
+public class GetUserDataEndpoint(UserManager<User> userManager, UserMapper mapper)
+    : EndpointWithoutRequest<UserDataResponse>
 {
     public override void Configure()
     {
-        Get("user/me");
-        Summary(s => { s.Summary = "Get current user profile"; });
+        Post("user/data");
+        Summary(s => { s.Summary = "Get full profile data for the authenticated user"; });
     }
 
     public override async Task HandleAsync(CancellationToken ct)
@@ -27,7 +27,6 @@ public class GetCurrentUserEndpoint(UserManager<User> userManager, UserMapper ma
             return;
         }
 
-        var response = mapper.ToResponse(user);
-        await Send.OkAsync(response, ct);
+        await Send.OkAsync(mapper.ToDataResponse(user), ct);
     }
 }

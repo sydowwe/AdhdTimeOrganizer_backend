@@ -43,6 +43,10 @@ public class DeleteUserAccountEndpoint(UserManager<User> userManager)
         {
             HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict, Path = "/api/auth"
         });
+        HttpContext.Response.Cookies.Delete("session-hash", new CookieOptions
+        {
+            HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict, Path = "/api"
+        });
 
         await Send.NoContentAsync(ct);
     }

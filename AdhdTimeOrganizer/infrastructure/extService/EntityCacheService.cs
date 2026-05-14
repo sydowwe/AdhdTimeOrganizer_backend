@@ -1,6 +1,7 @@
 ﻿using AdhdTimeOrganizer.domain.extServiceContract;
 using AdhdTimeOrganizer.domain.extServiceContract.user;
 using AdhdTimeOrganizer.domain.model.entity;
+using AdhdTimeOrganizer.domain.model.entity.@base.core;
 using Microsoft.Extensions.Caching.Distributed;
 using Newtonsoft.Json;
 

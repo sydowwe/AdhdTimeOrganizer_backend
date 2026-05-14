@@ -1,4 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.user;
+using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
@@ -11,7 +12,7 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.settings.email;
 /// </summary>
 public class ConfirmEmailChangeEndpoint(
     UserManager<User> userManager,
-    SignInManager<User> signInManager)
+    IRefreshTokenService refreshTokenService)
     : Endpoint<ConfirmEmailChangeRequest, EmptyResponse>
 {
     public override void Configure()
@@ -23,7 +24,7 @@ public class ConfirmEmailChangeEndpoint(
 
     public override async Task HandleAsync(ConfirmEmailChangeRequest req, CancellationToken ct)
     {
-        var user = await userManager.FindByIdAsync(req.UserId);
+        var user = await userManager.FindByIdAsync(req.UserId.ToString());
         if (user is null)
         {
             AddError("Invalid or expired confirmation link");
@@ -45,12 +46,8 @@ public class ConfirmEmailChangeEndpoint(
         // Also update username to match new email (common pattern)
         await userManager.SetUserNameAsync(user, req.NewEmail);
 
-        // Update security stamp to invalidate existing sessions
-        // This forces re-login on all devices for security
         await userManager.UpdateSecurityStampAsync(user);
-        
-        // Sign out the user from current session
-        await signInManager.SignOutAsync();
+        await refreshTokenService.RevokeAllUserTokensAsync(user.Id);
 
         await Send.NoContentAsync(ct);
     }

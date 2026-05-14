@@ -21,6 +21,10 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public string? GoogleOAuthUserId { get; set; }
     public string? GoogleCalendarRefreshToken { get; set; }
     public bool HasExtensionAccess { get; set; } = false;
+    public DateTime? LastLoginAt { get; set; }
+    public AppThemeEnum Theme { get; set; } = AppThemeEnum.System;
+    public int FirstDayOfWeek { get; set; } = 1;
+    public bool AskBeforeDelete { get; set; } = true;
 
 
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;

@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using Riok.Mapperly.Abstractions;
 
-namespace AdhdTimeOrganizer.domain.model.entity;
+namespace AdhdTimeOrganizer.domain.model.entity.@base.core;
 
 public abstract class BaseTableEntity : BaseEntity, IBaseTableEntity
 {

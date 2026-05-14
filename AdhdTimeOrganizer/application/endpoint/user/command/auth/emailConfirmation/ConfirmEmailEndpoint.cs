@@ -38,8 +38,7 @@ public class ConfirmEmailEndpoint(UserManager<User> userManager) : EndpointWitho
         }
         else
         {
-            var errorMessages = string.Join(", ", result.Errors.Select(e => e.Description));
-            await Send.ResponseAsync($"Failed to confirm email: {errorMessages}", 422, ct);
+            await Send.ResponseAsync("Invalid or expired confirmation link", 400, ct);
         }
     }
 }

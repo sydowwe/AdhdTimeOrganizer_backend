@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.request.user;
+using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.application.mapper.@interface;
@@ -7,13 +7,15 @@ using Riok.Mapperly.Abstractions;
 
 namespace AdhdTimeOrganizer.application.mapper;
 
-// Example DTOs
-
 [Mapper]
 public partial class UserMapper : IBaseCreateWithoutUserMapper<User, UserRequest>, IBaseUpdateMapper<User, UserRequest>, IBaseResponseMapper<User, UserResponse>
 {
     public partial UserResponse ToResponse(User entity);
 
+    [MapProperty(nameof(User.CreatedTimestamp), nameof(UserDataResponse.CreatedAt))]
+    [MapProperty(nameof(User.CurrentLocale), nameof(UserDataResponse.Locale))]
+    [MapProperty(nameof(User.Timezone), nameof(UserDataResponse.Timezone), Use = nameof(TimezoneToString))]
+    public partial UserDataResponse ToDataResponse(User entity);
 
     [MapProperty(nameof(UserRequest.Timezone), nameof(User.Timezone), Use = nameof(ToTimeZoneInfo))]
     public partial User ToEntity(UserRequest request);
@@ -27,6 +29,8 @@ public partial class UserMapper : IBaseCreateWithoutUserMapper<User, UserRequest
     {
         return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
     }
+
+    private static string TimezoneToString(TimeZoneInfo tz) => tz.Id;
 
     public User ToEntityWithGoogleId(GoogleAuthRegistrationRequest request)
     {

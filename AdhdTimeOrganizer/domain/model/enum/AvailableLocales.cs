@@ -1,7 +1,13 @@
-﻿namespace AdhdTimeOrganizer.domain.model.@enum;
+﻿using System.Text.Json.Serialization;
+
+namespace AdhdTimeOrganizer.domain.model.@enum;
 
 public enum AvailableLocales
 {
+    [JsonStringEnumMemberName("SK")]
     Sk,
-    En
+    [JsonStringEnumMemberName("EN")]
+    En,
+    [JsonStringEnumMemberName("CZ")]
+    Cz
 }
