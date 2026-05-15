@@ -1,5 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.generic;
-using AdhdTimeOrganizer.application.dto.response.toDoList;
+using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
@@ -10,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTimePeriod.query;
 
 public class GetCompletionHistoryRoutineTimePeriodEndpoint(AppDbContext dbContext)
-    : Endpoint<IdRequest, List<PeriodCompletionRecord>>
+    : EndpointWithoutRequest<List<PeriodCompletionRecord>>
 {
     public override void Configure()
     {
@@ -26,12 +25,13 @@ public class GetCompletionHistoryRoutineTimePeriodEndpoint(AppDbContext dbContex
         });
     }
 
-    public override async Task HandleAsync(IdRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
+        var id = Route<long>("id");
         var loggedUserId = User.GetId();
 
         var period = await dbContext.Set<RoutineTimePeriod>()
-            .Where(x => x.Id == req.Id && x.UserId == loggedUserId)
+            .Where(x => x.Id == id && x.UserId == loggedUserId)
             .Select(x => new { x.Id, x.HistoryDepth })
             .FirstOrDefaultAsync(ct);
 

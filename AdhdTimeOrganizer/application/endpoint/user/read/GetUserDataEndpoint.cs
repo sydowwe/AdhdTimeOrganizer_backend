@@ -9,7 +9,7 @@ namespace AdhdTimeOrganizer.application.endpoint.user.read;
 /// <summary>
 /// Returns the currently logged-in user's profile data.
 /// </summary>
-public class GetUserDataEndpoint(UserManager<User> userManager, UserMapper mapper)
+public class GetCurrentUserEndpoint(UserManager<User> userManager, UserMapper mapper)
     : EndpointWithoutRequest<UserDataResponse>
 {
     public override void Configure()

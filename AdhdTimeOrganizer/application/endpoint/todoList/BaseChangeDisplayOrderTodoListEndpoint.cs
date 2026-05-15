@@ -28,7 +28,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
     {
         var entityName = typeof(TEntity).Name;
 
-        Patch($"{entityName.Kebaberize()}/change-display-order");
+        Patch($"/{entityName.Kebaberize()}/change-display-order");
         Roles(AllowedRoles());
 
         Summary(s =>
@@ -39,6 +39,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
             s.Responses[404] = "The item to move, or a sibling item, could not be found.";
             s.Responses[409] = "A conflict occurred, requiring a full list re-index.";
             s.Responses[400] = "A bad request or other validation error occurred.";
+            s.Responses[500] = "An error occurred during item update.";
         });
     }
 

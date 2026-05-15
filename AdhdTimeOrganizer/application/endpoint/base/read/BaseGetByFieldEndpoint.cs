@@ -33,8 +33,8 @@ public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbC
         Roles(AllowedRoles());
         Summary(s =>
         {
-            s.Summary = $"Get {entityName} by Name";
-            s.Description = $"Retrieves a specific {entityName} by its name";
+            s.Summary = $"Get {entityName} by {FieldName}";
+            s.Description = $"Retrieves a specific {entityName} by its {FieldName.Camelize().ToLowerInvariant()}";
             s.Response<TResponse>(200, "Success");
             s.Response(404, "Not found");
         });

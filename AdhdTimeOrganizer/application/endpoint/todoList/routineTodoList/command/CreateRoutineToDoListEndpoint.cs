@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.toDoList;
+using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
@@ -12,7 +12,7 @@ using RoutineTodoListMapper = AdhdTimeOrganizer.application.mapper.todoList.Rout
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.command;
 
-public class CreateRoutineToDoListEndpoint(AppDbContext dbContext, RoutineTodoListMapper mapper, IOptions<TodoListSettings> settings)
+public class CreateRoutineTodoListEndpoint(AppDbContext dbContext, RoutineTodoListMapper mapper, IOptions<TodoListSettings> settings)
     : BaseCreateEndpoint<RoutineTodoList, CreateRoutineTodoListRequest, RoutineTodoListMapper>(dbContext, mapper)
 {
     private readonly AppDbContext _dbContext = dbContext;

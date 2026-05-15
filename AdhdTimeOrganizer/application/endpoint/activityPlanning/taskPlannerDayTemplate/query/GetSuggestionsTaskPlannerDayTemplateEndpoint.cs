@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.dto.response.suggestion;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.suggestion;
 using AdhdTimeOrganizer.domain.model.@enum;

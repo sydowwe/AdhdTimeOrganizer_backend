@@ -28,7 +28,7 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Post(Route);
+        Post($"/{Route}");
         Roles(AllowedRoles());
         Summary(s =>
         {

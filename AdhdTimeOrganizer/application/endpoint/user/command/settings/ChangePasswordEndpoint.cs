@@ -17,7 +17,10 @@ public class ChangePasswordEndpoint(
     {
         Patch("user/password");
         PreProcessor<VerifyUserPreProcessor<ChangePasswordRequest>>();
-        Summary(s => { s.Summary = "Change user password"; });
+        Summary(s => {
+            s.Summary = "Change user password";
+            s.Description = "Returns 401 if 2FA verification fails or current password is incorrect";
+        });
     }
 
     public override async Task HandleAsync(ChangePasswordRequest req, CancellationToken ct)
@@ -31,7 +34,7 @@ public class ChangePasswordEndpoint(
             {
                 AddError(error.Description);
             }
-            await Send.ErrorsAsync(400, ct);
+            await Send.ErrorsAsync(401, ct);
             return;
         }
 

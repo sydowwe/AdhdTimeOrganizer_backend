@@ -22,6 +22,6 @@ public class ExtensionLogoutEndpoint(IRefreshTokenService refreshTokenService)
             await refreshTokenService.RevokeRefreshTokenAsync(req.RefreshToken, ipAddress);
         }
 
-        await Send.OkAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.toDoList;
+using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entity;
@@ -18,7 +18,7 @@ public abstract class BaseCreateStepEndpoint<TParent>(AppDbContext dbContext)
 
     public override void Configure()
     {
-        Post($"{typeof(TParent).Name.Kebaberize()}/{{itemId}}/steps");
+        Post($"/{typeof(TParent).Name.Kebaberize()}/{{itemId}}/steps");
         Roles(EndpointHelper.GetUserOrHigherRoles());
         Summary(s =>
         {

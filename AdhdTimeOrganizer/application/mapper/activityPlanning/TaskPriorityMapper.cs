@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.toDoList;
+using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.mapper.@interface;

@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.response.toDoList;
+using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.todoList;

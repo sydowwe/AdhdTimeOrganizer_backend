@@ -1,42 +1,32 @@
+using AdhdTimeOrganizer.application.dto.request.todoList;
+using AdhdTimeOrganizer.application.dto.response.todoList;
+using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using FastEndpoints;
 using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.command;
 
-public class ChangePriorityTodoListItemEndpoint(AppDbContext dbContext) : EndpointWithoutRequest
+public class ChangePriorityTodoListItemEndpoint(AppDbContext dbContext)
+    : BasePatchEndpoint<TodoListItem, ChangePriorityTodoListItemRequest, TodoListItemResponse>(dbContext)
 {
-
     public override void Configure()
     {
         const string entityName = nameof(TodoListItem);
-        Patch($"{entityName.Kebaberize()}/change-priority/{{id:long:required}}/{{priorityId:long:required}}");
+        Patch($"/{entityName.Kebaberize()}/{{id}}/priority");
+        Roles(AllowedRoles());
         Summary(s =>
         {
-            s.Summary = $"Toggles {entityName} IsDone status";
-            s.Description = $"Toggles {entityName} IsDone status";
-            s.Response(204, "Toggled");
+            s.Summary = $"Change priority of {entityName}";
+            s.Description = $"Changes the priority of an existing {entityName}";
+            s.Response(204, "Success");
+            s.Response(404, "Not found");
             s.Response(400, "Bad request");
         });
     }
 
-    public override async Task HandleAsync(CancellationToken ct)
+    protected override void Mapping(TodoListItem entity, ChangePriorityTodoListItemRequest req)
     {
-        var entity = await dbContext.TodoListItems.FindAsync([Route<long>("id")], ct);
-
-        if (entity == null)
-        {
-            AddError("Entity not found");
-            await Send.NotFoundAsync(ct);
-            return;
-        }
-
-        entity.TaskPriorityId = Route<long>("priorityId");
-
-        dbContext.TodoListItems.Update(entity);
-        await dbContext.SaveChangesAsync(ct);
-
-        await Send.NoContentAsync(ct);
+        entity.TaskPriorityId = req.PriorityId;
     }
 }

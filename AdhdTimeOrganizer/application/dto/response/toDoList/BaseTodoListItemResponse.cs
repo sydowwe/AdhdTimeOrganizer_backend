@@ -1,6 +1,6 @@
 ﻿using AdhdTimeOrganizer.application.dto.response.extendable;
 
-namespace AdhdTimeOrganizer.application.dto.response.toDoList;
+namespace AdhdTimeOrganizer.application.dto.response.todoList;
 
 public record BaseTodoListResponse : WithIsDoneResponse
 {

@@ -1,5 +1,7 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.generic;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -20,14 +22,14 @@ public class BaseToggleIsHiddenEndpoint<TEntity>(AppDbContext dbContext) : Endpo
     {
         var entityName = typeof(TEntity).Name;
 
-        Patch($"{entityName.Kebaberize()}/toggle-is-hidden");
+        Patch($"/{entityName.Kebaberize()}/toggle-is-hidden");
         Roles(AllowedRoles());
         Summary(s =>
         {
             s.Summary = $"Toggles {entityName} IsHidden status";
             s.Description = $"Toggles {entityName} IsHidden status";
             s.Response(204, "Toggled");
-            s.Response(400, "Bad request");
+            s.Response(404, "Not found");
         });
     }
 
@@ -36,6 +38,13 @@ public class BaseToggleIsHiddenEndpoint<TEntity>(AppDbContext dbContext) : Endpo
         var entities = await dbContext.Set<TEntity>().Where(e => request.Ids.Contains(e.Id)).ToListAsync(ct);
 
         if (entities.Count < 1)
+        {
+            await Send.NotFoundAsync(ct);
+            return;
+        }
+
+        var userId = User.GetId();
+        if (entities.OfType<IEntityWithUser>().Any(e => e.UserId != userId))
         {
             await Send.NotFoundAsync(ct);
             return;

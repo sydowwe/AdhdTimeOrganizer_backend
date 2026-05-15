@@ -17,7 +17,7 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbC
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Patch($"{entityName.Kebaberize()}/toggle-is-done");
+        Patch($"/{entityName.Kebaberize()}/toggle-is-done");
         Roles(AllowedRoles());
         Summary(s =>
         {

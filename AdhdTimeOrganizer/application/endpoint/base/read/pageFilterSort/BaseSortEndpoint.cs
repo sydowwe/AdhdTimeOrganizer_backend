@@ -63,7 +63,8 @@ public abstract class BaseSortEndpoint<TEntity, TResponse, TMapper>(
         }
         catch (Exception ex)
         {
-            AddError($"An error occurred while retrieving filtered data: {ex.Message}");
+            Logger.LogError(ex, "Error retrieving sorted data for {Entity}", typeof(TEntity).Name);
+            AddError("An internal error occurred.");
             await Send.ErrorsAsync(500, ct);
         }
     }

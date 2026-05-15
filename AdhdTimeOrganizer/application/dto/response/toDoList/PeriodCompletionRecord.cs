@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.response.toDoList;
+﻿namespace AdhdTimeOrganizer.application.dto.response.todoList;
 
 public record PeriodCompletionRecord(
     DateOnly PeriodStart,

@@ -1,6 +1,8 @@
 using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -9,7 +11,7 @@ using Humanizer;
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
 public abstract class BasePatchEndpoint<TEntity, TRequest, TResponse>(
-    AppDbContext dbContext) : Endpoint<TRequest, long>
+    AppDbContext dbContext) : Endpoint<TRequest>
     where TEntity : class, IEntityWithId
     where TRequest : class, IPatchRequest
     where TResponse : class, IIdResponse
@@ -22,13 +24,13 @@ public abstract class BasePatchEndpoint<TEntity, TRequest, TResponse>(
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Patch($"/{entityName.Kebaberize()}/{{id}}");
+        Patch($"/{entityName.Kebaberize()}/{{id:long}}");
         Roles(AllowedRoles());
         Summary(s =>
         {
             s.Summary = $"Patch {entityName}";
             s.Description = $"Partially updates an existing {entityName}";
-            s.Response<TResponse>(200, "Success");
+            s.Response(204, "Success");
             s.Response(404, "Not found");
             s.Response(400, "Bad request");
         });
@@ -45,6 +47,12 @@ public abstract class BasePatchEndpoint<TEntity, TRequest, TResponse>(
                 return;
             }
 
+            if (entity is IEntityWithUser entityWithUser && entityWithUser.UserId != User.GetId())
+            {
+                await Send.NotFoundAsync(ct);
+                return;
+            }
+
             Mapping(entity, req);
 
             dbContext.Set<TEntity>().Update(entity);
@@ -56,7 +64,7 @@ public abstract class BasePatchEndpoint<TEntity, TRequest, TResponse>(
                 return;
             }
 
-            await Send.OkAsync(entity.Id, ct);
+            await Send.NoContentAsync(ct);
         }
         catch (Exception ex)
         {

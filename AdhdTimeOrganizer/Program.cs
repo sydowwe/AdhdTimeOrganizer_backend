@@ -6,10 +6,10 @@ using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface.manager;
 using AdhdTimeOrganizer.infrastructure.settings;
 using DotNetEnv;
+using AdhdTimeOrganizer.application.endpoint.@base;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.CookiePolicy;
@@ -50,7 +50,7 @@ try
     LoadSettingsFromConfiguration(builder.Configuration, builder.Services);
 
     var app = builder.Build();
-    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    var logger = app.Services.GetRequiredService<ILogger<AdhdTimeOrganizer.Program>>();
 
     logger.LogInformation("Backend starting.");
 
@@ -87,27 +87,20 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
 
     // Database configuration
     services.AddDbContext<AppDbContext>((sp, options) =>
-        options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly(typeof(Program).Assembly.FullName))
+        options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly(typeof(AdhdTimeOrganizer.Program).Assembly.FullName))
             .UseSnakeCaseNamingConvention()
             .ReplaceService<IMigrationsSqlGenerator, PartitionedNpgsqlMigrationsSqlGenerator>()
             .AddInterceptors(sp.GetRequiredService<SuggestionPatternRefreshInterceptor>())
             .LogTo(Console.WriteLine));
 
     // Dependency injection
-    try
-    {
-        services.AddDependencyInjection();
-    }
-    catch (Exception e)
-    {
-        Log.Fatal(e, "Failed to configure dependency injection");
-        throw;
-    }
+    services.AddDependencyInjection();
 
     // Identity services
 
     // FastEndpoints
     services.AddFastEndpoints();
+    services.AddSingleton<IGlobalPostProcessor, ErrorLoggingPostProcessor>();
     if (isDevelopment)
     {
         services.SwaggerDocument();
@@ -153,9 +146,11 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     });
 
     // JSON serialization configuration for FastEndpoints
-    services.ConfigureHttpJsonOptions(options => { options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()); });
-
-    services.ConfigureHttpJsonOptions(options => { options.SerializerOptions.Converters.Add(new DateOnlyJsonConverter()); });
+    services.ConfigureHttpJsonOptions(options =>
+    {
+        options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.SerializerOptions.Converters.Add(new DateOnlyJsonConverter());
+    });
     // File upload configuration
     services.Configure<KestrelServerOptions>(options => { options.Limits.MaxRequestBodySize = configuration.GetValue<int>("FileUpload:MaxFileSizeInMB") * 1024 * 1024; });
 
@@ -202,7 +197,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     services.Configure<ForwardedHeadersOptions>(options => { options.ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor; });
 }
 
-static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, ILogger<Program> logger)
+static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, ILogger<AdhdTimeOrganizer.Program> logger)
 {
     try
     {
@@ -239,7 +234,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
     }
 }
 
-static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
+static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Program> logger)
 {
     // Application stopping event
     app.Lifetime.ApplicationStopping.Register(() =>
@@ -248,6 +243,10 @@ static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
         Console.WriteLine("<< STOPPING called. Stack:");
         Console.WriteLine(Environment.StackTrace);
     });
+
+    // Must be first so real client IP is resolved before any logging
+    app.UseForwardedHeaders();
+    app.UseHttpsRedirection();
 
     // Swallow client-disconnect cancellations — not a server error
     app.Use(async (context, next) =>
@@ -262,72 +261,11 @@ static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
         }
     });
 
-    // Culture middleware
-    app.Use(async (context, next) =>
-    {
-        var uiCulture = context.Request.Headers.AcceptLanguage;
-
-        if (uiCulture.Count > 0)
-        {
-            try
-            {
-                var culture = new CultureInfo(uiCulture[0]?.Split(",")[0] ?? "sk-SK");
-                Thread.CurrentThread.CurrentCulture = culture;
-                Thread.CurrentThread.CurrentUICulture = culture;
-                CultureInfo.CurrentCulture = culture;
-                CultureInfo.CurrentUICulture = culture;
-            }
-            catch (CultureNotFoundException)
-            {
-                // Fallback to default culture if requested culture is not supported
-                var defaultCulture = new CultureInfo("sk-SK");
-                Thread.CurrentThread.CurrentCulture = defaultCulture;
-                Thread.CurrentThread.CurrentUICulture = defaultCulture;
-            }
-        }
-
-        logger.LogDebug("Request: {RequestPath}", context.Request.Path);
-        await next();
-        logger.LogDebug("Response: {StatusCode}", context.Response.StatusCode);
-    });
-
-    // Development-specific middleware
     if (app.Environment.IsDevelopment())
     {
-        app.UseSwaggerGen(); // FastEndpoints Swagger
+        app.UseSwaggerGen();
     }
 
-    // Middleware to capture and log response body for errors
-    app.Use(async (context, next) =>
-    {
-        var originalBodyStream = context.Response.Body;
-        using var responseBody = new MemoryStream();
-        context.Response.Body = responseBody;
-
-        await next();
-
-        responseBody.Seek(0, SeekOrigin.Begin);
-        
-        // Log response body for 4xx and 5xx errors
-        if (context.Response.StatusCode >= 400)
-        {
-            var responseText = await new StreamReader(responseBody).ReadToEndAsync();
-            responseBody.Seek(0, SeekOrigin.Begin);
-
-            var logLevel = context.Response.StatusCode >= 500 ? LogLevel.Error : LogLevel.Warning;
-            logger.Log(logLevel, 
-                "HTTP {Method} {Path} {StatusCode} - Response: {ResponseBody}", 
-                context.Request.Method, 
-                context.Request.Path, 
-                context.Response.StatusCode,
-                responseText.Length > 2000 ? responseText.Substring(0, 2000) + "... (truncated)" : responseText);
-            responseBody.Seek(0, SeekOrigin.Begin);
-        }
-
-        await responseBody.CopyToAsync(originalBodyStream);
-    });
-
-    // Request pipeline configuration
     app.UseSerilogRequestLogging(options =>
     {
         options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
@@ -337,8 +275,7 @@ static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
             diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
             diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
             diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
-            
-            // Log request body for non-GET requests (be careful with sensitive data)
+
             if (httpContext.Request.Method != "GET" && httpContext.Request.ContentLength > 0)
             {
                 httpContext.Request.EnableBuffering();
@@ -346,12 +283,9 @@ static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
                 using var reader = new StreamReader(httpContext.Request.Body, leaveOpen: true);
                 var body = reader.ReadToEndAsync().Result;
                 httpContext.Request.Body.Position = 0;
-                
-                // Truncate large bodies
+
                 if (body.Length > 1000)
-                {
                     body = body.Substring(0, 1000) + "... (truncated)";
-                }
                 diagnosticContext.Set("RequestBody", body);
             }
         };
@@ -366,8 +300,6 @@ static void ConfigurePipeline(WebApplication app, ILogger<Program> logger)
             return LogEventLevel.Information;
         };
     });
-    app.UseForwardedHeaders();
-    app.UseHttpsRedirection();
 
     app.UseCors("AllowFrontend");
 
@@ -393,4 +325,7 @@ static void LoadSettingsFromConfiguration(IConfiguration configuration, IService
     );
 }
 
-public partial class Program { }
+namespace AdhdTimeOrganizer
+{
+    public partial class Program { }
+}

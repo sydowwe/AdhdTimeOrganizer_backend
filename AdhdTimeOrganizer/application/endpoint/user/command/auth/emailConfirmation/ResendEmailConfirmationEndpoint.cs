@@ -11,6 +11,7 @@ public class ResendConfirmationEmailEndpoint(IUserEmailSenderService emailSender
     {
         Post("auth/resend-confirmation-email/{userId:required:long}");
         AllowAnonymous();
+        Summary(s => { s.Summary = "Resend email confirmation link to user"; });
     }
 
     public override async Task HandleAsync(CancellationToken ct)
@@ -28,7 +29,7 @@ public class ResendConfirmationEmailEndpoint(IUserEmailSenderService emailSender
         // Return the same response whether the user exists or is already confirmed to prevent enumeration
         if (user == null || await userManager.IsEmailConfirmedAsync(user))
         {
-            await Send.OkAsync("Confirmation email sent if applicable", ct);
+            await Send.NoContentAsync(ct);
             return;
         }
 
@@ -36,6 +37,6 @@ public class ResendConfirmationEmailEndpoint(IUserEmailSenderService emailSender
 
         await emailSender.SendConfirmationLinkAsync(user, token);
 
-        await Send.OkAsync("Confirmation email sent if applicable", ct);
+        await Send.NoContentAsync(ct);
     }
 }

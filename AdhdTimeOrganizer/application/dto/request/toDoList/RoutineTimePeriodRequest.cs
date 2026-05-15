@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.@base;
 
-namespace AdhdTimeOrganizer.application.dto.request.toDoList;
+namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
 public record RoutineTimePeriodRequest : TextColorRequest
 {

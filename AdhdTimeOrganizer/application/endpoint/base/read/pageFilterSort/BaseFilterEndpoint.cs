@@ -70,7 +70,8 @@ public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>(
         }
         catch (Exception ex)
         {
-            AddError($"An error occurred while retrieving filtered data: {ex.Message}");
+            Logger.LogError(ex, "Error retrieving filtered data for {Entity}", typeof(TEntity).Name);
+            AddError("An internal error occurred.");
             await Send.ErrorsAsync(500, ct);
         }
     }

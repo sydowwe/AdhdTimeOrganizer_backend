@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.application.dto.response.@base;
 
-namespace AdhdTimeOrganizer.application.dto.response.toDoList;
+namespace AdhdTimeOrganizer.application.dto.response.todoList;
 
 public record TodoListGroupedByCategoryResponse : IMyResponse
 {

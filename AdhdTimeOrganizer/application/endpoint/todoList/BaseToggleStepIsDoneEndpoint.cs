@@ -12,7 +12,7 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(AppDbContext dbConte
 {
     public override void Configure()
     {
-        Patch(typeof(TEntity).Name.Kebaberize() + "/{itemId:long:required}/steps/{stepId:guid:required}/toggle");
+        Patch($"/{typeof(TEntity).Name.Kebaberize()}/{{itemId:long:required}}/steps/{{stepId:guid:required}}/toggle");
         Roles(EndpointHelper.GetUserOrHigherRoles());
         Summary(s =>
         {

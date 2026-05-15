@@ -12,8 +12,8 @@ public class ActivityCreatedIsOnTodoListEventHandler(IServiceScopeFactory scopeF
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var toDoList = new TodoListItem { UserId = eventModel.UserId, ActivityId = eventModel.ActivityId, TaskPriorityId = eventModel.TaskPriorityId };
-        var result = await dbContext.AddEntityAsync(toDoList, ct);
+        var todoList = new TodoListItem { UserId = eventModel.UserId, ActivityId = eventModel.ActivityId, TaskPriorityId = eventModel.TaskPriorityId };
+        var result = await dbContext.AddEntityAsync(todoList, ct);
         if (result.Failed)
         {
             logger.LogError(result.ErrorMessage);

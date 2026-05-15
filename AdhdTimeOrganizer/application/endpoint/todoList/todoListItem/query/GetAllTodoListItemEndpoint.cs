@@ -1,8 +1,6 @@
-using AdhdTimeOrganizer.application.dto.request.toDoList;
-using AdhdTimeOrganizer.application.dto.response.toDoList;
+using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -12,27 +10,28 @@ using TodoListItemMapper = AdhdTimeOrganizer.application.mapper.todoList.TodoLis
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.query;
 
 public class GetAllTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapper mapper)
-    : Endpoint<GetTodoListItemsByListRequest, List<TodoListItemResponse>>
+    : EndpointWithoutRequest<List<TodoListItemResponse>>
 {
     public override void Configure()
     {
-        Get("/todo-list-item");
+        Get("/todo-list-item/{todoListId}");
         Roles(EndpointHelper.GetUserOrHigherRoles());
         Summary(s =>
         {
             s.Summary = "Get all todo list items";
-            s.Description = "Retrieves all todo list items filtered by todo list";
+            s.Description = "Retrieves all todo list items for a specific todo list";
             s.Response<List<TodoListItemResponse>>(200, "Success");
         });
     }
 
-    public override async Task HandleAsync(GetTodoListItemsByListRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
+        var todoListId = Route<long>("todoListId");
         var loggedUserId = User.GetId();
 
         var query = dbContext.Set<TodoListItem>()
             .FilteredByUser(loggedUserId)
-            .Where(tdl => tdl.TodoListId == req.TodoListId)
+            .Where(tdl => tdl.TodoListId == todoListId)
             .Include(tdl => tdl.Activity)
                 .ThenInclude(a => a.Role)
             .Include(tdl => tdl.Activity)

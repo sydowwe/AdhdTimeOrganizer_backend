@@ -74,7 +74,8 @@ public class FetchCategoriesAndRolesByPattern(AppDbContext dbContext)
         }
         catch (Exception ex)
         {
-            AddError($"An error occurred while retrieving filtered data: {ex.Message}");
+            Logger.LogError(ex, "Error retrieving categories and roles by pattern");
+            AddError("An internal error occurred.");
             await Send.ErrorsAsync(500, ct);
         }
     }

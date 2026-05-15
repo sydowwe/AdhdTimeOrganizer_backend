@@ -1,5 +1,7 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.generic;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -20,7 +22,7 @@ public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endp
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Delete(Route+"/{id:long}");
+        Delete($"/{Route}/{{id:long}}");
         Roles(AllowedRoles());
         Summary(s =>
         {
@@ -37,6 +39,12 @@ public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endp
         {
             var entity = await dbContext.Set<TEntity>().FindAsync([Route<long>("id")], ct);
             if (entity == null)
+            {
+                await Send.NotFoundAsync(ct);
+                return;
+            }
+
+            if (entity is IEntityWithUser entityWithUser && entityWithUser.UserId != User.GetId())
             {
                 await Send.NotFoundAsync(ct);
                 return;

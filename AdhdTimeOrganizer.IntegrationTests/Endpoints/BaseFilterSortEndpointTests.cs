@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using AdhdTimeOrganizer.application.dto.response.toDoList;
+using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;

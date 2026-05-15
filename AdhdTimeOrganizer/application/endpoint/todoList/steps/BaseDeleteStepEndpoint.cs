@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.toDoList;
+using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entity;
@@ -18,7 +18,7 @@ public abstract class BaseDeleteStepEndpoint<TParent>(AppDbContext dbContext)
 
     public override void Configure()
     {
-        Delete($"{typeof(TParent).Name.Kebaberize()}/{{itemId}}/steps/{{stepId}}");
+        Delete($"/{typeof(TParent).Name.Kebaberize()}/{{itemId}}/steps/{{stepId}}");
         Roles(EndpointHelper.GetUserOrHigherRoles());
         Summary(s =>
         {

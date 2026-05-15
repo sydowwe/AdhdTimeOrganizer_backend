@@ -38,6 +38,6 @@ public class ConnectGoogleCalendarEndpoint(
         user.GoogleCalendarRefreshToken = refreshToken;
         await userManager.UpdateAsync(user);
 
-        await Send.OkAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

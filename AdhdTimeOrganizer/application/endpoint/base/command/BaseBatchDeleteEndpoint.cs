@@ -1,5 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.generic;
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -26,6 +28,7 @@ public abstract class BaseBatchDeleteEndpoint<TEntity>(AppDbContext dbContext) :
             s.Description = $"Deletes multiple {entityName} entities";
             s.Response(204, "Success");
             s.Response(404, "One or more entities not found");
+            s.Response(400, "Bad request");
         });
     }
 
@@ -42,6 +45,13 @@ public abstract class BaseBatchDeleteEndpoint<TEntity>(AppDbContext dbContext) :
                     await Send.NotFoundAsync(ct);
                     return;
                 }
+
+                if (entity is IEntityWithUser entityWithUser && entityWithUser.UserId != User.GetId())
+                {
+                    await Send.NotFoundAsync(ct);
+                    return;
+                }
+
                 entities.Add(entity);
             }
 

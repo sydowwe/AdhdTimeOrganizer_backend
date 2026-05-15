@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.domain.helper;
 
-namespace AdhdTimeOrganizer.application.dto.response.toDoList;
+namespace AdhdTimeOrganizer.application.dto.response.todoList;
 
 public record RoutineTodoListResponse : BaseTodoListResponse
 {

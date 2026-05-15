@@ -5,19 +5,19 @@ using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 
-public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickEditActivityRequest>
+public class CloneActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickEditActivityRequest, long?>
 {
     public virtual string[] AllowedRoles() => EndpointHelper.GetUserOrHigherRoles();
 
     public override void Configure()
     {
-        Put("/activity/{id}/quick-edit");
+        Post("/activity/{id}/clone");
         Roles(AllowedRoles());
         Summary(s =>
         {
-            s.Summary = "Quick edit activity";
-            s.Description = "Overwrites editable fields of an existing activity";
-            s.Response(204, "Updated");
+            s.Summary = "Clone activity";
+            s.Description = "Creates a new activity cloned from an existing one";
+            s.Response(200, "Cloned successfully");
             s.Response(404, "Not found");
             s.Response(400, "Bad request");
         });
@@ -34,16 +34,20 @@ public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickE
                 return;
             }
 
-            entity.Name = req.Name;
-            entity.Text = req.Text;
-            entity.CategoryId = req.CategoryId;
+            var clonedEntity = entity.Clone();
+            clonedEntity.Name = clonedEntity.Name == req.Name ? $"{req.Name} (copy)" : req.Name;
+            clonedEntity.Text = req.Text;
+            clonedEntity.CategoryId = req.CategoryId;
 
-            var result = await dbContext.UpdateEntityAsync(entity, ct);
+            var result = await dbContext.AddEntityAsync(clonedEntity, ct);
             if (result.Failed)
             {
                 AddError(result.ErrorMessage!);
                 await Send.ErrorsAsync(400, ct);
+                return;
             }
+
+            await Send.OkAsync(clonedEntity.Id, ct);
         }
         catch (Exception ex)
         {

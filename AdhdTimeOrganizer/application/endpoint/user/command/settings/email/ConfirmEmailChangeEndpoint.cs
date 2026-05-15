@@ -19,6 +19,7 @@ public class ConfirmEmailChangeEndpoint(
     {
         Post("user/change-email/confirm");
         AllowAnonymous();
+        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => { s.Summary = "Confirm email change with token"; });
     }
 

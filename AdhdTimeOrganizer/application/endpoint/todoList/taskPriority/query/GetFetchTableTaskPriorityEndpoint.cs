@@ -12,13 +12,11 @@ public class GetFetchTableTaskPriorityEndpoint(
     TaskPriorityMapper mapper) 
     : BaseFetchTableEndpoint<TaskPriority, TaskPriorityResponse, TaskPriorityFilterRequest, TaskPriorityMapper>(dbContext, mapper)
 {
-    private readonly TaskPriorityMapper _mapper = mapper;
-
     protected override IQueryable<TaskPriority> ApplyCustomFiltering(IQueryable<TaskPriority> query, TaskPriorityFilterRequest filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Text))
         {
-            query = query.Where(tu => tu.Text != null && tu.Text.Contains(filter.Text));
+            query = query.Where(tu => tu.Text.Contains(filter.Text));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Color))

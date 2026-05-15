@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace AdhdTimeOrganizer.application.dto.request.toDoList;
+namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
 public record TodoListStepRequest
 {

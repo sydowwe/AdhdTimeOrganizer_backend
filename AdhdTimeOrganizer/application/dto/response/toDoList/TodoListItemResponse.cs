@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 
-namespace AdhdTimeOrganizer.application.dto.response.toDoList;
+namespace AdhdTimeOrganizer.application.dto.response.todoList;
 
 public record TodoListItemResponse : BaseTodoListResponse
 {

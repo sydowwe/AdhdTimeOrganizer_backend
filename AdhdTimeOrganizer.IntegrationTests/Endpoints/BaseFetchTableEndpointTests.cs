@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.application.dto.response;
+using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;

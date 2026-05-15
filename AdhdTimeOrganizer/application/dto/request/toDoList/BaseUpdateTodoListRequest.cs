@@ -1,7 +1,7 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.extendable;
 using AdhdTimeOrganizer.domain.helper;
 
-namespace AdhdTimeOrganizer.application.dto.request.toDoList;
+namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
 public record BaseUpdateTodoListRequest : WithIsDoneRequest
 {

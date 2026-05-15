@@ -71,7 +71,8 @@ public abstract class BaseFetchTableEndpoint<TEntity, TResponse, TFilter, TMappe
         }
         catch (Exception ex)
         {
-            AddError($"An error occurred while retrieving filtered data: {ex.Message}");
+            Logger.LogError(ex, "Error retrieving table data for {Entity}", typeof(TEntity).Name);
+            AddError("An internal error occurred.");
             await Send.ErrorsAsync(500, ct);
         }
     }

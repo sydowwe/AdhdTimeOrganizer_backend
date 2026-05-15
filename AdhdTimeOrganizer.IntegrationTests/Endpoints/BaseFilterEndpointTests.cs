@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
@@ -9,7 +10,7 @@ using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-// Tests BaseFilterEndpoint via GetFilteredSortedCalendar
+// Tests BaseFilterEndpoint via GetFilteredSortedCalendarEndpoint
 public class BaseFilterEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
     private const string Route = "/api/calendar/filter";

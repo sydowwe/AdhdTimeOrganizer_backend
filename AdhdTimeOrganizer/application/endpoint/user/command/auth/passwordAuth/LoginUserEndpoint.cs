@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
 
-public class LoginEndpoint(
+public class LoginUserEndpoint(
     SignInManager<User> signInManager,
     UserManager<User> userManager,
     IJwtService jwtService,

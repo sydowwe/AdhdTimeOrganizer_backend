@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.toDoList;
+using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;

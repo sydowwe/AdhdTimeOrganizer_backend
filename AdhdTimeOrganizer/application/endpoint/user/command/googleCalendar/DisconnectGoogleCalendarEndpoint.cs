@@ -25,6 +25,6 @@ public class DisconnectGoogleCalendarEndpoint(UserManager<User> userManager)
         user.GoogleCalendarRefreshToken = null;
         await userManager.UpdateAsync(user);
 
-        await Send.OkAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

@@ -50,6 +50,6 @@ public class LogoutAllEndpoint(IRefreshTokenService refreshTokenService) : Endpo
             Path = "/api"
         });
 
-        await Send.OkAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

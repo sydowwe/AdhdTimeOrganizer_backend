@@ -22,6 +22,8 @@ public class PatchPlannerTaskStatusEndpoint(AppDbContext dbContext) : Endpoint<P
             s.Description = "Patches PlannerTask status";
             s.Response(204, "Updated");
             s.Response(404, "Not found");
+            s.Response(400, "Bad request or validation error");
+            s.Response(500, "Internal server error");
         });
     }
 

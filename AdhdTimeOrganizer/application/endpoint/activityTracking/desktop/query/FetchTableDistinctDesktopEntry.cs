@@ -70,7 +70,8 @@ public class FetchTableDistinctDesktopEntry(AppDbContext dbContext)
         }
         catch (Exception ex)
         {
-            AddError($"An error occurred while retrieving filtered data: {ex.Message}");
+            Logger.LogError(ex, "Error retrieving distinct desktop entries");
+            AddError("An internal error occurred.");
             await Send.ErrorsAsync(500, ct);
         }
     }

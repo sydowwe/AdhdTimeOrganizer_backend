@@ -60,7 +60,7 @@ public class BasePatchEndpointTests(TestWebApplicationFactory factory) : Integra
     }
 
     [Fact]
-    public async Task Patch_ValidRequest_Returns200WithId()
+    public async Task Patch_ValidRequest_Returns204NoContent()
     {
         var id = await SeedTemplatePlannerTaskAsync();
         var request = new
@@ -71,9 +71,7 @@ public class BasePatchEndpointTests(TestWebApplicationFactory factory) : Integra
 
         var response = await Client.PatchAsJsonAsync($"{Route}/{id}", request);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var returnedId = await response.Content.ReadFromJsonAsync<long>();
-        returnedId.Should().Be(id);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Fact]

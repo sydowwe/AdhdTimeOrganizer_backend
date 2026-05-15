@@ -12,8 +12,6 @@ public class GetFetchTableTaskImportanceEndpoint(
     TaskImportanceMapper mapper)
     : BaseFetchTableEndpoint<TaskImportance, TaskImportanceResponse, TaskImportanceFilterRequest, TaskImportanceMapper>(dbContext, mapper)
 {
-    private readonly TaskImportanceMapper _mapper = mapper;
-
     protected override IQueryable<TaskImportance> ApplyCustomFiltering(IQueryable<TaskImportance> query, TaskImportanceFilterRequest filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Text))
