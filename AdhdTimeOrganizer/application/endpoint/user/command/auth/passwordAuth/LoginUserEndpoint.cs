@@ -18,7 +18,7 @@ public class LoginUserEndpoint(
 {
     public override void Configure()
     {
-        Post("auth/login");
+        Post("/auth/login");
         AllowAnonymous();
         Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => { s.Summary = "Login a user"; });

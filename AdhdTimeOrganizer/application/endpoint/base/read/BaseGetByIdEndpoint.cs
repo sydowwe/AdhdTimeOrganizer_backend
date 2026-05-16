@@ -16,16 +16,13 @@ public abstract class BaseGetByIdEndpoint<TEntity, TResponse, TMapper>(AppDbCont
 {
     private readonly TMapper _mapper = mapper;
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Get($"/{entityName.Kebaberize()}/{{id:long}}");
-        Roles(AllowedRoles());
+        Get($"/{entityName.Kebaberize()}/{{id:long:required}}");
+
         Summary(s =>
         {
             s.Summary = $"Get {entityName} by ID";
@@ -44,7 +41,8 @@ public abstract class BaseGetByIdEndpoint<TEntity, TResponse, TMapper>(AppDbCont
         var entity = await query.FirstOrDefaultAsync(e => e.Id == id, ct);
         if (entity == null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError($"{typeof(TEntity).Name} not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

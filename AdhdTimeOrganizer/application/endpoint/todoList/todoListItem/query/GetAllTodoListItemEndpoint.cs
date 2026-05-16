@@ -15,7 +15,7 @@ public class GetAllTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapp
     public override void Configure()
     {
         Get("/todo-list-item/{todoListId}");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
         Summary(s =>
         {
             s.Summary = "Get all todo list items";

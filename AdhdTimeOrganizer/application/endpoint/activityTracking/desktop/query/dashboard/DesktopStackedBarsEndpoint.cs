@@ -14,6 +14,13 @@ public class DesktopStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<WebEx
     public override void Configure()
     {
         Post("/activity-tracking/desktop/stacked-bars");
+        Summary(s =>
+        {
+            s.Summary = "Get desktop process usage stacked bars data";
+            s.Description = "Returns process usage breakdown grouped by time windows (active and background seconds) for a given date range";
+            s.Response<IEnumerable<DesktopStackedBarsWindow>>(200, "Success");
+            s.Response(400, "Bad request");
+        });
         Validator<WebExtensionSummaryValidator>();
     }
 

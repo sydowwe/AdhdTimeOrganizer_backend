@@ -1,10 +1,18 @@
 using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.command;
 
 public class UpdatePlannerTaskEndpoint(AppDbContext dbContext, PlannerTaskMapper mapper)
-    : BaseUpdateEndpoint<PlannerTask, PlannerTaskRequest, PlannerTaskMapper>(dbContext, mapper);
+    : BaseUpdateEndpoint<PlannerTask, PlannerTaskRequest, PlannerTaskMapper>(dbContext, mapper)
+{
+    public override void Configure()
+    {
+        base.Configure();
+        Validator<PlannerTaskValidator>();
+    }
+}

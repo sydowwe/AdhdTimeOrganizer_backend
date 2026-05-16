@@ -15,10 +15,6 @@ public static class EndpointHelper
                ?? throw new InvalidOperationException("User not verified. Ensure VerifyUserPreProcessor is configured.");
     }
 
-    public static string[] GetUserOrHigherRoles()
-    {
-        return ["User", "Admin", "Root"];
-    }
 
     public static string[] GetAdminOrHigherRoles()
     {

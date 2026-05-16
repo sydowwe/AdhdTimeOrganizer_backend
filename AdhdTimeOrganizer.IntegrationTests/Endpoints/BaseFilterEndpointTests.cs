@@ -13,7 +13,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 // Tests BaseFilterEndpoint via GetFilteredSortedCalendarEndpoint
 public class BaseFilterEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/calendar/filter";
+    private const string Route = "calendar/filter";
 
     private async Task SeedCalendarAsync()
     {
@@ -40,7 +40,7 @@ public class BaseFilterEndpointTests(TestWebApplicationFactory factory) : Integr
             Until = DateOnly.FromDateTime(DateTime.Today.AddDays(1)).ToString("yyyy-MM-dd")
         };
 
-        var response = await Client.PostAsJsonAsync(Route, request);
+        var response = await client.PostAsJsonAsync(Route, request);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadAsStringAsync();
@@ -51,11 +51,7 @@ public class BaseFilterEndpointTests(TestWebApplicationFactory factory) : Integr
     [Fact]
     public async Task Filter_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
         var request = new
         {
             From = "2024-01-01",

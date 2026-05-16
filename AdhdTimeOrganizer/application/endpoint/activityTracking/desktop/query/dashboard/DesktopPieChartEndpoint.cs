@@ -13,6 +13,13 @@ public class DesktopPieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest
     public override void Configure()
     {
         Post("/activity-tracking/desktop/pie-chart");
+        Summary(s =>
+        {
+            s.Summary = "Get desktop process usage pie chart data";
+            s.Description = "Returns breakdown of process usage time (active and background) for a given date range, filtered by minimum percentage threshold";
+            s.Response<DesktopPieChartResponse>(200, "Success");
+            s.Response(400, "Bad request");
+        });
         Validator<PieChartValidator>();
     }
 

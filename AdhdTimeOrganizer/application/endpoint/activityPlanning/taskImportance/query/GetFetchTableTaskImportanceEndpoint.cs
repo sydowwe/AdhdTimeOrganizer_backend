@@ -21,7 +21,7 @@ public class GetFetchTableTaskImportanceEndpoint(
 
         if (!string.IsNullOrWhiteSpace(filter.Color))
         {
-            query = query.Where(tu => tu.Color.Contains(filter.Color));
+            query = query.Where(tu => tu.Color == filter.Color);
         }
 
         if (filter.MinImportance.HasValue)
@@ -32,11 +32,6 @@ public class GetFetchTableTaskImportanceEndpoint(
         if (filter.MaxImportance.HasValue)
         {
             query = query.Where(tu => tu.Importance <= filter.MaxImportance.Value);
-        }
-
-        if (filter.UserId.HasValue)
-        {
-            query = query.Where(tu => tu.UserId == filter.UserId.Value);
         }
 
         return query;

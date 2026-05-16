@@ -11,7 +11,7 @@ public class GetGoogleCalendarStatusEndpoint(UserManager<User> userManager)
 {
     public override void Configure()
     {
-        Get("user/google-calendar/status");
+        Get("/user/google-calendar/status");
         Summary(s => { s.Summary = "Get Google Calendar connection status"; });
     }
 

@@ -20,7 +20,7 @@ public class FetchCategoriesAndRolesByPattern(AppDbContext dbContext)
     {
         const string entityName = "Distinct desktop entries";
         Post("/fetch-categories-and-roles-by-pattern");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
         Summary(s =>
         {
             s.Summary = $"Get filtered and paginated {entityName} list";

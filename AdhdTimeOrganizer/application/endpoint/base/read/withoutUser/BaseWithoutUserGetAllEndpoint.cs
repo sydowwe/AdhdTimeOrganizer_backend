@@ -16,10 +16,7 @@ public abstract class BaseWithoutUserGetAllEndpoint<TEntity, TResponse, TMapper>
 {
     private readonly TMapper _mapper = mapper;
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public virtual string? RouteParam => null;
 
@@ -30,7 +27,7 @@ public abstract class BaseWithoutUserGetAllEndpoint<TEntity, TResponse, TMapper>
     {
         var entityName = typeof(TEntity).Name;
         Get($"/{entityName.Kebaberize()}" + AddedRouteParam);
-        Roles(AllowedRoles());
+        
 
         Summary(s =>
         {

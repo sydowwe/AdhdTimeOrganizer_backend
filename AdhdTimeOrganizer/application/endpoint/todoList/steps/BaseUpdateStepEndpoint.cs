@@ -19,7 +19,7 @@ public abstract class BaseUpdateStepEndpoint<TParent>(AppDbContext dbContext)
     public override void Configure()
     {
         Put($"/{typeof(TParent).Name.Kebaberize()}/{{itemId}}/steps/{{stepId}}");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
         Summary(s =>
         {
             s.Summary = $"Update a step on a {typeof(TParent).Name}";
@@ -37,7 +37,8 @@ public abstract class BaseUpdateStepEndpoint<TParent>(AppDbContext dbContext)
         var step = parent?.Steps.FirstOrDefault(s => s.Id == req.StepId);
         if (step is null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError("Step not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

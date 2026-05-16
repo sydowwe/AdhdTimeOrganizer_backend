@@ -5,31 +5,34 @@ using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using QRCoder;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 
 [Collection("Integration")]
-public abstract class IntegrationTestBase : IAsyncLifetime
+public abstract class IntegrationTestBase(TestWebApplicationFactory factory) : IAsyncLifetime
 {
-    protected readonly TestWebApplicationFactory Factory;
-    protected HttpClient Client = null!;
+    protected readonly TestWebApplicationFactory factory = factory;
+    protected HttpClient client = null!;
+    protected HttpClient anonClient = null!;
+    protected readonly Uri baseUrl = new("https://localhost/api/");
 
     protected const string TestEmail = "test@integration.com";
-    protected const string TestPassword = "Test@1234!";
-
-    protected IntegrationTestBase(TestWebApplicationFactory factory)
-    {
-        Factory = factory;
-    }
+    private const string TestPassword = "Test@1234!";
 
     public async Task InitializeAsync()
     {
-        Client = Factory.CreateClient(new WebApplicationFactoryClientOptions
+        client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             HandleCookies = true,
             AllowAutoRedirect = false,
-            BaseAddress = new Uri("http://localhost")
+            BaseAddress = baseUrl
+        });
+
+        anonClient = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = baseUrl
         });
         await SeedRolesAndUser();
         await LoginAsync();
@@ -37,7 +40,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 
     private async Task SeedRolesAndUser()
     {
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var sp = scope.ServiceProvider;
         var roleManager = sp.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<UserRole>>();
         var userManager = sp.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<User>>();
@@ -68,12 +71,11 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         };
         await userManager.CreateAsync(user, TestPassword);
         await userManager.AddToRoleAsync(user, "User");
-        await userManager.AddToRoleAsync(user, "Admin");
     }
 
     protected async Task<long> GetTestUserIdAsync()
     {
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<User>>();
         var user = await userManager.FindByEmailAsync(TestEmail);
         return user!.Id;
@@ -89,17 +91,17 @@ public abstract class IntegrationTestBase : IAsyncLifetime
             RecaptchaToken = "test",
             Timezone = "UTC"
         };
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/login");
         request.Headers.Add("X-Client-Id", Guid.NewGuid().ToString());
         request.Content = JsonContent.Create(payload);
-        var response = await Client.SendAsync(request);
+        var response = await client.SendAsync(request);
 
         response.EnsureSuccessStatusCode();
     }
 
     protected AppDbContext CreateDbContext()
     {
-        var scope = Factory.Services.CreateScope();
+        var scope = factory.Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<AppDbContext>();
     }
 

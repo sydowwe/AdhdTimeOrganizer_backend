@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.extensions;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
@@ -11,6 +12,7 @@ public class UpdateUserPreferencesEndpoint(UserManager<User> userManager) : Endp
     public override void Configure()
     {
         Put("user/preferences");
+        Validator<UpdateUserPreferencesValidator>();
         Summary(s => { s.Summary = "Partially update the current user's appearance and locale preferences"; });
     }
 

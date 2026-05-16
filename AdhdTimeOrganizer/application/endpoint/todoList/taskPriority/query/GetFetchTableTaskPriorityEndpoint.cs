@@ -21,7 +21,7 @@ public class GetFetchTableTaskPriorityEndpoint(
 
         if (!string.IsNullOrWhiteSpace(filter.Color))
         {
-            query = query.Where(tu => tu.Color.Contains(filter.Color));
+            query = query.Where(tu => tu.Color == filter.Color);
         }
 
         if (filter.MinPriority.HasValue)
@@ -32,11 +32,6 @@ public class GetFetchTableTaskPriorityEndpoint(
         if (filter.MaxPriority.HasValue)
         {
             query = query.Where(tu => tu.Priority <= filter.MaxPriority.Value);
-        }
-
-        if (filter.UserId.HasValue)
-        {
-            query = query.Where(tu => tu.UserId == filter.UserId.Value);
         }
 
         return query;

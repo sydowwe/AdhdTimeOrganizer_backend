@@ -8,7 +8,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlannerDay
 public class GetSelectOptionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext, TaskPlannerDayTemplateMapper mapper)
     : BaseGetSelectOptionsEndpoint<TaskPlannerDayTemplate, TaskPlannerDayTemplateMapper>(dbContext, mapper)
 {
-    public override IQueryable<TaskPlannerDayTemplate> Filter(IQueryable<TaskPlannerDayTemplate> query)
+    protected override IQueryable<TaskPlannerDayTemplate> Filter(IQueryable<TaskPlannerDayTemplate> query)
     {
         return query.Where(t => t.IsActive).OrderBy(t => t.Name);
     }

@@ -16,6 +16,13 @@ public class DesktopSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCard
     public override void Configure()
     {
         Post("/activity-tracking/desktop/summary-cards");
+        Summary(s =>
+        {
+            s.Summary = "Get desktop process usage summary cards";
+            s.Description = "Returns top N processes with current usage (active and background) and comparison against baseline period";
+            s.Response<List<DesktopProcessSummaryDto>>(200, "Success");
+            s.Response(400, "Bad request");
+        });
         Validator<TopDomainsValidator>();
     }
 

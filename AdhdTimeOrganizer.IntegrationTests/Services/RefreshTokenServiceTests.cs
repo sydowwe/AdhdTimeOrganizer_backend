@@ -15,7 +15,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
     public async Task GenerateRefreshToken_ReturnsNonEmptyOpaqueString()
     {
         var userId = await GetTestUserIdAsync();
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
 
         var token = await service.GenerateRefreshTokenAsync(userId, isExtensionClient: false, AuthMethodEnum.Password, stayLoggedIn: false);
@@ -27,7 +27,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
     public async Task GenerateRefreshToken_StayLoggedIn_CreatesLongLivedToken()
     {
         var userId = await GetTestUserIdAsync();
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
 
         await service.GenerateRefreshTokenAsync(userId, isExtensionClient: false, AuthMethodEnum.Password, stayLoggedIn: true);
@@ -44,7 +44,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
     public async Task GenerateRefreshToken_ShortSession_CreatesOneDayToken()
     {
         var userId = await GetTestUserIdAsync();
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
 
         await service.GenerateRefreshTokenAsync(userId, isExtensionClient: false, AuthMethodEnum.Password, stayLoggedIn: false);
@@ -61,7 +61,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
     public async Task ValidateRefreshToken_ValidToken_ReturnsTrueWithUser()
     {
         var userId = await GetTestUserIdAsync();
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         var token = await service.GenerateRefreshTokenAsync(userId, false, AuthMethodEnum.Password);
 
@@ -76,7 +76,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
     [Fact]
     public async Task ValidateRefreshToken_UnknownToken_ReturnsFalse()
     {
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
 
         var (isValid, _, _, user, error) = await service.ValidateRefreshTokenAsync("completely-unknown-token");
@@ -92,7 +92,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
         var userId = await GetTestUserIdAsync();
         string token1, token2;
         {
-            using var scope = Factory.Services.CreateScope();
+            using var scope = factory.Services.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
             token1 = await service.GenerateRefreshTokenAsync(userId, false, AuthMethodEnum.Password);
             token2 = await service.GenerateRefreshTokenAsync(userId, false, AuthMethodEnum.Password);
@@ -100,7 +100,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
         }
 
         // Attempting to validate the revoked token triggers the reuse-attack protection
-        using var scope2 = Factory.Services.CreateScope();
+        using var scope2 = factory.Services.CreateScope();
         var service2 = scope2.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         var (isValid, _, _, user, _) = await service2.ValidateRefreshTokenAsync(token1);
 
@@ -116,7 +116,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
     public async Task RevokeRefreshToken_SetsIsRevokedAndRevokedAt()
     {
         var userId = await GetTestUserIdAsync();
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         var token = await service.GenerateRefreshTokenAsync(userId, false, AuthMethodEnum.Password);
 
@@ -136,7 +136,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
     public async Task RevokeAllUserTokens_RevokesEveryActiveToken()
     {
         var userId = await GetTestUserIdAsync();
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         await service.GenerateRefreshTokenAsync(userId, false, AuthMethodEnum.Password);
         await service.GenerateRefreshTokenAsync(userId, false, AuthMethodEnum.Password);
@@ -151,7 +151,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
     [Fact]
     public async Task CleanupExpiredTokens_WhenNoOldTokensExist_ReturnsZero()
     {
-        using var scope = Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
 
         // All tokens in the DB are recent (just created by login/other tests), so nothing qualifies

@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory
 
 public class GetFilteredActivityHistoryEndpoint(AppDbContext dbContext, ActivityHistoryMapper mapper) : BaseFilterEndpoint<ActivityHistory, ActivityHistoryResponse, ActivityHistoryDetailFilter, ActivityHistoryMapper>(dbContext, mapper)
 {
-    public override SortByRequest[]? DefaultSortBy => [new SortByRequest("StartTimestamp", false), new SortByRequest("EndTimestamp", false)];
+    public override SortByRequest[] AlwaysSortBy => [new("StartTimestamp", false), new("EndTimestamp", false)];
 
     protected override IQueryable<ActivityHistory> ApplyCustomFiltering(IQueryable<ActivityHistory> query, ActivityHistoryDetailFilter filter)
     {

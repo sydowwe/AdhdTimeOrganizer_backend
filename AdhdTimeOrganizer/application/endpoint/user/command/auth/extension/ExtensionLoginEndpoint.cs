@@ -17,7 +17,7 @@ public class ExtensionLoginEndpoint(
 {
     public override void Configure()
     {
-        Post("auth/extension/login");
+        Post("/auth/extension/login");
         AllowAnonymous();
         Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Forwarded-For");
         Summary(s => { s.Summary = "Login for browser extension clients"; });

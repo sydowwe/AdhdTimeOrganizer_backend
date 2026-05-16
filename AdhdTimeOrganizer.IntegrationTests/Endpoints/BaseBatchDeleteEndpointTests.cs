@@ -9,7 +9,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 public class BaseBatchDeleteEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/activity-category/batch-delete";
+    private const string Route = "activity-category/batch-delete";
 
     private async Task<List<long>> SeedCategoriesAsync(int count)
     {
@@ -29,7 +29,7 @@ public class BaseBatchDeleteEndpointTests(TestWebApplicationFactory factory) : I
         var ids = await SeedCategoriesAsync(3);
         var request = new { Ids = ids };
 
-        var response = await Client.PostAsJsonAsync(Route, request);
+        var response = await client.PostAsJsonAsync(Route, request);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -37,12 +37,6 @@ public class BaseBatchDeleteEndpointTests(TestWebApplicationFactory factory) : I
     [Fact]
     public async Task BatchDelete_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
-
         var response = await anonClient.PostAsJsonAsync(Route, new { Ids = new[] { 1L } });
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -51,7 +45,7 @@ public class BaseBatchDeleteEndpointTests(TestWebApplicationFactory factory) : I
     [Fact]
     public async Task BatchDelete_NonExistingEntity_Returns404()
     {
-        var response = await Client.PostAsJsonAsync(Route, new { Ids = new[] { 999999999L } });
+        var response = await client.PostAsJsonAsync(Route, new { Ids = new[] { 999999999L } });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

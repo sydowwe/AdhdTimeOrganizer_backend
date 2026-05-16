@@ -27,17 +27,12 @@ public class GetFetchTableActivityRoleEndpoint(
 
         if (!string.IsNullOrWhiteSpace(filter.Color))
         {
-            query = query.Where(r => r.Color.Contains(filter.Color));
+            query = query.Where(r => r.Color == filter.Color);
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Icon))
         {
             query = query.Where(r => r.Icon != null && r.Icon.Contains(filter.Icon));
-        }
-
-        if (filter.UserId.HasValue)
-        {
-            query = query.Where(r => r.UserId == filter.UserId.Value);
         }
 
         return query;

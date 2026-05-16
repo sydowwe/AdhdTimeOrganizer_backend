@@ -12,18 +12,28 @@ using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.service;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.infrastructure.security;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.command;
 
+[AllowExtensionClients]
 public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint<DesktopActivityWindowDto>
 {
     public override void Configure()
     {
         Post("/heartbeat");
+        Summary(s =>
+        {
+            s.Summary = "Process desktop activity heartbeat";
+            s.Description = "Records desktop activity data from client, updates activity history, and automates planner task/todo completion based on tracked time";
+            s.Response<int>(200, "Success - returns count of processed entries");
+            s.Response(400, "Bad request");
+        });
         Validator<DesktopActivityHeartbeatValidator>();
         Group<ActivityTrackingDesktopGroup>();
+        Policies("ActivityTracking");
     }
 
     public override async Task HandleAsync(DesktopActivityWindowDto req, CancellationToken ct)
@@ -95,7 +105,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
 
         await AutomateActivityStatusAsync(userId, req.WindowStart, activitySecondsInBatch, ct);
 
-        await Send.ResponseAsync(processedCount, StatusCodes.Status201Created, ct);
+        await Send.ResponseAsync(processedCount, cancellation: ct);
     }
 
     private async Task AutomateActivityStatusAsync(long userId, DateTime windowStart, Dictionary<long, int> activitySecondsInBatch, CancellationToken ct)

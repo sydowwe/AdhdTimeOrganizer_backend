@@ -22,10 +22,7 @@ public abstract class BaseFetchTableEndpoint<TEntity, TResponse, TFilter, TMappe
 {
     public virtual string EndpointPath => "filtered-table";
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public virtual bool FilteredByUser => true;
 
@@ -33,11 +30,11 @@ public abstract class BaseFetchTableEndpoint<TEntity, TResponse, TFilter, TMappe
     {
         var entityName = typeof(TEntity).Name;
         Post($"/{entityName.Kebaberize()}/{EndpointPath}");
+        
         Summary(s =>
         {
             s.Summary = $"Get filtered and paginated {entityName} list";
             s.Description = $"Retrieves a filtered, paginated and sorted list of {entityName}";
-            Roles(AllowedRoles());
 
             s.Response<BaseTableResponse<TResponse>>(200, "Success");
             s.Response(400, "Bad request");

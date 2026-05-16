@@ -8,12 +8,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
-public class PieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest, PieChartResponse>
+public class WebExtensionPieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest, PieChartResponse>
 {
     public override void Configure()
     {
         Post("/activity-tracking/web-extension/pie-chart");
         Validator<PieChartValidator>();
+        Summary(s =>
+        {
+            s.Summary = "Get web activity breakdown by domain for a pie chart";
+            s.Description = "Aggregates web extension activity by domain within a time period, optionally filtering by minimum percentage threshold";
+            s.Response<PieChartResponse>(200, "Success");
+            s.Response(400, "Bad request");
+        });
     }
 
     public override async Task HandleAsync(PieChartRequest req, CancellationToken ct)

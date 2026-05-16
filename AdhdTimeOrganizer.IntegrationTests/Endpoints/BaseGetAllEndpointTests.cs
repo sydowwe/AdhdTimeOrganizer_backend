@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 public class BaseGetAllEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/activity-category";
+    private const string Route = "activity-category";
 
     private async Task SeedCategoriesAsync()
     {
@@ -28,7 +28,7 @@ public class BaseGetAllEndpointTests(TestWebApplicationFactory factory) : Integr
     {
         await SeedCategoriesAsync();
 
-        var response = await Client.GetAsync(Route);
+        var response = await client.GetAsync(Route);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var items = await response.Content.ReadFromJsonAsync<List<ActivityCategoryResponse>>();
@@ -39,11 +39,7 @@ public class BaseGetAllEndpointTests(TestWebApplicationFactory factory) : Integr
     [Fact]
     public async Task GetAll_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
 
         var response = await anonClient.GetAsync(Route);
 

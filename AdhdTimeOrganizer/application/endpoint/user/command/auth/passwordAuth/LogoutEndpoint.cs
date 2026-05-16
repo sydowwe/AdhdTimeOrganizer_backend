@@ -7,7 +7,7 @@ public class LogoutEndpoint(IRefreshTokenService refreshTokenService) : Endpoint
 {
     public override void Configure()
     {
-        Post("auth/logout");
+        Post("/auth/logout");
         Summary(s => { s.Summary = "Logout a user and revoke refresh token"; });
     }
 

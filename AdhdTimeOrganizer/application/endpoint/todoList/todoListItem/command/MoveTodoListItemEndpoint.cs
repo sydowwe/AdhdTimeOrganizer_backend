@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.extensions;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.extensions;
@@ -20,8 +21,9 @@ public class MoveTodoListItemEndpoint(AppDbContext dbContext, IOptions<TodoListS
     public override void Configure()
     {
         const string entityName = nameof(TodoListItem);
-        Patch($"/{entityName.Kebaberize()}/{{id}}/move");
-        Roles(AllowedRoles());
+        Patch($"/{entityName.Kebaberize()}/{{id:long:required}}/move");
+        Validator<MoveToListTodoListItemValidator>();
+        
         Summary(s =>
         {
             s.Summary = $"Move {entityName} to a different todo list";
@@ -37,7 +39,8 @@ public class MoveTodoListItemEndpoint(AppDbContext dbContext, IOptions<TodoListS
         var entity = await _dbContext.TodoListItems.FindAsync([Route<long>("id")], ct);
         if (entity == null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError("TodoListItem not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

@@ -8,7 +8,7 @@ public class LogoutAllEndpoint(IRefreshTokenService refreshTokenService) : Endpo
 {
     public override void Configure()
     {
-        Post("auth/logout-all");
+        Post("/auth/logout-all");
         Summary(s => { s.Summary = "Logout from all devices by revoking all refresh tokens"; });
     }
 

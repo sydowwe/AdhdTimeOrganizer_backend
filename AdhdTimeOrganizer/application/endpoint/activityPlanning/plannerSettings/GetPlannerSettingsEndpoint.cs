@@ -15,7 +15,7 @@ public class GetPlannerSettingsEndpoint(AppDbContext dbContext, UserPlannerSetti
     public override void Configure()
     {
         Get("/planner/settings");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
         Summary(s =>
         {
             s.Summary = "Get planner settings for the current user";

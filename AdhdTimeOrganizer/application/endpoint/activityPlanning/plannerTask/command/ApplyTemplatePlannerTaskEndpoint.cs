@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
@@ -18,22 +19,21 @@ public class ApplyTemplatePlannerTaskEndpoint(
     CalendarMapper calendarMapper,
     PlannerTaskMapper plannerTaskMapper) : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
 {
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public override void Configure()
     {
         const string entityName = nameof(Calendar);
         Post($"/{entityName.Kebaberize()}/apply-planner-template");
-        Roles(AllowedRoles());
+        Validator<ApplyTemplateToTaskPlannerValidator>();
+        
         Summary(s =>
         {
             s.Summary = $"Apply template to {entityName}";
             s.Description = $"Applies a planner template to a {entityName}, creating tasks from the template";
-            s.Response<long>(200, "Template applied successfully");
+            s.Response<ApplyTemplatePlannerTaskResponse>(201, "Template applied successfully; new tasks created");
             s.Response(400, "Bad request");
+            s.Response(404, "Calendar or template not found");
         });
     }
 
@@ -98,7 +98,7 @@ public class ApplyTemplatePlannerTaskEndpoint(
                 Tasks = updatedTasks
             };
 
-            await Send.ResponseAsync(response, 200, ct);
+            await Send.ResponseAsync(response, 201, ct);
         }
         catch (Exception ex)
         {

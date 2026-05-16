@@ -12,7 +12,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 public class BaseFetchTableEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/activity-category/filtered-table";
+    private const string Route = "activity-category/filtered-table";
 
     private async Task SeedCategoriesAsync()
     {
@@ -37,7 +37,7 @@ public class BaseFetchTableEndpointTests(TestWebApplicationFactory factory) : In
             Filter = new { }
         };
 
-        var response = await Client.PostAsJsonAsync(Route, request);
+        var response = await client.PostAsJsonAsync(Route, request);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var table = await response.Content.ReadFromJsonAsync<BaseTableResponse<ActivityCategoryResponse>>();
@@ -49,11 +49,7 @@ public class BaseFetchTableEndpointTests(TestWebApplicationFactory factory) : In
     [Fact]
     public async Task FetchTable_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
 
         var response = await anonClient.PostAsJsonAsync(Route, new { ItemsPerPage = 10, Page = 1, SortBy = Array.Empty<object>(), UseFilter = false, Filter = new { } });
 

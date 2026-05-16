@@ -12,7 +12,7 @@ public class GetTwoFactorAuthStatusEndpoint(UserManager<User> userManager)
 {
     public override void Configure()
     {
-        Get("user/2fa/status");
+        Get("/user/2fa/status");
         Summary(s => { s.Summary = "Get two-factor authentication status"; });
     }
 

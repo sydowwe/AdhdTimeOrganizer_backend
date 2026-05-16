@@ -12,18 +12,13 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : EndpointWithoutRequest
     where TEntity : class, IEntityWithId
 {
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetAdminOrHigherRoles();
-    }
-
     public virtual string Route => typeof(TEntity).Name.Kebaberize();
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Delete($"/{Route}/{{id:long}}");
-        Roles(AllowedRoles());
+        Delete($"/{Route}" + "/{id:long:required}");
+        
         Summary(s =>
         {
             s.Summary = $"Delete {entityName}";
@@ -40,13 +35,15 @@ public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endp
             var entity = await dbContext.Set<TEntity>().FindAsync([Route<long>("id")], ct);
             if (entity == null)
             {
-                await Send.NotFoundAsync(ct);
+                AddError($"{typeof(TEntity).Name} not found.");
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 
             if (entity is IEntityWithUser entityWithUser && entityWithUser.UserId != User.GetId())
             {
-                await Send.NotFoundAsync(ct);
+                AddError($"{typeof(TEntity).Name} not found.");
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 

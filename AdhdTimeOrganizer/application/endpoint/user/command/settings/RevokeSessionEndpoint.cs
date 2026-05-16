@@ -8,7 +8,7 @@ public class RevokeSessionEndpoint(IRefreshTokenService refreshTokenService) : E
 {
     public override void Configure()
     {
-        Delete("user/sessions/{id:long}");
+        Delete("user/sessions/{id:long:required}");
         Summary(s => { s.Summary = "Revoke a specific session by ID (cannot revoke the current session)"; });
     }
 
@@ -23,7 +23,8 @@ public class RevokeSessionEndpoint(IRefreshTokenService refreshTokenService) : E
 
         if (!found)
         {
-            await Send.NotFoundAsync(ct);
+            AddError("Session not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

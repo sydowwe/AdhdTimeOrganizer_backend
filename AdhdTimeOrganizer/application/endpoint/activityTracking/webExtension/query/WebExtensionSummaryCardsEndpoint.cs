@@ -17,6 +17,13 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
     {
         Post("/activity-tracking/web-extension/summary-cards");
         Validator<TopDomainsValidator>();
+        Summary(s =>
+        {
+            s.Summary = "Get top domain summary cards with baseline comparison";
+            s.Description = "Returns summary statistics for top domains with baseline comparison against a selected reference period";
+            s.Response<List<DomainSummaryDto>>(200, "Success");
+            s.Response(400, "Bad request");
+        });
     }
 
     public override async Task HandleAsync(SummaryCardsRequest req, CancellationToken ct)

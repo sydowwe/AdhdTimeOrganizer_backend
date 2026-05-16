@@ -19,7 +19,7 @@ public class GetAllGroupedRoutineTodoListEndpoint(
     public override void Configure()
     {
         Get("/routine-todo-list/grouped-by-time-period");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
 
         Summary(s =>
         {

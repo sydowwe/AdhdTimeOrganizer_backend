@@ -16,6 +16,13 @@ public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<
     {
         Post("/activity-tracking/web-extension/stacked-bars");
         Validator<WebExtensionSummaryValidator>();
+        Summary(s =>
+        {
+            s.Summary = "Get web activity aggregated into time windows for a stacked bar chart";
+            s.Description = "Aggregates web extension activity into configurable time windows and returns by-domain breakdowns, optionally filtering small domains into an 'Other' category";
+            s.Response<IEnumerable<WebExtensionStackedBarsWindow>>(200, "Success");
+            s.Response(400, "Bad request");
+        });
     }
 
     public override async Task HandleAsync(WebExtensionStackedBarsRequest req, CancellationToken ct)

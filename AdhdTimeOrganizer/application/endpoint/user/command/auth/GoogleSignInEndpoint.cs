@@ -22,7 +22,7 @@ public class GoogleSignInEndpoint(
 {
     public override void Configure()
     {
-        Post("auth/login/google");
+        Post("/auth/login/google");
         AllowAnonymous();
         Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => { s.Summary = "Sign in with Google OAuth"; });

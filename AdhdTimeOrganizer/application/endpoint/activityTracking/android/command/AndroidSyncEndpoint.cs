@@ -18,8 +18,10 @@ public class AndroidSyncEndpoint(AppDbContext dbContext) : Endpoint<AndroidSyncR
     public override void Configure()
     {
         Post("/sync");
+        Summary(s => s.Description = "Sync Android session data from mobile device");
         Validator<AndroidSyncValidator>();
         Group<ActivityTrackingAndroidGroup>();
+        Policies("ActivityTracking");
     }
 
     public override async Task HandleAsync(AndroidSyncRequest req, CancellationToken ct)

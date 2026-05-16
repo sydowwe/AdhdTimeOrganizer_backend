@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
@@ -18,10 +19,7 @@ public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbC
 {
     private readonly TMapper _mapper = mapper;
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public virtual bool FilteredByUser => true;
     protected abstract string FieldName { get; }
@@ -29,8 +27,8 @@ public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbC
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Get($"/{entityName.Kebaberize()}/by-{FieldName}/{{value}}");
-        Roles(AllowedRoles());
+        Get($"/{entityName.Kebaberize()}/by-{FieldName}/{{value:required}}");
+        
         Summary(s =>
         {
             s.Summary = $"Get {entityName} by {FieldName}";
@@ -43,10 +41,10 @@ public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbC
     public override async Task HandleAsync(CancellationToken ct)
     {
         var value = Route<string>("value");
-        if (string.IsNullOrEmpty(value))
+        if (string.IsNullOrWhiteSpace(value))
         {
-            AddError($"The value parameter is required and cannot be empty. /{typeof(TEntity).Name.Kebaberize()}/by-{FieldName}/{{value}}");
-            await Send.ErrorsAsync(cancellation: ct);
+            AddError($"{FieldName} value cannot be empty");
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 
@@ -61,7 +59,8 @@ public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbC
         var entity = await query.FirstOrDefaultAsync(FilterQuery(value), ct);
         if (entity == null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError($"{typeof(TEntity).Name} not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

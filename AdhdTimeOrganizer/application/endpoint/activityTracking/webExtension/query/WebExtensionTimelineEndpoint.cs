@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
 public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
-    : Endpoint<WebExtensionTimelineRequest, WebExtensionTimelineResponse>
+    : Endpoint<BaseTimelineRequest, WebExtensionTimelineResponse>
 {
     private const int ContextWindowRadius = 2;
     private const int ContextSwitchThresholdMinutes = 2;
@@ -20,10 +20,17 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
     public override void Configure()
     {
         Post("/activity-tracking/web-extension/timeline");
-        Validator<WebExtensionTimelineValidator>();
+        Validator<BaseTimelineValidator>();
+        Summary(s =>
+        {
+            s.Summary = "Get browsing activity as primary, detail, and background timeline sessions";
+            s.Description = "Constructs a multi-row timeline of web activities with dominant activity track, context switches, and background activity with intelligent session merging";
+            s.Response<WebExtensionTimelineResponse>(200, "Success");
+            s.Response(400, "Bad request");
+        });
     }
 
-    public override async Task HandleAsync(WebExtensionTimelineRequest req, CancellationToken ct)
+    public override async Task HandleAsync(BaseTimelineRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
         var (from, to) = req.ToDateTimeRange();

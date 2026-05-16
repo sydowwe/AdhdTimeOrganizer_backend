@@ -1,10 +1,12 @@
 using AdhdTimeOrganizer.application.dto.dto;
+using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.suggestion;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
@@ -25,8 +27,9 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext, 
 
     public override void Configure()
     {
-        Get("/repeating-planner-task/suggestions");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        Get("/repeating-planner-task/suggestions/{calendarId:long:required}");
+        
+        
         Summary(s =>
         {
             s.Summary = "Get task suggestions for a date";
@@ -38,14 +41,16 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext, 
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var dateString = Query<string>("date");
-        if (!DateOnly.TryParseExact(dateString, "yyyy-MM-dd", out var date))
+        var calendarId = Route<long>("calendarId");
+        var calendar = await dbContext.Set<Calendar>().FindAsync([calendarId], ct);
+
+        if (calendar == null)
         {
-            AddError("Invalid date format. Use yyyy-MM-dd.");
-            await Send.ErrorsAsync(400, ct);
+            AddError("Calendar not found");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
-
+        var date = calendar.Date;
         var userId = User.GetId();
         var isoDayOfWeek = date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
         var dayOfMonth = date.Day;
@@ -61,12 +66,6 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext, 
             .Include(t => t.Activity).ThenInclude(a => a.Category)
             .ToListAsync(ct);
 
-        Calendar? calendar = null;
-        if (tasks.Any(t => t.RecurrenceType == RecurrenceType.DayType))
-        {
-            calendar = await dbContext.Set<Calendar>()
-                .FirstOrDefaultAsync(c => c.UserId == userId && c.Date == date, ct);
-        }
 
         foreach (var task in tasks)
         {
@@ -75,9 +74,9 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext, 
                 RecurrenceType.DayOfWeek => task.ScheduledDays.Contains(date.DayOfWeek.ToString()),
                 RecurrenceType.DayOfMonth => task.ScheduledDates.Contains(date.Day),
                 RecurrenceType.DateRange => task.ActiveFromDate.HasValue && task.ActiveToDate.HasValue
-                    && task.ActiveFromDate.Value <= date && date <= task.ActiveToDate.Value,
+                                                                         && task.ActiveFromDate.Value <= date && date <= task.ActiveToDate.Value,
                 RecurrenceType.DayType => calendar != null
-                    && task.ScheduledForDayTypes.Contains(calendar.DayType.ToString()),
+                                          && task.ScheduledForDayTypes.Contains(calendar.DayType.ToString()),
                 _ => false
             };
             if (!matches) continue;
@@ -109,8 +108,8 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext, 
         // 2. Planner-pattern suggestions
         var plannerPatterns = await dbContext.Set<PlannerTaskPattern>()
             .Where(p => p.UserId == userId &&
-                ((p.PatternType == (int)RecurrenceType.DayOfWeek && p.PatternValue == isoDayOfWeek) ||
-                 (p.PatternType == (int)RecurrenceType.DayOfMonth && p.PatternValue == dayOfMonth)))
+                        ((p.PatternType == (int)RecurrenceType.DayOfWeek && p.PatternValue == isoDayOfWeek) ||
+                         (p.PatternType == (int)RecurrenceType.DayOfMonth && p.PatternValue == dayOfMonth)))
             .Include(p => p.Activity).ThenInclude(a => a.Role)
             .Include(p => p.Activity).ThenInclude(a => a.Category)
             .Include(p => p.Importance)
@@ -128,8 +127,8 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext, 
         // 3. Activity-history-pattern suggestions
         var historyPatterns = await dbContext.Set<ActivityHistoryPattern>()
             .Where(p => p.UserId == userId &&
-                ((p.PatternType == (int)RecurrenceType.DayOfWeek && p.PatternValue == isoDayOfWeek) ||
-                 (p.PatternType == (int)RecurrenceType.DayOfMonth && p.PatternValue == dayOfMonth)))
+                        ((p.PatternType == (int)RecurrenceType.DayOfWeek && p.PatternValue == isoDayOfWeek) ||
+                         (p.PatternType == (int)RecurrenceType.DayOfMonth && p.PatternValue == dayOfMonth)))
             .Include(p => p.Activity).ThenInclude(a => a.Role)
             .Include(p => p.Activity).ThenInclude(a => a.Category)
             .ToListAsync(ct);

@@ -8,12 +8,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
-public class DomainDetailsEndpoint(AppDbContext db) : Endpoint<DomainDetailsRequest, DomainDetailsResponse>
+public class WebDomainDetailsEndpoint(AppDbContext db) : Endpoint<DomainDetailsRequest, DomainDetailsResponse>
 {
     public override void Configure()
     {
         Get("/activity-tracking/web-extension/domain-details");
         Validator<DomainDetailsValidator>();
+        Summary(s =>
+        {
+            s.Summary = "Get details and page breakdown for a single domain";
+            s.Description = "Retrieves detailed activity breakdown for a specific domain, including page-level statistics and time distribution";
+            s.Response<DomainDetailsResponse>(200, "Success");
+            s.Response(400, "Bad request");
+            s.Response(404, "Domain not found");
+        });
     }
 
     public override async Task HandleAsync(DomainDetailsRequest req, CancellationToken ct)
@@ -29,7 +37,8 @@ public class DomainDetailsEndpoint(AppDbContext db) : Endpoint<DomainDetailsRequ
 
         if (records.Count == 0)
         {
-            await Send.NotFoundAsync(ct);
+            AddError("Domain not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

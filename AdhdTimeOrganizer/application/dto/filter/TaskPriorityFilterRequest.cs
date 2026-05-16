@@ -8,5 +8,4 @@ public class TaskPriorityFilterRequest : IFilterRequest
     public string? Color { get; set; }
     public int? MinPriority { get; set; }
     public int? MaxPriority { get; set; }
-    public long? UserId { get; set; }
 }

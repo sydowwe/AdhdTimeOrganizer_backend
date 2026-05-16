@@ -10,7 +10,7 @@ public class GetGoogleCalendarAuthUrlEndpoint(IGoogleCalendarService googleCalen
 {
     public override void Configure()
     {
-        Get("user/google-calendar/auth-url");
+        Get("/user/google-calendar/auth-url");
         Summary(s => { s.Summary = "Get Google Calendar OAuth authorization URL"; });
     }
 

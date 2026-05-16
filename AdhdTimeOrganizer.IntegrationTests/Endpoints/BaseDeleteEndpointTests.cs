@@ -9,7 +9,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 public class BaseDeleteEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/activity-category";
+    private const string Route = "activity-category";
 
     private async Task<long> SeedCategoryAsync()
     {
@@ -26,7 +26,7 @@ public class BaseDeleteEndpointTests(TestWebApplicationFactory factory) : Integr
     {
         var id = await SeedCategoryAsync();
 
-        var response = await Client.DeleteAsync($"{Route}/{id}");
+        var response = await client.DeleteAsync($"{Route}/{id}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -34,11 +34,7 @@ public class BaseDeleteEndpointTests(TestWebApplicationFactory factory) : Integr
     [Fact]
     public async Task Delete_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
 
         var response = await anonClient.DeleteAsync($"{Route}/1");
 
@@ -48,7 +44,7 @@ public class BaseDeleteEndpointTests(TestWebApplicationFactory factory) : Integr
     [Fact]
     public async Task Delete_NonExistingEntity_Returns404()
     {
-        var response = await Client.DeleteAsync($"{Route}/999999999");
+        var response = await client.DeleteAsync($"{Route}/999999999");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

@@ -15,7 +15,7 @@ public class RegenerateRecoveryCodesEndpoint(ITwoFactorAuthService twoFactorAuth
 {
     public override void Configure()
     {
-        Post("user/2fa/recovery-codes/regenerate");
+        Post("/user/2fa/recovery-codes/regenerate");
         PreProcessor<VerifyUserPreProcessor<VerifyUserRequest>>();
         Summary(s =>
         {

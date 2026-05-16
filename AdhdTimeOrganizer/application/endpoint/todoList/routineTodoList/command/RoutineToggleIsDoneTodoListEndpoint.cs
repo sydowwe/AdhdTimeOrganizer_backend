@@ -32,7 +32,9 @@ public class RoutineToggleIsDoneTodoListEndpoint(AppDbContext dbContext) : BaseT
         foreach (var period in periods)
         {
             RoutineResetService.CheckGrace(period, now);
-            RoutineResetService.TryReset(period, period.RoutineTodoListColl.ToList(), now);
+            var completion = RoutineResetService.TryReset(period, period.RoutineTodoListColl.ToList(), now);
+            if (completion != null)
+                _dbContext.Set<RoutinePeriodCompletion>().Add(completion);
         }
 
         return periods

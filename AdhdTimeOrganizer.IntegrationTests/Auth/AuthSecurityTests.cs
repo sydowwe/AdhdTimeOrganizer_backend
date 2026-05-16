@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
@@ -12,20 +13,17 @@ using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Auth;
 
-public class AuthSecurityTests : IntegrationTestBase
+public class AuthSecurityTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
     private User? _dedicatedUser;
-
-    public AuthSecurityTests(TestWebApplicationFactory factory) : base(factory) { }
 
     // ── 2FA ──────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task TwoFa_DirectCall_WithoutPreAuthToken_Returns401()
     {
-        var anonClient = Factory.CreateClient();
         var payload = new { Email = "anyone@test.com", Token = "123456", StayLoggedIn = false };
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login/2fa");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/login/2fa");
         request.Headers.Add("X-Forwarded-For", "10.0.0.1");
         request.Content = JsonContent.Create(payload);
 
@@ -37,9 +35,8 @@ public class AuthSecurityTests : IntegrationTestBase
     [Fact]
     public async Task TwoFa_WithTamperedPreAuthToken_Returns401()
     {
-        var anonClient = Factory.CreateClient();
         var payload = new { Email = "anyone@test.com", Token = "123456", StayLoggedIn = false, PendingAuthToken = "tampered.garbage.token" };
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login/2fa");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/login/2fa");
         request.Headers.Add("X-Forwarded-For", "10.0.0.1");
         request.Content = JsonContent.Create(payload);
 
@@ -56,7 +53,7 @@ public class AuthSecurityTests : IntegrationTestBase
         const string email = "unconfirmed-sec-test@integration.com";
         const string password = "Test@1234!";
 
-        using (var scope = Factory.Services.CreateScope())
+        using (var scope = factory.Services.CreateScope())
         {
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
             _dedicatedUser = new User
@@ -70,9 +67,8 @@ public class AuthSecurityTests : IntegrationTestBase
             await userManager.AddToRoleAsync(_dedicatedUser, "User");
         }
 
-        var anonClient = Factory.CreateClient();
         var payload = new { Email = email, Password = password, StayLoggedIn = false, RecaptchaToken = "test", Timezone = "UTC" };
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/login");
         request.Headers.Add("X-Client-Id", Guid.NewGuid().ToString());
         request.Content = JsonContent.Create(payload);
 
@@ -93,7 +89,7 @@ public class AuthSecurityTests : IntegrationTestBase
         const string password = "Test@1234!";
         const string newPassword = "NewTest@5678!";
 
-        using (var scope = Factory.Services.CreateScope())
+        using (var scope = factory.Services.CreateScope())
         {
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
             _dedicatedUser = new User
@@ -107,14 +103,14 @@ public class AuthSecurityTests : IntegrationTestBase
             await userManager.AddToRoleAsync(_dedicatedUser, "User");
         }
 
-        var cookieClient = Factory.CreateClient(new WebApplicationFactoryClientOptions
+        var cookieClient = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             HandleCookies = true,
             AllowAutoRedirect = false,
-            BaseAddress = new Uri("http://localhost")
+            BaseAddress = baseUrl
         });
         var loginPayload = new { Email = email, Password = password, StayLoggedIn = false, RecaptchaToken = "test", Timezone = "UTC" };
-        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login");
+        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, "auth/login");
         loginRequest.Headers.Add("X-Client-Id", Guid.NewGuid().ToString());
         loginRequest.Content = JsonContent.Create(loginPayload);
         (await cookieClient.SendAsync(loginRequest)).EnsureSuccessStatusCode();
@@ -126,8 +122,8 @@ public class AuthSecurityTests : IntegrationTestBase
                 .Should().BeTrue("login must create a refresh token");
         }
 
-        var changePayload = new { CurrentPassword = password, NewPassword = newPassword };
-        (await cookieClient.PatchAsJsonAsync("/api/user/password", changePayload))
+        var changePayload = new { Password = password, NewPassword = newPassword };
+        (await cookieClient.PatchAsJsonAsync("user/password", changePayload))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         using (var db = CreateDbContext())
@@ -151,7 +147,7 @@ public class AuthSecurityTests : IntegrationTestBase
         }
 
         // Client already has auth-token + refresh-token cookies from InitializeAsync login
-        var response = await Client.PostAsync("/api/auth/logout", null);
+        var response = await client.PostAsync("auth/logout", null);
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         using (var db = CreateDbContext())
@@ -167,7 +163,7 @@ public class AuthSecurityTests : IntegrationTestBase
         var userId = await GetTestUserIdAsync();
 
         // Generate extra tokens directly via the service
-        using (var scope = Factory.Services.CreateScope())
+        using (var scope = factory.Services.CreateScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<domain.extServiceContract.user.auth.IRefreshTokenService>();
             await svc.GenerateRefreshTokenAsync(userId, isExtensionClient: false,
@@ -176,8 +172,8 @@ public class AuthSecurityTests : IntegrationTestBase
                 domain.extServiceContract.user.auth.AuthMethodEnum.Password, stayLoggedIn: false);
         }
 
-        var response = await Client.PostAsync("/api/auth/logout-all", null);
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var response = await client.PostAsync("auth/logout-all", null);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         using (var db = CreateDbContext())
         {
@@ -191,9 +187,11 @@ public class AuthSecurityTests : IntegrationTestBase
     [Fact]
     public async Task ConfirmEmail_NonexistentUserId_Returns400_NotNotFound()
     {
-        var anonClient = Factory.CreateClient();
-
-        var response = await anonClient.GetAsync("/api/auth/confirm-email?userId=999999999&token=fakeToken");
+        var response = await anonClient.PostAsJsonAsync("auth/confirm-email", new ConfirmEmailRequest()
+        {
+            Token = "fakeToken",
+            UserId = 999999999
+        });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await response.Content.ReadAsStringAsync();
@@ -202,25 +200,11 @@ public class AuthSecurityTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task ConfirmEmail_PostMethod_Returns405()
-    {
-        var anonClient = Factory.CreateClient();
-
-        var response = await anonClient.PostAsync("/api/auth/confirm-email?userId=1&token=abc", null);
-
-        response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
-    }
-
-    [Fact]
     public async Task ResendConfirmationEmail_UnknownUserId_Returns200_SameAsKnown()
     {
-        var anonClient = Factory.CreateClient();
+        var response = await anonClient.PostAsync("auth/resend-confirmation-email/999999999", JsonContent.Create(new { }));
 
-        var response = await anonClient.PostAsync("/api/auth/resend-confirmation-email/999999999", null);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadAsStringAsync();
-        body.Should().Contain("Confirmation email sent if applicable");
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     // ── Forgot password ───────────────────────────────────────────────────────
@@ -228,9 +212,8 @@ public class AuthSecurityTests : IntegrationTestBase
     [Fact]
     public async Task ForgotPassword_WithRecaptchaToken_Returns204()
     {
-        var anonClient = Factory.CreateClient();
         var payload = new { Email = TestEmail, RecaptchaToken = "mocked-token" };
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/forgotten-password");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/forgotten-password");
         request.Headers.Add("X-Forwarded-For", "10.0.0.2");
         request.Content = JsonContent.Create(payload);
 
@@ -242,10 +225,9 @@ public class AuthSecurityTests : IntegrationTestBase
     [Fact]
     public async Task ForgotPassword_MissingRecaptchaToken_ReturnsError()
     {
-        var anonClient = Factory.CreateClient();
         // Omit RecaptchaToken — it is `required` so the request is malformed
         var payload = new { Email = TestEmail };
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/forgotten-password");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/forgotten-password");
         request.Headers.Add("X-Forwarded-For", "10.0.0.3");
         request.Content = JsonContent.Create(payload);
 
@@ -257,11 +239,12 @@ public class AuthSecurityTests : IntegrationTestBase
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
 
+
     public override async Task DisposeAsync()
     {
         if (_dedicatedUser is not null)
         {
-            using var scope = Factory.Services.CreateScope();
+            using var scope = factory.Services.CreateScope();
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
             var user = await userManager.FindByIdAsync(_dedicatedUser.Id.ToString());
             if (user is not null)

@@ -14,7 +14,7 @@ public class GetCurrentUserEndpoint(UserManager<User> userManager, UserMapper ma
 {
     public override void Configure()
     {
-        Post("user/data");
+        Post("/user/data");
         Summary(s => { s.Summary = "Get full profile data for the authenticated user"; });
     }
 

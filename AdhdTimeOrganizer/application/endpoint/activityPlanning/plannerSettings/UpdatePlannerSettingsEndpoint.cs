@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.application.mapper.user;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -15,7 +16,8 @@ public class UpdatePlannerSettingsEndpoint(AppDbContext dbContext, UserPlannerSe
     public override void Configure()
     {
         Put("/planner/settings");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
+        Validator<UserPlannerSettingsValidator>();
         Summary(s =>
         {
             s.Summary = "Update planner settings for the current user";

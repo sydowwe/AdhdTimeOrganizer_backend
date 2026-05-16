@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.activity;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 
@@ -7,12 +8,13 @@ namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 
 public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickEditActivityRequest>
 {
-    public virtual string[] AllowedRoles() => EndpointHelper.GetUserOrHigherRoles();
+    
 
     public override void Configure()
     {
-        Put("/activity/{id}/quick-edit");
-        Roles(AllowedRoles());
+        Put("/activity/{id:long:required}/quick-edit");
+        Validator<QuickEditActivityValidator>();
+        
         Summary(s =>
         {
             s.Summary = "Quick edit activity";
@@ -30,7 +32,8 @@ public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickE
             var entity = await dbContext.Activities.FindAsync([Route<long>("id")], ct);
             if (entity == null)
             {
-                await Send.NotFoundAsync(ct);
+                AddError("Activity not found.");
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 
@@ -43,7 +46,10 @@ public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickE
             {
                 AddError(result.ErrorMessage!);
                 await Send.ErrorsAsync(400, ct);
+                return;
             }
+
+            await Send.NoContentAsync(ct);
         }
         catch (Exception ex)
         {

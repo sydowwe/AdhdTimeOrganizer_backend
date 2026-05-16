@@ -16,16 +16,13 @@ public abstract class BasePatchEndpoint<TEntity, TRequest, TResponse>(
     where TRequest : class, IPatchRequest
     where TResponse : class, IIdResponse
 {
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Patch($"/{entityName.Kebaberize()}/{{id:long}}");
-        Roles(AllowedRoles());
+        Patch($"/{entityName.Kebaberize()}/{{id:long:required}}");
+        
         Summary(s =>
         {
             s.Summary = $"Patch {entityName}";
@@ -43,26 +40,22 @@ public abstract class BasePatchEndpoint<TEntity, TRequest, TResponse>(
             var entity = await dbContext.Set<TEntity>().FindAsync([Route<long>("id")], ct);
             if (entity == null)
             {
-                await Send.NotFoundAsync(ct);
+                AddError($"{typeof(TEntity).Name} not found.");
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 
             if (entity is IEntityWithUser entityWithUser && entityWithUser.UserId != User.GetId())
             {
-                await Send.NotFoundAsync(ct);
+                AddError($"{typeof(TEntity).Name} not found.");
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 
             Mapping(entity, req);
 
             dbContext.Set<TEntity>().Update(entity);
-            var affectedRows = await dbContext.SaveChangesAsync(ct);
-            if (affectedRows == 0)
-            {
-                AddError("No rows were updated. Entity may not exist.");
-                await Send.ErrorsAsync(400, ct);
-                return;
-            }
+            await dbContext.SaveChangesAsync(ct);
 
             await Send.NoContentAsync(ct);
         }

@@ -13,7 +13,7 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(AppDbContext dbConte
     public override void Configure()
     {
         Patch($"/{typeof(TEntity).Name.Kebaberize()}/{{itemId:long:required}}/steps/{{stepId:guid:required}}/toggle");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
         Summary(s =>
         {
             var name = typeof(TEntity).Name;
@@ -32,14 +32,16 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(AppDbContext dbConte
         var item = await FetchItem(ItemId, ct);
         if (item is null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError($"{typeof(TEntity).Name} not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 
         var step = item.Steps.FirstOrDefault(s => s.Id == StepId);
         if (step is null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError("Step not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

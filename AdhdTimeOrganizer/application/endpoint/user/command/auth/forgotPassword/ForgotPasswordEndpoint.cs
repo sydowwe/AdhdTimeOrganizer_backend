@@ -16,7 +16,7 @@ public class ForgotPasswordEndpoint(
 {
     public override void Configure()
     {
-        Post("auth/forgotten-password");
+        Post("/auth/forgotten-password");
         AllowAnonymous();
         Throttle(hitLimit: 3, durationSeconds: 60, headerName: "X-Forwarded-For");
         Summary(s => { s.Summary = "Request a password reset link"; });

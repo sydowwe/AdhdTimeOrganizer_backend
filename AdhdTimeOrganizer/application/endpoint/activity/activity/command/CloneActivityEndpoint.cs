@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.activity;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 
@@ -7,12 +8,11 @@ namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 
 public class CloneActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickEditActivityRequest, long?>
 {
-    public virtual string[] AllowedRoles() => EndpointHelper.GetUserOrHigherRoles();
 
     public override void Configure()
     {
-        Post("/activity/{id}/clone");
-        Roles(AllowedRoles());
+        Post("/activity/{id:long:required}/clone");
+        Validator<QuickEditActivityValidator>();
         Summary(s =>
         {
             s.Summary = "Clone activity";
@@ -30,7 +30,8 @@ public class CloneActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickEditA
             var entity = await dbContext.Activities.FindAsync([Route<long>("id")], ct);
             if (entity == null)
             {
-                await Send.NotFoundAsync(ct);
+                AddError("Activity not found.");
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 

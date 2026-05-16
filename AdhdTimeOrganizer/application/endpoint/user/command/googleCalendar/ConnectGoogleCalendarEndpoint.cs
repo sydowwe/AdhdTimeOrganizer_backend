@@ -1,11 +1,11 @@
+using AdhdTimeOrganizer.application.dto.request.user;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.googleCalendar;
-
-public record ConnectGoogleCalendarRequest(string Code);
 
 public class ConnectGoogleCalendarEndpoint(
     UserManager<User> userManager,
@@ -14,7 +14,8 @@ public class ConnectGoogleCalendarEndpoint(
 {
     public override void Configure()
     {
-        Post("user/google-calendar/connect");
+        Post("/user/google-calendar/connect");
+        Validator<ConnectGoogleCalendarValidator>();
         Summary(s => { s.Summary = "Connect Google Calendar by exchanging OAuth code for refresh token"; });
     }
 

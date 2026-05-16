@@ -16,7 +16,7 @@ public class ValidateTwoFactorAuthForLoginEndpoint(
 {
     public override void Configure()
     {
-        Post("auth/login/2fa");
+        Post("/auth/login/2fa");
         Summary(s => { s.Summary = "Validate 2FA for login"; });
         AllowAnonymous();
         Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Forwarded-For");
@@ -76,6 +76,6 @@ public class ValidateTwoFactorAuthForLoginEndpoint(
 
         await jwtService.GenerateJwtAndSetAuthCookie(request.StayLoggedIn, AuthMethodEnum.Password, user, HttpContext);
 
-        await Send.OkAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
+using AdhdTimeOrganizer.domain.extServiceContract.user;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -22,6 +24,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16")
+        .WithUsername("postgres")
+        .WithPassword("P@$$w0rd")
+        .WithPortBinding(5430,5432)
         .Build();
 
     public TestWebApplicationFactory()
@@ -30,7 +35,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         Environment.SetEnvironmentVariable("JWT_AUDIENCE", "test-audience");
         Environment.SetEnvironmentVariable("PAGE_URL", "https://localhost");
         Environment.SetEnvironmentVariable("DB_HOST", "localhost");
-        Environment.SetEnvironmentVariable("DB_PORT", "5432");
+        Environment.SetEnvironmentVariable("DB_PORT", "5430");
         Environment.SetEnvironmentVariable("DB_USER", "postgres");
         Environment.SetEnvironmentVariable("DB_PASSWORD", "P@$$w0rd");
         Environment.SetEnvironmentVariable("DB_NAME", "postgres");
@@ -71,6 +76,17 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
                 .Setup(s => s.VerifyRecaptchaAsync(It.IsAny<string>(), It.IsAny<string>()))
                 .ReturnsAsync(Result.Successful());
             services.AddSingleton(recaptchaMock.Object);
+
+            var emailDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IUserEmailSenderService));
+            if (emailDescriptor != null) services.Remove(emailDescriptor);
+
+            var emailMock = new Mock<IUserEmailSenderService>();
+            emailMock.Setup(s => s.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Returns(Task.CompletedTask);
+            emailMock.Setup(s => s.SendConfirmationLinkAsync(It.IsAny<User>(), It.IsAny<string>())).Returns(Task.CompletedTask);
+            emailMock.Setup(s => s.SendEmailChangeConfirmationAsync(It.IsAny<User>(), It.IsAny<string>(), It.IsAny<string>())).Returns(Task.CompletedTask);
+            emailMock.Setup(s => s.SendPasswordResetLinkAsync(It.IsAny<User>(), It.IsAny<string>())).Returns(Task.CompletedTask);
+            emailMock.Setup(s => s.SendPasswordResetCodeAsync(It.IsAny<User>(), It.IsAny<string>())).Returns(Task.CompletedTask);
+            services.AddSingleton(emailMock.Object);
 
             services.Configure<CookiePolicyOptions>(o =>
             {

@@ -8,5 +8,4 @@ public class TaskImportanceFilterRequest : IFilterRequest
     public string? Color { get; set; }
     public int? MinImportance { get; set; }
     public int? MaxImportance { get; set; }
-    public long? UserId { get; set; }
 }

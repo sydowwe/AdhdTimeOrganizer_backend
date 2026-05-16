@@ -18,7 +18,7 @@ public class GetFilteredSortedCalendarEndpoint(AppDbContext dbContext, CalendarM
         return query.Where(c => c.Date >= filter.From && c.Date <= filter.Until);
     }
 
-    public override SortByRequest[] DefaultSortBy =>
+    public override SortByRequest[] AlwaysSortBy =>
     [
         new()
         {

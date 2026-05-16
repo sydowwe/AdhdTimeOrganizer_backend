@@ -18,10 +18,7 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext, Act
 {
     public virtual string EndpointPath => "filtered-table";
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public override void Configure()
     {
@@ -31,7 +28,7 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext, Act
         {
             s.Summary = $"Get filtered and paginated {entityName} list";
             s.Description = $"Retrieves a filtered, paginated and sorted list of {entityName}";
-            Roles(AllowedRoles());
+            
 
             s.Response<List<ActivityHistoryListGroupedByDateResponse>>(200, "Success");
             s.Response(400, "Bad request");

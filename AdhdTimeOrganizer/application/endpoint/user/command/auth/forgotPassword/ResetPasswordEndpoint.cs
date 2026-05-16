@@ -10,7 +10,7 @@ public class ResetPasswordEndpoint(UserManager<User> userManager)
 {
     public override void Configure()
     {
-        Post("auth/reset-password");
+        Post("/auth/reset-password");
         AllowAnonymous();
         Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => { s.Summary = "Reset password using reset token"; });

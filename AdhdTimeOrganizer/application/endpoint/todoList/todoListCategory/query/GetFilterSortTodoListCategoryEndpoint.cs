@@ -18,7 +18,7 @@ public class GetFilterSortTodoListCategoryEndpoint(AppDbContext dbContext, TodoL
     public override void Configure()
     {
         Post("/todo-list-category/filter-sort");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
 
         Summary(s =>
         {

@@ -24,7 +24,7 @@ public class FetchTableDistinctAndroidEntry(AppDbContext dbContext)
         {
             s.Summary = $"Get filtered and paginated {entityName} list";
             s.Description = $"Retrieves a filtered, paginated and sorted list of {entityName}";
-            Roles(EndpointHelper.GetUserOrHigherRoles());
+            
 
             s.Response<BaseTableResponse<AndroidDistinctEntriesResponse>>(200, "Success");
             s.Response(400, "Bad request");

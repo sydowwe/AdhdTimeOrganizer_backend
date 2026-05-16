@@ -18,10 +18,7 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
     where TRequest : class, ICreateRequest
     where TMapper : IBaseCreateMapper<TEntity, TRequest>
 {
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public virtual string Route => typeof(TEntity).Name.Kebaberize();
 
@@ -29,7 +26,7 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
     {
         var entityName = typeof(TEntity).Name;
         Post($"/{Route}");
-        Roles(AllowedRoles());
+        
         Summary(s =>
         {
             s.Summary = $"Create {entityName}";

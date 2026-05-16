@@ -19,7 +19,7 @@ public abstract class BaseDeleteStepEndpoint<TParent>(AppDbContext dbContext)
     public override void Configure()
     {
         Delete($"/{typeof(TParent).Name.Kebaberize()}/{{itemId}}/steps/{{stepId}}");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
         Summary(s =>
         {
             s.Summary = $"Delete a step from a {typeof(TParent).Name}";
@@ -37,7 +37,8 @@ public abstract class BaseDeleteStepEndpoint<TParent>(AppDbContext dbContext)
         var step = parent?.Steps.FirstOrDefault(s => s.Id == req.StepId);
         if (step is null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError("Step not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

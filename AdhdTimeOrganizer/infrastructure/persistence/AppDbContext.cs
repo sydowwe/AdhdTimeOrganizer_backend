@@ -68,8 +68,18 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UserEntityConfiguration).Assembly);
 
-        modelBuilder.Entity<WebExtensionActivityEntry>()
-            .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate);
+        // Apply user-scoped filter to all IEntityWithUser entities except WebExtensionActivityEntry
+        // which needs a combined filter below.
+        modelBuilder.ApplyUserQueryFilters(loggedUserService, [typeof(WebExtensionActivityEntry)]);
+
+        // WebExtensionActivityEntry needs both the partition date filter and the user filter.
+        if (loggedUserService != null)
+            modelBuilder.Entity<WebExtensionActivityEntry>()
+                .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate &&
+                                     (!loggedUserService.IsAuthenticated || x.UserId == loggedUserService.GetUserId));
+        else
+            modelBuilder.Entity<WebExtensionActivityEntry>()
+                .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate);
 
         OnModelCreatingPartial(modelBuilder);
     }

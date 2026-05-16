@@ -14,7 +14,7 @@ public class ResendVerificationEmailEndpoint(
 {
     public override void Configure()
     {
-        Post("user/resend-verification");
+        Post("/user/resend-verification");
         Summary(s => { s.Summary = "Resend verification email to the authenticated user (max 1/min)"; });
     }
 

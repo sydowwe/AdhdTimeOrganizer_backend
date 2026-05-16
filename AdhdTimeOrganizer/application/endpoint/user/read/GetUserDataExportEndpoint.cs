@@ -12,8 +12,15 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
 {
     public override void Configure()
     {
-        Get("user/data-export");
-        Summary(s => { s.Summary = "Download all user data as a JSON file (max 1/min)"; });
+        Get("/user/data-export");
+        Summary(s =>
+        {
+            s.Summary = "Download all user data as a JSON file (max 1/min)";
+            s.Description = "Exports all user data as a JSON file. Rate-limited to 1 request per minute.";
+            s.Response(200, "Success");
+            s.Response(429, "Too many requests");
+            s.Response(401, "Unauthorized");
+        });
     }
 
     public override async Task HandleAsync(CancellationToken ct)

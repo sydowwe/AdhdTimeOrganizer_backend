@@ -315,6 +315,13 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
     {
         config.Endpoints.RoutePrefix = "api";
         config.Endpoints.ShortNames = true;
+        config.Endpoints.Configurator = ep =>
+        {
+            if (ep.AllowedRoles is null || ep.AllowedRoles.Count == 0)
+            {
+                ep.Roles("User", "Admin", "Root");
+            }
+        };
     });
 }
 

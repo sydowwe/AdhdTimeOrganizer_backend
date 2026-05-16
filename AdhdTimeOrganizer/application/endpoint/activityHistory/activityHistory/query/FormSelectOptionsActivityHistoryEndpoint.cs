@@ -13,7 +13,7 @@ public class FormSelectOptionsActivityHistoryEndpoint(AppDbContext appDbContext)
 
     protected override IQueryable<Activity> GetBaseQuery(long userId)
     {
-        return _appDbContext.Set<ActivityHistory>()
+        return AppDbContext.Set<ActivityHistory>()
             .AsNoTracking()
             .FilteredByUser(userId)
             .Select(ah => ah.Activity)

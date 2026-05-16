@@ -23,7 +23,7 @@ public class RegisterUserEndpoint(
 {
     public override void Configure()
     {
-        Post("auth/register");
+        Post("/auth/register");
         AllowAnonymous();
         Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
         Summary(s => s.Summary = "Register a user with email & password");

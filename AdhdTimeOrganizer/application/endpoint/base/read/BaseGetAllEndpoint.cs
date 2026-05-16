@@ -17,10 +17,7 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppDbConte
     where TMapper : IBaseResponseMapper<TEntity, TResponse>
 {
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public virtual string? RouteParam => null;
 
@@ -32,7 +29,7 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppDbConte
     {
         var entityName = typeof(TEntity).Name;
         Get($"/{entityName.Kebaberize()}" + AddedRouteParam);
-        Roles(AllowedRoles());
+        
 
         Summary(s =>
         {

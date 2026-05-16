@@ -27,12 +27,7 @@ public class GetFetchTableActivityCategoryEndpoint(
 
         if (!string.IsNullOrWhiteSpace(filter.Color))
         {
-            query = query.Where(c => c.Color.Contains(filter.Color));
-        }
-
-        if (filter.UserId.HasValue)
-        {
-            query = query.Where(c => c.UserId == filter.UserId.Value);
+            query = query.Where(c => c.Color == filter.Color);
         }
 
         return query;

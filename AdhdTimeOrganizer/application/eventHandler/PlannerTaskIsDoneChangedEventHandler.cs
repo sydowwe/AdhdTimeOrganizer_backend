@@ -16,6 +16,7 @@ public class PlannerTaskIsDoneChangedEventHandler(IServiceScopeFactory scopeFact
 
         await SyncRoutineTodoList(dbContext, eventModel, ct);
         await SyncTodoListItem(dbContext, eventModel, ct);
+        await dbContext.SaveChangesAsync(ct);
     }
 
     private static async Task SyncRoutineTodoList(AppDbContext dbContext, PlannerTaskIsDoneChangedEvent eventModel, CancellationToken ct)
@@ -39,8 +40,6 @@ public class PlannerTaskIsDoneChangedEventHandler(IServiceScopeFactory scopeFact
             if (item.TotalCount.HasValue)
                 item.DoneCount = 0;
         }
-
-        await dbContext.SaveChangesAsync(ct);
     }
 
     private static async Task SyncTodoListItem(AppDbContext dbContext, PlannerTaskIsDoneChangedEvent eventModel, CancellationToken ct)
@@ -66,7 +65,5 @@ public class PlannerTaskIsDoneChangedEventHandler(IServiceScopeFactory scopeFact
             if (item.TotalCount.HasValue)
                 item.DoneCount = 0;
         }
-
-        await dbContext.SaveChangesAsync(ct);
     }
 }

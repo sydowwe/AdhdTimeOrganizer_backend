@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -17,6 +18,12 @@ public class CreateRoutineTodoListEndpoint(AppDbContext dbContext, RoutineTodoLi
 {
     private readonly AppDbContext _dbContext = dbContext;
     private readonly TodoListSettings _settings = settings.Value;
+
+    public override void Configure()
+    {
+        base.Configure();
+        Validator<CreateRoutineTodoListValidator>();
+    }
 
     protected override async Task<Result> AfterMapping(RoutineTodoList entity, CreateRoutineTodoListRequest req, CancellationToken ct = default)
     {

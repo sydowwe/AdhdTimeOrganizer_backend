@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using RoutineTodoListMapper = AdhdTimeOrganizer.application.mapper.todoList.RoutineTodoListMapper;
@@ -10,6 +11,12 @@ namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.comman
 public class UpdateRoutineTodoListEndpoint(AppDbContext dbContext, RoutineTodoListMapper mapper)
     : BaseUpdateEndpoint<RoutineTodoList, UpdateRoutineTodoListRequest, RoutineTodoListMapper>(dbContext, mapper)
 {
+    public override void Configure()
+    {
+        base.Configure();
+        Validator<UpdateRoutineTodoListValidator>();
+    }
+
     protected override Task AfterMapping(RoutineTodoList entity, UpdateRoutineTodoListRequest req, CancellationToken ct = default)
     {
         if (req.Steps is not null)

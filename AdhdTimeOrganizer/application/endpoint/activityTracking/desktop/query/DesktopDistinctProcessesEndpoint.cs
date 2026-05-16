@@ -12,6 +12,12 @@ public class DesktopDistinctProcessesEndpoint(AppDbContext db) : EndpointWithout
     public override void Configure()
     {
         Get("/distinct-processes");
+        Summary(s =>
+        {
+            s.Summary = "Get distinct desktop processes";
+            s.Description = "Returns list of all unique processes recorded in desktop activity history";
+            s.Response<List<TitleValueObject>>(200, "Success");
+        });
         Group<ActivityTrackingDesktopGroup>();
     }
 

@@ -12,19 +12,16 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(AppDbContext appDbContext) : EndpointWithoutRequest<List<ActivityFormSelectOptionsResponse>>
     where TEntity : class
 {
-    protected readonly AppDbContext _appDbContext = appDbContext;
+    protected readonly AppDbContext AppDbContext = appDbContext;
 
     public abstract string EntityRoute { get; }
     
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public override void Configure()
     {
         Get($"/{EntityRoute}/form-select-options");
-        Roles(AllowedRoles());
+        
         Summary(s =>
         {
             s.Summary = $"Get {EntityRoute} form select options";

@@ -22,14 +22,14 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
     private readonly TodoListSettings _settings = settings.Value;
 
 
-    public virtual string[] AllowedRoles() => EndpointHelper.GetUserOrHigherRoles();
+    
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
 
         Patch($"/{entityName.Kebaberize()}/change-display-order");
-        Roles(AllowedRoles());
+        
 
         Summary(s =>
         {
@@ -158,6 +158,8 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
 
     private async Task RebalanceDisplayOrdersAsync(long followingId, CancellationToken ct)
     {
+        var userId = User.GetId();
+
         var groupId = await _dbSet.GetGroupIdById(followingId, GroupFilterExpression, ct);
         if (groupId is null)
         {
@@ -165,7 +167,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
         }
 
         var query = _dbSet.AsQueryable()
-            .Where(e => e.UserId == User.GetId());
+            .Where(e => e.UserId == userId);
 
         var items = await query.Where(e => GroupFilterExpression.Compile()(e) == groupId)
             .OrderByDescending(e => e.DisplayOrder)

@@ -13,7 +13,7 @@ public class FormSelectOptionsPlannerTaskEndpoint(AppDbContext appDbContext)
 
     protected override IQueryable<Activity> GetBaseQuery(long userId)
     {
-        return _appDbContext.Set<PlannerTask>()
+        return AppDbContext.Set<PlannerTask>()
             .AsNoTracking()
             .FilteredByUser(userId)
             .Select(pt => pt.Activity)

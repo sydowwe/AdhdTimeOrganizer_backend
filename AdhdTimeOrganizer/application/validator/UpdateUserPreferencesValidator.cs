@@ -17,6 +17,14 @@ public class UpdateUserPreferencesValidator : Validator<UpdateUserPreferencesReq
             .Must(BeValidTimezone!)
             .When(x => x.Timezone != null)
             .WithMessage("Timezone must be a valid IANA or system timezone identifier.");
+
+        RuleFor(x => x.Theme)
+            .IsInEnum()
+            .When(x => x.Theme.HasValue);
+
+        RuleFor(x => x.Locale)
+            .IsInEnum()
+            .When(x => x.Locale.HasValue);
     }
 
     private static bool BeValidTimezone(string timezone)

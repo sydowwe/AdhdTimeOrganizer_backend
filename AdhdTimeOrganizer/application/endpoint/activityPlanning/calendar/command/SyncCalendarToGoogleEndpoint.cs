@@ -18,12 +18,12 @@ public class SyncCalendarToGoogleEndpoint(
     IGoogleCalendarService googleCalendarService)
     : EndpointWithoutRequest<SyncCalendarToGoogleResponse>
 {
-    public virtual string[] AllowedRoles() => EndpointHelper.GetUserOrHigherRoles();
+    
 
     public override void Configure()
     {
-        Post("calendar/{id:long}/sync-to-google");
-        Roles(AllowedRoles());
+        Post("calendar/{id:long:required}/sync-to-google");
+        
         Summary(s => { s.Summary = "Sync a calendar day's planner tasks to Google Calendar"; });
     }
 
@@ -51,7 +51,8 @@ public class SyncCalendarToGoogleEndpoint(
 
         if (calendar is null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError("Calendar not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

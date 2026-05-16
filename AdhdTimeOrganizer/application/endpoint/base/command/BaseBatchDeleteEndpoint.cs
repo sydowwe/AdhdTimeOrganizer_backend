@@ -12,16 +12,11 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 public abstract class BaseBatchDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endpoint<IdListRequest>
     where TEntity : class, IEntityWithId
 {
-    protected virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetAdminOrHigherRoles();
-    }
-
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
         Post($"/{entityName.Kebaberize()}/batch-delete");
-        Roles(AllowedRoles());
+        
         Summary(s =>
         {
             s.Summary = $"Batch delete {entityName}";
@@ -42,13 +37,15 @@ public abstract class BaseBatchDeleteEndpoint<TEntity>(AppDbContext dbContext) :
                 var entity = await dbContext.Set<TEntity>().FindAsync([idRequest], ct);
                 if (entity == null)
                 {
-                    await Send.NotFoundAsync(ct);
+                    AddError($"{typeof(TEntity).Name} not found.");
+                    await Send.ErrorsAsync(404, ct);
                     return;
                 }
 
                 if (entity is IEntityWithUser entityWithUser && entityWithUser.UserId != User.GetId())
                 {
-                    await Send.NotFoundAsync(ct);
+                    AddError($"{typeof(TEntity).Name} not found.");
+                    await Send.ErrorsAsync(404, ct);
                     return;
                 }
 

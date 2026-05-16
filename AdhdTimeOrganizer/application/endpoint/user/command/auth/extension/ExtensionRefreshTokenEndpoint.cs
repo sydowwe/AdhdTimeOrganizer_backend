@@ -10,7 +10,7 @@ public class ExtensionRefreshTokenEndpoint(IJwtService jwtService)
 {
     public override void Configure()
     {
-        Post("auth/extension/refresh");
+        Post("/auth/extension/refresh");
         AllowAnonymous();
         Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Forwarded-For");
         Summary(s => { s.Summary = "Refresh access token using refresh token from request body (extension clients)"; });

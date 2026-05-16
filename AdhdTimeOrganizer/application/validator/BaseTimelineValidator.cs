@@ -4,9 +4,9 @@ using FluentValidation;
 
 namespace AdhdTimeOrganizer.application.validator;
 
-public class WebExtensionTimelineValidator : Validator<WebExtensionTimelineRequest>
+public class BaseTimelineValidator : Validator<BaseTimelineRequest>
 {
-    public WebExtensionTimelineValidator()
+    public BaseTimelineValidator()
     {
         RuleFor(x => x.From).NotEmpty();
         RuleFor(x => x.MinSeconds)

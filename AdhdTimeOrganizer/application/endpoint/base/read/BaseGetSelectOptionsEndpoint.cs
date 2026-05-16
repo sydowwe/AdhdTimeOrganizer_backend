@@ -16,10 +16,7 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppDbContex
 {
     private readonly TMapper _mapper = mapper;
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public virtual string AddedRouteParam => string.Empty;
 
@@ -29,7 +26,7 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppDbContex
     {
         var entityName = typeof(TEntity).Name;
         Get($"/{entityName.Kebaberize()}/all-options/{AddedRouteParam}");
-        Roles(AllowedRoles());
+        
         Summary(s =>
         {
             s.Summary = $"Get {entityName} select options";
@@ -56,7 +53,7 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppDbContex
         await Send.OkAsync(options, ct);
     }
 
-    public virtual IQueryable<TEntity> Filter(IQueryable<TEntity> query) => query;
+    protected virtual IQueryable<TEntity> Filter(IQueryable<TEntity> query) => query;
 
     protected virtual IQueryable<TEntity> Sort(IQueryable<TEntity> query) => query.OrderBy(e => e.Id);
 

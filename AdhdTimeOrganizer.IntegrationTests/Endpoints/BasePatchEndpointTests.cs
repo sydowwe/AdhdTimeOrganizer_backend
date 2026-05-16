@@ -14,7 +14,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 // Tests BasePatchEndpoint via TemplatePlannerTaskChangeSpanEndpoint
 public class BasePatchEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/template-planner-task";
+    private const string Route = "template-planner-task";
 
     private async Task<long> SeedTemplatePlannerTaskAsync()
     {
@@ -69,7 +69,7 @@ public class BasePatchEndpointTests(TestWebApplicationFactory factory) : Integra
             EndTime = new { Hours = 11, Minutes = 0 }
         };
 
-        var response = await Client.PatchAsJsonAsync($"{Route}/{id}", request);
+        var response = await client.PatchAsJsonAsync($"{Route}/{id}", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -77,11 +77,7 @@ public class BasePatchEndpointTests(TestWebApplicationFactory factory) : Integra
     [Fact]
     public async Task Patch_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
         var request = new
         {
             StartTime = new { Hours = 10, Minutes = 0 },
@@ -102,7 +98,7 @@ public class BasePatchEndpointTests(TestWebApplicationFactory factory) : Integra
             EndTime = new { Hours = 11, Minutes = 0 }
         };
 
-        var response = await Client.PatchAsJsonAsync($"{Route}/999999999", request);
+        var response = await client.PatchAsJsonAsync($"{Route}/999999999", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

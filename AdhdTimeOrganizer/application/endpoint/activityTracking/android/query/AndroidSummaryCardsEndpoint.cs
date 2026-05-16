@@ -15,6 +15,13 @@ public class AndroidSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCard
     public override void Configure()
     {
         Post("/activity-tracking/android/summary-cards");
+        Summary(s =>
+        {
+            s.Summary = "Get Android app usage summary cards";
+            s.Description = "Returns top N apps with current usage and comparison against baseline period";
+            s.Response<List<AndroidAppSummaryDto>>(200, "Success");
+            s.Response(400, "Bad request");
+        });
         Validator<TopDomainsValidator>();
     }
 

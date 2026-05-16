@@ -12,7 +12,7 @@ public class ActivityFormSelectOptionsEndpoint(AppDbContext appDbContext)
 
     protected override IQueryable<Activity> GetBaseQuery(long userId)
     {
-        return _appDbContext.Set<Activity>()
+        return AppDbContext.Set<Activity>()
             .AsNoTracking()
             .FilteredByUser(userId);
     }

@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 public class BaseGetSelectOptionsEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/activity-category/all-options";
+    private const string Route = "activity-category/all-options";
 
     private async Task SeedCategoriesAsync()
     {
@@ -27,7 +27,7 @@ public class BaseGetSelectOptionsEndpointTests(TestWebApplicationFactory factory
     {
         await SeedCategoriesAsync();
 
-        var response = await Client.GetAsync(Route);
+        var response = await client.GetAsync(Route);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var options = await response.Content.ReadFromJsonAsync<List<SelectOptionResponse>>();
@@ -43,11 +43,7 @@ public class BaseGetSelectOptionsEndpointTests(TestWebApplicationFactory factory
     [Fact]
     public async Task GetSelectOptions_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
 
         var response = await anonClient.GetAsync(Route);
 

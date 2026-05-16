@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 // Tests BaseToggleIsHiddenEndpoint via ToggleIsHiddenRoutineTimePeriodEndpoint
 public class BaseToggleIsHiddenEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/routine-time-period/toggle-is-hidden";
+    private const string Route = "routine-time-period/toggle-is-hidden";
 
     private async Task<long> SeedRoutineTimePeriodAsync()
     {
@@ -36,7 +36,7 @@ public class BaseToggleIsHiddenEndpointTests(TestWebApplicationFactory factory) 
         var id = await SeedRoutineTimePeriodAsync();
         var request = new { Ids = new[] { id } };
 
-        var response = await Client.PatchAsJsonAsync(Route, request);
+        var response = await client.PatchAsJsonAsync(Route, request);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -44,11 +44,7 @@ public class BaseToggleIsHiddenEndpointTests(TestWebApplicationFactory factory) 
     [Fact]
     public async Task ToggleIsHidden_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
 
         var response = await anonClient.PatchAsJsonAsync(Route, new { Ids = new[] { 1L } });
 
@@ -58,7 +54,7 @@ public class BaseToggleIsHiddenEndpointTests(TestWebApplicationFactory factory) 
     [Fact]
     public async Task ToggleIsHidden_NonExistingEntity_Returns404()
     {
-        var response = await Client.PatchAsJsonAsync(Route, new { Ids = new[] { 999999999L } });
+        var response = await client.PatchAsJsonAsync(Route, new { Ids = new[] { 999999999L } });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

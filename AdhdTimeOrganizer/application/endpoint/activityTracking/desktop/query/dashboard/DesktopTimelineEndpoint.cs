@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query.dashboard;
 
 public class DesktopTimelineEndpoint(AppDbContext dbContext)
-    : Endpoint<WebExtensionTimelineRequest, DesktopTimelineResponse>
+    : Endpoint<BaseTimelineRequest, DesktopTimelineResponse>
 {
     private const int ContextWindowRadius = 2;
     private const int ContextSwitchThresholdMinutes = 2;
@@ -19,10 +19,17 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
     public override void Configure()
     {
         Post("/activity-tracking/desktop/timeline");
-        Validator<WebExtensionTimelineValidator>();
+        Summary(s =>
+        {
+            s.Summary = "Get desktop process usage timeline with context awareness";
+            s.Description = "Returns primary sessions, detail sessions, and background sessions with context switch detection and merging";
+            s.Response<DesktopTimelineResponse>(200, "Success");
+            s.Response(400, "Bad request");
+        });
+        Validator<BaseTimelineValidator>();
     }
 
-    public override async Task HandleAsync(WebExtensionTimelineRequest req, CancellationToken ct)
+    public override async Task HandleAsync(BaseTimelineRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
         var (from, to) = req.ToDateTimeRange();

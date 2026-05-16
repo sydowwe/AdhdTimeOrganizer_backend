@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Humanizer;
@@ -13,8 +14,9 @@ public class ChangePriorityTodoListItemEndpoint(AppDbContext dbContext)
     public override void Configure()
     {
         const string entityName = nameof(TodoListItem);
-        Patch($"/{entityName.Kebaberize()}/{{id}}/priority");
-        Roles(AllowedRoles());
+        Patch($"/{entityName.Kebaberize()}/{{id:long:required}}/priority");
+        Validator<ChangePriorityTodoListItemValidator>();
+        
         Summary(s =>
         {
             s.Summary = $"Change priority of {entityName}";

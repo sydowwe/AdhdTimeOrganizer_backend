@@ -19,7 +19,7 @@ public abstract class BaseCreateStepEndpoint<TParent>(AppDbContext dbContext)
     public override void Configure()
     {
         Post($"/{typeof(TParent).Name.Kebaberize()}/{{itemId}}/steps");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        
         Summary(s =>
         {
             s.Summary = $"Add a step to a {typeof(TParent).Name}";
@@ -36,7 +36,8 @@ public abstract class BaseCreateStepEndpoint<TParent>(AppDbContext dbContext)
 
         if (parent is null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError($"{typeof(TParent).Name} not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

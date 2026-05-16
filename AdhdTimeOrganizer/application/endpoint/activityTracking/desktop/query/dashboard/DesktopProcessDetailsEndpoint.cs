@@ -13,6 +13,14 @@ public class DesktopProcessDetailsEndpoint(AppDbContext db) : Endpoint<DesktopPr
     public override void Configure()
     {
         Get("/activity-tracking/desktop/process-details");
+        Summary(s =>
+        {
+            s.Summary = "Get detailed desktop process usage statistics";
+            s.Description = "Returns breakdown of a specific process by window titles and monitors for a given date range";
+            s.Response<DesktopProcessDetailsResponse>(200, "Success");
+            s.Response(400, "Bad request");
+            s.Response(404, "Process not found");
+        });
         Validator<DesktopProcessDetailsValidator>();
     }
 
@@ -28,7 +36,8 @@ public class DesktopProcessDetailsEndpoint(AppDbContext db) : Endpoint<DesktopPr
 
         if (records.Count == 0)
         {
-            await Send.NotFoundAsync(ct);
+            AddError("Process not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

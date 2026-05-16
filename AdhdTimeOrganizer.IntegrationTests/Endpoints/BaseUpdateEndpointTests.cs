@@ -9,7 +9,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 public class BaseUpdateEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/activity-category";
+    private const string Route = "activity-category";
 
     private async Task<long> SeedCategoryAsync()
     {
@@ -32,7 +32,7 @@ public class BaseUpdateEndpointTests(TestWebApplicationFactory factory) : Integr
         var id = await SeedCategoryAsync();
         var request = new { Name = "Updated", Color = "#00FF00", Text = "updated" };
 
-        var response = await Client.PutAsJsonAsync($"{Route}/{id}", request);
+        var response = await client.PutAsJsonAsync($"{Route}/{id}", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -40,11 +40,7 @@ public class BaseUpdateEndpointTests(TestWebApplicationFactory factory) : Integr
     [Fact]
     public async Task Update_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
 
         var response = await anonClient.PutAsJsonAsync($"{Route}/1", new { Name = "X", Color = "#000000" });
 
@@ -54,7 +50,7 @@ public class BaseUpdateEndpointTests(TestWebApplicationFactory factory) : Integr
     [Fact]
     public async Task Update_NonExistingEntity_Returns404()
     {
-        var response = await Client.PutAsJsonAsync($"{Route}/999999999", new { Name = "X", Color = "#000000" });
+        var response = await client.PutAsJsonAsync($"{Route}/999999999", new { Name = "X", Color = "#000000" });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

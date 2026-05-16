@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 // Tests BaseFilterSortEndpoint via GetFilterSortTodoListEndpoint
 public class BaseFilterSortEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/todo-list/filter-sort";
+    private const string Route = "todo-list/filter-sort";
 
     private async Task SeedTodoListsAsync()
     {
@@ -34,7 +34,7 @@ public class BaseFilterSortEndpointTests(TestWebApplicationFactory factory) : In
             Filter = new { }
         };
 
-        var response = await Client.PostAsJsonAsync(Route, request);
+        var response = await client.PostAsJsonAsync(Route, request);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var items = await response.Content.ReadFromJsonAsync<List<TodoListResponse>>();
@@ -53,7 +53,7 @@ public class BaseFilterSortEndpointTests(TestWebApplicationFactory factory) : In
             Filter = new { Name = "Alpha" }
         };
 
-        var response = await Client.PostAsJsonAsync(Route, request);
+        var response = await client.PostAsJsonAsync(Route, request);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var items = await response.Content.ReadFromJsonAsync<List<TodoListResponse>>();
@@ -64,11 +64,7 @@ public class BaseFilterSortEndpointTests(TestWebApplicationFactory factory) : In
     [Fact]
     public async Task FilterSort_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
 
         var response = await anonClient.PostAsJsonAsync(Route, new { SortBy = Array.Empty<object>(), UseFilter = false, Filter = new { } });
 

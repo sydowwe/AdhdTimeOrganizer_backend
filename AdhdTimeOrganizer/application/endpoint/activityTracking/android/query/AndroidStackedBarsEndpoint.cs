@@ -14,6 +14,13 @@ public class AndroidStackedBarsEndpoint(AppDbContext db) : Endpoint<AndroidStack
     public override void Configure()
     {
         Post("/activity-tracking/android/stacked-bars");
+        Summary(s =>
+        {
+            s.Summary = "Get Android app usage stacked bars data";
+            s.Description = "Returns app usage breakdown grouped by time windows for a given date range";
+            s.Response<IEnumerable<AndroidStackedBarsWindow>>(200, "Success");
+            s.Response(400, "Bad request");
+        });
         Validator<AndroidStackedBarsValidator>();
     }
 

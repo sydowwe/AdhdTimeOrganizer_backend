@@ -17,6 +17,13 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
     {
         Post("/activity-tracking/web-extension/heartbeat");
         Validator<WebExtensionHeartbeatValidator>();
+        Summary(s =>
+        {
+            s.Summary = "Receive browser extension heartbeat activity data";
+            s.Description = "Records web extension activity data from browser, creating or updating domain activity records";
+            s.Response<int>(200, "Success - returns count of processed activities");
+            s.Response(400, "Bad request");
+        });
     }
 
     public override async Task HandleAsync(WebExtensionHeartbeatRequest req, CancellationToken ct)

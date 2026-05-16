@@ -46,7 +46,7 @@ public class GetFilterSortedPlannerTaskEndpoint(AppDbContext dbContext, PlannerT
         return query;
     }
 
-    public override SortByRequest[] DefaultSortBy =>
+    public override SortByRequest[] AlwaysSortBy =>
     [
         new()
         {

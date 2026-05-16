@@ -20,7 +20,7 @@ public class ToggleTwoFactorAuthEndpoint(
 {
     public override void Configure()
     {
-        Post("user/2fa/toggle");
+        Post("/user/2fa/toggle");
         PreProcessor<VerifyUserPreProcessor<VerifyUserRequest>>();
         Summary(s => { s.Summary = "Enable or disable two-factor authentication"; });
     }

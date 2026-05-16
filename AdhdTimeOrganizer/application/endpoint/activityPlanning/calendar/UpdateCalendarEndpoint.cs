@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using CalendarMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.CalendarMapper;
@@ -11,6 +11,12 @@ namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 public class UpdateCalendarEndpoint(AppDbContext dbContext, CalendarMapper mapper)
     : BaseUpdateEndpoint<Calendar, CalendarRequest, CalendarMapper>(dbContext, mapper)
 {
+    public override void Configure()
+    {
+        base.Configure();
+        Validator<CalendarRequestValidator>();
+    }
+
     protected override Task AfterMapping(Calendar entity, CalendarRequest req, CancellationToken ct = default)
     {
         ValidateDayType(entity);

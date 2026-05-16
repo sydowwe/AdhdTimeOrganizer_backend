@@ -9,7 +9,7 @@ public class ExtensionLogoutEndpoint(IRefreshTokenService refreshTokenService)
 {
     public override void Configure()
     {
-        Post("auth/extension/logout");
+        Post("/auth/extension/logout");
         Summary(s => { s.Summary = "Logout extension client and revoke refresh token"; });
     }
 

@@ -12,13 +12,13 @@ namespace AdhdTimeOrganizer.application.endpoint.todoList;
 public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbContext) : Endpoint<ToggleIsDoneRequest>
     where TEntity : BaseTodoListItem
 {
-    public virtual string[] AllowedRoles() => EndpointHelper.GetUserOrHigherRoles();
+    
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
         Patch($"/{entityName.Kebaberize()}/toggle-is-done");
-        Roles(AllowedRoles());
+        
         Summary(s =>
         {
             s.Summary = $"Toggles {entityName} IsDone status";
@@ -35,7 +35,8 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbC
 
         if (itemsToToggle.Count == 0)
         {
-            await Send.NotFoundAsync(ct);
+            AddError($"{typeof(TEntity).Name} not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 

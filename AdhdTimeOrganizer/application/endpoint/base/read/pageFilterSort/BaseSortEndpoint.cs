@@ -22,10 +22,7 @@ public abstract class BaseSortEndpoint<TEntity, TResponse, TMapper>(
 {
     public virtual string EndpointPath => "sort";
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public virtual bool FilteredByUser => true;
 
@@ -33,13 +30,13 @@ public abstract class BaseSortEndpoint<TEntity, TResponse, TMapper>(
     {
         var entityName = typeof(TEntity).Name;
         Post($"/{entityName.Kebaberize()}/{EndpointPath}");
+        
         Summary(s =>
         {
             s.Summary = $"Get sorted {entityName} list";
-            s.Description = $"Retrieves a sorted of {entityName}";
-            Roles(AllowedRoles());
+            s.Description = $"Retrieves a sorted list of {entityName}";
 
-            s.Response<BaseTableResponse<TResponse>>(200, "Success");
+            s.Response<List<TResponse>>(200, "Success");
             s.Response(400, "Bad request");
         });
     }

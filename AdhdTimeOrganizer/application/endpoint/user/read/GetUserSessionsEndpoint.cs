@@ -10,7 +10,7 @@ public class GetUserSessionsEndpoint(IRefreshTokenService refreshTokenService) :
 {
     public override void Configure()
     {
-        Get("user/sessions");
+        Get("/user/sessions");
         Summary(s => { s.Summary = "List all active sessions for the authenticated user"; });
     }
 

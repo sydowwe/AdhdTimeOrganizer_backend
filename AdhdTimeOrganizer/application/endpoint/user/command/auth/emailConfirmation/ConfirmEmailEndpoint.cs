@@ -1,21 +1,23 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.user;
+﻿using AdhdTimeOrganizer.application.dto.request.user;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.emailConfirmation;
 
-public class ConfirmEmailEndpoint(UserManager<User> userManager) : EndpointWithoutRequest
+public class ConfirmEmailEndpoint(UserManager<User> userManager) : Endpoint<ConfirmEmailRequest>
 {
     public override void Configure()
     {
-        Get("auth/confirm-email");
+        Post("/auth/confirm-email");
         AllowAnonymous();
+        Validator<ConfirmEmailValidator>();
     }
 
-    public override async Task HandleAsync(CancellationToken ct)
+    public override async Task HandleAsync(ConfirmEmailRequest req, CancellationToken ct)
     {
-        var userId = Query<long>("userId");
-        var token = Query<string>("token");
+        var userId = req.UserId;
+        var token = req.Token;
 
         if (userId <= 0 || string.IsNullOrEmpty(token))
         {

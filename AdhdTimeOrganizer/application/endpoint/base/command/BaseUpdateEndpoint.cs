@@ -19,18 +19,14 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
 {
     private readonly TMapper _mapper = mapper;
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
 
     public virtual string Route => typeof(TEntity).Name.Kebaberize();
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Put($"/{Route}/{{id:long}}");
-        Roles(AllowedRoles());
+        Put($"/{Route}" + "/{id:long:required}");
+        
         Summary(s =>
         {
             s.Summary = $"Update {entityName}";
@@ -48,13 +44,15 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
             var entity = await dbContext.Set<TEntity>().FindAsync([Route<long>("id")], ct);
             if (entity == null)
             {
-                await Send.NotFoundAsync(ct);
+                AddError($"{typeof(TEntity).Name} not found.");
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 
             if (entity is IEntityWithUser entityWithUser && entityWithUser.UserId != User.GetId())
             {
-                await Send.NotFoundAsync(ct);
+                AddError($"{typeof(TEntity).Name} not found.");
+                await Send.ErrorsAsync(404, ct);
                 return;
             }
 
@@ -63,13 +61,7 @@ public abstract class BaseUpdateEndpoint<TEntity, TRequest, TMapper>(
             await AfterMapping(entity, req, ct);
 
             dbContext.Set<TEntity>().Update(entity);
-            var affectedRows = await dbContext.SaveChangesAsync(ct);
-            if (affectedRows == 0)
-            {
-                AddError("No rows were updated. Entity may not exist.");
-                await Send.ErrorsAsync(400, ct);
-                return;
-            }
+            await dbContext.SaveChangesAsync(ct);
 
             await Send.NoContentAsync(ct);
         }

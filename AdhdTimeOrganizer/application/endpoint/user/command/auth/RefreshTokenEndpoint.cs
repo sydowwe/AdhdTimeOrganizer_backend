@@ -7,7 +7,7 @@ public class RefreshTokenEndpoint(IJwtService jwtService) : EndpointWithoutReque
 {
     public override void Configure()
     {
-        Post("auth/refresh");
+        Post("/auth/refresh");
         AllowAnonymous();
         Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Forwarded-For");
         Summary(s => { s.Summary = "Refresh access token using refresh token from cookie (web clients)"; });

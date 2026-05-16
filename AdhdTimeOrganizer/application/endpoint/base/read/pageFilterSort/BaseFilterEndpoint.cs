@@ -22,26 +22,23 @@ public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>(
 {
     public virtual string EndpointPath => "filter";
 
-    public virtual string[] AllowedRoles()
-    {
-        return EndpointHelper.GetUserOrHigherRoles();
-    }
+
 
     public virtual bool FilteredByUser => true;
 
-    public virtual SortByRequest[]? DefaultSortBy => null;
+    public virtual SortByRequest[] AlwaysSortBy => [];
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
         Post($"/{entityName.Kebaberize()}/{EndpointPath}");
+        
         Summary(s =>
         {
             s.Summary = $"Get filtered {entityName} list";
             s.Description = $"Retrieves a filtered list of {entityName}";
-            Roles(AllowedRoles());
 
-            s.Response<BaseTableResponse<TResponse>>(200, "Success");
+            s.Response<List<TResponse>>(200, "Success");
             s.Response(400, "Bad request");
         });
     }
@@ -59,9 +56,9 @@ public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>(
 
             query = ApplyCustomFiltering(query, filter);
 
-            if (DefaultSortBy is not null)
+            if (AlwaysSortBy.Length > 0)
             {
-                query = query.SortByMany(DefaultSortBy);
+                query = query.SortByMany(AlwaysSortBy);
             }
 
             var response = await mapper.ProjectToResponse(query).ToListAsync(ct);

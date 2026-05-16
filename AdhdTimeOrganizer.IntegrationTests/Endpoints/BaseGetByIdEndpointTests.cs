@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 public class BaseGetByIdEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "/api/activity-category";
+    private const string Route = "activity-category";
 
     private async Task<long> SeedCategoryAsync()
     {
@@ -28,7 +28,7 @@ public class BaseGetByIdEndpointTests(TestWebApplicationFactory factory) : Integ
     {
         var id = await SeedCategoryAsync();
 
-        var response = await Client.GetAsync($"{Route}/{id}");
+        var response = await client.GetAsync($"{Route}/{id}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var item = await response.Content.ReadFromJsonAsync<ActivityCategoryResponse>();
@@ -39,11 +39,7 @@ public class BaseGetByIdEndpointTests(TestWebApplicationFactory factory) : Integ
     [Fact]
     public async Task GetById_WithoutAuth_Returns401()
     {
-        using var anonClient = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
+        
 
         var response = await anonClient.GetAsync($"{Route}/1");
 
@@ -53,7 +49,7 @@ public class BaseGetByIdEndpointTests(TestWebApplicationFactory factory) : Integ
     [Fact]
     public async Task GetById_NonExistingEntity_Returns404()
     {
-        var response = await Client.GetAsync($"{Route}/999999999");
+        var response = await client.GetAsync($"{Route}/999999999");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

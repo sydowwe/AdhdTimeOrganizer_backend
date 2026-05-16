@@ -16,7 +16,7 @@ public class ResetTwoFactorAuthEndpoint(ITwoFactorAuthService twoFactorAuthServi
 {
     public override void Configure()
     {
-        Post("user/2fa/reset");
+        Post("/user/2fa/reset");
         PreProcessor<VerifyUserPreProcessor<VerifyUserRequest>>();
         Summary(s =>
         {

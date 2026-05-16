@@ -1,6 +1,8 @@
+using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.suggestion;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
@@ -20,8 +22,9 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext
 
     public override void Configure()
     {
-        Get("/task-planner-day-template/suggestions");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        Get("/task-planner-day-template/suggestions/{calendarId:long:required}");
+        
+        
         Summary(s =>
         {
             s.Summary = "Get template suggestions for a date";
@@ -33,24 +36,23 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var dateString = Query<string>("date");
-        if (!DateOnly.TryParseExact(dateString, "yyyy-MM-dd", out var date))
+        var calendarId = Route<long>("calendarId");
+        var calendar = await dbContext.Set<Calendar>().FindAsync([calendarId], ct);
+
+        if (calendar == null)
         {
-            AddError("Invalid date format. Use yyyy-MM-dd.");
-            await Send.ErrorsAsync(400, ct);
+            AddError("Calendar not found");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
-
+        var date = calendar.Date;
         var userId = User.GetId();
         var isoDayOfWeek = date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
-
-        var calendar = await dbContext.Set<Calendar>()
-            .FirstOrDefaultAsync(c => c.UserId == userId && c.Date == date, ct);
 
         var patterns = await dbContext.Set<TemplateSuggestionPattern>()
             .Where(p => p.UserId == userId &&
                 ((p.PatternType == 0 && p.PatternValue == isoDayOfWeek) ||
-                 (calendar != null && p.PatternType == 1 && p.PatternValue == (int)calendar.DayType)))
+                 (p.PatternType == 1 && p.PatternValue == (int)calendar.DayType)))
             .Include(p => p.Template)
             .ToListAsync(ct);
 

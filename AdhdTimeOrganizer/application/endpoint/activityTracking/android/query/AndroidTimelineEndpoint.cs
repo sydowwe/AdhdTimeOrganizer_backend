@@ -13,6 +13,13 @@ public class AndroidTimelineEndpoint(AppDbContext db) : Endpoint<AndroidTimeline
     public override void Configure()
     {
         Post("/activity-tracking/android/timeline");
+        Summary(s =>
+        {
+            s.Summary = "Get Android app usage timeline";
+            s.Description = "Returns chronological list of app sessions for a given date range with optional minimum duration filter";
+            s.Response<AndroidTimelineResponse>(200, "Success");
+            s.Response(400, "Bad request");
+        });
         Validator<AndroidTimelineValidator>();
     }
 

@@ -1,6 +1,8 @@
+using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -13,8 +15,8 @@ public class GetCompletionHistoryRoutineTimePeriodEndpoint(AppDbContext dbContex
 {
     public override void Configure()
     {
-        Get("/routine-time-period/{id}/completion-history");
-        Roles(EndpointHelper.GetUserOrHigherRoles());
+        Get("/routine-time-period/{id:long:required}/completion-history");
+        
 
         Summary(s =>
         {
@@ -37,7 +39,8 @@ public class GetCompletionHistoryRoutineTimePeriodEndpoint(AppDbContext dbContex
 
         if (period == null)
         {
-            await Send.NotFoundAsync(ct);
+            AddError("RoutineTimePeriod not found.");
+            await Send.ErrorsAsync(404, ct);
             return;
         }
 
