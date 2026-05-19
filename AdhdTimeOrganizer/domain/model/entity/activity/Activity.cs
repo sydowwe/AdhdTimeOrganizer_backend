@@ -3,6 +3,8 @@ using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.entity.@base;
+using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
+using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activity;
@@ -25,6 +27,11 @@ public class Activity : BaseNameTextEntity
 
     public TrackerDesktopMappingByPattern? TrackerDesktopMappingByPattern { get; set; }
     public TrackerAndroidMappingByPattern? TrackerAndroidMappingByPattern { get; set; }
+
+    public ActivityBacklogProfile? BacklogProfile { get; set; }
+    public ActivityDiyProfile? DiyProfile { get; set; }
+    public ActivityBucketListProfile? BucketListProfile { get; set; }
+    public virtual ICollection<MemoryAnchor> MemoryAnchors { get; set; } = new List<MemoryAnchor>();
 
     public Activity Clone()
     {

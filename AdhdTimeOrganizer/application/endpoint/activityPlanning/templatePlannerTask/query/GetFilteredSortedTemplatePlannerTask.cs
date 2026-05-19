@@ -9,7 +9,7 @@ using TemplatePlannerTaskMapper = AdhdTimeOrganizer.application.mapper.activityP
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templatePlannerTask.query;
 
-public class GetFilterSortedTemplatePlannerTaskEndpoint(AppDbContext dbContext, TemplatePlannerTaskMapper mapper)
+public class FilterTemplatePlannerTaskEndpoint(AppDbContext dbContext, TemplatePlannerTaskMapper mapper)
     : BaseFilterEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse, TemplatePlannerTaskFilter, TemplatePlannerTaskMapper>(dbContext, mapper)
 {
     protected override IQueryable<TemplatePlannerTask> ApplyCustomFiltering(IQueryable<TemplatePlannerTask> query, TemplatePlannerTaskFilter filter)

@@ -25,7 +25,7 @@ public class RegisterUserEndpoint(
     {
         Post("/auth/register");
         AllowAnonymous();
-        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
+        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Real-IP");
         Summary(s => s.Summary = "Register a user with email & password");
     }
 
@@ -55,7 +55,7 @@ public class RegisterUserEndpoint(
         {
             var duplicate = identityResult.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail");
             var msg = duplicate
-                ? $"User already exists with EMAIL: {newUser.Email}"
+                ? "User already exists"
                 : "Failed to register user: " + string.Join(", ", identityResult.Errors.Select(e => e.Description));
             AddError(msg);
             await Send.ErrorsAsync(duplicate ? 409 : 400, ct);
@@ -69,9 +69,9 @@ public class RegisterUserEndpoint(
             return;
         }
 
+        TwoFactorAuthResponse? twoFaData = null;
         try
         {
-            await SendConfirmationEmail(newUser);
             var twoFaResult = await twoFactorAuthService.SetUpTwoFactorAuth(newUser);
             if (twoFaResult.Failed)
             {
@@ -89,14 +89,18 @@ public class RegisterUserEndpoint(
             }
 
             await tx.CommitAsync(ct);
-            await Send.OkAsync(twoFaResult.Data, ct);
+            twoFaData = twoFaResult.Data;
         }
         catch (Exception ex)
         {
             await tx.RollbackAsync(ct);
             AddError(ex.Message);
             await Send.ErrorsAsync(500, ct);
+            return;
         }
+
+        await SendConfirmationEmail(newUser);
+        await Send.OkAsync(twoFaData, ct);
     }
 
     private async Task SendConfirmationEmail(User user)

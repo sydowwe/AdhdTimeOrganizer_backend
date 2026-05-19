@@ -18,9 +18,11 @@ public class GoogleRecaptchaService(HttpClient httpClient) : IGoogleRecaptchaSer
     public async Task<Result> VerifyRecaptchaAsync(string token, string expectedAction)
     {
         //TODO fix recaptcha
-        var response =
-            await httpClient.PostAsync(
-                $"{RecaptchaApiUrl}?secret={Uri.EscapeDataString(Helper.GetEnvVar("RECAPTCHA_SECRET"))}&response={Uri.EscapeDataString(token)}", null);
+        var formContent = new FormUrlEncodedContent([
+            new KeyValuePair<string, string>("secret", Helper.GetEnvVar("RECAPTCHA_SECRET")),
+            new KeyValuePair<string, string>("response", token)
+        ]);
+        var response = await httpClient.PostAsync(RecaptchaApiUrl, formContent);
         var json = await response.Content.ReadAsStringAsync();
         var result = JsonSerializer.Deserialize<RecaptchaResponse>(json);
         if (result is null)

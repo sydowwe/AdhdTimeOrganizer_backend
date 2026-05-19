@@ -19,7 +19,7 @@ public class ExtensionLoginEndpoint(
     {
         Post("/auth/extension/login");
         AllowAnonymous();
-        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Forwarded-For");
+        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Real-IP");
         Summary(s => { s.Summary = "Login for browser extension clients"; });
     }
 
@@ -45,7 +45,7 @@ public class ExtensionLoginEndpoint(
 
         if (result.IsLockedOut)
         {
-            var lockoutDuration = user.LockoutEnd!.Value - DateTimeOffset.Now;
+            var lockoutDuration = user.LockoutEnd!.Value - DateTimeOffset.UtcNow;
             var minutes = (int)lockoutDuration.TotalMinutes;
             var seconds = lockoutDuration.Seconds;
             AddError($"Too many failed login attempts. Try again in {minutes}m {seconds}s");

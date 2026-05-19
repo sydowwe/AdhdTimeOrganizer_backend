@@ -1,6 +1,6 @@
+using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using FastEndpoints;
-using System.Security.Claims;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
 
@@ -14,14 +14,7 @@ public class LogoutAllEndpoint(IRefreshTokenService refreshTokenService) : Endpo
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !long.TryParse(userIdClaim, out var userId))
-        {
-            AddError("User not authenticated");
-            await Send.ErrorsAsync(401, ct);
-            return;
-        }
-
+        var userId = User.GetId();
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         await refreshTokenService.RevokeAllUserTokensAsync(userId, ipAddress);
 

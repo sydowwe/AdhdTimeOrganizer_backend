@@ -10,4 +10,5 @@ public interface ITwoFactorAuthService
     Task<Result> ValidateToken(User user, string? token);
     Task<Result<IEnumerable<string>>> GenerateNewRecoveryCodes(User user);
     Task<Result<string>> GenerateNewQrCode(User user);
+    Task<Result<User>> ValidatePendingLoginToken(string pendingAuthToken, string totpCode, CancellationToken ct);
 }

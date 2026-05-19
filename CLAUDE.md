@@ -9,6 +9,20 @@ When writing EF Core entity configurations, always use the builder extension hel
 
 Before writing a custom endpoint, check whether one of the base classes in `AdhdTimeOrganizer/application/endpoint/base/` already covers the pattern. Use them when they fit; write a plain `Endpoint<TReq, TRes>` only when they don't.
 
+Convention: `<Verb><Entity>Endpoint`
+- `GetSelectOptions<Entity>Endpoint`
+- `GetById<Entity>Endpoint`
+- `GetAll<Entity>Endpoint`
+- `GetBy<FieldName><Entity>Endpoint`
+- `Update<Entity>Endpoint`
+- `Create<Entity>Endpoint`
+- `Delete<Entity>Endpoint`
+- `BatchDelete<Entity>Endpoint`
+- `Grid<Entity>Endpoint` — paginated filter+sort table view (BaseGridEndpoint)
+- `FilterSort<Entity>Endpoint` — filter+sort without pagination (BaseFilterSortEndpoint)
+- `Filter<Entity>Endpoint` — filter only (BaseFilterEndpoint)
+- `Sort<Entity>Endpoint` — sort only (BaseSortEndpoint)
+
 **Commands** (`endpoint/base/command/`)
 | Class | HTTP | Use when |
 |---|---|---|
@@ -28,7 +42,7 @@ Before writing a custom endpoint, check whether one of the base classes in `Adhd
 | `BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>` | POST `/filter` | Return list filtered by a custom `IFilterRequest` |
 | `BaseSortEndpoint<TEntity, TResponse, TMapper>` | POST `/sort` | Return list with dynamic sort columns |
 | `BaseFilterSortEndpoint<TEntity, TResponse, TFilter, TMapper>` | POST `/filter-sort` | Filter + sort without pagination |
-| `BaseFetchTableEndpoint<TEntity, TResponse, TFilter, TMapper>` | POST `/filtered-table` | Filter + sort + paginate (full table view) |
+| `BaseGridEndpoint<TEntity, TResponse, TFilter, TMapper>` | POST `/filtered-table` | Filter + sort + paginate (full table view) |
 
 All user-scoped base endpoints use `User.GetId()` and filter via `FilteredByUser` (default `true`). Override `AllowedRoles()`, `WithIncludes()`, `Sort()`, or `ApplyCustomFiltering()` as needed.
 

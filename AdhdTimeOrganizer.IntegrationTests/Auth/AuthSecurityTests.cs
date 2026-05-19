@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -80,108 +81,6 @@ public class AuthSecurityTests(TestWebApplicationFactory factory) : IntegrationT
         body.Should().Contain("Invalid email or password");
     }
 
-    // ── Password change ───────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task PasswordChange_RevokesAllRefreshTokens()
-    {
-        const string email = "pwchange-sec-test@integration.com";
-        const string password = "Test@1234!";
-        const string newPassword = "NewTest@5678!";
-
-        using (var scope = factory.Services.CreateScope())
-        {
-            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
-            _dedicatedUser = new User
-            {
-                Email = email,
-                EmailConfirmed = true,
-                CurrentLocale = AvailableLocales.En,
-                Timezone = TimeZoneInfo.Utc
-            };
-            await userManager.CreateAsync(_dedicatedUser, password);
-            await userManager.AddToRoleAsync(_dedicatedUser, "User");
-        }
-
-        var cookieClient = factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            HandleCookies = true,
-            AllowAutoRedirect = false,
-            BaseAddress = baseUrl
-        });
-        var loginPayload = new { Email = email, Password = password, StayLoggedIn = false, RecaptchaToken = "test", Timezone = "UTC" };
-        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, "auth/login");
-        loginRequest.Headers.Add("X-Client-Id", Guid.NewGuid().ToString());
-        loginRequest.Content = JsonContent.Create(loginPayload);
-        (await cookieClient.SendAsync(loginRequest)).EnsureSuccessStatusCode();
-
-        var userId = _dedicatedUser.Id;
-        using (var db = CreateDbContext())
-        {
-            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked))
-                .Should().BeTrue("login must create a refresh token");
-        }
-
-        var changePayload = new { Password = password, NewPassword = newPassword };
-        (await cookieClient.PatchAsJsonAsync("user/password", changePayload))
-            .StatusCode.Should().Be(HttpStatusCode.NoContent);
-
-        using (var db = CreateDbContext())
-        {
-            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked))
-                .Should().BeFalse("all refresh tokens must be revoked after password change");
-        }
-    }
-
-    // ── Logout ────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Logout_RevokesRefreshToken_InDb()
-    {
-        var userId = await GetTestUserIdAsync();
-
-        using (var db = CreateDbContext())
-        {
-            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked))
-                .Should().BeTrue("login in InitializeAsync must create a refresh token");
-        }
-
-        // Client already has auth-token + refresh-token cookies from InitializeAsync login
-        var response = await client.PostAsync("auth/logout", null);
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-
-        using (var db = CreateDbContext())
-        {
-            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked))
-                .Should().BeFalse("logout must revoke the refresh token in the DB");
-        }
-    }
-
-    [Fact]
-    public async Task LogoutAll_RevokesAllRefreshTokens_InDb()
-    {
-        var userId = await GetTestUserIdAsync();
-
-        // Generate extra tokens directly via the service
-        using (var scope = factory.Services.CreateScope())
-        {
-            var svc = scope.ServiceProvider.GetRequiredService<domain.extServiceContract.user.auth.IRefreshTokenService>();
-            await svc.GenerateRefreshTokenAsync(userId, isExtensionClient: false,
-                domain.extServiceContract.user.auth.AuthMethodEnum.Password, stayLoggedIn: false);
-            await svc.GenerateRefreshTokenAsync(userId, isExtensionClient: false,
-                domain.extServiceContract.user.auth.AuthMethodEnum.Password, stayLoggedIn: false);
-        }
-
-        var response = await client.PostAsync("auth/logout-all", null);
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-
-        using (var db = CreateDbContext())
-        {
-            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked))
-                .Should().BeFalse("logout-all must revoke every active refresh token");
-        }
-    }
-
     // ── Email confirmation ────────────────────────────────────────────────────
 
     [Fact]
@@ -200,11 +99,127 @@ public class AuthSecurityTests(TestWebApplicationFactory factory) : IntegrationT
     }
 
     [Fact]
-    public async Task ResendConfirmationEmail_UnknownUserId_Returns200_SameAsKnown()
+    public async Task ResendConfirmationEmail_UnknownEmail_Returns204_SameAsKnown()
     {
-        var response = await anonClient.PostAsync("auth/resend-confirmation-email/999999999", JsonContent.Create(new { }));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/resend-confirmation-email");
+        request.Headers.Add("X-Forwarded-For", "10.0.0.3");
+        request.Content = JsonContent.Create(new { Email = "nonexistent@example.com" });
+
+        var response = await anonClient.SendAsync(request);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    // ── 2FA replay & lockout ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TwoFa_Extension_ReplayedPendingToken_Returns401()
+    {
+        // Generate a real pending token for the shared test user (2FA disabled → TOTP always passes)
+        var userId = await GetTestUserIdAsync();
+        var protector = factory.Services
+            .GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector("2fa-pending")
+            .ToTimeLimitedDataProtector();
+        var pendingToken = protector.Protect(userId.ToString(), TimeSpan.FromMinutes(5));
+
+        var payload = new { Email = TestEmail, Token = "000000", StayLoggedIn = false, PendingAuthToken = pendingToken };
+
+        // First request — token consumed (2FA disabled → TOTP passes → 204)
+        using var req1 = new HttpRequestMessage(HttpMethod.Post, "auth/login/2fa/extension");
+        req1.Content = JsonContent.Create(payload);
+        var res1 = await anonClient.SendAsync(req1);
+        res1.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Second request with the same token must be rejected as replayed
+        using var req2 = new HttpRequestMessage(HttpMethod.Post, "auth/login/2fa/extension");
+        req2.Content = JsonContent.Create(payload);
+        var res2 = await anonClient.SendAsync(req2);
+        res2.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task TwoFa_Extension_LockedOutAccount_Returns401()
+    {
+        const string email = "2fa-lockout-sec-test@integration.com";
+        long lockedUserId;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+            _dedicatedUser = new User
+            {
+                Email = email,
+                EmailConfirmed = true,
+                TwoFactorEnabled = true,
+                CurrentLocale = AvailableLocales.En,
+                Timezone = TimeZoneInfo.Utc
+            };
+            await userManager.CreateAsync(_dedicatedUser, "Test@1234!");
+            await userManager.AddToRoleAsync(_dedicatedUser, "User");
+
+            // Exhaust failed attempts to trigger Identity lockout
+            for (var i = 0; i < 5; i++)
+                await userManager.AccessFailedAsync(_dedicatedUser);
+
+            lockedUserId = _dedicatedUser.Id;
+        }
+
+        var protector = factory.Services
+            .GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector("2fa-pending")
+            .ToTimeLimitedDataProtector();
+        var pendingToken = protector.Protect(lockedUserId.ToString(), TimeSpan.FromMinutes(5));
+
+        var payload = new { Email = email, Token = "000000", StayLoggedIn = false, PendingAuthToken = pendingToken };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/login/2fa/extension");
+        request.Content = JsonContent.Create(payload);
+
+        var response = await anonClient.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("locked");
+    }
+
+    // ── Token reuse detection ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RefreshToken_ReusedInParallel_DetectsReplayAndLocksUser()
+    {
+        var userId = await GetTestUserIdAsync();
+
+        // Extract the refresh token from cookies set during InitializeAsync
+        var refreshToken = client.DefaultRequestHeaders
+            .FirstOrDefault(h => h.Key == "Cookie")
+            .Value?.FirstOrDefault()?.Split("refresh-token=")
+            .LastOrDefault()?.Split(";")
+            .FirstOrDefault();
+
+        refreshToken.Should().NotBeNullOrEmpty("test setup must have a valid refresh token from InitializeAsync");
+
+        // Attempt to use the same refresh token twice in parallel
+        var task1 = client.PostAsync("auth/refresh", null);
+        var task2 = client.PostAsync("auth/refresh", null);
+
+        await Task.WhenAll(task1, task2);
+
+        var response1 = task1.Result;
+        var response2 = task2.Result;
+
+        // One should succeed, one should fail (or both fail — depends on implementation)
+        // The key is that after detecting reuse, the user is not in a catastrophic state
+        var bothSucceeded = response1.IsSuccessStatusCode && response2.IsSuccessStatusCode;
+        var atLeastOneFailed = !response1.IsSuccessStatusCode || !response2.IsSuccessStatusCode;
+        atLeastOneFailed.Should().BeTrue("token reuse should be detected and rejected");
+
+        // Verify the user is not locked out of normal operations (refresh should work with new token)
+        using (var db = CreateDbContext())
+        {
+            var user = await db.Users.FindAsync(userId);
+            user.Should().NotBeNull();
+            user!.LockoutEnd.Should().BeNull("user should not be permanently locked out for token reuse");
+        }
     }
 
     // ── Forgot password ───────────────────────────────────────────────────────

@@ -13,8 +13,6 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.command.misc;
 public class BaseToggleIsHiddenEndpoint<TEntity>(AppDbContext dbContext) : Endpoint<IdListRequest>
     where TEntity : class, IEntityWithId, IEntityWithIsHidden
 {
-
-
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;

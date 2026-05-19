@@ -5,7 +5,6 @@ using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.serviceContract;
-using AdhdTimeOrganizer.infrastructure.extService.user.auth;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
@@ -17,20 +16,21 @@ public class GoogleSignInEndpoint(
     AppDbContext dbContext,
     UserMapper mapper,
     IJwtService jwtService,
-    IUserDefaultsService userDefaultsService)
+    IUserDefaultsService userDefaultsService,
+    IGoogleSignInService googleSignInService)
     : Endpoint<GoogleSignInRequest, GoogleSignInResponse>
 {
     public override void Configure()
     {
         Post("/auth/login/google");
         AllowAnonymous();
-        Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Client-Id");
+        Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Real-IP");
         Summary(s => { s.Summary = "Sign in with Google OAuth"; });
     }
 
     public override async Task HandleAsync(GoogleSignInRequest req, CancellationToken ct)
     {
-        var googleSignInResult = await GoogleSignInService.GetUserInfoFromGoogleSignInCode(req.Code);
+        var googleSignInResult = await googleSignInService.GetUserInfoFromGoogleSignInCode(req.Code);
         if (googleSignInResult.Failed)
         {
             AddError("Failed to verify Google sign-in code.");
@@ -57,15 +57,9 @@ public class GoogleSignInEndpoint(
             if (user is null)
                 return;
         }
-        else if (!user.HasGoogleOAuth)
+        else if (!user.HasGoogleOAuth || user.GoogleOAuthUserId != googleUserId)
         {
-            AddError("A password is already associated with this email. Log in and link Google in account settings.");
-            await Send.ErrorsAsync(409, ct);
-            return;
-        }
-        else if (user.GoogleOAuthUserId != googleUserId)
-        {
-            AddError("User already exists with a different Google account.");
+            AddError("Could not sign in with Google.");
             await Send.ErrorsAsync(409, ct);
             return;
         }
@@ -88,28 +82,27 @@ public class GoogleSignInEndpoint(
         newUser.EmailConfirmed = true;
 
         await using var tx = await dbContext.Database.BeginTransactionAsync(ct);
-        var identityResult = await userManager.CreateAsync(newUser);
-        if (!identityResult.Succeeded)
-        {
-            var duplicate = identityResult.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail");
-            var msg = duplicate
-                ? $"User already exists with EMAIL: {newUser.Email}"
-                : "Failed to register user: " + string.Join(", ", identityResult.Errors.Select(e => e.Description));
-            AddError(msg);
-            await Send.ErrorsAsync(duplicate ? 409 : 400, ct);
-            return null;
-        }
-
-        identityResult = await userManager.AddToRoleAsync(newUser, "User");
-        if (!identityResult.Succeeded)
-        {
-            AddError("Failed to add user to role: " + string.Join(", ", identityResult.Errors.Select(e => e.Description)));
-            await Send.ErrorsAsync(500, ct);
-            return null;
-        }
-
         try
         {
+            var identityResult = await userManager.CreateAsync(newUser);
+            if (!identityResult.Succeeded)
+            {
+                var duplicate = identityResult.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail");
+                AddError(duplicate
+                    ? "Could not sign in with Google."
+                    : "Failed to register user: " + string.Join(", ", identityResult.Errors.Select(e => e.Description)));
+                await Send.ErrorsAsync(duplicate ? 409 : 400, ct);
+                return null;
+            }
+
+            identityResult = await userManager.AddToRoleAsync(newUser, "User");
+            if (!identityResult.Succeeded)
+            {
+                AddError("Failed to add user to role: " + string.Join(", ", identityResult.Errors.Select(e => e.Description)));
+                await Send.ErrorsAsync(500, ct);
+                return null;
+            }
+
             var setDefaultsResult = await userDefaultsService.CreateDefaultsAsync(newUser.Id, ct);
             if (setDefaultsResult.Failed)
             {

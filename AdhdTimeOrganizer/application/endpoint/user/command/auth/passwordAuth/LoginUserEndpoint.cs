@@ -20,7 +20,7 @@ public class LoginUserEndpoint(
     {
         Post("/auth/login");
         AllowAnonymous();
-        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Client-Id");
+        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Real-IP");
         Summary(s => { s.Summary = "Login a user"; });
     }
 
@@ -35,7 +35,7 @@ public class LoginUserEndpoint(
         }
 
         var user = await userManager.FindByEmailAsync(req.Email);
-        if (user is null || !user.EmailConfirmed)
+        if (user is null)
         {
             // Generic error to prevent user enumeration
             AddError("Invalid email or password");
@@ -45,19 +45,9 @@ public class LoginUserEndpoint(
 
         var result = await signInManager.CheckPasswordSignInAsync(user, req.Password, lockoutOnFailure: true);
 
-        if (result.IsLockedOut)
-        {
-            var lockoutDuration = user.LockoutEnd!.Value - DateTimeOffset.Now;
-            var minutes = (int)lockoutDuration.TotalMinutes;
-            var seconds = lockoutDuration.Seconds;
-            AddError($"Too many failed login attempts. Try again in {minutes}m {seconds}s");
-            await Send.ErrorsAsync(403, ct);
-            return;
-        }
-
         if (!result.Succeeded)
         {
-            // Generic error to prevent user enumeration
+            // Generic error to prevent user enumeration (including lockout state)
             AddError("Invalid email or password");
             await Send.ErrorsAsync(401, ct);
             return;

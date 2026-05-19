@@ -44,7 +44,7 @@ public class RefreshTokenService(AppDbContext dbContext, ILogger<RefreshTokenSer
         return token;
     }
 
-    public async Task<(bool IsValid, AuthMethodEnum AuthMethod, bool IsStayLoggedIn, User? User, string? ErrorMessage)> ValidateRefreshTokenAsync(string refreshToken)
+    public async Task<(bool IsValid, AuthMethodEnum AuthMethod, bool IsStayLoggedIn, bool IsExtensionClient, User? User, string? ErrorMessage)> ValidateRefreshTokenAsync(string refreshToken)
     {
         var tokenHash = HashToken(refreshToken);
 
@@ -53,21 +53,29 @@ public class RefreshTokenService(AppDbContext dbContext, ILogger<RefreshTokenSer
             .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
 
         if (storedToken == null)
-            return (false, AuthMethodEnum.Password, false, null, "Invalid refresh token");
+            return (false, AuthMethodEnum.Password, false, false, null, "Invalid refresh token");
 
         if (storedToken.IsRevoked)
         {
-            logger.LogWarning("Attempted use of revoked token for user {UserId}. Possible token reuse attack.",
-                storedToken.UserId);
-            await RevokeAllUserTokensAsync(storedToken.UserId);
-            return (false, AuthMethodEnum.Password, false, null, "Token has been revoked. All tokens invalidated for security.");
+            // A recently-revoked token (within grace window) may be a legitimate concurrent refresh,
+            // not a reuse attack — only mass-revoke when the token was revoked long enough ago.
+            var isRecentRevocation = storedToken.RevokedAt.HasValue &&
+                                     (DateTime.UtcNow - storedToken.RevokedAt.Value).TotalSeconds < 30;
+            if (!isRecentRevocation)
+            {
+                logger.LogWarning("Attempted use of revoked token for user {UserId}. Possible token reuse attack.",
+                    storedToken.UserId);
+                await RevokeAllUserTokensAsync(storedToken.UserId);
+                return (false, AuthMethodEnum.Password, false, false, null, "Token has been revoked. All tokens invalidated for security.");
+            }
+            return (false, AuthMethodEnum.Password, false, false, null, "Token has been revoked");
         }
 
         if (storedToken.ExpiresAt >= DateTime.UtcNow)
-            return (true, storedToken.AuthMethod, storedToken.StayLoggedIn, storedToken.User, null);
+            return (true, storedToken.AuthMethod, storedToken.StayLoggedIn, storedToken.IsExtensionClient, storedToken.User, null);
 
         await RevokeRefreshTokenAsync(refreshToken);
-        return (false, AuthMethodEnum.Password, false, null, "Refresh token expired");
+        return (false, AuthMethodEnum.Password, false, false, null, "Refresh token expired");
     }
 
     public async Task RevokeRefreshTokenAsync(string refreshToken, string? ipAddress = null)

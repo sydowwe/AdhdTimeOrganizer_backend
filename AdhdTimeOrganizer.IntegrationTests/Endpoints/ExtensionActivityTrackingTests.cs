@@ -9,6 +9,7 @@ using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -62,7 +63,7 @@ public class ExtensionActivityTrackingTests(TestWebApplicationFactory factory) :
             Entries = new List<DesktopActivityEntryDto>()
         };
 
-        var response = await anonClient.PostAsJsonAsync("heartbeat", request);
+        var response = await anonClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -108,7 +109,43 @@ public class ExtensionActivityTrackingTests(TestWebApplicationFactory factory) :
             Entries = new List<DesktopActivityEntryDto>()
         };
 
-        var response = await extensionClient.PostAsJsonAsync("heartbeat", request);
+        var response = await extensionClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task WebJwt_CannotAccess_ActivityTrackingPolicy_Returns403()
+    {
+        // client is web-authenticated via cookie JWT (no ActivityTracking role in claims)
+        var request = new DesktopActivityWindowDto
+        {
+            WindowStart = DateTime.UtcNow,
+            Entries = new List<DesktopActivityEntryDto>()
+        };
+
+        var response = await client.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ExtensionJwt_CannotAccess_WebOnlyEndpoint_Returns403()
+    {
+        var email = "extension-webonly-test@test.com";
+        await CreateUserWithExtensionAccess(email, hasExtensionAccess: true);
+
+        var loginResult = await ExtensionLoginSuccessAsync(email);
+
+        var extensionClient = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = baseUrl
+        });
+        extensionClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
+
+        // user/sessions uses the fallback policy which blocks extension clients via ExtensionClientRequirement
+        var response = await extensionClient.GetAsync("user/sessions");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }

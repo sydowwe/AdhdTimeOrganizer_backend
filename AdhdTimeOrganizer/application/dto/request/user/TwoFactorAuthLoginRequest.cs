@@ -4,5 +4,4 @@ public record TwoFactorAuthLoginRequest : TwoFactorAuthRequest
 {
     public required string Email { get; set; }
     public bool StayLoggedIn { get; set; }
-    public string? PendingAuthToken { get; set; }
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.config.dependencyInjection;
@@ -10,6 +11,7 @@ using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface.manager;
 using AdhdTimeOrganizer.infrastructure.settings;
 using DotNetEnv;
 using AdhdTimeOrganizer.application.endpoint.@base;
+using AdhdTimeOrganizer.application.middleware;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.CookiePolicy;
@@ -193,8 +195,20 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
         options.DefaultRequestCulture = new RequestCulture(defaultCulture);
     });
 
-    // Forwarded headers
-    services.Configure<ForwardedHeadersOptions>(options => { options.ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor; });
+    // Forwarded headers — KnownProxies loaded from config so clients cannot spoof X-Forwarded-For
+    services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+
+        var proxyIps = configuration.GetSection("ReverseProxy:TrustedProxies").Get<string[]>() ?? [];
+        foreach (var ip in proxyIps)
+        {
+            if (IPAddress.TryParse(ip, out var addr))
+                options.KnownProxies.Add(addr);
+        }
+    });
 }
 
 static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, ILogger<AdhdTimeOrganizer.Program> logger)
@@ -246,6 +260,8 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
 
     // Must be first so real client IP is resolved before any logging
     app.UseForwardedHeaders();
+    // Stamp X-Real-IP from the (now-resolved) RemoteIpAddress so Throttle() keys are non-spoofable
+    app.UseMiddleware<TrustedIpMiddleware>();
     app.UseHttpsRedirection();
 
     // Swallow client-disconnect cancellations — not a server error

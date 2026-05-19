@@ -1,14 +1,22 @@
-﻿using AdhdTimeOrganizer.application.dto.response.user;
+﻿using System.Security.Cryptography;
+using System.Text;
+using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.result;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Distributed;
 using QRCoder;
 
 namespace AdhdTimeOrganizer.infrastructure.extService.user.auth;
 
-public class TwoFactorAuthService(UserManager<User> userManager, IConfiguration configuration) : ITwoFactorAuthService, IScopedService
+public class TwoFactorAuthService(
+    UserManager<User> userManager,
+    IConfiguration configuration,
+    IDataProtectionProvider dataProtectionProvider,
+    IDistributedCache cache) : ITwoFactorAuthService, IScopedService
 {
     public async Task<Result<TwoFactorAuthResponse>> SetUpTwoFactorAuth(User user)
     {
@@ -63,6 +71,50 @@ public class TwoFactorAuthService(UserManager<User> userManager, IConfiguration 
         return string.IsNullOrEmpty(totpAuthenticatorKey)
             ? Result<string>.Error(ResultErrorType.NotFound, "totpAuthenticatorKey not found")
             : Result<string>.Successful(GenerateQrCode(totpAuthenticatorKey, user.Email!));
+    }
+
+    public async Task<Result<User>> ValidatePendingLoginToken(string pendingAuthToken, string totpCode, CancellationToken ct)
+    {
+        var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(pendingAuthToken)));
+        var cacheKey = $"2fa-consumed:{tokenHash}";
+        if (await cache.GetStringAsync(cacheKey, ct) is not null)
+            return Result<User>.Error(ResultErrorType.Unauthorized, "Invalid or expired authentication session");
+
+        long userId;
+        try
+        {
+            var protector = dataProtectionProvider.CreateProtector("2fa-pending").ToTimeLimitedDataProtector();
+            var userIdStr = protector.Unprotect(pendingAuthToken);
+            if (!long.TryParse(userIdStr, out userId))
+                throw new InvalidOperationException();
+        }
+        catch
+        {
+            return Result<User>.Error(ResultErrorType.Unauthorized, "Invalid or expired authentication session");
+        }
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result<User>.Error(ResultErrorType.Unauthorized, "Invalid or expired authentication session");
+
+        // Consume token immediately — even a wrong TOTP requires a fresh login to retry
+        await cache.SetStringAsync(cacheKey, "1", new DistributedCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+        }, ct);
+
+        if (await userManager.IsLockedOutAsync(user))
+            return Result<User>.Error(ResultErrorType.UserLockedOut, "Account is temporarily locked. Please try again later.");
+
+        var twoFactorResult = await ValidateToken(user, totpCode);
+        if (twoFactorResult.Failed)
+        {
+            await userManager.AccessFailedAsync(user);
+            return twoFactorResult.ToFailed<User>();
+        }
+
+        await userManager.ResetAccessFailedCountAsync(user);
+        return Result<User>.Successful(user);
     }
 
     private string GenerateQrCode(string secretKey, string userEmail)

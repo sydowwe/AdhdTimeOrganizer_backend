@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
@@ -59,6 +60,7 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
 
     public ICollection<TrackerDesktopMappingByPattern> TrackerDesktopMappingByPatternList { get; set; } = new List<TrackerDesktopMappingByPattern>();
     public ICollection<TrackerAndroidMappingByPattern> TrackerAndroidMappingByPatternList { get; set; } = new List<TrackerAndroidMappingByPattern>();
+    public ICollection<MemoryAnchor> MemoryAnchors { get; set; } = new List<MemoryAnchor>();
 
 
     public override string? Email

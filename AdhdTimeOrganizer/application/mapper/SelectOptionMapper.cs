@@ -2,13 +2,12 @@
 using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.mapper.@interface;
-using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.@base.core;
 
 namespace AdhdTimeOrganizer.application.mapper;
 
 public class SelectOptionMapper<TEntity> : IBaseCreateMapper<TEntity, SelectOptionRequest>, IBaseUpdateMapper<TEntity, SelectOptionRequest>, IBaseResponseMapper<TEntity, SelectOptionResponse>
-    where TEntity : SelectOptionBase
+    where TEntity : BaseLookup
 {
     public SelectOptionResponse ToResponse(TEntity entity)
     {

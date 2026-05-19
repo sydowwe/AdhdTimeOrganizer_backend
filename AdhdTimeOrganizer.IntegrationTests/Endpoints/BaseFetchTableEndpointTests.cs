@@ -10,9 +10,9 @@ using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-public class BaseFetchTableEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
+public class BaseGridEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
-    private const string Route = "activity-category/filtered-table";
+    private const string Route = "activity-category/gird";
 
     private async Task SeedCategoriesAsync()
     {

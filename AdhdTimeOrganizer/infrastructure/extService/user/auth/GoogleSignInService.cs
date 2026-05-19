@@ -1,4 +1,6 @@
-﻿using AdhdTimeOrganizer.domain.helper;
+﻿using AdhdTimeOrganizer.config.dependencyInjection;
+using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
+using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.result;
 using Google.Apis.Auth;
 using Google.Apis.Auth.OAuth2;
@@ -6,9 +8,9 @@ using Google.Apis.Auth.OAuth2.Flows;
 
 namespace AdhdTimeOrganizer.infrastructure.extService.user.auth;
 
-public static class GoogleSignInService
+public class GoogleSignInService : IGoogleSignInService, IScopedService
 {
-    public static async Task<Result<GoogleUserInfo>> GetUserInfoFromGoogleSignInCode(string code)
+    public async Task<Result<GoogleUserInfo>> GetUserInfoFromGoogleSignInCode(string code)
     {
         try
         {

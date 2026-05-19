@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
@@ -11,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
 public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppDbContext appDbContext, TMapper mapper) : EndpointWithoutRequest<List<SelectOptionResponse>>
-    where TEntity : class, IEntityWithUser
+    where TEntity : class, IEntityWithUser, IEntityWithId
     where TMapper : IBaseSelectOptionMapper<TEntity>
 {
     private readonly TMapper _mapper = mapper;

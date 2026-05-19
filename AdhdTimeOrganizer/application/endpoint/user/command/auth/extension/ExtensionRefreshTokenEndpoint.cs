@@ -12,7 +12,7 @@ public class ExtensionRefreshTokenEndpoint(IJwtService jwtService)
     {
         Post("/auth/extension/refresh");
         AllowAnonymous();
-        Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Forwarded-For");
+        Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Real-IP");
         Summary(s => { s.Summary = "Refresh access token using refresh token from request body (extension clients)"; });
     }
 
@@ -25,22 +25,19 @@ public class ExtensionRefreshTokenEndpoint(IJwtService jwtService)
             return;
         }
 
-        try
-        {
-            var (accessToken, newRefreshToken, _) = await jwtService.RefreshTokensAsync(
-                req.RefreshToken, isExtensionClient: true, HttpContext);
+        var result = await jwtService.RefreshTokensAsync(req.RefreshToken, HttpContext);
 
-            var response = new RefreshTokenResponse
-            {
-                AccessToken = accessToken,
-                RefreshToken = newRefreshToken
-            };
-            await Send.OkAsync(response, ct);
-        }
-        catch (UnauthorizedAccessException ex)
+        if (!result.Success)
         {
-            AddError(ex.Message);
+            AddError(result.Error ?? "Invalid or expired refresh token");
             await Send.ErrorsAsync(401, ct);
+            return;
         }
+
+        await Send.OkAsync(new RefreshTokenResponse
+        {
+            AccessToken = result.AccessToken!,
+            RefreshToken = result.RefreshToken!
+        }, ct);
     }
 }

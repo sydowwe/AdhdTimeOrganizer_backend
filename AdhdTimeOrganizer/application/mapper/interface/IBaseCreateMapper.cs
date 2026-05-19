@@ -1,11 +1,12 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.domain.model.entityInterface;
 
 namespace AdhdTimeOrganizer.application.mapper.@interface;
 
 public interface IBaseCreateMapper<TEntity, in TCreateRequest> : IMapperService
-    where TEntity : class, IEntityWithUser
+    where TEntity : class, IEntityWithUser, IEntityWithId
     where TCreateRequest : class, ICreateRequest
 {
     TEntity ToEntity(TCreateRequest request, long userId);

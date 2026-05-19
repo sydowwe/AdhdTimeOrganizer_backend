@@ -9,7 +9,7 @@ public class RefreshTokenEndpoint(IJwtService jwtService) : EndpointWithoutReque
     {
         Post("/auth/refresh");
         AllowAnonymous();
-        Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Forwarded-For");
+        Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Real-IP");
         Summary(s => { s.Summary = "Refresh access token using refresh token from cookie (web clients)"; });
     }
 
@@ -24,19 +24,16 @@ public class RefreshTokenEndpoint(IJwtService jwtService) : EndpointWithoutReque
             return;
         }
 
-        try
-        {
-            var (accessToken, newRefreshToken, isStayLoggedIn) = await jwtService.RefreshTokensAsync(
-                refreshToken, isExtensionClient: false, HttpContext);
+        var result = await jwtService.RefreshTokensAsync(refreshToken, HttpContext);
 
-            jwtService.SetTokenCookies(HttpContext, accessToken, newRefreshToken, isStayLoggedIn);
-
-            await Send.NoContentAsync(ct);
-        }
-        catch (UnauthorizedAccessException ex)
+        if (!result.Success)
         {
-            AddError(ex.Message);
+            AddError(result.Error ?? "Invalid or expired refresh token");
             await Send.ErrorsAsync(401, ct);
+            return;
         }
+
+        jwtService.SetTokenCookies(HttpContext, result.AccessToken!, result.RefreshToken!, result.IsStayLoggedIn);
+        await Send.NoContentAsync(ct);
     }
 }

@@ -16,7 +16,7 @@ namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory
 public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext, ActivityHistoryMapper mapper)
     : Endpoint<BaseFilterSortPaginateRequest<ActivityHistoryFilterRequest>, List<ActivityHistoryListGroupedByDateResponse>>
 {
-    public virtual string EndpointPath => "filtered-table";
+    public virtual string EndpointPath => "gird";
 
 
 

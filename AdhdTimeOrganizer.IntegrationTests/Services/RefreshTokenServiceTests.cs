@@ -65,7 +65,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
         var token = await service.GenerateRefreshTokenAsync(userId, false, AuthMethodEnum.Password);
 
-        var (isValid, _, _, user, error) = await service.ValidateRefreshTokenAsync(token);
+        var (isValid, _, _, _, user, error) = await service.ValidateRefreshTokenAsync(token);
 
         isValid.Should().BeTrue();
         user.Should().NotBeNull();
@@ -79,7 +79,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
         using var scope = factory.Services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
 
-        var (isValid, _, _, user, error) = await service.ValidateRefreshTokenAsync("completely-unknown-token");
+        var (isValid, _, _, _, user, error) = await service.ValidateRefreshTokenAsync("completely-unknown-token");
 
         isValid.Should().BeFalse();
         user.Should().BeNull();
@@ -102,7 +102,7 @@ public class RefreshTokenServiceTests : IntegrationTestBase
         // Attempting to validate the revoked token triggers the reuse-attack protection
         using var scope2 = factory.Services.CreateScope();
         var service2 = scope2.ServiceProvider.GetRequiredService<IRefreshTokenService>();
-        var (isValid, _, _, user, _) = await service2.ValidateRefreshTokenAsync(token1);
+        var (isValid, _, _, _, user, _) = await service2.ValidateRefreshTokenAsync(token1);
 
         isValid.Should().BeFalse();
         user.Should().BeNull();

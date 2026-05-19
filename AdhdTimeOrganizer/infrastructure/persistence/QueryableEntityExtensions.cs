@@ -52,7 +52,7 @@ public static class QueryableEntityExtensions
     }
 
     public static IQueryable<TEntity> FilteredByUser<TEntity>(this IQueryable<TEntity> query, long userId)
-        where TEntity : class, IEntityWithUser
+        where TEntity : class, IEntityWithUser, IEntityWithId
     {
         return query.Where(e => e.UserId == userId);
     }

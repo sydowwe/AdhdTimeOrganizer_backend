@@ -11,6 +11,7 @@ public class ConfirmEmailEndpoint(UserManager<User> userManager) : Endpoint<Conf
     {
         Post("/auth/confirm-email");
         AllowAnonymous();
+        Throttle(hitLimit: 30, durationSeconds: 60, headerName: "X-Forwarded-For");
         Validator<ConfirmEmailValidator>();
     }
 

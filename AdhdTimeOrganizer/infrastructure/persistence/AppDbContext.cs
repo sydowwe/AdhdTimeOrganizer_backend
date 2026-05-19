@@ -1,6 +1,7 @@
 ﻿using AdhdTimeOrganizer.domain.extServiceContract.user;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
@@ -26,6 +27,10 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<Activity> Activities { get; set; }
     public DbSet<ActivityCategory> ActivityCategories { get; set; }
     public DbSet<ActivityRole> ActivityRoles { get; set; }
+    public DbSet<ActivityLocationType> ActivityLocationTypes { get; set; }
+    public DbSet<ActivityWeatherDependency> ActivityWeatherDependencies { get; set; }
+    public DbSet<ActivityExpectedCostTier> ActivityExpectedCostTiers { get; set; }
+    public DbSet<ActivityExperienceType> ActivityExperienceTypes { get; set; }
     public DbSet<ActivityHistory> ActivityHistories { get; set; }
     public DbSet<Calendar> Calendars { get; set; }
     public DbSet<TaskImportance> TaskImportances { get; set; }

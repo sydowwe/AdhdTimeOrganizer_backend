@@ -4,7 +4,7 @@ namespace AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 
 public interface IJwtService
 {
-    Task<(string AccessToken, string RefreshToken, bool IsStayLoggedIn)> RefreshTokensAsync(string refreshToken, bool isExtensionClient, HttpContext httpContext);
+    Task<RefreshTokenResult> RefreshTokensAsync(string refreshToken, HttpContext httpContext);
 
     Task GenerateJwtAndSetAuthCookie(bool stayLoggedIn, AuthMethodEnum authMethod, User user, HttpContext httpContext);
 

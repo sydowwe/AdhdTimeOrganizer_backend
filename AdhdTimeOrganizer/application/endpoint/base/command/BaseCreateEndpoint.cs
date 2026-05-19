@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -14,7 +15,7 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
     AppDbContext dbContext,
     TMapper mapper) : Endpoint<TRequest, long>
-    where TEntity : class, IEntityWithUser
+    where TEntity : class, IEntityWithUser, IEntityWithId
     where TRequest : class, ICreateRequest
     where TMapper : IBaseCreateMapper<TEntity, TRequest>
 {

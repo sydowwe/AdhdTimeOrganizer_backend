@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
@@ -15,7 +16,7 @@ namespace AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>(
     AppDbContext dbContext,
     TMapper mapper) : Endpoint<TFilter, List<TResponse>>
-    where TEntity : class, IEntityWithUser
+    where TEntity : class, IEntityWithUser, IEntityWithId
     where TResponse : class, IIdResponse
     where TFilter : class, IFilterRequest
     where TMapper : class, IBaseResponseMapper<TEntity, TResponse>

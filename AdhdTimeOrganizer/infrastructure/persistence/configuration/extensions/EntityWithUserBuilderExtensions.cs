@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using AdhdTimeOrganizer.domain.model.entity.@base;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.domain.model.entityInterface;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -8,14 +9,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 
 public static class EntityWIthUserBuilderExtensions
 {
-    public static ReferenceCollectionBuilder<User, TEntity> IsManyWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, IEnumerable<TEntity>?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser
+    public static ReferenceCollectionBuilder<User, TEntity> IsManyWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, IEnumerable<TEntity>?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser, IEntityWithId
     {
        return builder.HasOne(r => r.User)
            .WithMany(navigationProperty)
            .HasForeignKey(r => r.UserId).IsRequired()
            .OnDelete(deleteBehavior);
     }
-    public static ReferenceReferenceBuilder<TEntity,User> IsOneWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, TEntity?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser
+    public static ReferenceReferenceBuilder<TEntity,User> IsOneWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, TEntity?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser, IEntityWithId
     {
         return builder.HasOne(r => r.User)
             .WithOne(navigationProperty)

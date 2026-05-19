@@ -14,24 +14,24 @@ public class JwtService(IEcdsaKeyProvider ecdsaKeyProvider, IRefreshTokenService
 {
     private static DateTime AccessTokenExpiry => DateTime.UtcNow.AddMinutes(15);
 
-    public async Task<(string AccessToken, string RefreshToken, bool IsStayLoggedIn)> RefreshTokensAsync(
-        string refreshToken, bool isExtensionClient, HttpContext httpContext)
+    public async Task<RefreshTokenResult> RefreshTokensAsync(string refreshToken, HttpContext httpContext)
     {
-        var (isValid, authMethod, isStayLoggedIn, user, errorMessage) = await refreshTokenService.ValidateRefreshTokenAsync(refreshToken);
+        var (isValid, authMethod, isStayLoggedIn, isExtensionClient, user, errorMessage) = await refreshTokenService.ValidateRefreshTokenAsync(refreshToken);
 
         if (!isValid || user == null)
-            throw new UnauthorizedAccessException(errorMessage ?? "Invalid refresh token");
+            return RefreshTokenResult.Fail(errorMessage ?? "Invalid refresh token");
 
         var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = httpContext.Request.Headers.UserAgent.ToString();
 
         await refreshTokenService.RevokeRefreshTokenAsync(refreshToken, ipAddress);
 
-        var accessToken = await CreateEcdsaJwtToken(user, authMethod, ClientTypeEnum.Web);
+        var clientType = isExtensionClient ? ClientTypeEnum.Extension : ClientTypeEnum.Web;
+        var accessToken = await CreateEcdsaJwtToken(user, authMethod, clientType);
         var newRefreshToken = await refreshTokenService.GenerateRefreshTokenAsync(
             user.Id, isExtensionClient, authMethod, isStayLoggedIn, ipAddress, userAgent);
 
-        return (accessToken, newRefreshToken, isStayLoggedIn);
+        return RefreshTokenResult.Ok(accessToken, newRefreshToken, isStayLoggedIn);
     }
 
     public async Task GenerateJwtAndSetAuthCookie(bool stayLoggedIn, AuthMethodEnum authMethod, User user, HttpContext httpContext)

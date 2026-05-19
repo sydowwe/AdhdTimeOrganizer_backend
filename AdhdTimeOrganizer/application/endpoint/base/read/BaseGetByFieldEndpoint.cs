@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
@@ -13,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
 public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<TResponse>
-    where TEntity : class, IEntityWithUser
+    where TEntity : class, IEntityWithUser, IEntityWithId
     where TResponse : class, IIdResponse
     where TMapper : IBaseResponseMapper<TEntity, TResponse>
 {
