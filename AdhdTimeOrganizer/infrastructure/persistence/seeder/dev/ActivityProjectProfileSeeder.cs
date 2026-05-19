@@ -6,21 +6,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
-public class ActivityDiyProfileSeeder(
+public class ActivityProjectProfileSeeder(
     AppDbContext dbContext,
-    ILogger<ActivityDiyProfileSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<ActivityProjectProfileSeeder> logger) : IDevDatabaseSeeder, IScopedService
 {
     public string SeederName => "ActivityDiyProfile";
     public int Order => 11;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<ActivityDiyProfile>();
+        await dbContext.TruncateTableAsync<ActivityProjectProfile>();
     }
 
     public async Task SeedForUser(long userId)
     {
-        if (await dbContext.Set<ActivityDiyProfile>().AnyAsync())
+        if (await dbContext.Set<ActivityProjectProfile>().AnyAsync())
             return;
 
         var activities = await dbContext.Activities
@@ -35,14 +35,14 @@ public class ActivityDiyProfileSeeder(
 
         long? GetId(string name) => activities.FirstOrDefault(a => a.Name == name)?.Id;
 
-        var profiles = new List<ActivityDiyProfile>();
+        var profiles = new List<ActivityProjectProfile>();
 
         void Add(string name, DifficultyLevel difficulty, string projectArea, decimal estimatedHours,
             bool isMessy, List<string> materials, List<string> tools, ReadinessStatus readiness)
         {
             var activityId = GetId(name);
             if (activityId == null) return;
-            profiles.Add(new ActivityDiyProfile
+            profiles.Add(new ActivityProjectProfile
             {
                 ActivityId = activityId.Value,
                 DifficultyLevel = difficulty,
@@ -93,7 +93,7 @@ public class ActivityDiyProfileSeeder(
             ["IDE", "Docker", "CI/CD pipeline", "database client", "Figma"],
             ReadinessStatus.Planning);
 
-        await dbContext.Set<ActivityDiyProfile>().AddRangeAsync(profiles);
+        await dbContext.Set<ActivityProjectProfile>().AddRangeAsync(profiles);
         await dbContext.SaveChangesAsync();
 
         logger.LogInformation("Seeded {Count} DIY profiles for user {UserId}", profiles.Count, userId);

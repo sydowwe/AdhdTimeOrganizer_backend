@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.domain.model.@enum;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activity.profile;
 
-public class ActivityDiyProfile : BaseTableEntity
+public class ActivityProjectProfile : BaseTableEntity
 {
     public long ActivityId { get; set; }
     public Activity Activity { get; set; } = null!;

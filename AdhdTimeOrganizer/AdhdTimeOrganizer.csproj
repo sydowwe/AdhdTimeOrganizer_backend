@@ -57,6 +57,7 @@
       <Folder Include="application\preprocessor\" />
       <Folder Include="domain\" />
       <Folder Include="infrastructure\persistence\Migrations\" />
+      <Folder Include="logs\" />
     </ItemGroup>
 
 

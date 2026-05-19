@@ -18,7 +18,6 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbCo
     {
         var adminUser = new User
         {
-            UserName = Helper.GetEnvVar("ROOT_ADMIN_USERNAME"),
             Email = Helper.GetEnvVar("ROOT_ADMIN_EMAIL"),
 
             EmailConfirmed = true,

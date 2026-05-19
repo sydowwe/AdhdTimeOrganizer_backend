@@ -49,9 +49,9 @@ public class DevSeederManager(
     public async Task<long?> GetRootAdminUserId()
     {
         // Get root admin user ID for user default seeders
-        var rootAdminUsername = Helper.GetEnvVar("ROOT_ADMIN_USERNAME");
+        var rootAdminEmail = Helper.GetEnvVar("ROOT_ADMIN_EMAIL");
         var adminUser = await dbContext.Users
-            .FirstOrDefaultAsync(u => u.UserName == rootAdminUsername);
+            .FirstOrDefaultAsync(u => u.UserName == rootAdminEmail);
 
         if (adminUser == null)
         {

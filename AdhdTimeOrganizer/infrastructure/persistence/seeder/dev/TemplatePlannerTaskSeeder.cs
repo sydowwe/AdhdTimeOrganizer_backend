@@ -67,8 +67,6 @@ public class TemplatePlannerTaskSeeder(
 
         // Get importance levels
         var criticalImportance = importances.FirstOrDefault(i => i.Importance == 999) ?? throw new InvalidOperationException("Critical importance level missing.");
-        var highImportance = importances.FirstOrDefault(i => i.Importance == 888) ?? throw new InvalidOperationException("High importance level missing.");
-        var mediumImportance = importances.FirstOrDefault(i => i.Importance == 777) ?? throw new InvalidOperationException("Medium importance level missing.");
         var optionalImportance = importances.FirstOrDefault(i => i.Importance == 666) ?? throw new InvalidOperationException("Optional importance level missing.");
 
         var templateTasks = new List<TemplatePlannerTask>();
@@ -85,7 +83,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(7, 30),
                     EndTime = new TimeOnly(8, 30),
                     IsBackground = false,
-                    ImportanceId = mediumImportance.Id,
+                    ImportanceId = null,
                     Location = "Home",
                     Notes = "Morning workout to start the day",
                     UserId = userId
@@ -117,7 +115,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(9, 30),
                     EndTime = new TimeOnly(12, 30),
                     IsBackground = false,
-                    ImportanceId = highImportance.Id,
+                    ImportanceId = optionalImportance.Id,
                     Location = "Home",
                     Notes = "Deep work session",
                     UserId = userId
@@ -133,7 +131,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(12, 30),
                     EndTime = new TimeOnly(13, 0),
                     IsBackground = false,
-                    ImportanceId = mediumImportance.Id,
+                    ImportanceId = null,
                     Location = "Home",
                     UserId = userId
                 });
@@ -148,7 +146,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(14, 0),
                     EndTime = new TimeOnly(16, 0),
                     IsBackground = false,
-                    ImportanceId = highImportance.Id,
+                    ImportanceId = criticalImportance.Id,
                     Location = "Home",
                     Notes = "Bug fixing session",
                     UserId = userId
@@ -164,7 +162,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(16, 0),
                     EndTime = new TimeOnly(17, 0),
                     IsBackground = false,
-                    ImportanceId = mediumImportance.Id,
+                    ImportanceId = null,
                     Location = "Home",
                     Notes = "Review PRs",
                     UserId = userId
@@ -180,7 +178,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(22, 30),
                     EndTime = new TimeOnly(23, 0),
                     IsBackground = false,
-                    ImportanceId = highImportance.Id,
+                    ImportanceId = optionalImportance.Id,
                     Location = "Home",
                     UserId = userId
                 });
@@ -215,7 +213,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(10, 0),
                     EndTime = new TimeOnly(13, 0),
                     IsBackground = false,
-                    ImportanceId = highImportance.Id,
+                    ImportanceId = null,
                     Location = "Office",
                     Notes = "Focused work time",
                     UserId = userId
@@ -231,7 +229,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(14, 0),
                     EndTime = new TimeOnly(15, 30),
                     IsBackground = false,
-                    ImportanceId = mediumImportance.Id,
+                    ImportanceId = null,
                     Location = "Office",
                     UserId = userId
                 });
@@ -250,7 +248,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(10, 0),
                     EndTime = new TimeOnly(11, 0),
                     IsBackground = false,
-                    ImportanceId = mediumImportance.Id,
+                    ImportanceId = null,
                     Location = "Home",
                     UserId = userId
                 });
@@ -265,7 +263,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(11, 0),
                     EndTime = new TimeOnly(13, 0),
                     IsBackground = false,
-                    ImportanceId = mediumImportance.Id,
+                    ImportanceId = null,
                     Location = "Home",
                     UserId = userId
                 });
@@ -280,7 +278,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(13, 0),
                     EndTime = new TimeOnly(14, 30),
                     IsBackground = false,
-                    ImportanceId = highImportance.Id,
+                    ImportanceId = criticalImportance.Id,
                     Location = "Store",
                     UserId = userId
                 });
@@ -342,7 +340,7 @@ public class TemplatePlannerTaskSeeder(
                     StartTime = new TimeOnly(23, 0),
                     EndTime = new TimeOnly(23, 30),
                     IsBackground = false,
-                    ImportanceId = mediumImportance.Id,
+                    ImportanceId = null,
                     Location = "Home",
                     UserId = userId
                 });

@@ -21,8 +21,7 @@ public abstract class BaseGridEndpoint<TEntity, TResponse, TFilter, TMapper>(
     where TFilter : class, IFilterRequest
     where TMapper : class, IBaseResponseMapper<TEntity, TResponse>
 {
-    public virtual string EndpointPath => "filtered-table";
-
+    public virtual string EndpointPath => "grid";
 
 
     public virtual bool FilteredByUser => true;

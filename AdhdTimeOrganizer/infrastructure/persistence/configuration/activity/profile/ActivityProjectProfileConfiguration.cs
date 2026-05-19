@@ -5,15 +5,15 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activity.profile;
 
-public class ActivityDiyProfileConfiguration : IEntityTypeConfiguration<ActivityDiyProfile>
+public class ActivityProjectProfileConfiguration : IEntityTypeConfiguration<ActivityProjectProfile>
 {
-    public void Configure(EntityTypeBuilder<ActivityDiyProfile> builder)
+    public void Configure(EntityTypeBuilder<ActivityProjectProfile> builder)
     {
         builder.BaseEntityConfigure();
 
         builder.HasOne(p => p.Activity)
-            .WithOne(a => a.DiyProfile)
-            .HasForeignKey<ActivityDiyProfile>(p => p.ActivityId)
+            .WithOne(a => a.ProjectProfile)
+            .HasForeignKey<ActivityProjectProfile>(p => p.ActivityId)
             .OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(p => p.ActivityId).IsUnique();
 

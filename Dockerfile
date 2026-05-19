@@ -1,9 +1,8 @@
 ﻿FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY ["AdhdTimeOrganizer.sln", "."]
 COPY ["AdhdTimeOrganizer/AdhdTimeOrganizer.csproj", "AdhdTimeOrganizer/"]
-RUN dotnet restore "AdhdTimeOrganizer.sln"
+RUN dotnet restore "AdhdTimeOrganizer/AdhdTimeOrganizer.csproj"
 
 COPY . .
 WORKDIR "/src/AdhdTimeOrganizer"

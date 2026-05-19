@@ -73,10 +73,8 @@ public class PlannerTaskSeeder(
 
         // Get importance levels
         var criticalImportance = importances.FirstOrDefault(i => i.Importance == 999);
-        var highImportance = importances.FirstOrDefault(i => i.Importance == 888);
-        var mediumImportance = importances.FirstOrDefault(i => i.Importance == 777);
         var optionalImportance = importances.FirstOrDefault(i => i.Importance == 666);
-        if (criticalImportance == null || highImportance == null || mediumImportance == null || optionalImportance == null)
+        if (criticalImportance == null || optionalImportance == null)
         {
             throw new InvalidOperationException("Critical importance levels are missing in the database.");
         }
@@ -114,7 +112,7 @@ public class PlannerTaskSeeder(
                     EndTime = isWeekend ? new TimeOnly(10, 0) : new TimeOnly(8, 30),
                     IsBackground = false,
 
-                    ImportanceId = mediumImportance.Id,
+                    ImportanceId = null,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
                     Notes = "Morning workout",
@@ -168,7 +166,7 @@ public class PlannerTaskSeeder(
                         StartTime = calendar.Date.DayOfWeek == DayOfWeek.Monday ? new TimeOnly(11, 30) : new TimeOnly(9, 30),
                         EndTime = new TimeOnly(13, 0),
                         IsBackground = false,
-                        ImportanceId = highImportance.Id,
+                        ImportanceId = null,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Deep work session - new features",
@@ -186,7 +184,7 @@ public class PlannerTaskSeeder(
                         StartTime = new TimeOnly(14, 0),
                         EndTime = new TimeOnly(16, 0),
                         IsBackground = false,
-                        ImportanceId = highImportance.Id,
+                        ImportanceId = criticalImportance.Id,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Fix critical bugs",
@@ -204,7 +202,7 @@ public class PlannerTaskSeeder(
                         EndTime = new TimeOnly(17, 0),
                         IsBackground = false,
 
-                        ImportanceId = mediumImportance.Id,
+                        ImportanceId = null,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Review team PRs",
@@ -241,7 +239,7 @@ public class PlannerTaskSeeder(
                         StartTime = new TimeOnly(10, 0),
                         EndTime = new TimeOnly(12, 0),
                         IsBackground = false,
-                        ImportanceId = mediumImportance.Id,
+                        ImportanceId = null,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Weekly cleaning",
@@ -258,7 +256,7 @@ public class PlannerTaskSeeder(
                         StartTime = new TimeOnly(13, 0),
                         EndTime = new TimeOnly(14, 30),
                         IsBackground = false,
-                        ImportanceId = highImportance.Id,
+                        ImportanceId = criticalImportance.Id,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Supermarket",
                         Notes = "Buy food for the week",
@@ -276,7 +274,7 @@ public class PlannerTaskSeeder(
                         EndTime = isWeekend && calendar.Date.DayOfWeek == DayOfWeek.Saturday ? new TimeOnly(16, 30) : new TimeOnly(12, 30),
                         IsBackground = false,
 
-                        ImportanceId = mediumImportance.Id,
+                        ImportanceId = null,
                         Status = PlannerTaskStatus.NotStarted,
                         Location = "Home",
                         Notes = "Learning time",
@@ -366,7 +364,7 @@ public class PlannerTaskSeeder(
                     EndTime = new TimeOnly(22, 0),
                     IsBackground = false,
 
-                    ImportanceId = mediumImportance.Id,
+                    ImportanceId = null,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
                     Notes = "Evening meditation",
@@ -383,7 +381,7 @@ public class PlannerTaskSeeder(
                     StartTime = new TimeOnly(22, 30),
                     EndTime = new TimeOnly(23, 0),
                     IsBackground = false,
-                    ImportanceId = highImportance.Id,
+                    ImportanceId = null,
                     Status = PlannerTaskStatus.NotStarted,
                     Location = "Home",
                     Notes = "Wind down for sleep",

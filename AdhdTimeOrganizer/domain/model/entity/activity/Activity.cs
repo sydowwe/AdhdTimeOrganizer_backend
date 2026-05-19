@@ -29,7 +29,7 @@ public class Activity : BaseNameTextEntity
     public TrackerAndroidMappingByPattern? TrackerAndroidMappingByPattern { get; set; }
 
     public ActivityBacklogProfile? BacklogProfile { get; set; }
-    public ActivityDiyProfile? DiyProfile { get; set; }
+    public ActivityProjectProfile? ProjectProfile { get; set; }
     public ActivityBucketListProfile? BucketListProfile { get; set; }
     public virtual ICollection<MemoryAnchor> MemoryAnchors { get; set; } = new List<MemoryAnchor>();
 
