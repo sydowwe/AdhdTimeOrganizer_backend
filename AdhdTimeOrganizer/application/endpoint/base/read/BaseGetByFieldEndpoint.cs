@@ -1,10 +1,6 @@
-using System.Linq.Expressions;
-using AdhdTimeOrganizer.application.dto.request.generic;
+﻿using AdhdTimeOrganizer.application.dto.response;
 using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.@interface;
-using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -13,27 +9,23 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
-public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<TResponse>
-    where TEntity : class, IEntityWithUser, IEntityWithId
-    where TResponse : class, IIdResponse
-    where TMapper : IBaseResponseMapper<TEntity, TResponse>
+public abstract class BaseGetByFieldEndpoint<TEntity, TResponse>(AppDbContext dbContext) : EndpointWithoutRequest<TResponse>
+    where TEntity : class, IEntityWithId
+    where TResponse : class, IIdResponse, IProjectionResponse<TResponse, TEntity>
 {
-    private readonly TMapper _mapper = mapper;
+    public virtual string[] AllowedRoles() => EndpointHelper.GetAdminOrHigherRoles();
 
-
-
-    public virtual bool FilteredByUser => true;
     protected abstract string FieldName { get; }
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Get($"/{entityName.Kebaberize()}/by-{FieldName}/{{value:required}}");
-        
+        Get($"/{entityName.Kebaberize()}/by-{FieldName}/{{value}}");
+        Roles(AllowedRoles());
         Summary(s =>
         {
-            s.Summary = $"Get {entityName} by {FieldName}";
-            s.Description = $"Retrieves a specific {entityName} by its {FieldName.Camelize().ToLowerInvariant()}";
+            s.Summary = $"Get {entityName} by Name";
+            s.Description = $"Retrieves a specific {entityName} by its name";
             s.Response<TResponse>(200, "Success");
             s.Response(404, "Not found");
         });
@@ -42,34 +34,24 @@ public abstract class BaseGetByFieldEndpoint<TEntity, TResponse, TMapper>(AppDbC
     public override async Task HandleAsync(CancellationToken ct)
     {
         var value = Route<string>("value");
-        if (string.IsNullOrWhiteSpace(value))
+        if (string.IsNullOrEmpty(value))
         {
-            AddError($"{FieldName} value cannot be empty");
-            await Send.ErrorsAsync(400, ct);
+            AddError($"The value parameter is required and cannot be empty. /{typeof(TEntity).Name.Kebaberize()}/by-{FieldName}/{{value}}");
+            await Send.ErrorsAsync(cancellation: ct);
             return;
         }
 
-        var dbSet = dbContext.Set<TEntity>();
-        var query = WithIncludes(dbSet);
+        var query = dbContext.Set<TEntity>();
 
-        if (FilteredByUser)
-        {
-            query = query.FilteredByUser(User.GetId());
-        }
-
-        var entity = await query.FirstOrDefaultAsync(FilterQuery(value), ct);
+        var entity = await TResponse.Projection(FilterByField(query.AsNoTracking(), value)).FirstOrDefaultAsync(ct);
         if (entity == null)
         {
-            AddError($"{typeof(TEntity).Name} not found.");
-            await Send.ErrorsAsync(404, ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
-        var response = _mapper.ToResponse(entity);
-        await Send.OkAsync(response, ct);
+        await Send.OkAsync(entity, ct);
     }
 
-    protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;
-
-    protected abstract Expression<Func<TEntity, bool>> FilterQuery(string value);
+    protected abstract IQueryable<TEntity> FilterByField(IQueryable<TEntity> query, string value);
 }

@@ -1,6 +1,7 @@
-﻿using AdhdTimeOrganizer.application.dto.response.@base;
+﻿using AdhdTimeOrganizer.application.dto.request.generic;
+using AdhdTimeOrganizer.application.dto.response;
+using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -9,20 +10,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
-public abstract class BaseGetByIdEndpoint<TEntity, TResponse, TMapper>(AppDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<TResponse>
+public abstract class BaseGetByIdEndpoint<TEntity, TResponse>(AppDbContext dbContext) : Endpoint<IdRequest, TResponse>
     where TEntity : class, IEntityWithId
-    where TResponse : class, IIdResponse
-    where TMapper : IBaseResponseMapper<TEntity, TResponse>
+    where TResponse : class, IIdResponse, IProjectionResponse<TResponse, TEntity>
 {
-    private readonly TMapper _mapper = mapper;
-
-
+    public virtual string[] AllowedRoles() => EndpointHelper.GetAdminOrHigherRoles();
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Get($"/{entityName.Kebaberize()}/{{id:long:required}}");
-
+        Get($"/{entityName.Kebaberize()}/{{id}}");
+        Roles(AllowedRoles());
         Summary(s =>
         {
             s.Summary = $"Get {entityName} by ID";
@@ -32,23 +30,27 @@ public abstract class BaseGetByIdEndpoint<TEntity, TResponse, TMapper>(AppDbCont
         });
     }
 
-    public override async Task HandleAsync(CancellationToken ct)
-    {
-        var id = Route<long>("id");
-        var dbSet = dbContext.Set<TEntity>();
-        var query = WithIncludes(dbSet);
+    protected virtual Task<bool> AuthorizeAsync(TResponse entity, CancellationToken ct) => Task.FromResult(true);
 
-        var entity = await query.FirstOrDefaultAsync(e => e.Id == id, ct);
+    protected virtual TResponse PostProcess(TResponse entity) => entity;
+
+    public override async Task HandleAsync(IdRequest req, CancellationToken ct)
+    {
+        var dbSet = dbContext.Set<TEntity>();
+
+        var entity = await TResponse.Projection(dbSet.AsNoTracking().Where(e => e.Id == req.Id)).FirstOrDefaultAsync(ct);
         if (entity == null)
         {
-            AddError($"{typeof(TEntity).Name} not found.");
-            await Send.ErrorsAsync(404, ct);
+            await Send.NotFoundAsync(ct);
             return;
         }
 
-        var response = _mapper.ToResponse(entity);
-        await Send.OkAsync(response, ct);
-    }
+        if (!await AuthorizeAsync(entity, ct))
+        {
+            await Send.ForbiddenAsync(ct);
+            return;
+        }
 
-    protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;
+        await Send.OkAsync(PostProcess(entity), ct);
+    }
 }

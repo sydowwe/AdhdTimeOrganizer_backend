@@ -1,9 +1,10 @@
 using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 
 namespace AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
 
-public record CreateTrackerDesktopMappingRequest : ICreateRequest
+public record CreateTrackerDesktopMappingRequest : ICreateRequest<TrackerDesktopMappingByPattern>
 {
     public string? ProcessName { get; init; }
     public PatternMatchType? ProcessNameMatchType { get; init; }
@@ -24,4 +25,19 @@ public record CreateTrackerDesktopMappingRequest : ICreateRequest
     public long? ActivityId { get; init; }
     public long? RoleId { get; init; }
     public long? CategoryId { get; init; }
+
+    public TrackerDesktopMappingByPattern ToEntity => new()
+    {
+        ProcessName = ProcessName,
+        ProcessNameMatchType = ProcessNameMatchType,
+        ProductName = ProductName,
+        ProductNameMatchType = ProductNameMatchType,
+        WindowTitle = WindowTitle,
+        WindowTitleMatchType = WindowTitleMatchType,
+        IsActive = IsActive,
+        IsIgnored = IsIgnored,
+        ActivityId = ActivityId,
+        RoleId = RoleId,
+        CategoryId = CategoryId,
+    };
 }

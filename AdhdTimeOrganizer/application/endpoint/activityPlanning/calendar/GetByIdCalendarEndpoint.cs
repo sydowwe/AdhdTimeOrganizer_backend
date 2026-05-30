@@ -1,18 +1,11 @@
 ﻿using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using Microsoft.EntityFrameworkCore;
-using CalendarMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.CalendarMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 
-public class GetByIdCalendarEndpoint(AppDbContext dbContext, CalendarMapper mapper)
-    : BaseGetByIdEndpoint<Calendar, CalendarResponse, CalendarMapper>(dbContext, mapper)
+public class GetByIdCalendarEndpoint(AppDbContext dbContext)
+    : BaseGetByIdEndpoint<Calendar, CalendarResponse>(dbContext)
 {
-    protected override IQueryable<Calendar> WithIncludes(IQueryable<Calendar> query)
-    {
-        return query.Include(t => t.Tasks);
-    }
 }

@@ -3,7 +3,6 @@ using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.summaryCards;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

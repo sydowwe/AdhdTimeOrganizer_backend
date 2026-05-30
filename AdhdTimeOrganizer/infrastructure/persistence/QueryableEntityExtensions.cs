@@ -1,7 +1,6 @@
 ﻿using System.Linq.Expressions;
 using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.domain.model.@enum;
@@ -95,58 +94,25 @@ public static class QueryableEntityExtensions
     }
 
 
-    public static async Task<BaseTableResponse<TResponse>> GetTableDataAsync<TResponse, TEntity, TMapper>(
+    public static async Task<BaseGridResponse<TResponse>> GetGridDataAsync<TResponse, TEntity>(
         this IQueryable<TEntity> query,
         SortByRequest[] sortBy,
         int itemsPerPage,
         int page,
-        TMapper mapper,
-        CancellationToken cancellationToken = default
-    )
-        where TEntity : class, IEntityWithId
-        where TResponse : class, IIdResponse
-        where TMapper : class, IBaseResponseMapper<TEntity, TResponse>
-    {
-        // Get total count before pagination
-        var itemsCount = await query.CountAsync(cancellationToken);
-        var pageCount = (int)Math.Ceiling((double)itemsCount / itemsPerPage);
-
-        // Apply sorting and pagination using your existing extension
-        var paginatedQuery = query.SortByManyAndPaginate(sortBy, itemsPerPage, page);
-
-        // Execute query and map results
-        var items = await mapper.ProjectToResponse(paginatedQuery).ToListAsync(cancellationToken);
-
-        return new BaseTableResponse<TResponse>
-        {
-            Items = items,
-            ItemsCount = itemsCount,
-            PageCount = pageCount
-        };
-    }
-
-    public static async Task<BaseTableResponse<TResponse>> GetTableDataAsync<TResponse, TEntity>(
-        this IQueryable<TEntity> query,
-        SortByRequest[] sortBy,
-        int itemsPerPage,
-        int page,
-        Expression<Func<TEntity, TResponse>> map,
+        Func<IQueryable<TEntity>, IQueryable<TResponse>> map,
         CancellationToken cancellationToken = default
     )
         where TEntity : class, IEntityWithId
         where TResponse : class, IIdResponse
     {
-        // Get total count before pagination
         var itemsCount = await query.CountAsync(cancellationToken);
         var pageCount = (int)Math.Ceiling((double)itemsCount / itemsPerPage);
 
-        // Apply sorting and pagination using your existing extension
-        var paginatedQuery = query.SortByManyAndPaginate(sortBy, itemsPerPage, page);
+        var paginatedQuery = map(query).SortByManyAndPaginate(sortBy, itemsPerPage, page);
 
-        // Execute query and map results
-        var items = await paginatedQuery.Select(map).ToListAsync(cancellationToken);
+        var items = await paginatedQuery.ToListAsync(cancellationToken);
 
-        return new BaseTableResponse<TResponse>
+        return new BaseGridResponse<TResponse>
         {
             Items = items,
             ItemsCount = itemsCount,

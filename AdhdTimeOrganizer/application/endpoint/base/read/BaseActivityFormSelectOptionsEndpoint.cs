@@ -1,7 +1,6 @@
 ﻿using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

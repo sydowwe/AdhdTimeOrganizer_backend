@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 
 namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
 
-public record TrackerDesktopMappingResponse : IIdResponse
+public record TrackerDesktopMappingResponse : IIdResponse, IProjectionResponse<TrackerDesktopMappingResponse, TrackerDesktopMappingByPattern>
 {
     public long Id { get; init; }
 
@@ -24,4 +24,37 @@ public record TrackerDesktopMappingResponse : IIdResponse
     public ActivityFilterFormResponse? Activity { get; set; }
     public long? RoleId { get; set; }
     public long? CategoryId { get; set; }
+
+    public static IQueryable<TrackerDesktopMappingResponse> Projection(IQueryable<TrackerDesktopMappingByPattern> q) =>
+        q.Select(e => new TrackerDesktopMappingResponse
+        {
+            Id = e.Id,
+            ProcessName = e.ProcessName,
+            ProcessNameMatchType = e.ProcessNameMatchType,
+            ProductName = e.ProductName,
+            ProductNameMatchType = e.ProductNameMatchType,
+            WindowTitle = e.WindowTitle,
+            WindowTitleMatchType = e.WindowTitleMatchType,
+            IsActive = e.IsActive,
+            IsIgnored = e.IsIgnored,
+            Activity = e.Activity == null ? null : new ActivityFilterFormResponse { Id = e.Activity.Id, Text = e.Activity.Name, RoleId = e.Activity.RoleId, CategoryId = e.Activity.CategoryId },
+            RoleId = e.RoleId,
+            CategoryId = e.CategoryId,
+        });
+
+    public static TrackerDesktopMappingResponse FromEntity(TrackerDesktopMappingByPattern e) => new()
+    {
+        Id = e.Id,
+        ProcessName = e.ProcessName,
+        ProcessNameMatchType = e.ProcessNameMatchType,
+        ProductName = e.ProductName,
+        ProductNameMatchType = e.ProductNameMatchType,
+        WindowTitle = e.WindowTitle,
+        WindowTitleMatchType = e.WindowTitleMatchType,
+        IsActive = e.IsActive,
+        IsIgnored = e.IsIgnored,
+        Activity = e.Activity == null ? null : new ActivityFilterFormResponse { Id = e.Activity.Id, Text = e.Activity.Name, RoleId = e.Activity.RoleId, CategoryId = e.Activity.CategoryId },
+        RoleId = e.RoleId,
+        CategoryId = e.CategoryId,
+    };
 }

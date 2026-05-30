@@ -1,5 +1,4 @@
 ﻿using System.Linq.Expressions;
-using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.settings;
 using Microsoft.EntityFrameworkCore;

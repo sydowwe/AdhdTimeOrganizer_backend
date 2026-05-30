@@ -4,7 +4,6 @@ using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
 using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;

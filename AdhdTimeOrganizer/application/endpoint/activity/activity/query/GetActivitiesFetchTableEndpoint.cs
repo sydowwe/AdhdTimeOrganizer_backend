@@ -1,25 +1,15 @@
 using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
-using AdhdTimeOrganizer.application.mapper.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.query;
 
 public class GridActivityEndpoint(
-    AppDbContext dbContext,
-    ActivityMapper mapper) 
-    : BaseGridEndpoint<Activity, ActivityResponse, ActivityFilterRequest, ActivityMapper>(dbContext, mapper)
+    AppDbContext dbContext) 
+    : BaseGridEndpoint<Activity, ActivityResponse, ActivityFilterRequest>(dbContext)
 {
-    protected override IQueryable<Activity> WithIncludes(IQueryable<Activity> query)
-    {
-        return query
-            .Include(a => a.Role)
-            .Include(a => a.Category);
-    }
-
     protected override IQueryable<Activity> ApplyCustomFiltering(IQueryable<Activity> query, ActivityFilterRequest filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Name))

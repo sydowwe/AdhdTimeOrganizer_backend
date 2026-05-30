@@ -1,14 +1,13 @@
 using AdhdTimeOrganizer.application.dto.request.timer;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.application.mapper.timer;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.timer;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.timer.timerPreset.command;
 
-public class CreateTimerPresetEndpoint(AppDbContext dbContext, TimerPresetMapper mapper)
-    : BaseCreateEndpoint<TimerPreset, TimerPresetRequest, TimerPresetMapper>(dbContext, mapper)
+public class CreateTimerPresetEndpoint(AppDbContext dbContext)
+    : BaseCreateEndpoint<TimerPreset, TimerPresetRequest>(dbContext)
 {
     public override void Configure()
     {

@@ -1,5 +1,4 @@
 using AdhdTimeOrganizer.application.dto.dto;
-using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.dto.request.activityTracking;
 

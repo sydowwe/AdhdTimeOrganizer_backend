@@ -1,11 +1,8 @@
 using AdhdTimeOrganizer.application.dto.request.generic;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList;
 

@@ -40,7 +40,7 @@ public class BaseGridEndpointTests(TestWebApplicationFactory factory) : Integrat
         var response = await client.PostAsJsonAsync(Route, request);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var table = await response.Content.ReadFromJsonAsync<BaseTableResponse<ActivityCategoryResponse>>();
+        var table = await response.Content.ReadFromJsonAsync<BaseGridResponse<ActivityCategoryResponse>>();
         table.Should().NotBeNull();
         table!.Items.Should().NotBeNull();
         table.ItemsCount.Should().BeGreaterThanOrEqualTo(2);

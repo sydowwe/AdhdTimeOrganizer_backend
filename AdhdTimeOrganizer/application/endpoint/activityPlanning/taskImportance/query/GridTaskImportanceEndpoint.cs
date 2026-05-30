@@ -1,16 +1,14 @@
 using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskImportance.query;
 
 public class GridTaskImportanceEndpoint(
-    AppDbContext dbContext,
-    TaskImportanceMapper mapper)
-    : BaseGridEndpoint<TaskImportance, TaskImportanceResponse, TaskImportanceFilterRequest, TaskImportanceMapper>(dbContext, mapper)
+    AppDbContext dbContext)
+    : BaseGridEndpoint<TaskImportance, TaskImportanceResponse, TaskImportanceFilterRequest>(dbContext)
 {
     protected override IQueryable<TaskImportance> ApplyCustomFiltering(IQueryable<TaskImportance> query, TaskImportanceFilterRequest filter)
     {

@@ -6,8 +6,8 @@ using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
-public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : EndpointWithoutRequest
-    where TEntity : class, IEntityWithId
+public abstract class BaseSoftDeleteEndpoint<TEntity>(AppDbContext dbContext) : EndpointWithoutRequest
+    where TEntity : class, IEntityWithId, ISoftDeletable
 {
     public virtual string[] AllowedRoles() => EndpointHelper.GetAdminOrHigherRoles();
 
@@ -20,8 +20,8 @@ public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endp
         Roles(AllowedRoles());
         Summary(s =>
         {
-            s.Summary = $"Delete {entityName}";
-            s.Description = $"Deletes a {entityName}";
+            s.Summary = $"Soft-delete {entityName}";
+            s.Description = $"Sets IsActive = false on {entityName}. Does not remove the record.";
             s.Response(204, "Success");
             s.Response(404, "Not found");
         });
@@ -29,18 +29,24 @@ public abstract class BaseDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endp
 
     public override async Task HandleAsync(CancellationToken ct)
     {
+        var entity = await dbContext.Set<TEntity>().FindAsync([Route<long>("id")], ct);
+        if (entity == null)
+        {
+            await Send.NotFoundAsync(ct);
+            return;
+        }
+
+        if (!entity.IsActive)
+        {
+            await Send.NoContentAsync(ct);
+            return;
+        }
+
         try
         {
-            var entity = await dbContext.Set<TEntity>().FindAsync([Route<long>("id")], ct);
-            if (entity == null)
-            {
-                await Send.NotFoundAsync(ct);
-                return;
-            }
-
-            dbContext.Set<TEntity>().Remove(entity);
+            entity.IsActive = false;
+            dbContext.Set<TEntity>().Update(entity);
             await dbContext.SaveChangesAsync(ct);
-
             await Send.NoContentAsync(ct);
         }
         catch (Exception ex)

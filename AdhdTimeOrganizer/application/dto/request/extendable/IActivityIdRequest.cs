@@ -2,7 +2,7 @@
 
 namespace AdhdTimeOrganizer.application.dto.request.extendable;
 
-public interface IActivityIdRequest : IMyRequest
+public interface IActivityIdRequest
 {
     public long ActivityId { get; init; }
 }

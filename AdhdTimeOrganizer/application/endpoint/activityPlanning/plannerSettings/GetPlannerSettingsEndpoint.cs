@@ -1,7 +1,5 @@
 using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.user;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -9,13 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerSettings;
 
-public class GetPlannerSettingsEndpoint(AppDbContext dbContext, UserPlannerSettingsMapper mapper)
+public class GetPlannerSettingsEndpoint(AppDbContext dbContext)
     : EndpointWithoutRequest<UserPlannerSettingsResponse>
 {
     public override void Configure()
     {
         Get("/planner/settings");
-        
+
         Summary(s =>
         {
             s.Summary = "Get planner settings for the current user";
@@ -36,6 +34,6 @@ public class GetPlannerSettingsEndpoint(AppDbContext dbContext, UserPlannerSetti
             await dbContext.SaveChangesAsync(ct);
         }
 
-        await Send.OkAsync(mapper.ToResponse(settings), ct);
+        await Send.OkAsync(UserPlannerSettingsResponse.FromEntity(settings), ct);
     }
 }

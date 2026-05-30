@@ -4,7 +4,7 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 namespace AdhdTimeOrganizer.application.dto.request.@base;
 
 
-public record TextColorRequest : IMyRequest
+public record TextColorRequest
 {
     [Required, StringLength(500)]
     public required string Text { get; init; }

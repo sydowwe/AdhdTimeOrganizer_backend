@@ -1,14 +1,13 @@
 using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.activity.memoryAnchor;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.memoryAnchor.query;
 
-public class GridMemoryAnchorEndpoint(AppDbContext dbContext, MemoryAnchorMapper mapper)
-    : BaseGridEndpoint<MemoryAnchor, MemoryAnchorResponse, MemoryAnchorFilterRequest, MemoryAnchorMapper>(dbContext, mapper)
+public class GridMemoryAnchorEndpoint(AppDbContext dbContext)
+    : BaseGridEndpoint<MemoryAnchor, MemoryAnchorResponse, MemoryAnchorFilterRequest>(dbContext)
 {
     protected override IQueryable<MemoryAnchor> ApplyCustomFiltering(IQueryable<MemoryAnchor> query, MemoryAnchorFilterRequest filter)
     {

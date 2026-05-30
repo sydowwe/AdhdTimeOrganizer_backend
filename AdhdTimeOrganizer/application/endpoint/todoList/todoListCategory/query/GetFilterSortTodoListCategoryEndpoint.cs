@@ -2,23 +2,18 @@ using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
-using TodoListCategoryMapper = AdhdTimeOrganizer.application.mapper.todoList.TodoListCategoryMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListCategory.query;
 
-public class GetFilterSortTodoListCategoryEndpoint(AppDbContext dbContext, TodoListCategoryMapper mapper)
+public class GetFilterSortTodoListCategoryEndpoint(AppDbContext dbContext)
     : Endpoint<BaseFilterSortRequest<TodoListCategoryFilterRequest>, List<TodoListCategoryResponse>>
 {
     public override void Configure()
     {
         Post("/todo-list-category/filter-sort");
-        
 
         Summary(s =>
         {
@@ -42,7 +37,7 @@ public class GetFilterSortTodoListCategoryEndpoint(AppDbContext dbContext, TodoL
         if (req is { UseFilter: true, Filter: not null } && !string.IsNullOrWhiteSpace(req.Filter.Name))
             query = query.Where(c => c.Name.Contains(req.Filter.Name));
 
-        var result = await mapper.ProjectToResponse(query.SortByMany(req.SortBy)).ToListAsync(ct);
+        var result = await TodoListCategoryResponse.Projection(query.SortByMany(req.SortBy)).ToListAsync(ct);
 
         var hasUncategorized = await dbContext.TodoLists
             .AnyAsync(tl => tl.UserId == userId && tl.CategoryId == null, ct);

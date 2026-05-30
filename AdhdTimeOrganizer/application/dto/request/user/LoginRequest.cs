@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.user;
 
-public record LoginRequest : IMyRequest
+public record LoginRequest
 {
     public bool StayLoggedIn { get; set; }
     [Required] public required string RecaptchaToken { get; init; }

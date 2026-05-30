@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 
-public record PlannerFilterRequest : IMyRequest
+public record PlannerFilterRequest
 {
     [Required]
     public DateTime FilterDate { get; init; }

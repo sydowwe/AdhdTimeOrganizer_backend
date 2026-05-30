@@ -1,7 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.activity.profile;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.activity.profile;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -10,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.bucketList.command;
 
-public class UpdateActivityBucketListProfileEndpoint(AppDbContext dbContext, ActivityBucketListProfileMapper mapper)
+public class UpdateActivityBucketListProfileEndpoint(AppDbContext dbContext)
     : Endpoint<ActivityBucketListProfileRequest>
 {
     public override void Configure()
@@ -44,7 +42,7 @@ public class UpdateActivityBucketListProfileEndpoint(AppDbContext dbContext, Act
                 return;
             }
 
-            mapper.UpdateEntity(req, entity);
+            req.UpdateEntity(entity);
             dbContext.Set<ActivityBucketListProfile>().Update(entity);
             await dbContext.SaveChangesAsync(ct);
             await Send.NoContentAsync(ct);

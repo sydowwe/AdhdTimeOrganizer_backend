@@ -1,15 +1,13 @@
 using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using TodoListItemMapper = AdhdTimeOrganizer.application.mapper.todoList.TodoListItemMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.command;
 
-public class UpdateTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapper mapper)
-    : BaseUpdateEndpoint<TodoListItem, UpdateTodoListItemRequest, TodoListItemMapper>(dbContext, mapper)
+public class UpdateTodoListItemEndpoint(AppDbContext dbContext)
+    : BaseUpdateEndpoint<TodoListItem, UpdateTodoListItemRequest>(dbContext)
 {
     public override void Configure()
     {
@@ -17,7 +15,7 @@ public class UpdateTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapp
         Validator<UpdateTodoListItemValidator>();
     }
 
-    protected override Task AfterMapping(TodoListItem entity, UpdateTodoListItemRequest req, CancellationToken ct = default)
+    protected override Task<bool> AfterMapping(TodoListItem entity, UpdateTodoListItemRequest req, CancellationToken ct = default)
     {
         if (req.Steps is not null)
         {
@@ -35,6 +33,6 @@ public class UpdateTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapp
             entity.DoneCount = 0;
         }
 
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 }

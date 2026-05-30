@@ -1,6 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.entityInterface;
 
 namespace AdhdTimeOrganizer.domain.model.entity.suggestion;
 

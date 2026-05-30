@@ -3,7 +3,6 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AdhdTimeOrganizer.application.validator;
 

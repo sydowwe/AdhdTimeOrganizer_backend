@@ -34,7 +34,6 @@
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
         <PackageReference Include="QRCoder" Version="1.8.0" />
         <PackageReference Include="Quartz.Extensions.Hosting" Version="3.*" />
-        <PackageReference Include="Riok.Mapperly" Version="4.3.1" />
         <PackageReference Include="Scrutor" Version="7.0.0" />
         <PackageReference Include="Serilog" Version="4.3.1" />
         <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
@@ -52,8 +51,6 @@
       <Folder Include="application\endpoint\activityTracking\desktop\" />
       <Folder Include="application\endpoint\activity\activity\query\" />
       <Folder Include="application\endpoint\activity\role\command\" />
-      <Folder Include="application\mapper\activityTracking\desktop\" />
-      <Folder Include="application\mapper\activity\" />
       <Folder Include="application\preprocessor\" />
       <Folder Include="domain\" />
       <Folder Include="infrastructure\persistence\Migrations\" />

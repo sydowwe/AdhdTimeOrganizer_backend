@@ -1,8 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.application.mapper.user;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -10,13 +8,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerSettings;
 
-public class UpdatePlannerSettingsEndpoint(AppDbContext dbContext, UserPlannerSettingsMapper mapper)
+public class UpdatePlannerSettingsEndpoint(AppDbContext dbContext)
     : Endpoint<UserPlannerSettingsRequest>
 {
     public override void Configure()
     {
         Put("/planner/settings");
-        
+
         Validator<UserPlannerSettingsValidator>();
         Summary(s =>
         {
@@ -35,12 +33,12 @@ public class UpdatePlannerSettingsEndpoint(AppDbContext dbContext, UserPlannerSe
         if (settings == null)
         {
             settings = new UserPlannerSettings { UserId = userId };
-            mapper.UpdateEntity(req, settings);
+            req.UpdateEntity(settings);
             await dbContext.UserPlannerSettings.AddAsync(settings, ct);
         }
         else
         {
-            mapper.UpdateEntity(req, settings);
+            req.UpdateEntity(settings);
             dbContext.UserPlannerSettings.Update(settings);
         }
 

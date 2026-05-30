@@ -17,11 +17,11 @@ public record SuggestionResponse
     public string? Notes { get; init; }
     public required string Color { get; init; }
     public required RecurrenceType RecurrenceType { get; init; }
-    public required string[] ScheduledDays { get; init; }
-    public required int[] ScheduledDates { get; init; }
+    public required IEnumerable<string> ScheduledDays { get; init; }
+    public required IEnumerable<int> ScheduledDates { get; init; }
     public DateOnly? ActiveFromDate { get; init; }
     public DateOnly? ActiveToDate { get; init; }
-    public required string[] ScheduledForDayTypes { get; init; }
+    public required IEnumerable<string> ScheduledForDayTypes { get; init; }
     public required SuggestionSourceType SourceType { get; init; }
     public int? OccurrenceCount { get; init; }
 }

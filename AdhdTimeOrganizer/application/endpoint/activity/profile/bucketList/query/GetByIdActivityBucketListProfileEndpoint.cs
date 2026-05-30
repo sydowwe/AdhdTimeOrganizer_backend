@@ -1,6 +1,5 @@
 using AdhdTimeOrganizer.application.dto.response.activity.profile;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.mapper.activity.profile;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -8,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.bucketList.query;
 
-public class GetByIdActivityBucketListProfileEndpoint(AppDbContext dbContext, ActivityBucketListProfileMapper mapper)
+public class GetByIdActivityBucketListProfileEndpoint(AppDbContext dbContext)
     : EndpointWithoutRequest<ActivityBucketListProfileResponse>
 {
     public override void Configure()
@@ -38,6 +37,6 @@ public class GetByIdActivityBucketListProfileEndpoint(AppDbContext dbContext, Ac
             return;
         }
 
-        await Send.OkAsync(mapper.ToResponse(entity), ct);
+        await Send.OkAsync(ActivityBucketListProfileResponse.FromEntity(entity), ct);
     }
 }

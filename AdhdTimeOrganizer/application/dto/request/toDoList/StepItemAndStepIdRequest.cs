@@ -6,4 +6,4 @@ namespace AdhdTimeOrganizer.application.dto.request.todoList;
 public record StepItemAndStepIdRequest(
     [Required] long ItemId,
     [Required] Guid StepId
-) : IMyRequest;
+);

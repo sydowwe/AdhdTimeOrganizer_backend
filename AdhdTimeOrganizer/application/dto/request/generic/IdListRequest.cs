@@ -5,4 +5,4 @@ namespace AdhdTimeOrganizer.application.dto.request.generic;
 
 public record IdListRequest(
     [Required] List<long> Ids
-) : IMyRequest;
+);

@@ -1,8 +1,10 @@
 using AdhdTimeOrganizer.application.dto.request.@base;
+using AdhdTimeOrganizer.application.dto.request.@interface;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
-public record RoutineTimePeriodRequest : TextColorRequest
+public record RoutineTimePeriodRequest : TextColorRequest, ICreateRequest<RoutineTimePeriod>, IUpdateRequest<RoutineTimePeriod>
 {
     public int LengthInDays { get; init; }
     public bool IsHidden { get; init; } = false;
@@ -21,4 +23,22 @@ public record RoutineTimePeriodRequest : TextColorRequest
 
     /// <summary>1–100 — how many past periods to include in completion history.</summary>
     public int HistoryDepth { get; init; } = 16;
+
+
+    public RoutineTimePeriod ToEntity => new RoutineTimePeriod
+    {
+        Text = Text,
+        Color = Color,
+        LengthInDays = LengthInDays,
+        IsHidden = IsHidden,
+        ResetAnchorDay = ResetAnchorDay,
+        StreakThreshold = StreakThreshold,
+        StreakGraceDays = StreakGraceDays,
+        HistoryDepth = HistoryDepth,
+        UserId = 0
+    };
+    public void UpdateEntity(RoutineTimePeriod entity)
+    {
+        throw new NotImplementedException();
+    }
 }

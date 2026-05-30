@@ -1,9 +1,9 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.request.@interface;
+using AdhdTimeOrganizer.application.dto.response;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.@interface;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -13,27 +13,24 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 
-public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>(
-    AppDbContext dbContext,
-    TMapper mapper) : Endpoint<TFilter, List<TResponse>>
+public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter>(AppDbContext dbContext)
+    : Endpoint<TFilter, List<TResponse>>
     where TEntity : class, IEntityWithUser, IEntityWithId
-    where TResponse : class, IIdResponse
+    where TResponse : class, IIdResponse, IProjectionResponse<TResponse, TEntity>
     where TFilter : class, IFilterRequest
-    where TMapper : class, IBaseResponseMapper<TEntity, TResponse>
 {
+    public virtual string[] AllowedRoles() => EndpointHelper.GetAdminOrHigherRoles();
+
     public virtual string EndpointPath => "filter";
 
-
-
     public virtual bool FilteredByUser => true;
-
-    public virtual SortByRequest[] AlwaysSortBy => [];
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
         Post($"/{entityName.Kebaberize()}/{EndpointPath}");
-        
+        Roles(AllowedRoles());
+
         Summary(s =>
         {
             s.Summary = $"Get filtered {entityName} list";
@@ -48,7 +45,7 @@ public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>(
     {
         try
         {
-            var query = WithIncludes(dbContext.Set<TEntity>().AsNoTracking());
+            var query = dbContext.Set<TEntity>().AsNoTracking();
 
             if (FilteredByUser)
             {
@@ -57,12 +54,7 @@ public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>(
 
             query = ApplyCustomFiltering(query, filter);
 
-            if (AlwaysSortBy.Length > 0)
-            {
-                query = query.SortByMany(AlwaysSortBy);
-            }
-
-            var response = await mapper.ProjectToResponse(query).ToListAsync(ct);
+            var response = await TResponse.Projection(query).ToListAsync(ct);
 
             await Send.OkAsync(response, ct);
         }
@@ -74,10 +66,7 @@ public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter, TMapper>(
         }
     }
 
-    protected abstract IQueryable<TEntity> ApplyCustomFiltering(IQueryable<TEntity> query, TFilter filter);
+    public virtual SortByRequest[] AlwaysSortBy => [];
 
-    protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query)
-    {
-        return query;
-    }
+    protected abstract IQueryable<TEntity> ApplyCustomFiltering(IQueryable<TEntity> query, TFilter filter);
 }

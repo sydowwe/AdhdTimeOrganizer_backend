@@ -1,10 +1,9 @@
 using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.lookup.locationType.command;
 
-public class UpdateActivityLocationTypeEndpoint(AppDbContext dbContext, LookupMapper<ActivityLocationType> mapper)
-    : BaseUpdateEndpoint<ActivityLocationType, SelectOptionRequest, LookupMapper<ActivityLocationType>>(dbContext, mapper);
+public class UpdateActivityLocationTypeEndpoint(AppDbContext dbContext)
+    : BaseUpdateEndpoint<ActivityLocationType, SelectOptionRequest<ActivityLocationType>>(dbContext);

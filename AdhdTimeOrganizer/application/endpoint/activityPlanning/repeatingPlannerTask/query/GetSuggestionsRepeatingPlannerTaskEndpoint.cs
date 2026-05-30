@@ -1,13 +1,8 @@
 using AdhdTimeOrganizer.application.dto.dto;
-using AdhdTimeOrganizer.application.dto.request.generic;
-using AdhdTimeOrganizer.application.dto.response;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.suggestion;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
@@ -19,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.repeatingPlannerTask.query;
 
-public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext, RepeatingPlannerTaskMapper mapper)
+public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext)
     : EndpointWithoutRequest<List<SuggestionResponse>>
 {
     private static readonly string[] DayNames =
@@ -81,7 +76,7 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext, 
             };
             if (!matches) continue;
 
-            var r = mapper.ToResponse(task);
+            var r = RepeatingPlannerTaskResponse.FromEntity(task);
             result.Add(new SuggestionResponse
             {
                 RepeatingPlannerTaskId = task.Id,

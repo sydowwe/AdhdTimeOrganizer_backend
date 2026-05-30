@@ -1,5 +1,4 @@
 using AdhdTimeOrganizer.application.dto.request.user;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using FastEndpoints;

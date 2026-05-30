@@ -4,13 +4,11 @@ using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using Microsoft.EntityFrameworkCore;
-using TemplatePlannerTaskMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.TemplatePlannerTaskMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templatePlannerTask.query;
 
-public class FilterTemplatePlannerTaskEndpoint(AppDbContext dbContext, TemplatePlannerTaskMapper mapper)
-    : BaseFilterEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse, TemplatePlannerTaskFilter, TemplatePlannerTaskMapper>(dbContext, mapper)
+public class FilterTemplatePlannerTaskEndpoint(AppDbContext dbContext)
+    : BaseFilterEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse, TemplatePlannerTaskFilter>(dbContext)
 {
     protected override IQueryable<TemplatePlannerTask> ApplyCustomFiltering(IQueryable<TemplatePlannerTask> query, TemplatePlannerTaskFilter filter)
     {
@@ -54,9 +52,4 @@ public class FilterTemplatePlannerTaskEndpoint(AppDbContext dbContext, TemplateP
             IsDesc = false
         }
     ];
-
-    protected override IQueryable<TemplatePlannerTask> WithIncludes(IQueryable<TemplatePlannerTask> query)
-    {
-        return query.Include(t => t.Activity).ThenInclude(a => a.Role);
-    }
 }

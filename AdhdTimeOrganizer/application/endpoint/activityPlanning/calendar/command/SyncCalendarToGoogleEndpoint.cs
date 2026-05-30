@@ -1,5 +1,4 @@
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
 using AdhdTimeOrganizer.infrastructure.persistence;

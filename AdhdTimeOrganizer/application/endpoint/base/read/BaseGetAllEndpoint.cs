@@ -1,9 +1,6 @@
-﻿using System.Linq.Expressions;
+﻿using AdhdTimeOrganizer.application.dto.response;
 using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.@interface;
-using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -12,17 +9,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
-public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppDbContext dbContext, TMapper mapper) : EndpointWithoutRequest<List<TResponse>>
-    where TEntity : class, IEntityWithUser, IEntityWithId
-    where TResponse : class, IIdResponse
-    where TMapper : IBaseResponseMapper<TEntity, TResponse>
+public abstract class BaseGetAllEndpoint<TEntity, TResponse>(AppDbContext dbContext) : EndpointWithoutRequest<List<TResponse>>
+    where TEntity : class, IEntityWithId
+    where TResponse : class, IIdResponse, IProjectionResponse<TResponse, TEntity>
 {
-
-
+    public virtual string[] AllowedRoles() => EndpointHelper.GetAdminOrHigherRoles();
 
     public virtual string? RouteParam => null;
-
-    public virtual bool FilteredByUser => true;
 
     private string AddedRouteParam => RouteParam != null ? $"/{RouteParam}" : string.Empty;
 
@@ -30,7 +23,7 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppDbConte
     {
         var entityName = typeof(TEntity).Name;
         Get($"/{entityName.Kebaberize()}" + AddedRouteParam);
-        
+        Roles(AllowedRoles());
 
         Summary(s =>
         {
@@ -42,23 +35,15 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse, TMapper>(AppDbConte
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var dbSet = dbContext.Set<TEntity>();
-        var query = WithIncludes(dbSet);
-
-        if (FilteredByUser)
-        {
-            query = query.FilteredByUser(User.GetId());
-        }
-        query = query.Where(FilterQuery);
+        var query = dbContext.Set<TEntity>().AsNoTracking();
+        query = Filter(query);
         query = Sort(query);
 
-        var items = await mapper.ProjectToResponse(query).ToListAsync(ct);
+        var items = await TResponse.Projection(query).ToListAsync(ct);
         await Send.OkAsync(items, ct);
     }
 
-    protected virtual IQueryable<TEntity> WithIncludes(IQueryable<TEntity> query) => query;
-
     protected virtual IQueryable<TEntity> Sort(IQueryable<TEntity> query) => query.OrderBy(e => e.Id);
 
-    protected virtual Expression<Func<TEntity, bool>> FilterQuery => e=> true;
+    protected virtual IQueryable<TEntity> Filter(IQueryable<TEntity> query) => query;
 }

@@ -2,14 +2,12 @@
 using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query;
 
-public class FilterActivityHistoryEndpoint(AppDbContext dbContext, ActivityHistoryMapper mapper) : BaseFilterEndpoint<ActivityHistory, ActivityHistoryResponse, ActivityHistoryDetailFilter, ActivityHistoryMapper>(dbContext, mapper)
+public class FilterActivityHistoryEndpoint(AppDbContext dbContext) : BaseFilterEndpoint<ActivityHistory, ActivityHistoryResponse, ActivityHistoryDetailFilter>(dbContext)
 {
     public override SortByRequest[] AlwaysSortBy => [new("StartTimestamp", false), new("EndTimestamp", false)];
 
@@ -20,14 +18,5 @@ public class FilterActivityHistoryEndpoint(AppDbContext dbContext, ActivityHisto
         query = query.Where(ah => ah.StartTimestamp >= from && ah.EndTimestamp <= to);
 
         return query;
-    }
-
-    protected override IQueryable<ActivityHistory> WithIncludes(IQueryable<ActivityHistory> query)
-    {
-        return query
-            .Include(ah => ah.Activity)
-            .ThenInclude(a => a.Role)
-            .Include(ah => ah.Activity)
-            .ThenInclude(a => a.Category);
     }
 }

@@ -4,7 +4,6 @@ using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -14,13 +13,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.command;
 
-public class ApplyTemplatePlannerTaskEndpoint(
-    AppDbContext dbContext,
-    CalendarMapper calendarMapper,
-    PlannerTaskMapper plannerTaskMapper) : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
+public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext) : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
 {
-
-
     public override void Configure()
     {
         const string entityName = nameof(Calendar);
@@ -62,7 +56,12 @@ public class ApplyTemplatePlannerTaskEndpoint(
             template.LastUsedAt = DateTime.UtcNow;
             template.UsageCount++;
 
-            var newTasks = req.TasksFromTemplate.Select(t => plannerTaskMapper.ToEntity(t, User.GetId())).ToList();
+            var newTasks = req.TasksFromTemplate.Select(t =>
+            {
+                var entity = t.ToEntity;
+                entity.UserId = User.GetId();
+                return entity;
+            }).ToList();
             var existingTasks = calendar.Tasks.ToList();
 
             switch (req.ConflictResolution)
@@ -90,11 +89,11 @@ public class ApplyTemplatePlannerTaskEndpoint(
             dbContext.PlannerTasks.AddRange(newTasks);
             await dbContext.SaveChangesAsync(ct);
 
-            var updatedTasks = await plannerTaskMapper.ProjectToResponse(dbContext.PlannerTasks.Where(t => t.CalendarId == calendar.Id).WithIncludes().OrderBy(t => t.StartTime)).ToListAsync(ct);
+            var updatedTasks = await PlannerTaskResponse.Projection(dbContext.PlannerTasks.Where(t => t.CalendarId == calendar.Id).WithIncludes().OrderBy(t => t.StartTime)).ToListAsync(ct);
 
             var response = new ApplyTemplatePlannerTaskResponse
             {
-                Calendar = calendarMapper.ToResponse(calendar!),
+                Calendar = CalendarResponse.FromEntity(calendar!),
                 Tasks = updatedTasks
             };
 

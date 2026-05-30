@@ -3,15 +3,12 @@ using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using Microsoft.EntityFrameworkCore;
-using CalendarMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.CalendarMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 
-public class FilterCalendarEndpoint(AppDbContext dbContext, CalendarMapper mapper)
-    : BaseFilterEndpoint<Calendar, CalendarResponse, CalendarFilter, CalendarMapper>(dbContext, mapper)
+public class FilterCalendarEndpoint(AppDbContext dbContext)
+    : BaseFilterEndpoint<Calendar, CalendarResponse, CalendarFilter>(dbContext)
 {
     protected override IQueryable<Calendar> ApplyCustomFiltering(IQueryable<Calendar> query, CalendarFilter filter)
     {

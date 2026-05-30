@@ -1,15 +1,12 @@
-using AdhdTimeOrganizer.application.dto.response;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.application.mapper.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.category.query;
 
 public class GetByIdActivityCategoryEndpoint(
-    AppDbContext dbContext,
-    ActivityCategoryMapper mapper)
-    : BaseGetByIdEndpoint<ActivityCategory, ActivityCategoryResponse, ActivityCategoryMapper>(dbContext, mapper)
+    AppDbContext dbContext)
+    : BaseGetByIdEndpoint<ActivityCategory, ActivityCategoryResponse>(dbContext)
 {
 }

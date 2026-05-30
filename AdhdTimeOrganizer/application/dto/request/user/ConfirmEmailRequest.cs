@@ -4,7 +4,7 @@ using FluentValidation;
 
 namespace AdhdTimeOrganizer.application.dto.request.user;
 
-public record ConfirmEmailRequest : IMyRequest
+public record ConfirmEmailRequest
 {
     public required long UserId { get; init; }
     public required string Token { get; init; }

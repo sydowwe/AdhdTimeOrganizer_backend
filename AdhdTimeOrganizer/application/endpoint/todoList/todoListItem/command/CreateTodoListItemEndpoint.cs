@@ -1,20 +1,17 @@
 using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.infrastructure.settings;
 using Microsoft.Extensions.Options;
-using TodoListItemMapper = AdhdTimeOrganizer.application.mapper.todoList.TodoListItemMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.command;
 
-public class CreateTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapper mapper, IOptions<TodoListSettings> settings)
-    : BaseCreateEndpoint<TodoListItem, CreateTodoListItemRequest, TodoListItemMapper>(dbContext, mapper)
+public class CreateTodoListItemEndpoint(AppDbContext dbContext, IOptions<TodoListSettings> settings)
+    : BaseCreateEndpoint<TodoListItem, CreateTodoListItemRequest>(dbContext)
 {
     private readonly AppDbContext _dbContext = dbContext;
     private readonly TodoListSettings _settings = settings.Value;
@@ -25,7 +22,7 @@ public class CreateTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapp
         Validator<CreateTodoListItemValidator>();
     }
 
-    protected override async Task<Result> AfterMapping(TodoListItem entity, CreateTodoListItemRequest req, CancellationToken ct = default)
+    protected override async Task<bool> AfterMapping(TodoListItem entity, CreateTodoListItemRequest req, CancellationToken ct = default)
     {
         entity.DisplayOrder = await _dbContext.TodoListItems.GetNextDisplayOrder(_settings, User.GetId(), entity.TaskPriorityId, ct);
         entity.TodoListId = req.TodoListId;
@@ -40,6 +37,6 @@ public class CreateTodoListItemEndpoint(AppDbContext dbContext, TodoListItemMapp
             entity.DoneCount = 0;
         }
 
-        return Result.Successful();
+        return true;
     }
 }

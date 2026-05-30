@@ -5,7 +5,7 @@ using AdhdTimeOrganizer.domain.model.@enum;
 
 namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 
-public record PatchPlannerTaskStatusRequest : IMyRequest
+public record PatchPlannerTaskStatusRequest
 {
     [Required]
     public required PlannerTaskStatus Status { get; init; }

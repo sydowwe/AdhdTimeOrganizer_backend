@@ -1,6 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.dto.response.user;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.extServiceContract.user;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
@@ -17,7 +16,6 @@ public class RegisterUserEndpoint(
     ITwoFactorAuthService twoFactorAuthService,
     IUserEmailSenderService emailSender,
     IUserDefaultsService userDefaultsService,
-    UserMapper mapper,
     AppDbContext dbContext
 ) : Endpoint<PasswordRegistrationRequest, TwoFactorAuthResponse>
 {
@@ -47,7 +45,7 @@ public class RegisterUserEndpoint(
             return;
         }
 
-        var newUser = mapper.ToEntity(req);
+        var newUser = req.ToEntity;
 
         await using var tx = await dbContext.Database.BeginTransactionAsync(ct);
         var identityResult = await userManager.CreateAsync(newUser, req.Password);

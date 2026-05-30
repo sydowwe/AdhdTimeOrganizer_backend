@@ -1,17 +1,14 @@
 using AdhdTimeOrganizer.application.dto.filter;
-using AdhdTimeOrganizer.application.dto.response;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
-using AdhdTimeOrganizer.application.mapper.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.category.query;
 
 public class GridActivityCategoryEndpoint(
-    AppDbContext dbContext,
-    ActivityCategoryMapper mapper) 
-    : BaseGridEndpoint<ActivityCategory, ActivityCategoryResponse, CategoryFilterRequest, ActivityCategoryMapper>(dbContext, mapper)
+    AppDbContext dbContext) 
+    : BaseGridEndpoint<ActivityCategory, ActivityCategoryResponse, CategoryFilterRequest>(dbContext)
 {
     protected override IQueryable<ActivityCategory> ApplyCustomFiltering(IQueryable<ActivityCategory> query, CategoryFilterRequest filter)
     {

@@ -1,8 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.dto.response.generic;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.@interface;
-using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -11,23 +8,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
-public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppDbContext appDbContext, TMapper mapper) : EndpointWithoutRequest<List<SelectOptionResponse>>
-    where TEntity : class, IEntityWithUser, IEntityWithId
-    where TMapper : IBaseSelectOptionMapper<TEntity>
+public abstract class BaseGetSelectOptionsEndpoint<TEntity>(AppDbContext dbContext) : EndpointWithoutRequest<List<SelectOptionResponse>>
+    where TEntity : class, IEntityWithId
 {
-    private readonly TMapper _mapper = mapper;
+    protected virtual string[] AllowedRoles() => EndpointHelper.GetAdminOrHigherRoles();
 
-
-
-    public virtual string AddedRouteParam => string.Empty;
-
-    public virtual bool FilteredByUser => true;
+    protected virtual string AddedRouteParam => string.Empty;
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
         Get($"/{entityName.Kebaberize()}/all-options/{AddedRouteParam}");
-        
+        Roles(AllowedRoles());
         Summary(s =>
         {
             s.Summary = $"Get {entityName} select options";
@@ -38,18 +30,12 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppDbContex
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var query = appDbContext.Set<TEntity>().AsNoTracking();
-
-        if (FilteredByUser)
-        {
-            query = query.FilteredByUser(User.GetId());
-        }
+        var query = dbContext.Set<TEntity>().AsNoTracking();
 
         query = Filter(query);
-
         query = Sort(query);
 
-        var options = await query.Select(e => _mapper.ToSelectOptionResponse(e)).ToListAsync(ct);
+        var options = await Map(query).ToListAsync(ct);
 
         await Send.OkAsync(options, ct);
     }
@@ -58,4 +44,5 @@ public abstract class BaseGetSelectOptionsEndpoint<TEntity, TMapper>(AppDbContex
 
     protected virtual IQueryable<TEntity> Sort(IQueryable<TEntity> query) => query.OrderBy(e => e.Id);
 
+    protected abstract IQueryable<SelectOptionResponse> Map(IQueryable<TEntity> query);
 }

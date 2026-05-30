@@ -1,17 +1,14 @@
 using AdhdTimeOrganizer.application.dto.filter;
-using AdhdTimeOrganizer.application.dto.response;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
-using AdhdTimeOrganizer.application.mapper.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.role.query;
 
 public class GridActivityRoleEndpoint(
-    AppDbContext dbContext,
-    ActivityRoleMapper mapper) 
-    : BaseGridEndpoint<ActivityRole, ActivityRoleResponse, RoleFilterRequest, ActivityRoleMapper>(dbContext, mapper)
+    AppDbContext dbContext) 
+    : BaseGridEndpoint<ActivityRole, ActivityRoleResponse, RoleFilterRequest>(dbContext)
 {
     protected override IQueryable<ActivityRole> ApplyCustomFiltering(IQueryable<ActivityRole> query, RoleFilterRequest filter)
     {

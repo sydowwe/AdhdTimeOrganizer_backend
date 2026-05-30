@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
-public record UpdateStepRequest : IMyRequest
+public record UpdateStepRequest
 {
     [Required] public long ItemId { get; init; }
     [Required] public Guid StepId { get; init; }

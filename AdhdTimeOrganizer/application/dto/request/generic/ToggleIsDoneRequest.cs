@@ -6,4 +6,4 @@ namespace AdhdTimeOrganizer.application.dto.request.generic;
 public record ToggleIsDoneRequest(
     [Required] List<long> Ids,
     bool? ForceValue = null
-) : IMyRequest;
+);

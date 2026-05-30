@@ -1,7 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.activity.profile;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.activity.profile;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -10,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.project.command;
 
-public class UpdateActivityProjectProfileEndpoint(AppDbContext dbContext, ActivityProjectProfileMapper mapper)
+public class UpdateActivityProjectProfileEndpoint(AppDbContext dbContext)
     : Endpoint<ActivityProjectProfileRequest>
 {
     public override void Configure()
@@ -44,7 +42,7 @@ public class UpdateActivityProjectProfileEndpoint(AppDbContext dbContext, Activi
                 return;
             }
 
-            mapper.UpdateEntity(req, entity);
+            req.UpdateEntity(entity);
             dbContext.Set<ActivityProjectProfile>().Update(entity);
             await dbContext.SaveChangesAsync(ct);
             await Send.NoContentAsync(ct);

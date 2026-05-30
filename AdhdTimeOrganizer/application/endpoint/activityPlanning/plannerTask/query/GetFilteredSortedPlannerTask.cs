@@ -2,15 +2,13 @@
 using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.query;
 
-public class FilterPlannerTaskEndpoint(AppDbContext dbContext, PlannerTaskMapper mapper)
-    : BaseFilterEndpoint<PlannerTask, PlannerTaskResponse, PlannerTaskFilter, PlannerTaskMapper>(dbContext, mapper)
+public class FilterPlannerTaskEndpoint(AppDbContext dbContext)
+    : BaseFilterEndpoint<PlannerTask, PlannerTaskResponse, PlannerTaskFilter>(dbContext)
 {
     protected override IQueryable<PlannerTask> ApplyCustomFiltering(IQueryable<PlannerTask> query, PlannerTaskFilter filter)
     {
@@ -54,9 +52,4 @@ public class FilterPlannerTaskEndpoint(AppDbContext dbContext, PlannerTaskMapper
             IsDesc = false
         }
     ];
-
-    protected override IQueryable<PlannerTask> WithIncludes(IQueryable<PlannerTask> query)
-    {
-        return query.WithIncludes();
-    }
 }

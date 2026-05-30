@@ -2,18 +2,15 @@ using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.application.endpointGroups;
-using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.mapper.activityTracking;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query;
 
-public class GridTrackerDesktopMappingEndpoint(AppDbContext dbContext, TrackerDesktopMappingMapper mapper)
-    : BaseGridEndpoint<TrackerDesktopMappingByPattern, TrackerDesktopMappingResponse, TrackerDesktopMappingFilter, TrackerDesktopMappingMapper>(dbContext, mapper)
+public class GridTrackerDesktopMappingEndpoint(AppDbContext dbContext)
+    : BaseGridEndpoint<TrackerDesktopMappingByPattern, TrackerDesktopMappingResponse, TrackerDesktopMappingFilter>(dbContext)
 {
     public override void Configure()
     {
@@ -60,10 +57,5 @@ public class GridTrackerDesktopMappingEndpoint(AppDbContext dbContext, TrackerDe
             query = query.Where(e => e.CategoryId == filter.CategoryId.Value);
 
         return query;
-    }
-
-    protected override IQueryable<TrackerDesktopMappingByPattern> WithIncludes(IQueryable<TrackerDesktopMappingByPattern> query)
-    {
-        return query.Include(e => e.Activity);
     }
 }

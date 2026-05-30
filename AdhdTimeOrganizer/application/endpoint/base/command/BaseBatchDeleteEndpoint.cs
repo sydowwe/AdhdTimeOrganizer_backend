@@ -1,29 +1,29 @@
-using AdhdTimeOrganizer.application.dto.request.generic;
-using AdhdTimeOrganizer.application.extensions;
+﻿using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
+using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
 public abstract class BaseBatchDeleteEndpoint<TEntity>(AppDbContext dbContext) : Endpoint<IdListRequest>
     where TEntity : class, IEntityWithId
 {
+    public virtual string[] AllowedRoles() => EndpointHelper.GetAdminOrHigherRoles();
+
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
         Post($"/{entityName.Kebaberize()}/batch-delete");
-        
+        Roles(AllowedRoles());
         Summary(s =>
         {
             s.Summary = $"Batch delete {entityName}";
             s.Description = $"Deletes multiple {entityName} entities";
             s.Response(204, "Success");
             s.Response(404, "One or more entities not found");
-            s.Response(400, "Bad request");
         });
     }
 
@@ -31,25 +31,22 @@ public abstract class BaseBatchDeleteEndpoint<TEntity>(AppDbContext dbContext) :
     {
         try
         {
-            var entities = new List<TEntity>();
-            foreach (var idRequest in req.Ids)
+            var ids = req.Ids.Distinct().ToList();
+            if (ids.Count == 0)
             {
-                var entity = await dbContext.Set<TEntity>().FindAsync([idRequest], ct);
-                if (entity == null)
-                {
-                    AddError($"{typeof(TEntity).Name} not found.");
-                    await Send.ErrorsAsync(404, ct);
-                    return;
-                }
+                AddError("No ids were provided.");
+                await Send.ErrorsAsync(400, ct);
+                return;
+            }
 
-                if (entity is IEntityWithUser entityWithUser && entityWithUser.UserId != User.GetId())
-                {
-                    AddError($"{typeof(TEntity).Name} not found.");
-                    await Send.ErrorsAsync(404, ct);
-                    return;
-                }
+            var entities = await dbContext.Set<TEntity>()
+                .Where(e => ids.Contains(e.Id))
+                .ToListAsync(ct);
 
-                entities.Add(entity);
+            if (entities.Count != ids.Count)
+            {
+                await Send.NotFoundAsync(ct);
+                return;
             }
 
             dbContext.Set<TEntity>().RemoveRange(entities);
@@ -61,7 +58,7 @@ public abstract class BaseBatchDeleteEndpoint<TEntity>(AppDbContext dbContext) :
         {
             var result = DbUtils.HandleException(ex, nameof(HandleAsync));
             AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
+            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
         }
     }
 }

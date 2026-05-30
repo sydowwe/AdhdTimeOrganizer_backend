@@ -1,6 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.dto.response.user;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
@@ -14,7 +13,6 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
 public class GoogleSignInEndpoint(
     UserManager<User> userManager,
     AppDbContext dbContext,
-    UserMapper mapper,
     IJwtService jwtService,
     IUserDefaultsService userDefaultsService,
     IGoogleSignInService googleSignInService)
@@ -77,8 +75,9 @@ public class GoogleSignInEndpoint(
 
     private async Task<User?> Register(GoogleAuthRegistrationRequest req, CancellationToken ct)
     {
-        var newUser = mapper.ToEntityWithGoogleId(req);
+        var newUser = req.ToEntity;
 
+        newUser.GoogleOAuthUserId = req.GoogleOAuthUserId;
         newUser.EmailConfirmed = true;
 
         await using var tx = await dbContext.Database.BeginTransactionAsync(ct);

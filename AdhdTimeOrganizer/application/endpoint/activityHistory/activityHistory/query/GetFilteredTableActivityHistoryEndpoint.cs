@@ -1,10 +1,7 @@
-using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.filter.history;
 using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -13,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query;
 
-public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext, ActivityHistoryMapper mapper)
+public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext)
     : Endpoint<BaseFilterSortPaginateRequest<ActivityHistoryFilterRequest>, List<ActivityHistoryListGroupedByDateResponse>>
 {
     public virtual string EndpointPath => "gird";
@@ -48,7 +45,7 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext, Act
                 query = ApplyCustomFiltering(query, req.Filter);
             }
 
-            var history = await mapper.ProjectToResponse(query)
+            var history = await ActivityHistoryResponse.Projection(query)
                 .GroupBy(hr => hr.StartTimestamp.ToUniversalTime().Date)
                 .Select(group => new ActivityHistoryListGroupedByDateResponse
                 {

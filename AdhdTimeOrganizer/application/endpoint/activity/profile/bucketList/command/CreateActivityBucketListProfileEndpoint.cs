@@ -1,6 +1,4 @@
 using AdhdTimeOrganizer.application.dto.request.activity.profile;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.activity.profile;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -8,7 +6,7 @@ using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.bucketList.command;
 
-public class CreateActivityBucketListProfileEndpoint(AppDbContext dbContext, ActivityBucketListProfileMapper mapper)
+public class CreateActivityBucketListProfileEndpoint(AppDbContext dbContext)
     : Endpoint<ActivityBucketListProfileRequest, long>
 {
     public override void Configure()
@@ -28,7 +26,7 @@ public class CreateActivityBucketListProfileEndpoint(AppDbContext dbContext, Act
     {
         try
         {
-            var entity = mapper.ToEntity(req);
+            var entity = req.ToEntity;
             await dbContext.Set<ActivityBucketListProfile>().AddAsync(entity, ct);
             await dbContext.SaveChangesAsync(ct);
             await Send.ResponseAsync(entity.Id, 201, ct);

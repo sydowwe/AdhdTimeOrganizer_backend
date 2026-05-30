@@ -1,25 +1,19 @@
 using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.service;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
-using RoutineTodoListMapper = AdhdTimeOrganizer.application.mapper.todoList.RoutineTodoListMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.query;
 
 public class GetAllGroupedRoutineTodoListEndpoint(
-    AppDbContext dbContext,
-    RoutineTimePeriodMapper routineTimePeriodMapper,
-    RoutineTodoListMapper mapper) : EndpointWithoutRequest<IEnumerable<RoutineTodoListGroupedResponse>>
+    AppDbContext dbContext) : EndpointWithoutRequest<IEnumerable<RoutineTodoListGroupedResponse>>
 {
     public override void Configure()
     {
         Get("/routine-todo-list/grouped-by-time-period");
-        
 
         Summary(s =>
         {
@@ -90,14 +84,14 @@ public class GetAllGroupedRoutineTodoListEndpoint(
         var data = periods
             .Select(tp => new RoutineTodoListGroupedResponse
             {
-                RoutineTimePeriod = routineTimePeriodMapper.ToResponse(tp) with
+                RoutineTimePeriod = RoutineTimePeriodResponse.FromEntity(tp) with
                 {
                     NextResetAt = RoutineResetService.ComputeNextReset(tp),
                     CompletionHistory = completionsByPeriod.GetValueOrDefault(tp.Id, [])
                 },
                 Items = tp.RoutineTodoListColl
                     .OrderBy(e => e.IsDone).ThenBy(e => e.DisplayOrder)
-                    .Select(mapper.ToResponse)
+                    .Select(RoutineTodoListResponse.FromEntity)
                     .ToList()
             })
             .ToList();

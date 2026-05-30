@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
-public record CreateStepRequest : IMyRequest
+public record CreateStepRequest
 {
     [Required] public long ItemId { get; init; }
     [Required][MaxLength(255)] public required string Name { get; init; }

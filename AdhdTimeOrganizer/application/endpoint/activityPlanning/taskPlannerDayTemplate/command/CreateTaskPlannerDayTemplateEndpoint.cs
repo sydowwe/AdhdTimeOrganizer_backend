@@ -3,12 +3,11 @@ using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using TaskPlannerDayTemplateMapper = AdhdTimeOrganizer.application.mapper.activityPlanning.TaskPlannerDayTemplateMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlannerDayTemplate.command;
 
-public class CreateTaskPlannerDayTemplateEndpoint(AppDbContext dbContext, TaskPlannerDayTemplateMapper mapper)
-    : BaseCreateEndpoint<TaskPlannerDayTemplate, TaskPlannerDayTemplateRequest, TaskPlannerDayTemplateMapper>(dbContext, mapper)
+public class CreateTaskPlannerDayTemplateEndpoint(AppDbContext dbContext)
+    : BaseCreateEndpoint<TaskPlannerDayTemplate, TaskPlannerDayTemplateRequest>(dbContext)
 {
     public override void Configure()
     {

@@ -2,7 +2,7 @@ using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.activity;
 
-public record ActivitySelectForm : IMyRequest
+public record ActivitySelectForm
 {
     public long? ActivityId { get; init; }
     public long? RoleId { get; init; }

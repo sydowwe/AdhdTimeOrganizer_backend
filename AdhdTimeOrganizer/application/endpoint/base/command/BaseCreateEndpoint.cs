@@ -1,33 +1,25 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.@interface;
-using AdhdTimeOrganizer.application.endpointGroups;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.@interface;
-using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.entityInterface;
-using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.command;
 
-public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
-    AppDbContext dbContext,
-    TMapper mapper) : Endpoint<TRequest, long>
-    where TEntity : class, IEntityWithUser, IEntityWithId
-    where TRequest : class, ICreateRequest
-    where TMapper : IBaseCreateMapper<TEntity, TRequest>
+public abstract class BaseCreateEndpoint<TEntity, TRequest>(AppDbContext dbContext) : Endpoint<TRequest, long>
+    where TEntity : class, IEntityWithId
+    where TRequest : class, ICreateRequest<TEntity>
 {
+    public virtual string[] AllowedRoles() => EndpointHelper.GetAdminOrHigherRoles();
 
-
-    public virtual string Route => typeof(TEntity).Name.Kebaberize();
+    public virtual string Route => $"/{typeof(TEntity).Name.Kebaberize()}";
 
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
-        Post($"/{Route}");
-        
+        Post(Route);
+        Roles(AllowedRoles());
         Summary(s =>
         {
             s.Summary = $"Create {entityName}";
@@ -41,26 +33,16 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
     {
         try
         {
-            await BeforeMapping(req, ct);
-            var entity = mapper.ToEntity(req, User.GetId());
+            if (!await BeforeMapping(req, ct)) return;
 
-            var result = await AfterMapping(entity, req, ct);
-            if (result.Failed)
-            {
-                if (result.ErrorType == ResultErrorType.NotFound)
-                {
-                    AddError($"Entity not found");
-                    await Send.ErrorsAsync(404, ct);
-                    return;
-                }
+            var entity = req.ToEntity;
 
-                AddError(result.ErrorMessage!);
-                await Send.ErrorsAsync(400, ct);
-                return;
-            }
+            if (!await AfterMapping(entity, req, ct)) return;
 
             await dbContext.Set<TEntity>().AddAsync(entity, ct);
             await dbContext.SaveChangesAsync(ct);
+
+            await AfterSave(entity, ct);
 
             await Send.ResponseAsync(entity.Id, 201, ct);
         }
@@ -68,17 +50,15 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest, TMapper>(
         {
             var result = DbUtils.HandleException(ex, "Create");
             AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
+            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
         }
     }
 
-    protected virtual Task BeforeMapping(TRequest req, CancellationToken ct = default)
-    {
-        return Task.CompletedTask;
-    }
+    protected virtual Task<bool> BeforeMapping(TRequest req, CancellationToken ct = default)
+        => Task.FromResult(true);
 
-    protected virtual Task<Result> AfterMapping(TEntity entity, TRequest req, CancellationToken ct = default)
-    {
-        return Task.FromResult(Result.Successful());
-    }
+    protected virtual Task<bool> AfterMapping(TEntity entity, TRequest req, CancellationToken ct = default)
+        => Task.FromResult(true);
+
+    protected virtual Task AfterSave(TEntity entity, CancellationToken ct = default) => Task.CompletedTask;
 }

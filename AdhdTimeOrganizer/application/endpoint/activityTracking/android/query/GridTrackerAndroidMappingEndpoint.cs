@@ -2,18 +2,15 @@ using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.android;
 using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.application.endpointGroups;
-using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.mapper.activityTracking;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.android.query;
 
-public class GridTrackerAndroidMappingEndpoint(AppDbContext dbContext, TrackerAndroidMappingMapper mapper)
-    : BaseGridEndpoint<TrackerAndroidMappingByPattern, TrackerAndroidMappingResponse, TrackerAndroidMappingFilter, TrackerAndroidMappingMapper>(dbContext, mapper)
+public class GridTrackerAndroidMappingEndpoint(AppDbContext dbContext)
+    : BaseGridEndpoint<TrackerAndroidMappingByPattern, TrackerAndroidMappingResponse, TrackerAndroidMappingFilter>(dbContext)
 {
     public override void Configure()
     {
@@ -57,10 +54,5 @@ public class GridTrackerAndroidMappingEndpoint(AppDbContext dbContext, TrackerAn
             query = query.Where(e => e.CategoryId == filter.CategoryId.Value);
 
         return query;
-    }
-
-    protected override IQueryable<TrackerAndroidMappingByPattern> WithIncludes(IQueryable<TrackerAndroidMappingByPattern> query)
-    {
-        return query.Include(e => e.Activity);
     }
 }

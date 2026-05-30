@@ -4,8 +4,6 @@ using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -15,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query;
 
 public class FetchTableDistinctDesktopEntry(AppDbContext dbContext)
-    : Endpoint<BaseFilterSortPaginateRequest<TrackerDesktopDistinctEntriesFilter>, BaseTableResponse<TrackerDesktopDistinctEntriesResponse>>
+    : Endpoint<BaseFilterSortPaginateRequest<TrackerDesktopDistinctEntriesFilter>, BaseGridResponse<TrackerDesktopDistinctEntriesResponse>>
 {
     public override void Configure()
     {
@@ -27,7 +25,7 @@ public class FetchTableDistinctDesktopEntry(AppDbContext dbContext)
             s.Description = $"Retrieves a filtered, paginated and sorted list of {entityName}";
             
 
-            s.Response<BaseTableResponse<TrackerDesktopDistinctEntriesResponse>>(200, "Success");
+            s.Response<BaseGridResponse<TrackerDesktopDistinctEntriesResponse>>(200, "Success");
             s.Response(400, "Bad request");
         });
         Group<ActivityTrackingDesktopGroup>();
@@ -61,7 +59,7 @@ public class FetchTableDistinctDesktopEntry(AppDbContext dbContext)
 
             var items = await distinctQuery.SortByManyAndPaginate(req.SortBy, req.ItemsPerPage, req.Page).ToListAsync(ct);
 
-            await Send.OkAsync(new BaseTableResponse<TrackerDesktopDistinctEntriesResponse>
+            await Send.OkAsync(new BaseGridResponse<TrackerDesktopDistinctEntriesResponse>
             {
                 Items = items,
                 ItemsCount = itemsCount,

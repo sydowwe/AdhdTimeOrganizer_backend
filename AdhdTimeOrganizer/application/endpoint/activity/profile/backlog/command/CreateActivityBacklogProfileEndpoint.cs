@@ -1,16 +1,12 @@
 using AdhdTimeOrganizer.application.dto.request.activity.profile;
-using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.mapper.activity.profile;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.backlog.command;
 
-public class CreateActivityBacklogProfileEndpoint(AppDbContext dbContext, ActivityBacklogProfileMapper mapper)
+public class CreateActivityBacklogProfileEndpoint(AppDbContext dbContext)
     : Endpoint<ActivityBacklogProfileRequest, long>
 {
     public override void Configure()
@@ -30,7 +26,7 @@ public class CreateActivityBacklogProfileEndpoint(AppDbContext dbContext, Activi
     {
         try
         {
-            var entity = mapper.ToEntity(req);
+            var entity = req.ToEntity;
             await dbContext.Set<ActivityBacklogProfile>().AddAsync(entity, ct);
             await dbContext.SaveChangesAsync(ct);
             await Send.ResponseAsync(entity.Id, 201, ct);

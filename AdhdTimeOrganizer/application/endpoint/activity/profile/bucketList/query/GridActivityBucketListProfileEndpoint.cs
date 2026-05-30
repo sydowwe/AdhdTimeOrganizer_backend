@@ -1,65 +1,30 @@
 using AdhdTimeOrganizer.application.dto.filter;
-using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.activity.profile;
-using AdhdTimeOrganizer.application.dto.response.@base;
+using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.mapper.activity.profile;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using FastEndpoints;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.bucketList.query;
 
-public class GridActivityBucketListProfileEndpoint(AppDbContext dbContext, ActivityBucketListProfileMapper mapper)
-    : Endpoint<BaseFilterSortPaginateRequest<ActivityBucketListProfileFilterRequest>, BaseTableResponse<ActivityBucketListProfileResponse>>
+public class GridActivityBucketListProfileEndpoint(AppDbContext dbContext)
+    : BaseGridEndpoint<ActivityBucketListProfile, ActivityBucketListProfileResponse, ActivityBucketListProfileFilterRequest>(dbContext)
 {
-    public override void Configure()
+    public override string EndpointPath => "grid";
+
+    protected override IQueryable<ActivityBucketListProfile> ApplyCustomFiltering(IQueryable<ActivityBucketListProfile> query,
+        ActivityBucketListProfileFilterRequest filter)
     {
-        Post("/activity-bucket-list-profile/grid");
-        Summary(s =>
-        {
-            s.Summary = "Get filtered and paginated ActivityBucketListProfile list";
-            s.Response<BaseTableResponse<ActivityBucketListProfileResponse>>(200, "Success");
-            s.Response(400, "Bad request");
-        });
-    }
+        var userId = User.GetId();
 
-    public override async Task HandleAsync(BaseFilterSortPaginateRequest<ActivityBucketListProfileFilterRequest> req, CancellationToken ct)
-    {
-        try
-        {
-            var userId = User.GetId();
+        query = query.Where(p => p.Activity.UserId == userId);
 
-            var query = dbContext.Set<ActivityBucketListProfile>()
-                .AsNoTracking()
-                .Where(p => p.Activity.UserId == userId);
+        if (filter.RequiresTravel.HasValue)
+            query = query.Where(p => p.RequiresTravel == filter.RequiresTravel.Value);
 
-            if (req is { UseFilter: true, Filter: not null })
-            {
-                var filter = req.Filter;
+        if (filter.ComfortZoneStep.HasValue)
+            query = query.Where(p => p.ComfortZoneStep == filter.ComfortZoneStep.Value);
 
-                if (filter.RequiresTravel.HasValue)
-                    query = query.Where(p => p.RequiresTravel == filter.RequiresTravel.Value);
-
-                if (filter.ComfortZoneStep.HasValue)
-                    query = query.Where(p => p.ComfortZoneStep == filter.ComfortZoneStep.Value);
-            }
-
-            var response = await query.GetTableDataAsync<ActivityBucketListProfileResponse, ActivityBucketListProfile, ActivityBucketListProfileMapper>(
-                req.SortBy,
-                req.ItemsPerPage,
-                req.Page,
-                mapper,
-                ct);
-
-            await Send.OkAsync(response, ct);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error retrieving table data for ActivityBucketListProfile");
-            AddError("An internal error occurred.");
-            await Send.ErrorsAsync(500, ct);
-        }
+        return query;
     }
 }

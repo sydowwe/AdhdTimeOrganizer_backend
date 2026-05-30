@@ -1,5 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.@base.core;
+﻿using AdhdTimeOrganizer.domain.model.entity.@base.core;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using AdhdTimeOrganizer.domain.result;
 using Microsoft.EntityFrameworkCore;

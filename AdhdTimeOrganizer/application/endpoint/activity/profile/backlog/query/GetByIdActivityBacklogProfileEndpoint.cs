@@ -1,6 +1,5 @@
 using AdhdTimeOrganizer.application.dto.response.activity.profile;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.mapper.activity.profile;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
@@ -8,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.backlog.query;
 
-public class GetByIdActivityBacklogProfileEndpoint(AppDbContext dbContext, ActivityBacklogProfileMapper mapper)
+public class GetByIdActivityBacklogProfileEndpoint(AppDbContext dbContext)
     : EndpointWithoutRequest<ActivityBacklogProfileResponse>
 {
     public override void Configure()
@@ -38,6 +37,6 @@ public class GetByIdActivityBacklogProfileEndpoint(AppDbContext dbContext, Activ
             return;
         }
 
-        await Send.OkAsync(mapper.ToResponse(entity), ct);
+        await Send.OkAsync(ActivityBacklogProfileResponse.FromEntity(entity), ct);
     }
 }

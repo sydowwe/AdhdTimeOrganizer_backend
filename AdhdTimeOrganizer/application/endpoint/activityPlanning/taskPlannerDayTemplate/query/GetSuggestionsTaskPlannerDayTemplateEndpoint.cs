@@ -1,11 +1,7 @@
-using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.suggestion;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.suggestion;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -14,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlannerDayTemplate.query;
 
-public class GetSuggestionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext, TaskPlannerDayTemplateMapper templateMapper)
+public class GetSuggestionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext)
     : EndpointWithoutRequest<List<TemplateSuggestionResponse>>
 {
     private static readonly string[] DayNames =
@@ -60,7 +56,7 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext
             .OrderByDescending(p => p.OccurrenceCount)
             .Select(p => new TemplateSuggestionResponse
             {
-                Template = templateMapper.ToResponse(p.Template),
+                Template = TaskPlannerDayTemplateResponse.FromEntity(p.Template),
                 PatternType = p.PatternType,
                 PatternLabel = p.PatternType == 0
                     ? DayNames[p.PatternValue - 1]

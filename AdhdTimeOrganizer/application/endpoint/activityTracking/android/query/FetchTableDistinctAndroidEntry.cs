@@ -4,7 +4,6 @@ using AdhdTimeOrganizer.application.dto.response.activityTracking.android;
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -14,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.android.query;
 
 public class FetchTableDistinctAndroidEntry(AppDbContext dbContext)
-    : Endpoint<BaseFilterSortPaginateRequest<AndroidDistinctEntriesFilter>, BaseTableResponse<AndroidDistinctEntriesResponse>>
+    : Endpoint<BaseFilterSortPaginateRequest<AndroidDistinctEntriesFilter>, BaseGridResponse<AndroidDistinctEntriesResponse>>
 {
     public override void Configure()
     {
@@ -26,7 +25,7 @@ public class FetchTableDistinctAndroidEntry(AppDbContext dbContext)
             s.Description = $"Retrieves a filtered, paginated and sorted list of {entityName}";
             
 
-            s.Response<BaseTableResponse<AndroidDistinctEntriesResponse>>(200, "Success");
+            s.Response<BaseGridResponse<AndroidDistinctEntriesResponse>>(200, "Success");
             s.Response(400, "Bad request");
         });
         Group<ActivityTrackingAndroidGroup>();
@@ -59,7 +58,7 @@ public class FetchTableDistinctAndroidEntry(AppDbContext dbContext)
 
             var items = await distinctQuery.SortByManyAndPaginate(req.SortBy, req.ItemsPerPage, req.Page).ToListAsync(ct);
 
-            await Send.OkAsync(new BaseTableResponse<AndroidDistinctEntriesResponse>
+            await Send.OkAsync(new BaseGridResponse<AndroidDistinctEntriesResponse>
             {
                 Items = items,
                 ItemsCount = itemsCount,

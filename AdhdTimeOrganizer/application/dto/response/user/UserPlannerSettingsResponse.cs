@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.application.dto.@enum;
+using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 namespace AdhdTimeOrganizer.application.dto.response.user;
 
@@ -13,4 +14,17 @@ public record UserPlannerSettingsResponse
     public long? DefaultApplyTemplateId { get; init; }
     public required ApplyTemplateConflictResolutionEnum DefaultConflictResolution { get; init; }
     public required bool DefaultApplyPreviewMode { get; init; }
+
+    public static UserPlannerSettingsResponse FromEntity(UserPlannerSettings entity) => new()
+    {
+        RemindersEnabled = entity.RemindersEnabled,
+        ReminderMinutesBefore = entity.ReminderMinutesBefore,
+        DetailsPanelExpandedByDefault = entity.DetailsPanelExpandedByDefault,
+        ArrowKeyNavEnabled = entity.ArrowKeyNavEnabled,
+        PredefinedSkipReasons = entity.PredefinedSkipReasons,
+        SlotDurationMinutes = entity.SlotDurationMinutes,
+        DefaultApplyTemplateId = entity.DefaultApplyTemplateId,
+        DefaultConflictResolution = entity.DefaultConflictResolution,
+        DefaultApplyPreviewMode = entity.DefaultApplyPreviewMode
+    };
 }

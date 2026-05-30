@@ -1,25 +1,12 @@
 using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.application.mapper.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using Microsoft.EntityFrameworkCore;
-using RoutineTodoListMapper = AdhdTimeOrganizer.application.mapper.todoList.RoutineTodoListMapper;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.query;
 
 public class GetByIdRoutineTodoListEndpoint(
-    AppDbContext dbContext,
-    RoutineTodoListMapper mapper)
-    : BaseGetByIdEndpoint<RoutineTodoList, RoutineTodoListResponse, RoutineTodoListMapper>(dbContext, mapper)
+    AppDbContext dbContext)
+    : BaseGetByIdEndpoint<RoutineTodoList, RoutineTodoListResponse>(dbContext)
 {
-    protected override IQueryable<RoutineTodoList> WithIncludes(IQueryable<RoutineTodoList> query)
-    {
-        return query
-            .Include(rtdl => rtdl.Activity)
-                .ThenInclude(a => a.Role)
-            .Include(rtdl => rtdl.Activity)
-                .ThenInclude(a => a.Category)
-            .Include(rtdl => rtdl.RoutineTimePeriod);
-    }
 }

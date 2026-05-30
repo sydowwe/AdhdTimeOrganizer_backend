@@ -1,5 +1,4 @@
 using AdhdTimeOrganizer.application.dto.request.activity;
-using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

@@ -1,5 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
+﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
