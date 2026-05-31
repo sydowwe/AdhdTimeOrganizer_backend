@@ -31,11 +31,11 @@ public record RepeatingPlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<R
         ImportanceId = ImportanceId,
         IsActive = IsActive,
         RecurrenceType = RecurrenceType,
-        ScheduledDays = ScheduledDays,
-        ScheduledDates = ScheduledDates,
+        ScheduledDays = ScheduledDays.ToList(),
+        ScheduledDates = ScheduledDates.ToList(),
         ActiveFromDate = ActiveFromDate,
         ActiveToDate = ActiveToDate,
-        ScheduledForDayTypes = ScheduledForDayTypes
+        ScheduledForDayTypes = ScheduledForDayTypes.ToList()
     };
 
     public void UpdateEntity(RepeatingPlannerTask entity)
@@ -49,10 +49,10 @@ public record RepeatingPlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<R
         entity.ImportanceId = ImportanceId;
         entity.IsActive = IsActive;
         entity.RecurrenceType = RecurrenceType;
-        entity.ScheduledDays = ScheduledDays;
-        entity.ScheduledDates = ScheduledDates;
+        entity.ScheduledDays = ScheduledDays.ToList();
+        entity.ScheduledDates = ScheduledDates.ToList();
         entity.ActiveFromDate = ActiveFromDate;
         entity.ActiveToDate = ActiveToDate;
-        entity.ScheduledForDayTypes = ScheduledForDayTypes;
+        entity.ScheduledForDayTypes = ScheduledForDayTypes.ToList();
     }
 }

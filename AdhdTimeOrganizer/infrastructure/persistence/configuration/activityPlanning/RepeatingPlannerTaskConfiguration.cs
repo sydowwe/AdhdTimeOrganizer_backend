@@ -33,7 +33,7 @@ public class RepeatingPlannerTaskConfiguration : IEntityTypeConfiguration<Repeat
                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
             )
             .Metadata.SetValueComparer(
-                new ValueComparer<List<string>>(
+                new ValueComparer<ICollection<string>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
                     c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                     c => c.ToList()
@@ -48,7 +48,7 @@ public class RepeatingPlannerTaskConfiguration : IEntityTypeConfiguration<Repeat
                        .ToList()
             )
             .Metadata.SetValueComparer(
-                new ValueComparer<List<int>>(
+                new ValueComparer<ICollection<int>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
                     c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                     c => c.ToList()
@@ -61,7 +61,7 @@ public class RepeatingPlannerTaskConfiguration : IEntityTypeConfiguration<Repeat
                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
             )
             .Metadata.SetValueComparer(
-                new ValueComparer<List<string>>(
+                new ValueComparer<ICollection<string>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
                     c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                     c => c.ToList()
