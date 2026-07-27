@@ -1,37 +1,38 @@
-using System.Net;
-using System.Net.Http.Json;
-using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
-using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.Testing;
+using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-// Tests BasePatchEndpoint via TemplatePlannerTaskChangeSpanEndpoint
-public class BasePatchEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
+// Tests BasePatchEndpoint via TemplatePlannerTaskChangeSpanEndpoint ("/template-planner-task/{id}")
+[Collection("Postgres")]
+public class TemplatePlannerTaskChangeSpanEndpointTests(AppDbContextFixture fixture)
+    : BasePatchEndpointTests(fixture)
 {
-    private const string Route = "template-planner-task";
+    protected override string EndpointUrl => "api/template-planner-task";
 
-    private async Task<long> SeedTemplatePlannerTaskAsync()
+    protected override async Task<long> SeedEntityAsync(DbContext db)
     {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
+        var ctx = (AppDbContext)db;
+        var userId = FakeLoggedUserService.TestUserId;
 
         var role = new ActivityRole { Name = "Role", Color = "#FF0000", UserId = userId };
-        db.ActivityRoles.Add(role);
-        await db.SaveChangesAsync();
+        ctx.ActivityRoles.Add(role);
+        await ctx.SaveChangesAsync();
 
         var activity = new Activity { Name = "Activity", RoleId = role.Id, UserId = userId };
-        db.Activities.Add(activity);
-        await db.SaveChangesAsync();
+        ctx.Activities.Add(activity);
+        await ctx.SaveChangesAsync();
 
         var importance = new TaskImportance { Text = "Required", Importance = 5, UserId = userId };
-        db.TaskImportances.Add(importance);
-        await db.SaveChangesAsync();
+        ctx.TaskImportances.Add(importance);
+        await ctx.SaveChangesAsync();
 
         var template = new TaskPlannerDayTemplate
         {
@@ -40,8 +41,8 @@ public class BasePatchEndpointTests(TestWebApplicationFactory factory) : Integra
             SuggestedForDayType = DayType.Workday,
             UserId = userId
         };
-        db.TaskPlannerDayTemplates.Add(template);
-        await db.SaveChangesAsync();
+        ctx.TaskPlannerDayTemplates.Add(template);
+        await ctx.SaveChangesAsync();
 
         var task = new TemplatePlannerTask
         {
@@ -53,70 +54,16 @@ public class BasePatchEndpointTests(TestWebApplicationFactory factory) : Integra
             IsBackground = false,
             UserId = userId
         };
-        db.TemplatePlannerTasks.Add(task);
-        await db.SaveChangesAsync();
+        ctx.TemplatePlannerTasks.Add(task);
+        await ctx.SaveChangesAsync();
 
         return task.Id;
     }
 
-    [Fact]
-    public async Task Patch_ValidRequest_Returns204NoContent()
-    {
-        var id = await SeedTemplatePlannerTaskAsync();
-        var request = new
+    protected override Task<object> BuildValidPayloadAsync(DbContext db, long id) =>
+        Task.FromResult<object>(new
         {
             StartTime = new { Hours = 10, Minutes = 0 },
             EndTime = new { Hours = 11, Minutes = 0 }
-        };
-
-        var response = await client.PatchAsJsonAsync($"{Route}/{id}", request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-    }
-
-    [Fact]
-    public async Task Patch_WithoutAuth_Returns401()
-    {
-        
-        var request = new
-        {
-            StartTime = new { Hours = 10, Minutes = 0 },
-            EndTime = new { Hours = 11, Minutes = 0 }
-        };
-
-        var response = await anonClient.PatchAsJsonAsync($"{Route}/1", request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task Patch_NonExistingEntity_Returns404()
-    {
-        var request = new
-        {
-            StartTime = new { Hours = 10, Minutes = 0 },
-            EndTime = new { Hours = 11, Minutes = 0 }
-        };
-
-        var response = await client.PatchAsJsonAsync($"{Route}/999999999", request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    public override async Task DisposeAsync()
-    {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        db.TemplatePlannerTasks.RemoveRange(
-            db.TemplatePlannerTasks.Where(t => t.UserId == userId));
-        db.TaskPlannerDayTemplates.RemoveRange(
-            db.TaskPlannerDayTemplates.Where(t => t.UserId == userId));
-        db.TaskImportances.RemoveRange(
-            db.TaskImportances.Where(t => t.UserId == userId));
-        db.Activities.RemoveRange(
-            db.Activities.Where(a => a.UserId == userId));
-        db.ActivityRoles.RemoveRange(
-            db.ActivityRoles.Where(r => r.UserId == userId));
-        await db.SaveChangesAsync();
-    }
+        });
 }

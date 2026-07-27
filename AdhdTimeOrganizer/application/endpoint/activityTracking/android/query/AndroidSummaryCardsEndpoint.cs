@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.android.dashboard;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.android.query;
 
@@ -111,7 +111,8 @@ public class AndroidSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCard
             days = (int)(maxDate - minDate).TotalDays + 1;
         }
 
-        if (days <= 0) days = 1;
+        if (days <= 0)
+            days = 1;
 
         return data
             .GroupBy(x => x.AppLabel)
@@ -123,7 +124,8 @@ public class AndroidSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCard
 
     private static double CalculatePercentChange(long current, long average)
     {
-        if (average == 0) return current > 0 ? 100.0 : 0.0;
-        return Math.Round(((double)(current - average) / average) * 100, 1);
+        if (average == 0)
+            return current > 0 ? 100.0 : 0.0;
+        return Math.Round((double)(current - average) / average * 100, 1);
     }
 }

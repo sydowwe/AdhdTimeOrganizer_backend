@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.@event;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.eventHandler;
 
@@ -22,8 +23,6 @@ public class ActivityAddedToHistoryEventHandler(IServiceScopeFactory scopeFactor
         };
         var result = await dbContext.AddEntityAsync(historyRecord, ct);
         if (result.Failed)
-        {
             logger.LogError(result.ErrorMessage);
-        }
     }
 }

@@ -1,17 +1,16 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.activity.memoryAnchor;
 
 public record MemoryAnchorRequest : ActivityIdRequest, IMyRequest<MemoryAnchor>
 {
-    [Required] public int AnchorMonth { get; init; }
-    [Required] public int AnchorYear { get; init; }
-    [Required] public string HighlightNote { get; init; } = null!;
-    [Required] public int Rating { get; init; }
+    public int AnchorMonth { get; init; }
+    public int AnchorYear { get; init; }
+    public string HighlightNote { get; init; } = null!;
+    public int Rating { get; init; }
 
-    public MemoryAnchor ToEntity => new() { UserId = 0, ActivityId = ActivityId, AnchorMonth = AnchorMonth, AnchorYear = AnchorYear, HighlightNote = HighlightNote, Rating = Rating };
+    public MemoryAnchor ToEntity => new() { ActivityId = ActivityId, AnchorMonth = AnchorMonth, AnchorYear = AnchorYear, HighlightNote = HighlightNote, Rating = Rating };
 
     public void UpdateEntity(MemoryAnchor e)
     {

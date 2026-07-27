@@ -25,9 +25,7 @@ public record DateRangeDto
 
 
         if (to <= from)
-        {
             to = to.AddDays(1);
-        }
 
         return (from, to);
     }

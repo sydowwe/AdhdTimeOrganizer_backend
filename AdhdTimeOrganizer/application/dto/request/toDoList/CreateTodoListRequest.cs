@@ -1,15 +1,13 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
 public record CreateTodoListItemRequest : BaseCreateTodoListRequest, ICreateRequest<TodoListItem>
 {
-    [Required]
     public long TaskPriorityId { get; init; }
 
-    [Required]
+
     public long TodoListId { get; init; }
 
     public DateOnly? DueDate { get; init; }
@@ -25,6 +23,6 @@ public record CreateTodoListItemRequest : BaseCreateTodoListRequest, ICreateRequ
         TaskPriorityId = TaskPriorityId,
         TodoListId = TodoListId,
         DueDate = DueDate,
-        DueTime = DueTime,
+        DueTime = DueTime
     };
 }

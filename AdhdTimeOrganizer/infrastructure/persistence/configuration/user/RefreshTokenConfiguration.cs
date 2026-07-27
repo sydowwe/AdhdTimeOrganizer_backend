@@ -1,16 +1,32 @@
-using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.domain.entity.user;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
+using User = AdhdTimeOrganizer.domain.model.entity.user.User;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.user;
 
+/// <summary>
+/// Configures Framework's <see cref="RefreshToken"/> for this host. Framework ships its own
+/// <c>RefreshTokenCoreEntityConfiguration</c>, but it lives in an assembly <c>AppDbContext</c> never
+/// applies and deliberately leaves the FK unconfigured (it doesn't know the concrete user type) — so
+/// this file stays, supplying the FK plus the lookup indexes and the column widths already in the
+/// database.
+/// </summary>
 public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
 {
     public void Configure(EntityTypeBuilder<RefreshToken> builder)
     {
         builder.BaseEntityConfigure();
-        builder.IsManyWithOneUser(u => u.RefreshTokens);
+
+        // Configured from the principal end: Framework's RefreshToken has a UserId but no User
+        // navigation, so IsManyWithOneUser (which requires BaseEntityWithUser<TUser>) doesn't apply.
+        // No standalone user_id index — ix_refresh_token_user_revoked below already leads with it.
+        builder.HasOne<User>()
+            .WithMany(u => u.RefreshTokens)
+            .HasForeignKey(rt => rt.UserId)
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.Property(rt => rt.TokenHash)
             .HasMaxLength(64)

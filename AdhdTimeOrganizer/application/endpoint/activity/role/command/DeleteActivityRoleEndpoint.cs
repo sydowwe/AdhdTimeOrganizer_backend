@@ -1,6 +1,6 @@
-using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.domain.model.entity.activity;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.role.command;
 

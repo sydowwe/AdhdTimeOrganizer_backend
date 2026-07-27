@@ -15,7 +15,7 @@ public class PatchPlannerTaskStatusEndpoint(AppDbContext dbContext) : Endpoint<P
     public override void Configure()
     {
         Patch($"/{nameof(PlannerTask).Kebaberize()}/{{id:long:required}}/status");
-        
+
         Validator<PatchPlannerTaskStatusValidator>();
         Summary(s =>
         {
@@ -69,10 +69,8 @@ public class PatchPlannerTaskStatusEndpoint(AppDbContext dbContext) : Endpoint<P
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             if (entity.Calendar.Date == today)
-            {
                 await new PlannerTaskIsDoneChangedEvent(entity.ActivityId, entity.UserId, entity.IsDone, entity.TodolistItemId)
                     .PublishAsync(Mode.WaitForAll, ct);
-            }
 
             await Send.NoContentAsync(ct);
         }

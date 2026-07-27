@@ -2,12 +2,12 @@ using AdhdTimeOrganizer.application.dto.request.activity;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 
 public class CloneActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickEditActivityRequest, long?>
 {
-
     public override void Configure()
     {
         Post("/activity/{id:long:required}/clone");

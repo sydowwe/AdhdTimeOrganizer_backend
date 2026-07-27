@@ -1,9 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+using AdhdTimeOrganizer.domain.model.entity.user;
+using Sydowwe.Framework.application.dto.request.user;
 
 namespace AdhdTimeOrganizer.application.dto.request.user;
 
-public record PasswordRegistrationRequest : UserRequest
+public record PasswordRegistrationRequest : BasePasswordRegistrationRequest<User>
 {
-    [Required] public required string RecaptchaToken { get; init; }
-    [Required] public required string Password { get; set; }
+    public override User ToEntity => PopulateBaseFields(new User { Timezone = TimeZoneInfo.FindSystemTimeZoneById(Timezone) });
 }

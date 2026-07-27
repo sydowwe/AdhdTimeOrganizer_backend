@@ -1,9 +1,12 @@
-using AdhdTimeOrganizer.domain.model.entity.@base;
+using AdhdTimeOrganizer.domain.model.entity.user;
+using Sydowwe.Framework.domain.entityInterface;
 
 namespace AdhdTimeOrganizer.domain.model.entity.todoList;
 
-public class TodoList : BaseNameTextEntity
+public class TodoList : BaseEntityWithUser, IBaseNameTextEntity
 {
+    public required string Name { get; set; }
+    public string? Text { get; set; }
     public string? Icon { get; set; }
 
     public long? CategoryId { get; set; }

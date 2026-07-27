@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.application.dto.request.activity.memoryAnchor;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.validator;
 
@@ -39,6 +39,7 @@ public class CreateMemoryAnchorValidator : Validator<MemoryAnchorRequest>
                 ctx.AddFailure(nameof(req.ActivityId), "Activity not found.");
                 return;
             }
+
             if (!info.HasBacklog && !info.HasBucketList)
                 ctx.AddFailure(nameof(req.ActivityId),
                     "Activity must have a Backlog or BucketList profile to be anchored.");

@@ -1,22 +1,21 @@
-using AdhdTimeOrganizer.application.dto.request.todoList;
-using AdhdTimeOrganizer.application.dto.response.todoList;
-using AdhdTimeOrganizer.application.endpoint.@base.command;
+﻿using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Humanizer;
+using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.command;
 
 public class ChangePriorityTodoListItemEndpoint(AppDbContext dbContext)
-    : BasePatchEndpoint<TodoListItem, ChangePriorityTodoListItemRequest, TodoListItemResponse>(dbContext)
+    : BasePatchEndpoint<TodoListItem, ChangePriorityTodoListItemRequest>(dbContext)
 {
     public override void Configure()
     {
         const string entityName = nameof(TodoListItem);
         Patch($"/{entityName.Kebaberize()}/{{id:long:required}}/priority");
         Validator<ChangePriorityTodoListItemValidator>();
-        
+
         Summary(s =>
         {
             s.Summary = $"Change priority of {entityName}";

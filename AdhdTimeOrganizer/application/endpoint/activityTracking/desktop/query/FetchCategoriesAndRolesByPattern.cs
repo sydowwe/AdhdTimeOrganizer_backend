@@ -1,14 +1,15 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
-using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
-using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.application.endpointGroups;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.request.@base.table;
+using Sydowwe.Framework.application.dto.response.generic;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query;
 
@@ -19,7 +20,7 @@ public class FetchCategoriesAndRolesByPattern(AppDbContext dbContext)
     {
         const string entityName = "Distinct desktop entries";
         Post("/fetch-categories-and-roles-by-pattern");
-        
+
         Summary(s =>
         {
             s.Summary = $"Get filtered and paginated {entityName} list";
@@ -39,9 +40,7 @@ public class FetchCategoriesAndRolesByPattern(AppDbContext dbContext)
             query = query.FilteredByUser(User.GetId());
 
             if (req is { UseFilter: true, Filter: not null })
-            {
                 query = ApplyCustomFiltering(query, req.Filter);
-            }
 
             var rows = await query
                 .Select(e => new

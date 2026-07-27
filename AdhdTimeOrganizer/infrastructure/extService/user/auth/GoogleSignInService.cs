@@ -1,10 +1,10 @@
-﻿using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
-using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.result;
+﻿using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using Google.Apis.Auth;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.domain.result;
 
 namespace AdhdTimeOrganizer.infrastructure.extService.user.auth;
 
@@ -18,16 +18,16 @@ public class GoogleSignInService : IGoogleSignInService, IScopedService
             {
                 ClientSecrets = new ClientSecrets
                 {
-                    ClientId =  Helper.GetEnvVar("OAUTH2_GOOGLE_CLIENT_ID"),
+                    ClientId = Helper.GetEnvVar("OAUTH2_GOOGLE_CLIENT_ID"),
                     ClientSecret = Helper.GetEnvVar("OAUTH2_GOOGLE_CLIENT_SECRET")
                 },
                 Scopes = ["openid", "email"]
             });
             var tokenResponse = await flow.ExchangeCodeForTokenAsync(
-                userId: "user",
-                code: code,
-                redirectUri: "postmessage",
-                taskCancellationToken: CancellationToken.None
+                "user",
+                code,
+                "postmessage",
+                CancellationToken.None
             );
 
             if (string.IsNullOrEmpty(tokenResponse.IdToken))

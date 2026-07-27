@@ -1,10 +1,10 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query.dashboard;
 

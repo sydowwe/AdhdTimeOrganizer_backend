@@ -1,6 +1,6 @@
 namespace AdhdTimeOrganizer.application.dto.response.activityTracking.android;
 
-public class AndroidSyncResponse
+public record AndroidSyncResponse
 {
     public int Accepted { get; set; }
     public int DuplicatesSkipped { get; set; }

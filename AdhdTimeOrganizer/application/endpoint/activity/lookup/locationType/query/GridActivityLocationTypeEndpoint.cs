@@ -1,15 +1,15 @@
-using AdhdTimeOrganizer.application.dto.filter;
-using AdhdTimeOrganizer.application.dto.response.generic;
-using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using Sydowwe.Framework.application.dto.request.filter;
+using Sydowwe.Framework.application.dto.response.generic;
+using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.lookup.locationType.query;
 
 public class GridActivityLocationTypeEndpoint(AppDbContext dbContext)
-    : BaseGridEndpoint<ActivityLocationType, LookupResponse<ActivityLocationType>, LookupFilterRequest>(dbContext)
+    : BaseGridEndpoint<ActivityLocationType, LookupResponse<ActivityLocationType>, LookupFilter>(dbContext)
 {
-    protected override IQueryable<ActivityLocationType> ApplyCustomFiltering(IQueryable<ActivityLocationType> query, LookupFilterRequest filter)
+    protected override IQueryable<ActivityLocationType> ApplyCustomFiltering(IQueryable<ActivityLocationType> query, LookupFilter filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Text))
             query = query.Where(x => x.Text.Contains(filter.Text));

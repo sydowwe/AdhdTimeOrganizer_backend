@@ -1,9 +1,9 @@
 ﻿using AdhdTimeOrganizer.application.dto.filter;
-using AdhdTimeOrganizer.application.dto.request.generic;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
-using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using Sydowwe.Framework.application.dto.request.generic;
+using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 

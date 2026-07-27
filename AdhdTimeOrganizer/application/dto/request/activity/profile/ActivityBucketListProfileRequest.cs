@@ -1,17 +1,16 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.activity.profile;
 
 public record ActivityBucketListProfileRequest : IMyRequest<ActivityBucketListProfile>
 {
-    [Required] public long ActivityId { get; init; }
-    [Required] public long ExperienceTypeId { get; init; }
-    [Required] public int ComfortZoneStep { get; init; }
-    [Required] public bool RequiresTravel { get; init; }
+    public long ActivityId { get; init; }
+    public long ExperienceTypeId { get; init; }
+    public int ComfortZoneStep { get; init; }
+    public bool RequiresTravel { get; init; }
     public decimal? FinancialGoal { get; init; }
-    [Required] public string InspirationSource { get; init; } = null!;
+    public string InspirationSource { get; init; } = null!;
 
     public ActivityBucketListProfile ToEntity => new()
     {
@@ -20,7 +19,7 @@ public record ActivityBucketListProfileRequest : IMyRequest<ActivityBucketListPr
         ComfortZoneStep = ComfortZoneStep,
         RequiresTravel = RequiresTravel,
         FinancialGoal = FinancialGoal,
-        InspirationSource = InspirationSource,
+        InspirationSource = InspirationSource
     };
 
     public void UpdateEntity(ActivityBucketListProfile e)

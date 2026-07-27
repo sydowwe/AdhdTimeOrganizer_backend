@@ -1,10 +1,10 @@
 ﻿using AdhdTimeOrganizer.application.dto.response.activity;
-using AdhdTimeOrganizer.application.dto.response.generic;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.response.generic;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.@base.read;
 
@@ -14,13 +14,12 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(AppDbContex
     protected readonly AppDbContext AppDbContext = appDbContext;
 
     public abstract string EntityRoute { get; }
-    
 
 
     public override void Configure()
     {
         Get($"/{EntityRoute}/form-select-options");
-        
+
         Summary(s =>
         {
             s.Summary = $"Get {EntityRoute} form select options";
@@ -33,7 +32,7 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(AppDbContex
     {
         var userId = User.GetId();
         var query = GetBaseQuery(userId);
-        
+
         var activities = await query
             .Include(a => a.Category)
             .Include(a => a.Role)
@@ -55,7 +54,7 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(AppDbContex
                 Id = a.ActivityId,
                 Text = a.ActivityName,
                 RoleOption = new SelectOptionResponse(a.RoleId, a.RoleName),
-                CategoryOption = a.CategoryId.HasValue && a.CategoryName != null 
+                CategoryOption = a.CategoryId.HasValue && a.CategoryName != null
                     ? new SelectOptionResponse(a.CategoryId.Value, a.CategoryName)
                     : null,
                 TaskPriorityOption = null,

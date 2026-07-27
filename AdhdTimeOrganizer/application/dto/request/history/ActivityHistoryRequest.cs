@@ -1,17 +1,15 @@
-using System.ComponentModel.DataAnnotations;
 using AdhdTimeOrganizer.application.dto.request.activity;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.history;
 
 public record ActivityHistoryRequest : ActivityIdRequest, IMyRequest<ActivityHistory>
 {
-    [Required]
     public required DateTime StartTimestamp { get; init; }
 
-    [Required]
+
     public required IntTime Length { get; init; }
 
     public ActivityHistory ToEntity => new()
@@ -20,7 +18,7 @@ public record ActivityHistoryRequest : ActivityIdRequest, IMyRequest<ActivityHis
         ActivityId = ActivityId,
         StartTimestamp = StartTimestamp,
         Length = Length,
-        EndTimestamp = StartTimestamp.AddSeconds(Length.TotalSeconds),
+        EndTimestamp = StartTimestamp.AddSeconds(Length.TotalSeconds)
     };
 
     public void UpdateEntity(ActivityHistory e)

@@ -51,7 +51,8 @@ public class UpdateRoutineTodoListValidator : Validator<UpdateRoutineTodoListReq
                 .Select(p => (int?)p.LengthInDays)
                 .FirstOrDefaultAsync(ct);
 
-            if (lengthInDays is null) return;
+            if (lengthInDays is null)
+                return;
 
             if (lengthInDays <= 1)
             {

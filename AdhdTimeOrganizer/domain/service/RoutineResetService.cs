@@ -6,8 +6,7 @@ public static class RoutineResetService
 {
     // Weekly-aligned: period is <= 7 days OR a multiple of 7 → anchor = day of week (1=Mon…7=Sun)
     // Everything else (10d, 20d, 45d…)                       → anchor = day of month (1–30)
-    private static bool IsWeeklyAligned(RoutineTimePeriod period) =>
-        period.LengthInDays <= 7 || period.LengthInDays % 7 == 0;
+    private static bool IsWeeklyAligned(RoutineTimePeriod period) => period.LengthInDays <= 7 || period.LengthInDays % 7 == 0;
 
     public static DateTime ComputeNextReset(RoutineTimePeriod period)
     {
@@ -36,7 +35,11 @@ public static class RoutineResetService
                 // Calendar-month aligned: next reset is targetDay of the next calendar month
                 month = lastReset.Month + 1;
                 year = lastReset.Year;
-                if (month > 12) { month = 1; year++; }
+                if (month > 12)
+                {
+                    month = 1;
+                    year++;
+                }
             }
             else if (period.LengthInDays == 365)
             {
@@ -53,7 +56,11 @@ public static class RoutineResetService
                 if (earliest.Day > targetDay)
                 {
                     month++;
-                    if (month > 12) { month = 1; year++; }
+                    if (month > 12)
+                    {
+                        month = 1;
+                        year++;
+                    }
                 }
             }
 

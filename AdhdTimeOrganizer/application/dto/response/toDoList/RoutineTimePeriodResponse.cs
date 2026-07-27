@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using Sydowwe.Framework.application.dto.response;
 
 namespace AdhdTimeOrganizer.application.dto.response.todoList;
 
@@ -17,22 +18,22 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
     public DateTime NextResetAt { get; init; }
     public List<PeriodCompletionRecord> CompletionHistory { get; init; } = [];
 
-    public static IQueryable<RoutineTimePeriodResponse> Projection(IQueryable<RoutineTimePeriod> query) =>
-        query.Select(e => FromEntity(e));
-
-    public static RoutineTimePeriodResponse FromEntity(RoutineTimePeriod entity) => new()
+    public static IQueryable<RoutineTimePeriodResponse> Projection(IQueryable<RoutineTimePeriod> query)
     {
-        Id = entity.Id,
-        Text = entity.Text,
-        Color = entity.Color,
-        LengthInDays = entity.LengthInDays,
-        IsHidden = entity.IsHidden,
-        ResetAnchorDay = entity.ResetAnchorDay,
-        StreakThreshold = entity.StreakThreshold,
-        StreakGraceDays = entity.StreakGraceDays,
-        Streak = entity.Streak,
-        BestStreak = entity.BestStreak,
-        LastResetAt = entity.LastResetAt,
-        HistoryDepth = entity.HistoryDepth,
-    };
+        return query.Select(entity => new RoutineTimePeriodResponse
+        {
+            Id = entity.Id,
+            Text = entity.Text,
+            Color = entity.Color,
+            LengthInDays = entity.LengthInDays,
+            IsHidden = entity.IsHidden,
+            ResetAnchorDay = entity.ResetAnchorDay,
+            StreakThreshold = entity.StreakThreshold,
+            StreakGraceDays = entity.StreakGraceDays,
+            Streak = entity.Streak,
+            BestStreak = entity.BestStreak,
+            LastResetAt = entity.LastResetAt,
+            HistoryDepth = entity.HistoryDepth
+        });
+    }
 }

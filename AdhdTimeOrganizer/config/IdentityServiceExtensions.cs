@@ -1,13 +1,16 @@
-using System.Security.Claims;
-using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
-using AdhdTimeOrganizer.domain.helper;
+﻿using System.Security.Claims;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.infrastructure.extService.user.auth;
 using AdhdTimeOrganizer.infrastructure.security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
+using Sydowwe.Framework.domain.entity.user;
+using Sydowwe.Framework.domain.extServiceContract.user.auth;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.infrastructure.security;
 
 namespace AdhdTimeOrganizer.config;
 
@@ -32,7 +35,7 @@ public static class IdentityServiceExtensions
                     ValidAudience = Helper.GetEnvVar("JWT_AUDIENCE"),
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = keyProvider.GetSigningKey(),
-                    ValidAlgorithms = [keyProvider.SecurityAlgorithm],
+                    ValidAlgorithms = [keyProvider.SecurityAlgorithm]
                 };
                 options.Events = new JwtBearerEvents
                 {
@@ -48,9 +51,7 @@ public static class IdentityServiceExtensions
 
                         // Priority 2: Cookie (for web)
                         if (context.Request.Cookies.ContainsKey("auth-token"))
-                        {
                             context.Token = context.Request.Cookies["auth-token"];
-                        }
 
                         return Task.CompletedTask;
                     },
@@ -58,9 +59,7 @@ public static class IdentityServiceExtensions
                     {
                         // Set custom header for expired tokens
                         if (context.Exception is SecurityTokenExpiredException)
-                        {
                             context.Response.Headers.Append("X-Token-Expired", "true");
-                        }
                         return Task.CompletedTask;
                     }
                 };
@@ -71,32 +70,39 @@ public static class IdentityServiceExtensions
 
         services.AddAuthorization(options =>
         {
+            // Attached by the endpoint configurator in Program.cs to every endpoint WITHOUT
+            // [AllowExtensionClients], which is what actually makes extension access deny-by-default.
+            // No RequireAuthenticatedUser: it lands on anonymous endpoints too, and an anonymous
+            // caller carries no client_type claim, so the handler lets them through.
+            options.AddPolicy(ExtensionClientPolicies.DenyExtensionClients, policy =>
+                policy.AddRequirements(new ExtensionClientRequirement(false)));
+
             // Default policy: deny extension clients (for web-only endpoints)
-            options.AddPolicy("WebOnly", policy =>
+            options.AddPolicy(ExtensionClientPolicies.WebOnly, policy =>
             {
                 policy.RequireAuthenticatedUser();
-                policy.AddRequirements(new ExtensionClientRequirement(allowExtensionClients: false));
+                policy.AddRequirements(new ExtensionClientRequirement(false));
             });
 
             // Policy for extension clients only
-            options.AddPolicy("ExtensionOnly", policy =>
+            options.AddPolicy(ExtensionClientPolicies.ExtensionOnly, policy =>
             {
                 policy.RequireAuthenticatedUser();
-                policy.RequireClaim("client_type", "Extension");
+                policy.RequireClaim(AuthClaims.ClientType, AuthClaims.ExtensionClientType);
             });
 
             // Policy for activity tracking endpoints (allows extension clients)
-            options.AddPolicy("ActivityTracking", policy =>
+            options.AddPolicy(PortalAuthorizationPolicies.ActivityTracking, policy =>
             {
                 policy.RequireAuthenticatedUser();
-                policy.RequireRole("ActivityTracking");
-                policy.AddRequirements(new ExtensionClientRequirement(allowExtensionClients: true));
+                policy.RequireRole(ExtensionRoleClaimsProvider.ExtensionRole);
+                policy.AddRequirements(new ExtensionClientRequirement(true));
             });
 
             // Set fallback policy: all authenticated endpoints deny extension clients by default
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .AddRequirements(new ExtensionClientRequirement(allowExtensionClients: false))
+                .AddRequirements(new ExtensionClientRequirement(false))
                 .Build();
         });
 
@@ -122,10 +128,7 @@ public static class IdentityServiceExtensions
             .AddRoleManager<RoleManager<UserRole>>()
             .AddUserManager<UserManager<User>>();
 
-        services.Configure<IdentityOptions>(options =>
-        {
-            options.Tokens.AuthenticatorTokenProvider = TokenOptions.DefaultAuthenticatorProvider;
-        });
+        services.Configure<IdentityOptions>(options => { options.Tokens.AuthenticatorTokenProvider = TokenOptions.DefaultAuthenticatorProvider; });
         return services;
     }
 }

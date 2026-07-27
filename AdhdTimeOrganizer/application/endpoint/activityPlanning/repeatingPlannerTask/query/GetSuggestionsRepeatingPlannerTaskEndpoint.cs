@@ -2,7 +2,6 @@ using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.suggestion;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
@@ -11,6 +10,7 @@ using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.repeatingPlannerTask.query;
 
@@ -23,8 +23,8 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext)
     public override void Configure()
     {
         Get("/repeating-planner-task/suggestions/{calendarId:long:required}");
-        
-        
+
+
         Summary(s =>
         {
             s.Summary = "Get task suggestions for a date";
@@ -45,6 +45,7 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext)
             await Send.ErrorsAsync(404, ct);
             return;
         }
+
         var date = calendar.Date;
         var userId = User.GetId();
         var isoDayOfWeek = date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
@@ -74,9 +75,10 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext)
                                           && task.ScheduledForDayTypes.Contains(calendar.DayType.ToString()),
                 _ => false
             };
-            if (!matches) continue;
+            if (!matches)
+                continue;
 
-            var r = RepeatingPlannerTaskResponse.FromEntity(task);
+            var r = RepeatingPlannerTaskResponse.Projection(new[] { task }.AsQueryable()).Single();
             result.Add(new SuggestionResponse
             {
                 RepeatingPlannerTaskId = task.Id,
@@ -113,7 +115,8 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext)
         var plannerCoveredKeys = new HashSet<(long, int, int)>();
         foreach (var p in plannerPatterns)
         {
-            if (coveredActivityIds.Contains(p.ActivityId)) continue;
+            if (coveredActivityIds.Contains(p.ActivityId))
+                continue;
 
             result.Add(MapPatternToSuggestion(p, SuggestionSourceType.PlannedPattern));
             plannerCoveredKeys.Add((p.ActivityId, p.PatternType, p.PatternValue));
@@ -130,8 +133,10 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(AppDbContext dbContext)
 
         foreach (var p in historyPatterns)
         {
-            if (coveredActivityIds.Contains(p.ActivityId)) continue;
-            if (plannerCoveredKeys.Contains((p.ActivityId, p.PatternType, p.PatternValue))) continue;
+            if (coveredActivityIds.Contains(p.ActivityId))
+                continue;
+            if (plannerCoveredKeys.Contains((p.ActivityId, p.PatternType, p.PatternValue)))
+                continue;
 
             result.Add(MapHistoryPatternToSuggestion(p));
         }

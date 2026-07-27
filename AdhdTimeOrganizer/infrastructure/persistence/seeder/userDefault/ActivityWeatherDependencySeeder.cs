@@ -1,23 +1,23 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class ActivityWeatherDependencySeeder(
     AppDbContext dbContext,
-    ILogger<ActivityWeatherDependencySeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<ActivityWeatherDependencySeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "ActivityWeatherDependency";
     public int Order => 6;
 
     private static List<ActivityWeatherDependency> Defaults(long userId) =>
     [
-        new() { UserId = userId, Text = "None",  SortOrder = 1 },
+        new() { UserId = userId, Text = "None", SortOrder = 1 },
         new() { UserId = userId, Text = "Sunny", SortOrder = 2 },
-        new() { UserId = userId, Text = "Dry",   SortOrder = 3 },
-        new() { UserId = userId, Text = "Snow",  SortOrder = 4 }
+        new() { UserId = userId, Text = "Dry", SortOrder = 3 },
+        new() { UserId = userId, Text = "Snow", SortOrder = 4 }
     ];
 
     public async Task SetupDefaults(long userId, CancellationToken ct = default)

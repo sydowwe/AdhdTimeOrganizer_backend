@@ -1,12 +1,10 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
 public record CreateRoutineTodoListRequest : BaseCreateTodoListRequest, ICreateRequest<RoutineTodoList>
 {
-    [Required]
     public long TimePeriodId { get; init; }
     public List<DayOfWeek> SuggestedDays { get; init; } = [];
     public int? SuggestedDayOfMonth { get; init; }
@@ -20,6 +18,6 @@ public record CreateRoutineTodoListRequest : BaseCreateTodoListRequest, ICreateR
         SuggestedTime = SuggestedTime,
         TimePeriodId = TimePeriodId,
         SuggestedDays = SuggestedDays,
-        SuggestedDayOfMonth = SuggestedDayOfMonth,
+        SuggestedDayOfMonth = SuggestedDayOfMonth
     };
 }

@@ -1,15 +1,16 @@
-﻿using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.domain.serviceContract;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.user;
+using Sydowwe.Framework.domain.serviceContract;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.@default;
 
-public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbContext, IUserDefaultsService userDefaultsService, ILogger<DefaultUsersSeeder> logger) : IScopedService, IDefaultDatabaseSeeder
+public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbContext, IUserDefaultsService userDefaultsService, ILogger<DefaultUsersSeeder> logger)
+    : IScopedService, IAppWideDefaultSeeder
 {
     public string SeederName => "User";
     public int Order => 5;
@@ -21,7 +22,7 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbCo
             Email = Helper.GetEnvVar("ROOT_ADMIN_EMAIL"),
 
             EmailConfirmed = true,
-            CurrentLocale = AvailableLocales.Sk,
+            Locale = AvailableLocales.Sk,
             Timezone = TimeZoneInfo.Local,
             HasExtensionAccess = true
         };
@@ -33,7 +34,7 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbCo
             if (overrideData)
             {
                 existingAdmin.Email = adminUser.Email;
-                existingAdmin.CurrentLocale = adminUser.CurrentLocale;
+                existingAdmin.Locale = adminUser.Locale;
                 existingAdmin.Timezone = adminUser.Timezone;
                 existingAdmin.EmailConfirmed = true;
 
@@ -53,22 +54,16 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbCo
         {
             var result = await userManager.CreateAsync(adminUser, Helper.GetEnvVar("ROOT_ADMIN_PASSWORD"));
             if (!result.Succeeded)
-            {
                 logger.LogError(result.ToString());
-            }
 
             result = await userManager.AddToRoleAsync(adminUser, "Root");
             if (!result.Succeeded)
-            {
                 logger.LogError(result.ToString());
-            }
 
             // Use the handler directly instead of FastEndpoints command execution
             var defaultsRes = await userDefaultsService.CreateDefaultsAsync(adminUser.Id);
             if (defaultsRes.Failed)
-            {
                 logger.LogError(defaultsRes.ErrorMessage);
-            }
         }
         catch (Exception e)
         {

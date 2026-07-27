@@ -1,7 +1,7 @@
-using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
-
+using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.response;
+using Sydowwe.Framework.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.application.dto.response.activity.profile;
 
@@ -18,8 +18,9 @@ public record ActivityBacklogProfileResponse : IdResponse, IProjectionResponse<A
     public required int DurationMinutes { get; init; }
     public required bool IsRepeatable { get; init; }
 
-    public static IQueryable<ActivityBacklogProfileResponse> Projection(IQueryable<ActivityBacklogProfile> query) =>
-        query.Select(e => new ActivityBacklogProfileResponse
+    public static IQueryable<ActivityBacklogProfileResponse> Projection(IQueryable<ActivityBacklogProfile> query)
+    {
+        return query.Select(e => new ActivityBacklogProfileResponse
         {
             Id = e.Id,
             ActivityId = e.ActivityId,
@@ -31,22 +32,7 @@ public record ActivityBacklogProfileResponse : IdResponse, IProjectionResponse<A
             MaxParticipants = e.MaxParticipants,
             ExpectedCostTierId = e.ExpectedCostTierId,
             DurationMinutes = e.DurationMinutes,
-            IsRepeatable = e.IsRepeatable,
+            IsRepeatable = e.IsRepeatable
         });
-
-    public static ActivityBacklogProfileResponse FromEntity(ActivityBacklogProfile e) =>
-        new()
-        {
-            Id = e.Id,
-            ActivityId = e.ActivityId,
-            LocationTypeId = e.LocationTypeId,
-            WeatherDependencyId = e.WeatherDependencyId,
-            EnergyLevel = e.EnergyLevel,
-            EffortType = e.EffortType,
-            MinParticipants = e.MinParticipants,
-            MaxParticipants = e.MaxParticipants,
-            ExpectedCostTierId = e.ExpectedCostTierId,
-            DurationMinutes = e.DurationMinutes,
-            IsRepeatable = e.IsRepeatable,
-        };
+    }
 }

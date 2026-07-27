@@ -1,12 +1,14 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
+using Sydowwe.Framework.Testing;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-public class TimerPresetValidationTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
+[Collection("Postgres")]
+public class TimerPresetValidationTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
 {
     [Theory]
     [InlineData(0)]
@@ -14,7 +16,7 @@ public class TimerPresetValidationTests(TestWebApplicationFactory factory) : Int
     public async Task CreateTimerPreset_InvalidDuration_Returns400(int duration)
     {
         var request = new { Duration = duration };
-        var response = await client.PostAsJsonAsync("timer-preset", request);
+        var response = await CreateClient().PostAsJsonAsync("api/timer-preset", request);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -32,10 +34,10 @@ public class TimerPresetValidationTests(TestWebApplicationFactory factory) : Int
             FocusPeriodInCycleCount = 4,
             NumberOfCycles = 1
         };
-        var response = await client.PostAsJsonAsync("pomodoro-timer-preset", request);
+        var response = await CreateClient().PostAsJsonAsync("api/pomodoro-timer-preset", request);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
-    
+
     [Fact]
     public async Task CreatePomodoroTimerPreset_EmptyName_Returns400()
     {
@@ -48,7 +50,7 @@ public class TimerPresetValidationTests(TestWebApplicationFactory factory) : Int
             FocusPeriodInCycleCount = 4,
             NumberOfCycles = 1
         };
-        var response = await client.PostAsJsonAsync("pomodoro-timer-preset", request);
+        var response = await CreateClient().PostAsJsonAsync("api/pomodoro-timer-preset", request);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }

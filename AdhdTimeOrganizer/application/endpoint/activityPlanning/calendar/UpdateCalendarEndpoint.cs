@@ -1,9 +1,9 @@
-using AdhdTimeOrganizer.application.dto.request.taskPlanner;
-using AdhdTimeOrganizer.application.endpoint.@base.command;
+﻿using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar;
 
@@ -18,8 +18,10 @@ public class UpdateCalendarEndpoint(AppDbContext dbContext)
 
     protected override Task<bool> AfterMapping(Calendar entity, CalendarRequest req, CancellationToken ct = default)
     {
+        // ValidateDayType throws (ThrowError) on invalid input, so reaching here means the update is
+        // valid and must be saved — returning false would silently discard it and send no response.
         ValidateDayType(entity);
-        return Task.FromResult(false);
+        return Task.FromResult(true);
     }
 
     private void ValidateDayType(Calendar entity)

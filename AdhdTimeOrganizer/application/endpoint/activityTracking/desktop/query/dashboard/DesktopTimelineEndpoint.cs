@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query.dashboard;
 
@@ -96,7 +96,8 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
             for (var offset = -ContextWindowRadius; offset <= ContextWindowRadius; offset++)
             {
                 var idx = i + offset;
-                if (idx < 0 || idx >= sortedMinutes.Count) continue;
+                if (idx < 0 || idx >= sortedMinutes.Count)
+                    continue;
 
                 var neighborMinute = sortedMinutes[idx];
 
@@ -120,10 +121,8 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
                 currentMinute, primary.ProcessName, primary.ProductName, secondsSelector(primary)));
 
             foreach (var other in ordered.Skip(1))
-            {
                 secondaryMinutes.Add(new MinuteEntry(
                     other.WindowStart, other.ProcessName, other.ProductName, secondsSelector(other)));
-            }
         }
 
         var primarySessions = BuildSessionsFromMinutes(primaryMinutes);
@@ -166,7 +165,7 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
                     StartedAt = min.WindowStart,
                     EndedAt = windowEnd,
                     DurationSeconds = 60,
-                    TotalSeconds = min.Seconds,
+                    TotalSeconds = min.Seconds
                 };
             }
         }
@@ -190,13 +189,15 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
             {
                 for (var j = i + 1; j < Math.Min(i + 4, sessions.Count); j++)
                 {
-                    if (sessions[j].ProcessName != sessions[i].ProcessName) continue;
+                    if (sessions[j].ProcessName != sessions[i].ProcessName)
+                        continue;
 
                     var gapDuration = 0;
                     for (var k = i + 1; k < j; k++)
                         gapDuration += sessions[k].DurationSeconds;
 
-                    if (gapDuration > thresholdMinutes * 60) continue;
+                    if (gapDuration > thresholdMinutes * 60)
+                        continue;
 
                     for (var k = i + 1; k < j; k++)
                         absorbed.Add(sessions[k]);
@@ -205,7 +206,7 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
                     {
                         EndedAt = sessions[j].EndedAt,
                         DurationSeconds = (int)(sessions[j].EndedAt - sessions[i].StartedAt).TotalSeconds,
-                        TotalSeconds = sessions[i].TotalSeconds + sessions[j].TotalSeconds,
+                        TotalSeconds = sessions[i].TotalSeconds + sessions[j].TotalSeconds
                     };
 
                     sessions.RemoveRange(i + 1, j - i);
@@ -213,7 +214,8 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
                     break;
                 }
 
-                if (merged) break;
+                if (merged)
+                    break;
             }
         } while (merged);
 
@@ -222,7 +224,8 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
 
     private static List<DesktopTimelineSession> MergeAdjacentSessions(List<DesktopTimelineSession> sessions)
     {
-        if (sessions.Count == 0) return sessions;
+        if (sessions.Count == 0)
+            return sessions;
 
         sessions = sessions.OrderBy(s => s.StartedAt).ThenBy(s => s.ProcessName).ToList();
         var result = new List<DesktopTimelineSession> { sessions[0] };
@@ -239,7 +242,7 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
                 {
                     EndedAt = newEnd,
                     DurationSeconds = (int)(newEnd - last.StartedAt).TotalSeconds,
-                    TotalSeconds = last.TotalSeconds + current.TotalSeconds,
+                    TotalSeconds = last.TotalSeconds + current.TotalSeconds
                 };
             }
             else
@@ -292,7 +295,7 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
                         StartedAt = record.WindowStart,
                         EndedAt = windowEnd,
                         DurationSeconds = 60,
-                        TotalSeconds = record.BackgroundSeconds,
+                        TotalSeconds = record.BackgroundSeconds
                     };
                 }
             }
@@ -312,7 +315,8 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
 
     private static List<DesktopTimelineSession> BridgeGaps(List<DesktopTimelineSession> sessions)
     {
-        if (sessions.Count <= 1) return sessions;
+        if (sessions.Count <= 1)
+            return sessions;
 
         var result = new List<DesktopTimelineSession> { sessions[0] };
 
@@ -323,18 +327,14 @@ public class DesktopTimelineEndpoint(AppDbContext dbContext)
             var gapMinutes = (current.StartedAt - last.EndedAt).TotalMinutes;
 
             if (gapMinutes <= ContextSwitchThresholdMinutes)
-            {
                 result[^1] = last with
                 {
                     EndedAt = current.EndedAt,
                     DurationSeconds = (int)(current.EndedAt - last.StartedAt).TotalSeconds,
-                    TotalSeconds = last.TotalSeconds + current.TotalSeconds,
+                    TotalSeconds = last.TotalSeconds + current.TotalSeconds
                 };
-            }
             else
-            {
                 result.Add(current);
-            }
         }
 
         return result;

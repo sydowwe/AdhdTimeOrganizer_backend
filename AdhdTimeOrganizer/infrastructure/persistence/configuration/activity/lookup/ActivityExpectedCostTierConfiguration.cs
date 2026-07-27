@@ -1,5 +1,7 @@
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+using AdhdTimeOrganizer.domain.model.entity.user;
+using Sydowwe.Framework.infrastructure.persistence.configuration;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activity.lookup;
 
-public class ActivityExpectedCostTierConfiguration : BaseLookupConfiguration<ActivityExpectedCostTier>;
+public class ActivityExpectedCostTierConfiguration : BaseLookupWithUserConfiguration<User, ActivityExpectedCostTier>;

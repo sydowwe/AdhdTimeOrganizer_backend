@@ -2,12 +2,12 @@ using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.summaryCards;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query.dashboard;
 
@@ -105,7 +105,8 @@ public class DesktopSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCard
             days = (int)(maxDate - minDate).TotalDays + 1;
         }
 
-        if (days <= 0) days = 1;
+        if (days <= 0)
+            days = 1;
 
         return data
             .GroupBy(x => x.ProcessName)
@@ -133,30 +134,35 @@ public class DesktopSummaryCardsEndpoint(AppDbContext db) : Endpoint<SummaryCard
             ProductName = currentData.ProductName,
             IsNew = isNew,
 
-            Active = currentData.ActiveSeconds > 0 ? new ActivityStatDto
-            {
-                Seconds = currentData.ActiveSeconds,
-                AverageSeconds = isNew ? null : baseline!.AverageActiveSeconds,
-                PercentChange = isNew || baseline!.AverageActiveSeconds == 0
-                    ? null
-                    : CalculatePercentChange(currentData.ActiveSeconds, baseline.AverageActiveSeconds)
-            } : null,
+            Active = currentData.ActiveSeconds > 0
+                ? new ActivityStatDto
+                {
+                    Seconds = currentData.ActiveSeconds,
+                    AverageSeconds = isNew ? null : baseline!.AverageActiveSeconds,
+                    PercentChange = isNew || baseline!.AverageActiveSeconds == 0
+                        ? null
+                        : CalculatePercentChange(currentData.ActiveSeconds, baseline.AverageActiveSeconds)
+                }
+                : null,
 
-            Background = currentData.BackgroundSeconds > 0 ? new ActivityStatDto
-            {
-                Seconds = currentData.BackgroundSeconds,
-                AverageSeconds = isNew ? null : baseline!.AverageBackgroundSeconds,
-                PercentChange = isNew || baseline!.AverageBackgroundSeconds == 0
-                    ? null
-                    : CalculatePercentChange(currentData.BackgroundSeconds, baseline.AverageBackgroundSeconds)
-            } : null
+            Background = currentData.BackgroundSeconds > 0
+                ? new ActivityStatDto
+                {
+                    Seconds = currentData.BackgroundSeconds,
+                    AverageSeconds = isNew ? null : baseline!.AverageBackgroundSeconds,
+                    PercentChange = isNew || baseline!.AverageBackgroundSeconds == 0
+                        ? null
+                        : CalculatePercentChange(currentData.BackgroundSeconds, baseline.AverageBackgroundSeconds)
+                }
+                : null
         };
     }
 
     private static double CalculatePercentChange(int current, int average)
     {
-        if (average == 0) return current > 0 ? 100.0 : 0.0;
-        return Math.Round(((double)(current - average) / average) * 100, 1);
+        if (average == 0)
+            return current > 0 ? 100.0 : 0.0;
+        return Math.Round((double)(current - average) / average * 100, 1);
     }
 }
 

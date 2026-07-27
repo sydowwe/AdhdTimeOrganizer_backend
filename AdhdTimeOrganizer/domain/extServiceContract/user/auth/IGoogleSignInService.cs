@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.extService.user.auth;
+using Sydowwe.Framework.domain.result;
 
 namespace AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 

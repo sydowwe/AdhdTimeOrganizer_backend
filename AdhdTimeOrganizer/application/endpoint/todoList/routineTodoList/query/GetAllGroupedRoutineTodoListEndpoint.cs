@@ -1,10 +1,10 @@
 using AdhdTimeOrganizer.application.dto.response.todoList;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.service;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.query;
 
@@ -31,13 +31,13 @@ public class GetAllGroupedRoutineTodoListEndpoint(
         var periods = await dbContext.Set<RoutineTimePeriod>()
             .Where(x => x.UserId == loggedUserId)
             .Include(tp => tp.RoutineTodoListColl)
-                .ThenInclude(rtl => rtl.Activity)
-                .ThenInclude(a => a.Role)
+            .ThenInclude(rtl => rtl.Activity)
+            .ThenInclude(a => a.Role)
             .Include(tp => tp.RoutineTodoListColl)
-                .ThenInclude(rtl => rtl.Activity)
-                .ThenInclude(a => a.Category)
+            .ThenInclude(rtl => rtl.Activity)
+            .ThenInclude(a => a.Category)
             .Include(tp => tp.RoutineTodoListColl)
-                .ThenInclude(rtl => rtl.Steps)
+            .ThenInclude(rtl => rtl.Steps)
             .ToListAsync(ct);
 
         var changed = false;
@@ -84,14 +84,14 @@ public class GetAllGroupedRoutineTodoListEndpoint(
         var data = periods
             .Select(tp => new RoutineTodoListGroupedResponse
             {
-                RoutineTimePeriod = RoutineTimePeriodResponse.FromEntity(tp) with
+                RoutineTimePeriod = RoutineTimePeriodResponse.Projection(new[] { tp }.AsQueryable()).Single() with
                 {
                     NextResetAt = RoutineResetService.ComputeNextReset(tp),
                     CompletionHistory = completionsByPeriod.GetValueOrDefault(tp.Id, [])
                 },
                 Items = tp.RoutineTodoListColl
                     .OrderBy(e => e.IsDone).ThenBy(e => e.DisplayOrder)
-                    .Select(RoutineTodoListResponse.FromEntity)
+                    .Select(e => RoutineTodoListResponse.Projection(new[] { e }.AsQueryable()).Single())
                     .ToList()
             })
             .ToList();

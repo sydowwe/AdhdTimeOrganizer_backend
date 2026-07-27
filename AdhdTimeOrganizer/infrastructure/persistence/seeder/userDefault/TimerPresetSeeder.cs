@@ -1,13 +1,13 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.timer;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.timer;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class TimerPresetSeeder(
     AppDbContext dbContext,
-    ILogger<TimerPresetSeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<TimerPresetSeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "TimerPreset";
     public int Order => 10;
@@ -55,9 +55,7 @@ public class TimerPresetSeeder(
             .ToListAsync(ct);
 
         if (defaults.Count != existing.Count)
-        {
             return false;
-        }
 
         for (var i = 0; i < defaults.Count; i++)
         {

@@ -1,13 +1,17 @@
 using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
 public record UpdateStepRequest
 {
-    [Required] public long ItemId { get; init; }
-    [Required] public Guid StepId { get; init; }
-    [Required][MaxLength(255)] public required string Name { get; init; }
+    public long ItemId { get; init; }
+    public Guid StepId { get; init; }
+
+    [MaxLength(255)]
+    public required string Name { get; init; }
+
     public int Order { get; init; }
-    [MaxLength(1000)] public string? Note { get; init; }
+
+    [MaxLength(1000)]
+    public string? Note { get; init; }
 }

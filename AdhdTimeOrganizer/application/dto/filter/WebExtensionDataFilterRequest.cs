@@ -1,8 +1,8 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class WebExtensionDataFilterRequest : IFilterRequest
+public record WebExtensionDataFilterRequest : IFilterRequest
 {
     public long? ActivityId { get; set; }
     public string? Domain { get; set; }

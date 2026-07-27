@@ -3,10 +3,11 @@ using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query;
 
-public class FormSelectOptionsActivityHistoryEndpoint(AppDbContext appDbContext) 
+public class FormSelectOptionsActivityHistoryEndpoint(AppDbContext appDbContext)
     : BaseActivityFormSelectOptionsEndpoint<ActivityHistory>(appDbContext)
 {
     public override string EntityRoute => "activity-history";

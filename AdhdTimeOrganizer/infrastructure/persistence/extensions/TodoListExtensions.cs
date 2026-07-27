@@ -7,14 +7,13 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.extensions;
 
 public static class TodoListExtensions
 {
-    public static async Task<long> GetNextDisplayOrder<TEntity>(this DbSet<TEntity> dbSet, TodoListSettings settings, long userId, Expression<Func<TEntity, bool>>? groupFilter = null, CancellationToken ct = default)
+    public static async Task<long> GetNextDisplayOrder<TEntity>(this DbSet<TEntity> dbSet, TodoListSettings settings, long userId, Expression<Func<TEntity, bool>>? groupFilter = null,
+        CancellationToken ct = default)
         where TEntity : BaseTodoListItem
     {
         var query = dbSet.Where(e => e.UserId == userId);
         if (groupFilter != null)
-        {
             query = query.Where(groupFilter);
-        }
 
         var lastOrder = await query.MinAsync(e => (int?)e.DisplayOrder, ct) ?? 0;
         return lastOrder != 0 ? lastOrder - settings.DisplayOrderGap : settings.DisplayOrderStart;
@@ -38,12 +37,12 @@ public static class TodoListExtensions
             .FirstOrDefaultAsync(ct);
     }
 
-    public static async Task<long?> GetGroupIdById<TEntity>(this DbSet<TEntity> dbSet, long id, Expression<Func<TEntity, long>> groupId, CancellationToken ct = default) where TEntity : BaseTodoListItem
+    public static async Task<long?> GetGroupIdById<TEntity>(this DbSet<TEntity> dbSet, long id, Expression<Func<TEntity, long>> groupId, CancellationToken ct = default)
+        where TEntity : BaseTodoListItem
     {
         return await dbSet
             .Where(e => e.Id == id)
             .Select(groupId)
             .FirstOrDefaultAsync(ct);
     }
-
 }

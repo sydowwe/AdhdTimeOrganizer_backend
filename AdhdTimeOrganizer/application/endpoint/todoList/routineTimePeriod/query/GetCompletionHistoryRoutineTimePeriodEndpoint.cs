@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.application.dto.response.todoList;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTimePeriod.query;
 
@@ -13,7 +13,7 @@ public class GetCompletionHistoryRoutineTimePeriodEndpoint(AppDbContext dbContex
     public override void Configure()
     {
         Get("/routine-time-period/{id:long:required}/completion-history");
-        
+
 
         Summary(s =>
         {

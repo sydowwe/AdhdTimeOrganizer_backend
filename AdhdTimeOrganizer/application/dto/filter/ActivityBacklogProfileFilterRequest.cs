@@ -1,9 +1,9 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class ActivityBacklogProfileFilterRequest : IFilterRequest
+public record ActivityBacklogProfileFilterRequest : IFilterRequest
 {
     public EnergyLevel? EnergyLevel { get; set; }
     public EffortType? EffortType { get; set; }

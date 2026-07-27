@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence.converter;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityHistory;
 
@@ -13,7 +14,7 @@ public class ActivityHistoryConfiguration : IEntityTypeConfiguration<ActivityHis
         builder.BaseEntityConfigure();
 
         builder.IsManyWithOneUser(u => u.ActivityHistoryList);
-        builder.IsManyWithOneActivity(a=>a.ActivityHistoryList);
+        builder.IsManyWithOneActivity(a => a.ActivityHistoryList);
 
         builder.Property(a => a.StartTimestamp).IsRequired();
         builder.Property(a => a.EndTimestamp).IsRequired();

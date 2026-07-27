@@ -1,20 +1,21 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityWeatherDependencyDevSeeder(
     AppDbContext dbContext,
-    ILogger<ActivityWeatherDependencyDevSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<ActivityWeatherDependencyDevSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "ActivityWeatherDependencyDev";
     public int Order => 5;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<ActivityWeatherDependency>();
+        await dbContext.TruncateTableCascadeAsync<ActivityWeatherDependency>();
     }
 
     public async Task SeedForUser(long userId)
@@ -22,7 +23,7 @@ public class ActivityWeatherDependencyDevSeeder(
         (string Text, int SortOrder)[] custom =
         [
             ("Rainy", 5),
-            ("Cold",  6)
+            ("Cold", 6)
         ];
 
         var existing = await dbContext.ActivityWeatherDependencies
@@ -35,7 +36,8 @@ public class ActivityWeatherDependencyDevSeeder(
             .Select(c => new ActivityWeatherDependency { UserId = userId, Text = c.Text, SortOrder = c.SortOrder })
             .ToList();
 
-        if (toAdd.Count == 0) return;
+        if (toAdd.Count == 0)
+            return;
 
         await dbContext.ActivityWeatherDependencies.AddRangeAsync(toAdd);
         await dbContext.SaveChangesAsync();

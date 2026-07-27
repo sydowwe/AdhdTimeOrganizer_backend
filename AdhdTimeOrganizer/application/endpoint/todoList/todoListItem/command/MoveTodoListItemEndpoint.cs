@@ -1,7 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.todoList;
-using AdhdTimeOrganizer.application.dto.response.todoList;
-using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.application.extensions;
+﻿using AdhdTimeOrganizer.application.dto.request.todoList;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -9,11 +6,13 @@ using AdhdTimeOrganizer.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.infrastructure.settings;
 using Humanizer;
 using Microsoft.Extensions.Options;
+using Sydowwe.Framework.application.endpoint.@base.command;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListItem.command;
 
 public class MoveTodoListItemEndpoint(AppDbContext dbContext, IOptions<TodoListSettings> settings)
-    : BasePatchEndpoint<TodoListItem, MoveToListTodoListItemRequest, TodoListItemResponse>(dbContext)
+    : BasePatchEndpoint<TodoListItem, MoveToListTodoListItemRequest>(dbContext)
 {
     private readonly TodoListSettings _settings = settings.Value;
     private readonly AppDbContext _dbContext = dbContext;
@@ -23,7 +22,7 @@ public class MoveTodoListItemEndpoint(AppDbContext dbContext, IOptions<TodoListS
         const string entityName = nameof(TodoListItem);
         Patch($"/{entityName.Kebaberize()}/{{id:long:required}}/move");
         Validator<MoveToListTodoListItemValidator>();
-        
+
         Summary(s =>
         {
             s.Summary = $"Move {entityName} to a different todo list";
@@ -54,5 +53,7 @@ public class MoveTodoListItemEndpoint(AppDbContext dbContext, IOptions<TodoListS
         await Send.NoContentAsync(ct);
     }
 
-    protected override void Mapping(TodoListItem entity, MoveToListTodoListItemRequest req) { }
+    protected override void Mapping(TodoListItem entity, MoveToListTodoListItemRequest req)
+    {
+    }
 }

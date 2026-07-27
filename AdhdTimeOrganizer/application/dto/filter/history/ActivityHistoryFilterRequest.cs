@@ -1,9 +1,9 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.helper;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter.history;
 
-public class ActivityHistoryFilterRequest : IFilterRequest
+public record ActivityHistoryFilterRequest : IFilterRequest
 {
     public long? ActivityId { get; set; }
     public long? RoleId { get; set; }

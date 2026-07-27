@@ -1,20 +1,20 @@
-﻿using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.result;
-using AdhdTimeOrganizer.domain.serviceContract;
-using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface.manager;
+﻿using Sydowwe.Framework.domain.serviceContract;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.domain.result;
+using Sydowwe.Framework.infrastructure.persistence;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
 
 namespace AdhdTimeOrganizer.application.service;
 
 public class UserDefaultsService(
-    IUserDefaultSeederManager seederManager,
+    IPerUserDefaultSeederManager seederManager,
     ILogger<UserDefaultsService> logger) : IUserDefaultsService, IScopedService
 {
     public async Task<Result> CreateDefaultsAsync(long userId, CancellationToken ct = default)
     {
         try
         {
-            await seederManager.SeedAllForUserAsync(userId, overrideData: false, ct);
+            await seederManager.SeedAllForUserAsync(userId, false, ct);
             return Result.Successful();
         }
         catch (Exception e)

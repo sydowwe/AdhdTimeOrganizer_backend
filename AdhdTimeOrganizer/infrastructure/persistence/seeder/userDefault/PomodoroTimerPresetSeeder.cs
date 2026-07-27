@@ -1,13 +1,13 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.timer;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.timer;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class PomodoroTimerPresetSeeder(
     AppDbContext dbContext,
-    ILogger<PomodoroTimerPresetSeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<PomodoroTimerPresetSeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "PomodoroTimerPreset";
     public int Order => 11;
@@ -96,9 +96,7 @@ public class PomodoroTimerPresetSeeder(
             .ToListAsync(ct);
 
         if (defaults.Count != existing.Count)
-        {
             return false;
-        }
 
         for (var i = 0; i < defaults.Count; i++)
         {

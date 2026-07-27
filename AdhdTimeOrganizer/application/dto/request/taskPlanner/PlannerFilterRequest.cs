@@ -1,11 +1,9 @@
 using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 
 public record PlannerFilterRequest
 {
-    [Required]
     public DateTime FilterDate { get; init; }
 
     [Range(1, 72)]

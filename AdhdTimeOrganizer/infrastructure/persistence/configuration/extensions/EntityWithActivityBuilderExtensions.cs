@@ -7,7 +7,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 
 public static class EntityWithActivityBuilderExtensions
 {
-    public static void IsManyWithOneActivity<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<Activity, IEnumerable<TEntity>?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade, bool isRequired = true) where TEntity : BaseEntityWithActivity
+    public static void IsManyWithOneActivity<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<Activity, IEnumerable<TEntity>?>>? navigationProperty = null,
+        DeleteBehavior deleteBehavior = DeleteBehavior.Cascade, bool isRequired = true) where TEntity : BaseEntityWithActivity
     {
         builder.HasOne(p => p.Activity)
             .WithMany(navigationProperty)
@@ -15,7 +16,9 @@ public static class EntityWithActivityBuilderExtensions
             .IsRequired(isRequired)
             .OnDelete(deleteBehavior);
     }
-    public static void IsOneWithOneActivity<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<Activity, TEntity?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade, bool isRequired = true) where TEntity : BaseEntityWithActivity
+
+    public static void IsOneWithOneActivity<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<Activity, TEntity?>>? navigationProperty = null,
+        DeleteBehavior deleteBehavior = DeleteBehavior.Cascade, bool isRequired = true) where TEntity : BaseEntityWithActivity
     {
         builder.HasOne(p => p.Activity)
             .WithOne(navigationProperty)

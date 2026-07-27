@@ -1,22 +1,22 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class ActivityExpectedCostTierSeeder(
     AppDbContext dbContext,
-    ILogger<ActivityExpectedCostTierSeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<ActivityExpectedCostTierSeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "ActivityExpectedCostTier";
     public int Order => 6;
 
     private static List<ActivityExpectedCostTier> Defaults(long userId) =>
     [
-        new() { UserId = userId, Text = "Free",      SortOrder = 1 },
-        new() { UserId = userId, Text = "Cheap",     SortOrder = 2 },
-        new() { UserId = userId, Text = "Moderate",  SortOrder = 3 },
+        new() { UserId = userId, Text = "Free", SortOrder = 1 },
+        new() { UserId = userId, Text = "Cheap", SortOrder = 2 },
+        new() { UserId = userId, Text = "Moderate", SortOrder = 3 },
         new() { UserId = userId, Text = "Expensive", SortOrder = 4 }
     ];
 

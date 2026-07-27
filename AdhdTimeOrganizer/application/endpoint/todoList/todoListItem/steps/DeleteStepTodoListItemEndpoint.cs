@@ -9,6 +9,8 @@ public class DeleteStepTodoListItemEndpoint(AppDbContext dbContext)
 {
     private readonly AppDbContext _dbContext = dbContext;
 
-    protected override IQueryable<TodoListItem> GetParentQuery(long itemId, long userId) =>
-        _dbContext.Set<TodoListItem>().Where(e => e.Id == itemId && e.UserId == userId);
+    protected override IQueryable<TodoListItem> GetParentQuery(long itemId, long userId)
+    {
+        return _dbContext.Set<TodoListItem>().Where(e => e.Id == itemId && e.UserId == userId);
+    }
 }

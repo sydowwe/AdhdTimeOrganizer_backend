@@ -1,15 +1,15 @@
-using AdhdTimeOrganizer.application.dto.filter;
-using AdhdTimeOrganizer.application.dto.response.generic;
-using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using Sydowwe.Framework.application.dto.request.filter;
+using Sydowwe.Framework.application.dto.response.generic;
+using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.lookup.weatherDependency.query;
 
 public class GridActivityWeatherDependencyEndpoint(AppDbContext dbContext)
-    : BaseGridEndpoint<ActivityWeatherDependency, LookupResponse<ActivityWeatherDependency>, LookupFilterRequest>(dbContext)
+    : BaseGridEndpoint<ActivityWeatherDependency, LookupResponse<ActivityWeatherDependency>, LookupFilter>(dbContext)
 {
-    protected override IQueryable<ActivityWeatherDependency> ApplyCustomFiltering(IQueryable<ActivityWeatherDependency> query, LookupFilterRequest filter)
+    protected override IQueryable<ActivityWeatherDependency> ApplyCustomFiltering(IQueryable<ActivityWeatherDependency> query, LookupFilter filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Text))
             query = query.Where(x => x.Text.Contains(filter.Text));

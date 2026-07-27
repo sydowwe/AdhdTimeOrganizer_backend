@@ -1,21 +1,22 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class PlannerTaskSeeder(
     AppDbContext dbContext,
-    ILogger<PlannerTaskSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<PlannerTaskSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "PlannerTask";
     public int Order => 13;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<PlannerTask>();
+        await dbContext.TruncateTableCascadeAsync<PlannerTask>();
     }
 
     public async Task SeedForUser(long userId)
@@ -75,9 +76,7 @@ public class PlannerTaskSeeder(
         var criticalImportance = importances.FirstOrDefault(i => i.Importance == 999);
         var optionalImportance = importances.FirstOrDefault(i => i.Importance == 666);
         if (criticalImportance == null || optionalImportance == null)
-        {
             throw new InvalidOperationException("Critical importance levels are missing in the database.");
-        }
 
         // Get a to-do list to link (optional)
         var bugFixingTodo = todoLists.FirstOrDefault(tl => tl.ActivityId == bugFixing?.Id);
@@ -89,21 +88,20 @@ public class PlannerTaskSeeder(
         {
             var isWeekend = calendar.IsWeekend;
             // Update calendar fields
-            calendar.Label = isWeekend ? null : (calendar.Date.Day % 2 == 0 ? "HomeOffice" : "Office");
+            calendar.Label = isWeekend ? null : calendar.Date.Day % 2 == 0 ? "HomeOffice" : "Office";
             calendar.WakeUpTime = isWeekend ? new TimeOnly(9, 0) : new TimeOnly(7, 0);
             calendar.BedTime = new TimeOnly(23, 0);
             calendar.Weather = calendar.Date.Month switch
             {
-                12 or 1 or 2 => "Cold ❄️",
-                3 or 4 or 5 => "Mild 🌤️",
-                6 or 7 or 8 => "Hot ☀️",
-                _ => "Cool 🍂"
+                12 or 1 or 2 => "Cold â„ï¸",
+                3 or 4 or 5 => "Mild ðŸŒ¤ï¸",
+                6 or 7 or 8 => "Hot â˜€ï¸",
+                _ => "Cool ðŸ‚"
             };
             calendar.Notes = isWeekend ? "Weekend - relaxed schedule" : "Workday - stay focused";
 
             // Morning routine (every day)
             if (morningExercise != null)
-            {
                 plannerTasks.Add(new PlannerTask
                 {
                     CalendarId = calendar.Id,
@@ -118,13 +116,11 @@ public class PlannerTaskSeeder(
                     Notes = "Morning workout",
                     UserId = userId
                 });
-            }
 
             if (!isWeekend)
             {
                 // Workday tasks
                 if (dailyStandup != null)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -138,10 +134,8 @@ public class PlannerTaskSeeder(
                         Notes = "Daily team sync - Mandatory",
                         UserId = userId
                     });
-                }
 
                 if (calendar.Date.DayOfWeek == DayOfWeek.Monday && sprintPlanning != null)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -155,10 +149,8 @@ public class PlannerTaskSeeder(
                         Notes = "Weekly sprint planning",
                         UserId = userId
                     });
-                }
 
                 if (featureDev != null)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -172,10 +164,8 @@ public class PlannerTaskSeeder(
                         Notes = "Deep work session - new features",
                         UserId = userId
                     });
-                }
 
                 if (bugFixing != null)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -190,10 +180,8 @@ public class PlannerTaskSeeder(
                         Notes = "Fix critical bugs",
                         UserId = userId
                     });
-                }
 
                 if (codeReview != null)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -208,10 +196,8 @@ public class PlannerTaskSeeder(
                         Notes = "Review team PRs",
                         UserId = userId
                     });
-                }
 
                 if (laundry != null && calendar.Date.DayOfWeek == DayOfWeek.Wednesday)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -225,13 +211,11 @@ public class PlannerTaskSeeder(
                         Notes = "Do some laundry",
                         UserId = userId
                     });
-                }
             }
             else
             {
                 // Weekend tasks
                 if (houseCleaning != null && calendar.Date.DayOfWeek == DayOfWeek.Saturday)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -245,10 +229,8 @@ public class PlannerTaskSeeder(
                         Notes = "Weekly cleaning",
                         UserId = userId
                     });
-                }
 
                 if (groceryShopping != null && calendar.Date.DayOfWeek == DayOfWeek.Saturday)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -262,10 +244,8 @@ public class PlannerTaskSeeder(
                         Notes = "Buy food for the week",
                         UserId = userId
                     });
-                }
 
                 if (onlineCourse != null)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -280,10 +260,8 @@ public class PlannerTaskSeeder(
                         Notes = "Learning time",
                         UserId = userId
                     });
-                }
 
                 if (sideProject != null)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -298,10 +276,8 @@ public class PlannerTaskSeeder(
                         Notes = "Personal project work",
                         UserId = userId
                     });
-                }
 
                 if (gaming != null)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -316,10 +292,8 @@ public class PlannerTaskSeeder(
                         Notes = "Gaming session for fun",
                         UserId = userId
                     });
-                }
 
                 if (watchMovie != null && calendar.Date.DayOfWeek == DayOfWeek.Sunday)
-                {
                     plannerTasks.Add(new PlannerTask
                     {
                         CalendarId = calendar.Id,
@@ -333,12 +307,10 @@ public class PlannerTaskSeeder(
                         Notes = "Relaxing with a movie",
                         UserId = userId
                     });
-                }
             }
 
             // Evening routine (every day)
             if (familyDinner != null)
-            {
                 plannerTasks.Add(new PlannerTask
                 {
                     CalendarId = calendar.Id,
@@ -352,10 +324,8 @@ public class PlannerTaskSeeder(
                     Notes = "Family time - Important",
                     UserId = userId
                 });
-            }
 
             if (meditation != null)
-            {
                 plannerTasks.Add(new PlannerTask
                 {
                     CalendarId = calendar.Id,
@@ -370,10 +340,8 @@ public class PlannerTaskSeeder(
                     Notes = "Evening meditation",
                     UserId = userId
                 });
-            }
 
             if (sleepRoutine != null)
-            {
                 plannerTasks.Add(new PlannerTask
                 {
                     CalendarId = calendar.Id,
@@ -387,7 +355,6 @@ public class PlannerTaskSeeder(
                     Notes = "Wind down for sleep",
                     UserId = userId
                 });
-            }
         }
 
         await dbContext.PlannerTasks.AddRangeAsync(plannerTasks);

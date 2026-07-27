@@ -1,6 +1,7 @@
-using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.application.dto.response.generic;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using Sydowwe.Framework.application.dto.response;
+using Sydowwe.Framework.application.dto.response.@base;
+using Sydowwe.Framework.application.dto.response.generic;
 
 namespace AdhdTimeOrganizer.application.dto.response.todoList;
 
@@ -11,8 +12,9 @@ public record TodoListResponse : NameTextIconResponse,
     public int ItemCount { get; init; }
     public int CompletedCount { get; init; }
 
-    public static IQueryable<TodoListResponse> Projection(IQueryable<TodoList> q) =>
-        q.Select(e => new TodoListResponse
+    public static IQueryable<TodoListResponse> Projection(IQueryable<TodoList> q)
+    {
+        return q.Select(e => new TodoListResponse
         {
             Id = e.Id,
             Name = e.Name,
@@ -20,27 +22,21 @@ public record TodoListResponse : NameTextIconResponse,
             Icon = e.Icon,
             ItemCount = e.TodoListItemColl.Count(),
             CompletedCount = e.TodoListItemColl.Count(i => i.IsDone),
-            Category = e.Category == null ? null : new TodoListCategoryResponse
-            {
-                Id = e.Category.Id,
-                Name = e.Category.Name,
-                Text = e.Category.Text,
-                Color = e.Category.Color,
-                Icon = e.Category.Icon,
-            },
+            Category = e.Category == null
+                ? null
+                : new TodoListCategoryResponse
+                {
+                    Id = e.Category.Id,
+                    Name = e.Category.Name,
+                    Text = e.Category.Text,
+                    Color = e.Category.Color,
+                    Icon = e.Category.Icon
+                }
         });
+    }
 
-    public static TodoListResponse FromEntity(TodoList e) => new()
+    public static IQueryable<SelectOptionResponse> SelectOptionProjection(IQueryable<TodoList> q)
     {
-        Id = e.Id,
-        Name = e.Name,
-        Text = e.Text,
-        Icon = e.Icon,
-        ItemCount = e.ItemCount,
-        CompletedCount = e.CompletedCount,
-        Category = e.Category == null ? null : TodoListCategoryResponse.FromEntity(e.Category),
-    };
-
-    public static IQueryable<SelectOptionResponse> SelectOptionProjection(IQueryable<TodoList> q) =>
-        q.Select(e => new SelectOptionResponse { Id = e.Id, Text = e.Name });
+        return q.Select(e => new SelectOptionResponse { Id = e.Id, Text = e.Name });
+    }
 }

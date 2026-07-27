@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.helper;
+﻿using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.config;
 

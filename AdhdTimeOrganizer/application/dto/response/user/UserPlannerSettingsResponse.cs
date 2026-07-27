@@ -15,16 +15,17 @@ public record UserPlannerSettingsResponse
     public required ApplyTemplateConflictResolutionEnum DefaultConflictResolution { get; init; }
     public required bool DefaultApplyPreviewMode { get; init; }
 
-    public static UserPlannerSettingsResponse FromEntity(UserPlannerSettings entity) => new()
-    {
-        RemindersEnabled = entity.RemindersEnabled,
-        ReminderMinutesBefore = entity.ReminderMinutesBefore,
-        DetailsPanelExpandedByDefault = entity.DetailsPanelExpandedByDefault,
-        ArrowKeyNavEnabled = entity.ArrowKeyNavEnabled,
-        PredefinedSkipReasons = entity.PredefinedSkipReasons,
-        SlotDurationMinutes = entity.SlotDurationMinutes,
-        DefaultApplyTemplateId = entity.DefaultApplyTemplateId,
-        DefaultConflictResolution = entity.DefaultConflictResolution,
-        DefaultApplyPreviewMode = entity.DefaultApplyPreviewMode
-    };
+    public static UserPlannerSettingsResponse FromEntity(UserPlannerSettings entity) =>
+        new()
+        {
+            RemindersEnabled = entity.RemindersEnabled,
+            ReminderMinutesBefore = entity.ReminderMinutesBefore,
+            DetailsPanelExpandedByDefault = entity.DetailsPanelExpandedByDefault,
+            ArrowKeyNavEnabled = entity.ArrowKeyNavEnabled,
+            PredefinedSkipReasons = entity.PredefinedSkipReasons,
+            SlotDurationMinutes = entity.SlotDurationMinutes,
+            DefaultApplyTemplateId = entity.DefaultApplyTemplateId,
+            DefaultConflictResolution = entity.DefaultConflictResolution,
+            DefaultApplyPreviewMode = entity.DefaultApplyPreviewMode
+        };
 }

@@ -1,22 +1,22 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class ActivityLocationTypeSeeder(
     AppDbContext dbContext,
-    ILogger<ActivityLocationTypeSeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<ActivityLocationTypeSeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "ActivityLocationType";
     public int Order => 6;
 
     private static List<ActivityLocationType> Defaults(long userId) =>
     [
-        new() { UserId = userId, Text = "Indoor",  SortOrder = 1 },
+        new() { UserId = userId, Text = "Indoor", SortOrder = 1 },
         new() { UserId = userId, Text = "Outdoor", SortOrder = 2 },
-        new() { UserId = userId, Text = "Any",     SortOrder = 3 }
+        new() { UserId = userId, Text = "Any", SortOrder = 3 }
     ];
 
     public async Task SetupDefaults(long userId, CancellationToken ct = default)

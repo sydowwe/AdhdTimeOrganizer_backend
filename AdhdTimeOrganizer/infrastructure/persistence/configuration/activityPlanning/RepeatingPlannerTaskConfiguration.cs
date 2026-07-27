@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
 
@@ -44,8 +45,8 @@ public class RepeatingPlannerTaskConfiguration : IEntityTypeConfiguration<Repeat
             .HasConversion(
                 v => string.Join(',', v),
                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                       .Select(int.Parse)
-                       .ToList()
+                    .Select(int.Parse)
+                    .ToList()
             )
             .Metadata.SetValueComparer(
                 new ValueComparer<ICollection<int>>(

@@ -1,8 +1,8 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class TaskPriorityFilterRequest : IFilterRequest
+public record TaskPriorityFilterRequest : IFilterRequest
 {
     public string? Text { get; set; }
     public string? Color { get; set; }

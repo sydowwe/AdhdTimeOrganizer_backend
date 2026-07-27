@@ -1,20 +1,21 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivitySeeder(
     AppDbContext dbContext,
-    ILogger<ActivitySeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<ActivitySeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "Activity";
     public int Order => 9;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<Activity>();
+        await dbContext.TruncateTableCascadeAsync<Activity>();
     }
 
     public async Task SeedForUser(long userId)
@@ -56,7 +57,6 @@ public class ActivitySeeder(
 
         // Work activities
         if (workRole != null)
-        {
             activities.AddRange([
                 new Activity
                 {
@@ -104,11 +104,9 @@ public class ActivitySeeder(
                     UserId = userId
                 }
             ]);
-        }
 
         // Health & Fitness activities
         if (healthRole != null)
-        {
             activities.AddRange([
                 new Activity
                 {
@@ -138,11 +136,9 @@ public class ActivitySeeder(
                     UserId = userId
                 }
             ]);
-        }
 
         // Personal Development activities
         if (personalDevRole != null)
-        {
             activities.AddRange([
                 new Activity
                 {
@@ -172,11 +168,9 @@ public class ActivitySeeder(
                     UserId = userId
                 }
             ]);
-        }
 
         // Social activities
         if (socialRole != null)
-        {
             activities.AddRange([
                 new Activity
                 {
@@ -206,11 +200,9 @@ public class ActivitySeeder(
                     UserId = userId
                 }
             ]);
-        }
 
         // Household activities
         if (householdRole != null)
-        {
             activities.AddRange([
                 new Activity
                 {
@@ -240,11 +232,9 @@ public class ActivitySeeder(
                     UserId = userId
                 }
             ]);
-        }
 
         // Self-Care activities
         if (selfCareRole != null)
-        {
             activities.AddRange([
                 new Activity
                 {
@@ -274,11 +264,9 @@ public class ActivitySeeder(
                     UserId = userId
                 }
             ]);
-        }
 
         // Hobbies & Leisure activities
         if (hobbiesRole != null)
-        {
             activities.AddRange([
                 new Activity
                 {
@@ -308,7 +296,6 @@ public class ActivitySeeder(
                     UserId = userId
                 }
             ]);
-        }
 
         await dbContext.Activities.AddRangeAsync(activities);
         await dbContext.SaveChangesAsync();

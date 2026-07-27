@@ -1,61 +1,26 @@
-using System.Net;
-using System.Net.Http.Json;
 using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.Testing;
+using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-public class BaseBatchDeleteEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
+[Collection("Postgres")]
+public class BatchDeleteActivityCategoryEndpointTests(AppDbContextFixture fixture)
+    : BaseBatchDeleteEndpointTests(fixture)
 {
-    private const string Route = "activity-category/batch-delete";
+    protected override string EndpointUrl => "api/activity-category/batch-delete";
 
-    private async Task<List<long>> SeedCategoriesAsync(int count)
+    protected override async Task<long[]> SeedEntitiesAsync(DbContext db, int count)
     {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
         var categories = Enumerable.Range(1, count)
-            .Select(i => new ActivityCategory { Name = $"Batch {i}", Color = "#FF0000", UserId = userId })
+            .Select(i => new ActivityCategory { Name = $"Batch {i}", Color = "#FF0000", UserId = FakeLoggedUserService.TestUserId })
             .ToList();
-        db.ActivityCategories.AddRange(categories);
+        ((AppDbContext)db).ActivityCategories.AddRange(categories);
         await db.SaveChangesAsync();
-        return categories.Select(c => c.Id).ToList();
-    }
-
-    [Fact]
-    public async Task BatchDelete_ExistingEntities_Returns204()
-    {
-        var ids = await SeedCategoriesAsync(3);
-        var request = new { Ids = ids };
-
-        var response = await client.PostAsJsonAsync(Route, request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-    }
-
-    [Fact]
-    public async Task BatchDelete_WithoutAuth_Returns401()
-    {
-        var response = await anonClient.PostAsJsonAsync(Route, new { Ids = new[] { 1L } });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task BatchDelete_NonExistingEntity_Returns404()
-    {
-        var response = await client.PostAsJsonAsync(Route, new { Ids = new[] { 999999999L } });
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    public override async Task DisposeAsync()
-    {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        db.ActivityCategories.RemoveRange(
-            db.ActivityCategories.Where(c => c.UserId == userId));
-        await db.SaveChangesAsync();
+        return categories.Select(c => c.Id).ToArray();
     }
 }

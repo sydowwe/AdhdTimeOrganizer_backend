@@ -1,49 +1,20 @@
-using AdhdTimeOrganizer.application.dto.request.user;
-using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
-using FastEndpoints;
+using AdhdTimeOrganizer.domain.model.entity.user;
+using Microsoft.AspNetCore.Identity;
+using Sydowwe.Framework.application.endpoint.user.command.auth;
+using Sydowwe.Framework.domain.extServiceContract.user.auth;
+using Sydowwe.Framework.domain.serviceContract;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
 
+/// <summary>
+/// Second step of the web login: reads the partial-auth token from the cookie and issues the real
+/// session cookies. The base's defaults are exactly this, so only the throttling key is set here.
+/// </summary>
 public class ValidateTwoFactorAuthForLoginWebEndpoint(
-    ITwoFactorAuthService twoFactorAuthService,
-    IJwtService jwtService)
-    : Endpoint<TwoFactorAuthLoginRequest>
+    UserManager<User> userManager,
+    ITwoFactorAuthService<User> twoFactorAuthService,
+    IJwtService<User> jwtService,
+    IAuditService auditService)
+    : BaseValidateTwoFactorAuthForLoginEndpoint<User>(userManager, twoFactorAuthService, jwtService, auditService)
 {
-    public override void Configure()
-    {
-        Post("/auth/login/2fa");
-        Summary(s => { s.Summary = "Validate 2FA for login (web — cookie-based)"; });
-        AllowAnonymous();
-        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Real-IP");
-    }
-
-    public override async Task HandleAsync(TwoFactorAuthLoginRequest request, CancellationToken ct)
-    {
-        var rawToken = HttpContext.Request.Cookies["pending-2fa"];
-        if (string.IsNullOrEmpty(rawToken))
-        {
-            AddError("Invalid or expired authentication session");
-            await Send.ErrorsAsync(401, ct);
-            return;
-        }
-
-        var result = await twoFactorAuthService.ValidatePendingLoginToken(rawToken, request.Token, ct);
-        if (result.Failed)
-        {
-            AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(401, ct);
-            return;
-        }
-
-        HttpContext.Response.Cookies.Delete("pending-2fa", new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/api/auth/login/2fa"
-        });
-
-        await jwtService.GenerateJwtAndSetAuthCookie(request.StayLoggedIn, AuthMethodEnum.Password, result.Data, HttpContext);
-        await Send.NoContentAsync(ct);
-    }
 }

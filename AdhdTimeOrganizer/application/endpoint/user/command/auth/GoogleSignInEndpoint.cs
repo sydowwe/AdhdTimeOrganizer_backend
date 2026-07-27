@@ -1,28 +1,34 @@
-﻿using AdhdTimeOrganizer.application.dto.request.user;
+using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
+using Sydowwe.Framework.application.middleware;
+using Sydowwe.Framework.application.service.auth;
+using Sydowwe.Framework.config;
+using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.domain.extServiceContract.user.auth;
+using Sydowwe.Framework.domain.serviceContract;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
 
 public class GoogleSignInEndpoint(
     UserManager<User> userManager,
     AppDbContext dbContext,
-    IJwtService jwtService,
+    IJwtService<User> jwtService,
     IUserDefaultsService userDefaultsService,
-    IGoogleSignInService googleSignInService)
+    IGoogleSignInService googleSignInService,
+    IOptions<TwoFactorOptions> twoFactorOptions)
     : Endpoint<GoogleSignInRequest, GoogleSignInResponse>
 {
     public override void Configure()
     {
         Post("/auth/login/google");
         AllowAnonymous();
-        Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Real-IP");
+        Throttle(10, 60, TrustedIpMiddleware.ClientIpHeaderName);
         Summary(s => { s.Summary = "Sign in with Google OAuth"; });
     }
 
@@ -62,12 +68,39 @@ public class GoogleSignInEndpoint(
             return;
         }
 
-        await jwtService.GenerateJwtAndSetAuthCookie(true, AuthMethodEnum.Google, user, HttpContext);
+        // Federated sign-in and the local second factor: by default Google's authentication is taken
+        // to satisfy 2FA (the usual convention — the IdP authenticated the user, often with its own
+        // MFA). Deployments that want the local factor regardless set
+        // TwoFactor:FederatedLoginSatisfiesTwoFactor to false, and then a 2FA user must complete the
+        // code step here exactly as on password login. Stated as policy rather than left implicit,
+        // because the default does mean a compromised Google account reaches this account.
+        var twoFactor = twoFactorOptions.Value;
+        var mustVerifySecondFactor = twoFactor.Mode is not TwoFactorMode.Disabled &&
+                                     !twoFactor.FederatedLoginSatisfiesTwoFactor &&
+                                     (user.TwoFactorEnabled || twoFactor.Mode is TwoFactorMode.Required);
+
+        if (mustVerifySecondFactor)
+        {
+            var requiresSetup = await userManager.GetAuthenticatorKeyAsync(user) is null;
+            jwtService.IssueTwoFactorPendingCookie(HttpContext, user.Id, requiresSetup);
+
+            await Send.OkAsync(new GoogleSignInResponse
+            {
+                Email = googleInfo.Email,
+                CurrentLocale = user.Locale,
+                RequiresTwoFactor = true,
+                RequiresTwoFactorSetup = requiresSetup
+            }, ct);
+            return;
+        }
+
+        await jwtService.GenerateJwtAndSetAuthCookie(
+            true, AuthMethodEnum.Google, user, HttpContext);
 
         var response = new GoogleSignInResponse
         {
             Email = googleInfo.Email,
-            CurrentLocale = user.CurrentLocale
+            CurrentLocale = user.Locale
         };
 
         await Send.OkAsync(response, ct);
@@ -78,47 +111,25 @@ public class GoogleSignInEndpoint(
         var newUser = req.ToEntity;
 
         newUser.GoogleOAuthUserId = req.GoogleOAuthUserId;
+        // Google vouched for the address; there is nothing left for a confirmation mail to prove.
         newUser.EmailConfirmed = true;
 
-        await using var tx = await dbContext.Database.BeginTransactionAsync(ct);
-        try
+        // No password: the Google account is the credential. Everything else — role, defaults,
+        // one transaction — is the same as a password sign-up, so it comes from the shared flow.
+        var result = await UserRegistrationFlow.RunAsync(
+            userManager, dbContext, userDefaultsService, newUser, ct: ct);
+
+        if (result.Failed)
         {
-            var identityResult = await userManager.CreateAsync(newUser);
-            if (!identityResult.Succeeded)
-            {
-                var duplicate = identityResult.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail");
-                AddError(duplicate
-                    ? "Could not sign in with Google."
-                    : "Failed to register user: " + string.Join(", ", identityResult.Errors.Select(e => e.Description)));
-                await Send.ErrorsAsync(duplicate ? 409 : 400, ct);
-                return null;
-            }
-
-            identityResult = await userManager.AddToRoleAsync(newUser, "User");
-            if (!identityResult.Succeeded)
-            {
-                AddError("Failed to add user to role: " + string.Join(", ", identityResult.Errors.Select(e => e.Description)));
-                await Send.ErrorsAsync(500, ct);
-                return null;
-            }
-
-            var setDefaultsResult = await userDefaultsService.CreateDefaultsAsync(newUser.Id, ct);
-            if (setDefaultsResult.Failed)
-            {
-                AddError(setDefaultsResult.ErrorMessage!);
-                await Send.ErrorsAsync(500, ct);
-                return null;
-            }
-
-            await tx.CommitAsync(ct);
-            return newUser;
-        }
-        catch (Exception ex)
-        {
-            await tx.RollbackAsync(ct);
-            AddError(ex.Message);
-            await Send.ErrorsAsync(500, ct);
+            // Duplicate is reworded: on this route it means the address exists but is not linked to
+            // this Google account, and "user already exists" would confirm the address to a prober.
+            AddError(result.Outcome is UserRegistrationOutcome.DuplicateUser
+                ? "Could not sign in with Google."
+                : result.ErrorMessage!);
+            await Send.ErrorsAsync(result.StatusCode, ct);
             return null;
         }
+
+        return result.User;
     }
 }

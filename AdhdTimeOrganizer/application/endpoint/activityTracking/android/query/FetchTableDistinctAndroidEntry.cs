@@ -1,14 +1,15 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
-using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.android;
-using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.application.endpointGroups;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.request.@base.table;
+using Sydowwe.Framework.application.dto.response.@base;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.android.query;
 
@@ -23,7 +24,7 @@ public class FetchTableDistinctAndroidEntry(AppDbContext dbContext)
         {
             s.Summary = $"Get filtered and paginated {entityName} list";
             s.Description = $"Retrieves a filtered, paginated and sorted list of {entityName}";
-            
+
 
             s.Response<BaseGridResponse<AndroidDistinctEntriesResponse>>(200, "Success");
             s.Response(400, "Bad request");
@@ -40,9 +41,7 @@ public class FetchTableDistinctAndroidEntry(AppDbContext dbContext)
             query = query.FilteredByUser(User.GetId());
 
             if (req is { UseFilter: true, Filter: not null })
-            {
                 query = ApplyCustomFiltering(query, req.Filter);
-            }
 
             var distinctQuery = query
                 .GroupBy(e => new { e.PackageName, e.AppLabel })

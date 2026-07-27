@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
-using AdhdTimeOrganizer.application.dto.request.@base.table;
 using FastEndpoints;
 using FluentValidation;
+using Sydowwe.Framework.application.dto.request.@base.table;
 
 namespace AdhdTimeOrganizer.application.validator;
 

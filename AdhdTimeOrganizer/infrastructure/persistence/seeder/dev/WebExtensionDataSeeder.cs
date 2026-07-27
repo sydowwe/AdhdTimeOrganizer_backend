@@ -1,20 +1,21 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.activityTracking;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class WebExtensionDataSeeder(
     AppDbContext dbContext,
-    ILogger<WebExtensionDataSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<WebExtensionDataSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "WebExtensionData";
     public int Order => 12;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<WebExtensionActivityEntry>();
+        await dbContext.TruncateTableCascadeAsync<WebExtensionActivityEntry>();
     }
 
     public async Task SeedForUser(long userId)
@@ -29,34 +30,34 @@ public class WebExtensionDataSeeder(
         // Create data for the last 7 days
         List<WebExtensionActivityEntry> records = [];
 
-        for (int daysAgo = 6; daysAgo >= 0; daysAgo--)
+        for (var daysAgo = 6; daysAgo >= 0; daysAgo--)
         {
             var date = today.AddDays(-daysAgo);
 
             // Morning session (9:00 - 12:00)
             records.AddRange(CreateSessionData(userId, date.AddHours(9), 3,
-                [
-                    ("github.com", "https://github.com/user/repo", 40, 20),
-                    ("stackoverflow.com", "https://stackoverflow.com/questions/123", 30, 10),
-                    ("docs.microsoft.com", "https://docs.microsoft.com/dotnet", 20, 5)
-                ]));
+            [
+                ("github.com", "https://github.com/user/repo", 40, 20),
+                ("stackoverflow.com", "https://stackoverflow.com/questions/123", 30, 10),
+                ("docs.microsoft.com", "https://docs.microsoft.com/dotnet", 20, 5)
+            ]));
 
             // Afternoon session (13:00 - 17:00)
             records.AddRange(CreateSessionData(userId, date.AddHours(13), 4,
-                [
-                    ("github.com", "https://github.com/user/repo/pulls", 45, 15),
-                    ("localhost", "http://localhost:5000", 40, 20),
-                    ("youtube.com", "https://youtube.com/watch?v=tutorial", 15, 5),
-                    ("chatgpt.com", "https://chatgpt.com/chat", 30, 10)
-                ]));
+            [
+                ("github.com", "https://github.com/user/repo/pulls", 45, 15),
+                ("localhost", "http://localhost:5000", 40, 20),
+                ("youtube.com", "https://youtube.com/watch?v=tutorial", 15, 5),
+                ("chatgpt.com", "https://chatgpt.com/chat", 30, 10)
+            ]));
 
             // Evening session (19:00 - 21:00)
             records.AddRange(CreateSessionData(userId, date.AddHours(19), 2,
-                [
-                    ("reddit.com", "https://reddit.com/r/programming", 25, 15),
-                    ("youtube.com", "https://youtube.com/watch?v=entertainment", 35, 10),
-                    ("twitter.com", "https://twitter.com/home", 15, 10)
-                ]));
+            [
+                ("reddit.com", "https://reddit.com/r/programming", 25, 15),
+                ("youtube.com", "https://youtube.com/watch?v=entertainment", 35, 10),
+                ("twitter.com", "https://twitter.com/home", 15, 10)
+            ]));
         }
 
         await dbContext.WebExtensionActivityEntries.AddRangeAsync(records);
@@ -76,7 +77,7 @@ public class WebExtensionDataSeeder(
         var totalActiveWeight = activities.Sum(a => a.ActiveWeight);
         var lastActiveDomainIndex = -1;
 
-        for (int i = 0; i < windowCount; i++)
+        for (var i = 0; i < windowCount; i++)
         {
             var windowStart = sessionStart.AddMinutes(i);
             var isFinal = i == windowCount - 1;
@@ -93,10 +94,14 @@ public class WebExtensionDataSeeder(
                 var roll = Random.Shared.Next(totalActiveWeight);
                 var cumulative = 0;
                 primaryIndex = 0;
-                for (int j = 0; j < activities.Count; j++)
+                for (var j = 0; j < activities.Count; j++)
                 {
                     cumulative += activities[j].ActiveWeight;
-                    if (roll < cumulative) { primaryIndex = j; break; }
+                    if (roll < cumulative)
+                    {
+                        primaryIndex = j;
+                        break;
+                    }
                 }
             }
 
@@ -141,7 +146,8 @@ public class WebExtensionDataSeeder(
             }
 
             // Max 2 background domains (~60% of windows)
-            if (Random.Shared.Next(100) >= 60) continue;
+            if (Random.Shared.Next(100) >= 60)
+                continue;
 
             var bgCandidates = activities
                 .Where((_, idx) => !usedIndices.Contains(idx))
@@ -149,7 +155,6 @@ public class WebExtensionDataSeeder(
                 .Take(2);
 
             foreach (var bg in bgCandidates)
-            {
                 records.Add(new WebExtensionActivityEntry
                 {
                     UserId = userId,
@@ -161,7 +166,6 @@ public class WebExtensionDataSeeder(
                     BackgroundSeconds = Random.Shared.Next(5, 31),
                     IsFinal = isFinal
                 });
-            }
         }
 
         return records;

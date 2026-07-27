@@ -1,10 +1,10 @@
 using AdhdTimeOrganizer.application.dto.request.todoList;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.steps;
 
@@ -17,7 +17,7 @@ public abstract class BaseUpdateStepEndpoint<TParent>(AppDbContext dbContext)
     public override void Configure()
     {
         Put($"/{typeof(TParent).Name.Kebaberize()}/{{itemId}}/steps/{{stepId}}");
-        
+
         Summary(s =>
         {
             s.Summary = $"Update a step on a {typeof(TParent).Name}";

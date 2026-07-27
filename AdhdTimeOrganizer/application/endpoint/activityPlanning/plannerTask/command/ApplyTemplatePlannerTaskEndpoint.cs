@@ -1,7 +1,6 @@
 ﻿using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity;
@@ -10,6 +9,8 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.command;
 
@@ -20,7 +21,7 @@ public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext) : Endpoint
         const string entityName = nameof(Calendar);
         Post($"/{entityName.Kebaberize()}/apply-planner-template");
         Validator<ApplyTemplateToTaskPlannerValidator>();
-        
+
         Summary(s =>
         {
             s.Summary = $"Apply template to {entityName}";
@@ -93,7 +94,7 @@ public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext) : Endpoint
 
             var response = new ApplyTemplatePlannerTaskResponse
             {
-                Calendar = CalendarResponse.FromEntity(calendar!),
+                Calendar = CalendarResponse.Projection(new[] { calendar! }.AsQueryable()).Single(),
                 Tasks = updatedTasks
             };
 
@@ -116,7 +117,6 @@ public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext) : Endpoint
     }
 
 
-
     /// <summary>
     /// MergeIgnore: Carve new tasks around existing ones.
     /// If an existing task is in the middle of a new task, split the new task.
@@ -127,9 +127,7 @@ public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext) : Endpoint
         var result = new List<PlannerTask>();
 
         foreach (var segments in newTasks.Select(newTask => CarveTaskAroundBlockers(newTask, existingTasks)))
-        {
             result.AddRange(segments);
-        }
 
         return result;
     }
@@ -184,25 +182,20 @@ public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext) : Endpoint
             {
                 var segmentEnd = blocker.StartTime < task.EndTime ? blocker.StartTime : task.EndTime;
                 if (currentStart < segmentEnd)
-                {
                     result.Add(CloneTaskWithNewTimes(task, currentStart, segmentEnd));
-                }
             }
 
             currentStart = blocker.EndTime > currentStart ? blocker.EndTime : currentStart;
         }
 
         if (currentStart < task.EndTime)
-        {
             result.Add(CloneTaskWithNewTimes(task, currentStart, task.EndTime));
-        }
 
         return result;
     }
 
-    private static PlannerTask CloneTaskWithNewTimes(PlannerTask original, TimeOnly newStart, TimeOnly newEnd)
-    {
-        return new PlannerTask
+    private static PlannerTask CloneTaskWithNewTimes(PlannerTask original, TimeOnly newStart, TimeOnly newEnd) =>
+        new()
         {
             StartTime = newStart,
             EndTime = newEnd,
@@ -217,5 +210,4 @@ public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext) : Endpoint
             TodolistItemId = original.TodolistItemId,
             UserId = original.UserId
         };
-    }
 }

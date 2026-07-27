@@ -1,22 +1,21 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
+using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.activity.profile;
 
 public record ActivityBacklogProfileRequest : IMyRequest<ActivityBacklogProfile>
 {
-    [Required] public long ActivityId { get; init; }
-    [Required] public long LocationTypeId { get; init; }
-    [Required] public long WeatherDependencyId { get; init; }
-    [Required] public EnergyLevel EnergyLevel { get; init; }
+    public long ActivityId { get; init; }
+    public long LocationTypeId { get; init; }
+    public long WeatherDependencyId { get; init; }
+    public EnergyLevel EnergyLevel { get; init; }
     public EffortType? EffortType { get; init; }
-    [Required] public int MinParticipants { get; init; }
+    public int MinParticipants { get; init; }
     public int? MaxParticipants { get; init; }
-    [Required] public long ExpectedCostTierId { get; init; }
-    [Required] public int DurationMinutes { get; init; }
-    [Required] public bool IsRepeatable { get; init; }
+    public long ExpectedCostTierId { get; init; }
+    public int DurationMinutes { get; init; }
+    public bool IsRepeatable { get; init; }
 
     public ActivityBacklogProfile ToEntity => new()
     {
@@ -29,7 +28,7 @@ public record ActivityBacklogProfileRequest : IMyRequest<ActivityBacklogProfile>
         MaxParticipants = MaxParticipants,
         ExpectedCostTierId = ExpectedCostTierId,
         DurationMinutes = DurationMinutes,
-        IsRepeatable = IsRepeatable,
+        IsRepeatable = IsRepeatable
     };
 
     public void UpdateEntity(ActivityBacklogProfile e)

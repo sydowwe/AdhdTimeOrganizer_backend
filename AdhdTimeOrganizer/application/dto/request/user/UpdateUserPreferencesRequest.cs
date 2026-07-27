@@ -1,12 +1,12 @@
-using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.request.user;
 
 namespace AdhdTimeOrganizer.application.dto.request.user;
 
-public record UpdateUserPreferencesRequest
+/// <summary>
+/// Theme / Locale / Timezone / AskBeforeDelete come from <see cref="UserPreferencesRequest"/>;
+/// <see cref="FirstDayOfWeek"/> is this portal's own <c>User</c> column.
+/// </summary>
+public record UpdateUserPreferencesRequest : UserPreferencesRequest
 {
-    public AppThemeEnum? Theme { get; init; }
-    public AvailableLocales? Locale { get; init; }
-    public string? Timezone { get; init; }
     public int? FirstDayOfWeek { get; init; }
-    public bool? AskBeforeDelete { get; init; }
 }

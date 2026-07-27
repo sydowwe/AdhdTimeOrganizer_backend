@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
-using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activity.profile;
 
@@ -33,7 +33,7 @@ public class ActivityBacklogProfileConfiguration : IEntityTypeConfiguration<Acti
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.EnumColumn(p => p.EnergyLevel);
-        builder.EnumColumn(p => p.EffortType, isRequired: false);
+        builder.EnumColumn(p => p.EffortType, false);
 
         builder.Property(p => p.MinParticipants).IsRequired();
         builder.Property(p => p.DurationMinutes).IsRequired();

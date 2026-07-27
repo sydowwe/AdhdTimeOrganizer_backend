@@ -1,20 +1,21 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityCategorySeeder(
     AppDbContext dbContext,
-    ILogger<ActivityCategorySeeder> logger) : IScopedService, IDevDatabaseSeeder
+    ILogger<ActivityCategorySeeder> logger) : IScopedService, IPerUserDevSeeder
 {
     public string SeederName => "ActivityCategory";
     public int Order => 8;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<ActivityCategory>();
+        await dbContext.TruncateTableCascadeAsync<ActivityCategory>();
     }
 
     public async Task SeedForUser(long userId)

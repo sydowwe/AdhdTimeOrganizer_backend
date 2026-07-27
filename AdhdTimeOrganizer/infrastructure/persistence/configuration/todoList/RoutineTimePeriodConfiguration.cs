@@ -1,7 +1,7 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.todoList;
 
@@ -10,6 +10,7 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
     public void Configure(EntityTypeBuilder<RoutineTimePeriod> builder)
     {
         builder.BaseTextColorEntityConfigure();
+        builder.HasIndex(t => new { t.UserId, t.Text }).IsUnique();
 
         builder.Property(t => t.HistoryDepth).IsRequired();
         builder.Property(t => t.ResetAnchorDay).IsRequired();

@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.domain.model.entity.@base.core;
 using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.domain.entity.@base;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activity.profile;
 

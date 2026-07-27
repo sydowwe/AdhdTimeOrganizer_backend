@@ -1,10 +1,10 @@
 using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.calendar;
 using AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard.calendar;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard.calendar;
 

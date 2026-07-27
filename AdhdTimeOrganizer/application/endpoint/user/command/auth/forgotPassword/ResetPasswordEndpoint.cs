@@ -1,8 +1,7 @@
-﻿using AdhdTimeOrganizer.application.dto.request.user;
-using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
+using Sydowwe.Framework.application.endpoint.user.command.auth;
+using Sydowwe.Framework.domain.extServiceContract.user.auth;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.forgotPassword;
 
@@ -10,49 +9,4 @@ public class ResetPasswordEndpoint(
     UserManager<User> userManager,
     IRefreshTokenService refreshTokenService,
     IGoogleRecaptchaService googleRecaptchaService)
-    : Endpoint<ResetPasswordRequest, EmptyResponse>
-{
-    public override void Configure()
-    {
-        Post("/auth/reset-password");
-        AllowAnonymous();
-        Throttle(hitLimit: 5, durationSeconds: 60, headerName: "X-Real-IP");
-        Summary(s => { s.Summary = "Reset password using reset token"; });
-    }
-
-    public override async Task HandleAsync(ResetPasswordRequest req, CancellationToken ct)
-    {
-        var recaptchaResult = await googleRecaptchaService.VerifyRecaptchaAsync(req.RecaptchaToken, "reset_password");
-        if (recaptchaResult.Failed)
-        {
-            AddError("Recaptcha verification failed.");
-            await Send.ErrorsAsync(400, ct);
-            return;
-        }
-
-        var user = await userManager.FindByIdAsync(req.UserId.ToString());
-        if (user is null)
-        {
-            AddError("Invalid or expired reset token");
-            await Send.ErrorsAsync(400, ct);
-            return;
-        }
-
-        var result = await userManager.ResetPasswordAsync(user, req.Token, req.NewPassword);
-
-        if (!result.Succeeded)
-        {
-            foreach (var error in result.Errors)
-            {
-                AddError(error.Description);
-            }
-            await Send.ErrorsAsync(400, ct);
-            return;
-        }
-
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-        await refreshTokenService.RevokeAllUserTokensAsync(user.Id, ipAddress);
-
-        await Send.NoContentAsync(ct);
-    }
-}
+    : BaseResetPasswordEndpoint<User>(userManager, refreshTokenService, googleRecaptchaService);

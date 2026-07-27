@@ -1,9 +1,9 @@
-using AdhdTimeOrganizer.application.dto.request.generic;
-using AdhdTimeOrganizer.application.endpoint.@base.command;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using Sydowwe.Framework.application.dto.request.generic;
+using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.lookup.weatherDependency.command;
 
 public class UpdateActivityWeatherDependencyEndpoint(AppDbContext dbContext)
-    : BaseUpdateEndpoint<ActivityWeatherDependency, SelectOptionRequest<ActivityWeatherDependency>>(dbContext);
+    : BaseUpdateEndpoint<ActivityWeatherDependency, LookupRequest<ActivityWeatherDependency>>(dbContext);

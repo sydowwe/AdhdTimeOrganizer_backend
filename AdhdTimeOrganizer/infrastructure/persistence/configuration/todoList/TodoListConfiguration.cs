@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.todoList;
 
@@ -11,6 +12,7 @@ public class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
     {
         builder.BaseNameTextEntityConfigure();
         builder.IsManyWithOneUser(u => u.TodoListColl);
+        builder.HasIndex(r => new { r.UserId, r.Name }).IsUnique();
 
         builder.Property(r => r.Icon).HasMaxLength(255);
 

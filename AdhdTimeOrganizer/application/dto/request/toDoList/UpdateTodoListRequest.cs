@@ -1,12 +1,10 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
 public record UpdateTodoListItemRequest : BaseUpdateTodoListRequest, IUpdateRequest<TodoListItem>
 {
-    [Required]
     public long TaskPriorityId { get; init; }
 
     public DateOnly? DueDate { get; init; }

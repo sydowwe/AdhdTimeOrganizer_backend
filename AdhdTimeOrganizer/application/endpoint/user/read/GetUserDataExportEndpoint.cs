@@ -1,10 +1,10 @@
 using System.Text;
 using System.Text.Json;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.read;
 
@@ -114,7 +114,7 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
                 preferences = new
                 {
                     theme = user.Theme.ToString().ToLowerInvariant(),
-                    locale = user.CurrentLocale.ToString().ToUpperInvariant(),
+                    locale = user.Locale.ToString().ToUpperInvariant(),
                     timezone = user.Timezone.Id,
                     firstDayOfWeek = user.FirstDayOfWeek,
                     askBeforeDelete = user.AskBeforeDelete

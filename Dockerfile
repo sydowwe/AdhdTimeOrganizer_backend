@@ -19,5 +19,8 @@ RUN mkdir -p /app/secrets && chmod 700 /app/secrets
 COPY --from=build /app/publish .
 
 ENV ASPNETCORE_URLS=http://+:8080
+# EcdsaKeyProvider reads this as a raw env var (no fallback) and throws if it is unset.
+# No .env is copied into the image, so it has to be set here.
+ENV ECDSA_PRIVATE_KEY_PATH=secrets/ec_private.pem
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "AdhdTimeOrganizer.dll"]

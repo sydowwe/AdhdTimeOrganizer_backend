@@ -1,13 +1,15 @@
+﻿using System.Globalization;
 using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.android;
 using AdhdTimeOrganizer.application.endpointGroups;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.security;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.security;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.android.command;
 
@@ -20,7 +22,7 @@ public class AndroidSyncEndpoint(AppDbContext dbContext) : Endpoint<AndroidSyncR
         Summary(s => s.Description = "Sync Android session data from mobile device");
         Validator<AndroidSyncValidator>();
         Group<ActivityTrackingAndroidGroup>();
-        Policies("ActivityTracking");
+        Policies(PortalAuthorizationPolicies.ActivityTracking);
     }
 
     public override async Task HandleAsync(AndroidSyncRequest req, CancellationToken ct)
@@ -34,8 +36,8 @@ public class AndroidSyncEndpoint(AppDbContext dbContext) : Endpoint<AndroidSyncR
 
         foreach (var item in req.Sessions)
         {
-            if (!DateTime.TryParse(item.SessionStartUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var start) ||
-                !DateTime.TryParse(item.SessionEndUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var end))
+            if (!DateTime.TryParse(item.SessionStartUtc, null, DateTimeStyles.RoundtripKind, out var start) ||
+                !DateTime.TryParse(item.SessionEndUtc, null, DateTimeStyles.RoundtripKind, out var end))
             {
                 Logger.LogWarning("Android sync: skipping session with unparseable dates. Package={Package} Start={Start} End={End}",
                     item.PackageName, item.SessionStartUtc, item.SessionEndUtc);
@@ -101,7 +103,7 @@ public class AndroidSyncEndpoint(AppDbContext dbContext) : Endpoint<AndroidSyncR
                 AppLabel = session.AppLabel,
                 SessionStartUtc = session.Start,
                 SessionEndUtc = session.End,
-                DurationSeconds = session.Duration,
+                DurationSeconds = session.Duration
             });
 
             accepted++;

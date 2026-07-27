@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.application.dto.response.activity.profile;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.backlog.query;
 
@@ -37,6 +37,6 @@ public class GetByIdActivityBacklogProfileEndpoint(AppDbContext dbContext)
             return;
         }
 
-        await Send.OkAsync(ActivityBacklogProfileResponse.FromEntity(entity), ct);
+        await Send.OkAsync(ActivityBacklogProfileResponse.Projection(new[] { entity }.AsQueryable()).Single(), ct);
     }
 }

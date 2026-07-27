@@ -1,10 +1,10 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.android.dashboard;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.android.query;
 
@@ -52,9 +52,7 @@ public class AndroidTimelineEndpoint(AppDbContext db) : Endpoint<AndroidTimeline
             .ToList();
 
         if (req.MinSeconds is > 0)
-        {
             sessions = sessions.Where(s => s.DurationSeconds >= req.MinSeconds.Value).ToList();
-        }
 
         long id = 1;
         foreach (var session in sessions)

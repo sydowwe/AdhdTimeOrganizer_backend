@@ -22,11 +22,9 @@
         "LOGGING_LEVEL": "Information",
         "PAGE_URL": "https://localhost:3000",
         "API_URL": "https://localhost:8080",
-
         "MAIL_SMTP_SERVER": "smtp.gmail.com",
         "MAIL_SMTP_PORT": "465",
         "MAIL_FROM_EMAIL": "info@adhdTimeOrganizer.com"
-
       }
     },
     "http": {

@@ -1,17 +1,16 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.taskPlanner.template;
 
 public record TemplatePlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<TemplatePlannerTask>
 {
-    [Required]
     public required long TemplateId { get; init; }
 
 
     public TemplatePlannerTask ToEntity => new()
     {
+        UserId = 0,
         TemplateId = TemplateId,
         ActivityId = ActivityId,
         ImportanceId = ImportanceId,
@@ -19,7 +18,7 @@ public record TemplatePlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<Te
         EndTime = EndTime.ToTimeOnly(),
         IsBackground = IsBackground,
         Location = Location,
-        Notes = Notes,
+        Notes = Notes
     };
 
     public void UpdateEntity(TemplatePlannerTask entity)

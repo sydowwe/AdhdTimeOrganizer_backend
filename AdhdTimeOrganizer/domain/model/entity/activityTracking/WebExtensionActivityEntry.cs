@@ -5,7 +5,7 @@ namespace AdhdTimeOrganizer.domain.model.entity.activityTracking;
 public class WebExtensionActivityEntry : BaseEntityWithUser
 {
     public required DateOnly RecordDate { get; set; }
-    public required DateTime WindowStart { get; set; }  // Always 1-min aligned
+    public required DateTime WindowStart { get; set; } // Always 1-min aligned
     public required string Domain { get; set; }
     public required string? Url { get; set; }
     public required int ActiveSeconds { get; set; }

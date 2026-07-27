@@ -1,6 +1,6 @@
-using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
-
+using Sydowwe.Framework.application.dto.response;
+using Sydowwe.Framework.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.application.dto.response.activity.profile;
 
@@ -13,8 +13,9 @@ public record ActivityBucketListProfileResponse : IdResponse, IProjectionRespons
     public decimal? FinancialGoal { get; init; }
     public required string InspirationSource { get; init; }
 
-    public static IQueryable<ActivityBucketListProfileResponse> Projection(IQueryable<ActivityBucketListProfile> query) =>
-        query.Select(e => new ActivityBucketListProfileResponse
+    public static IQueryable<ActivityBucketListProfileResponse> Projection(IQueryable<ActivityBucketListProfile> query)
+    {
+        return query.Select(e => new ActivityBucketListProfileResponse
         {
             Id = e.Id,
             ActivityId = e.ActivityId,
@@ -22,18 +23,7 @@ public record ActivityBucketListProfileResponse : IdResponse, IProjectionRespons
             ComfortZoneStep = e.ComfortZoneStep,
             RequiresTravel = e.RequiresTravel,
             FinancialGoal = e.FinancialGoal,
-            InspirationSource = e.InspirationSource,
+            InspirationSource = e.InspirationSource
         });
-
-    public static ActivityBucketListProfileResponse FromEntity(ActivityBucketListProfile e) =>
-        new()
-        {
-            Id = e.Id,
-            ActivityId = e.ActivityId,
-            ExperienceTypeId = e.ExperienceTypeId,
-            ComfortZoneStep = e.ComfortZoneStep,
-            RequiresTravel = e.RequiresTravel,
-            FinancialGoal = e.FinancialGoal,
-            InspirationSource = e.InspirationSource,
-        };
+    }
 }

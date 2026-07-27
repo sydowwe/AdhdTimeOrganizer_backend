@@ -1,20 +1,21 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityRoleSeeder(
     AppDbContext dbContext,
-    ILogger<ActivityRoleSeeder> logger) : IScopedService, IDevDatabaseSeeder
+    ILogger<ActivityRoleSeeder> logger) : IScopedService, IPerUserDevSeeder
 {
     public string SeederName => "ActivityRole";
     public int Order => 7;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<ActivityRole>();
+        await dbContext.TruncateTableCascadeAsync<ActivityRole>();
     }
 
     public async Task SeedForUser(long userId)

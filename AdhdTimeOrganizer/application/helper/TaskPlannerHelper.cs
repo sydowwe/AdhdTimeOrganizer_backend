@@ -15,8 +15,5 @@ public static class TaskPlannerHelper
             .ThenInclude(a => a.Category);
     }
 
-    public static bool TasksOverlap(this PlannerTask task, TimeOnly start2, TimeOnly end2)
-    {
-        return task.StartTime < end2 && task.EndTime > start2;
-    }
+    public static bool TasksOverlap(this PlannerTask task, TimeOnly start2, TimeOnly end2) => task.StartTime < end2 && task.EndTime > start2;
 }

@@ -1,8 +1,6 @@
 ﻿using System.Linq.Expressions;
 using AdhdTimeOrganizer.application.dto.request.@base;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.domain.result;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.infrastructure.settings;
@@ -10,6 +8,10 @@ using FastEndpoints;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.domain.result;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList;
 
@@ -20,14 +22,12 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
     private readonly TodoListSettings _settings = settings.Value;
 
 
-    
-
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
 
         Patch($"/{entityName.Kebaberize()}/change-display-order");
-        
+
 
         Summary(s =>
         {
@@ -65,8 +65,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
             if (newOrderResult.Failed)
             {
                 AddError(newOrderResult.ErrorMessage ?? "An error occurred during order calculation.");
-                var statusCode = MapErrorTypeToStatusCode(newOrderResult.ErrorType);
-                await Send.ErrorsAsync(statusCode, ct);
+                await Send.ErrorsAsync(EndpointHelper.ToStatusCode(newOrderResult.ErrorType), ct);
                 return;
             }
 
@@ -87,19 +86,6 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
     }
 
     /// <summary>
-    /// Maps a domain error type to a corresponding HTTP status code.
-    /// </summary>
-    private static int MapErrorTypeToStatusCode(ResultErrorType? errorType)
-    {
-        return errorType switch
-        {
-            ResultErrorType.NotFound => 404,
-            ResultErrorType.Conflict => 409,
-            _ => 400 // Default to 400 Bad Request for other errors
-        };
-    }
-
-    /// <summary>
     /// Calculates the new DisplayOrder value based on the surrounding items using arithmetic of precedingOrder and followingOrder.
     /// </summary>
     private async Task<Result<long>> CalculateNewOrderAsync(ChangeDisplayOrderRequest req, CancellationToken ct)
@@ -111,9 +97,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
         {
             // If the list is completely empty (no following), start with startOrder.
             if (!req.FollowingItemId.HasValue)
-            {
                 return Result.Successful(standardGap);
-            }
 
             var followingOrder = await _dbSet.GetDisplayOrderById(req.FollowingItemId.Value, ct);
 
@@ -121,6 +105,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
                 ? Result.Successful(ArithmeticNewOrderNumber(followingOrder.Value - standardGap, followingOrder.Value))
                 : Result<long>.Error(ResultErrorType.NotFound, "The specified 'FollowingItemId' was not found.");
         }
+
         if (!req.FollowingItemId.HasValue)
         {
             var precedingOrder = await _dbSet.GetDisplayOrderById(req.PrecedingItemId.Value, ct);
@@ -144,10 +129,11 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
         // If no gap (midpoint equals one of the endpoints) -> signal conflict and request rebalance
         if (newOrder == preOrder.Value || newOrder == folOrder.Value)
         {
-            await RebalanceDisplayOrdersAsync(req.FollowingItemId.Value,ct);
+            await RebalanceDisplayOrdersAsync(req.FollowingItemId.Value, ct);
             var newOrderResult = await CalculateNewOrderAsync(req, ct);
             return newOrderResult;
         }
+
         return Result.Successful(newOrder);
     }
 
@@ -160,9 +146,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
 
         var groupId = await _dbSet.GetGroupIdById(followingId, GroupFilterExpression, ct);
         if (groupId is null)
-        {
             return;
-        }
 
         var query = _dbSet.AsQueryable()
             .Where(e => e.UserId == userId);
@@ -172,9 +156,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
             .ToListAsync(ct);
 
         for (var i = 0; i < items.Count; i++)
-        {
             items[i].DisplayOrder = _settings.DisplayOrderStart - (i + 1) * _settings.DisplayOrderGap;
-        }
 
         dbContext.Set<TEntity>().UpdateRange(items);
 

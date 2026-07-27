@@ -11,7 +11,7 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(AppDbContext dbConte
     public override void Configure()
     {
         Patch($"/{typeof(TEntity).Name.Kebaberize()}/{{itemId:long:required}}/steps/{{stepId:guid:required}}/toggle");
-        
+
         Summary(s =>
         {
             var name = typeof(TEntity).Name;
@@ -55,8 +55,10 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(AppDbContext dbConte
     }
 
     protected abstract Task<TEntity?> FetchItem(long itemId, CancellationToken ct);
+
     /// <summary>Returns true if the item was reset (e.g. routine period expired), so the toggle starts fresh.</summary>
     protected virtual bool BeforeToggle(TEntity item, DateTime now) => false;
+
     protected abstract Task PublishEvent(TEntity item, CancellationToken ct);
 
     /// <summary>
@@ -104,5 +106,7 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(AppDbContext dbConte
         }
     }
 
-    protected virtual void OnItemCompleted(TEntity item, DateTime now) { }
+    protected virtual void OnItemCompleted(TEntity item, DateTime now)
+    {
+    }
 }

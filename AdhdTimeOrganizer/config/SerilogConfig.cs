@@ -41,7 +41,7 @@ public static class SerilogConfig
                 { "request_path", new SinglePropertyColumnWriter("RequestPath", PropertyWriteMethod.Raw) },
                 { "request_method", new SinglePropertyColumnWriter("RequestMethod", PropertyWriteMethod.Raw, NpgsqlDbType.Varchar) },
                 { "response_status", new SinglePropertyColumnWriter("ResponseStatus", PropertyWriteMethod.Raw, NpgsqlDbType.Integer) },
-                { "response_time_ms", new SinglePropertyColumnWriter("ResponseTimeMs", PropertyWriteMethod.Raw, NpgsqlDbType.Double) },
+                { "response_time_ms", new SinglePropertyColumnWriter("ResponseTimeMs", PropertyWriteMethod.Raw, NpgsqlDbType.Double) }
 
                 // { "user_agent", new SinglePropertyColumnWriter("UserAgent", PropertyWriteMethod.Raw, NpgsqlDbType.Varchar) },
                 // { "client_ip", new SinglePropertyColumnWriter("ClientIp", PropertyWriteMethod.Raw, NpgsqlDbType.Inet) },
@@ -52,7 +52,6 @@ public static class SerilogConfig
             };
 
             if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Production")
-            {
                 config.WriteTo.PostgreSQL(
                     databaseConnectionString,
                     "warning_logs",
@@ -70,7 +69,6 @@ public static class SerilogConfig
                     e => Log.Error(e.Message),
                     configuration
                 );
-            }
         });
     }
 }

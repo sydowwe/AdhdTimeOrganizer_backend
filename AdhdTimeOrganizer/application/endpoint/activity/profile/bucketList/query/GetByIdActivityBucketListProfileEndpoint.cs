@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.application.dto.response.activity.profile;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.bucketList.query;
 
@@ -37,6 +37,6 @@ public class GetByIdActivityBucketListProfileEndpoint(AppDbContext dbContext)
             return;
         }
 
-        await Send.OkAsync(ActivityBucketListProfileResponse.FromEntity(entity), ct);
+        await Send.OkAsync(ActivityBucketListProfileResponse.Projection(new[] { entity }.AsQueryable()).Single(), ct);
     }
 }

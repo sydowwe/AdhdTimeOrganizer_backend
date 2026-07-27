@@ -1,20 +1,21 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.helper;
+﻿using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityHistorySeeder(
     AppDbContext dbContext,
-    ILogger<ActivityHistorySeeder> logger) : IScopedService, IDevDatabaseSeeder
+    ILogger<ActivityHistorySeeder> logger) : IScopedService, IPerUserDevSeeder
 {
     public string SeederName => "ActivityHistory";
     public int Order => 14;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<ActivityHistory>();
+        await dbContext.TruncateTableCascadeAsync<ActivityHistory>();
     }
 
     public async Task SeedForUser(long userId)

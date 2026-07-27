@@ -1,22 +1,23 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.domain.model.entity.@base.core;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityBucketListProfileSeeder(
     AppDbContext dbContext,
-    ILogger<ActivityBucketListProfileSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<ActivityBucketListProfileSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "ActivityBucketListProfile";
     public int Order => 12;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<ActivityBucketListProfile>();
+        await dbContext.TruncateTableCascadeAsync<ActivityBucketListProfile>();
     }
 
     public async Task SeedForUser(long userId)
@@ -37,7 +38,10 @@ public class ActivityBucketListProfileSeeder(
         var experienceIds = await EnsureLookups<ActivityExperienceType>(userId,
             [("Adrenaline", 1), ("Travel", 2), ("Skill", 3), ("Culinary", 4), ("Cultural", 5)]);
 
-        long? GetActivityId(string name) => activities.FirstOrDefault(a => a.Name == name)?.Id;
+        long? GetActivityId(string name)
+        {
+            return activities.FirstOrDefault(a => a.Name == name)?.Id;
+        }
 
         var profiles = new List<ActivityBucketListProfile>();
 
@@ -45,7 +49,8 @@ public class ActivityBucketListProfileSeeder(
             bool requiresTravel, decimal? financialGoal, string inspirationSource)
         {
             var activityId = GetActivityId(name);
-            if (activityId == null) return;
+            if (activityId == null)
+                return;
             profiles.Add(new ActivityBucketListProfile
             {
                 ActivityId = activityId.Value,
@@ -84,7 +89,7 @@ public class ActivityBucketListProfileSeeder(
     }
 
     private async Task<Dictionary<string, long>> EnsureLookups<T>(long userId, (string Text, int SortOrder)[] entries)
-        where T : BaseLookup
+        where T : BaseLookupWithUser
     {
         var existing = await dbContext.Set<T>()
             .Where(l => l.UserId == userId)
@@ -92,7 +97,8 @@ public class ActivityBucketListProfileSeeder(
 
         foreach (var (text, sortOrder) in entries)
         {
-            if (existing.ContainsKey(text)) continue;
+            if (existing.ContainsKey(text))
+                continue;
             var entity = (T)Activator.CreateInstance(typeof(T))!;
             entity.Text = text;
             entity.SortOrder = sortOrder;

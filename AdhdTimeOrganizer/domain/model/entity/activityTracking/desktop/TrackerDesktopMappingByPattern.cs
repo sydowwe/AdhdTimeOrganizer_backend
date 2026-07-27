@@ -1,6 +1,6 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 
@@ -11,7 +11,7 @@ public class TrackerDesktopMappingByPattern : BaseEntityWithUser
     public string? ProductName { get; set; }
     public PatternMatchType? ProductNameMatchType { get; set; }
 
-    public string? WindowTitle { get; set; }          // "*.github.com", "slack.exe", "code.exe"
+    public string? WindowTitle { get; set; } // "*.github.com", "slack.exe", "code.exe"
     public PatternMatchType? WindowTitleMatchType { get; set; }
 
     public required bool IsActive { get; set; }

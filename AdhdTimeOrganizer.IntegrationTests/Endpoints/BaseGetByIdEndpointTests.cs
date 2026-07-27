@@ -1,65 +1,24 @@
-using System.Net;
-using System.Net.Http.Json;
-using AdhdTimeOrganizer.application.dto.response;
-using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.Testing;
+using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-public class BaseGetByIdEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
+[Collection("Postgres")]
+public class GetByIdActivityCategoryEndpointTests(AppDbContextFixture fixture)
+    : BaseGetByIdEndpointTests(fixture)
 {
-    private const string Route = "activity-category";
+    protected override string EndpointUrl => "api/activity-category";
 
-    private async Task<long> SeedCategoryAsync()
+    protected override async Task<long> SeedEntityAsync(DbContext db)
     {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        var category = new ActivityCategory { Name = "GetById Test", Color = "#FF0000", UserId = userId };
-        db.ActivityCategories.Add(category);
+        var category = new ActivityCategory { Name = "GetById Test", Color = "#FF0000", UserId = FakeLoggedUserService.TestUserId };
+        ((AppDbContext)db).ActivityCategories.Add(category);
         await db.SaveChangesAsync();
         return category.Id;
-    }
-
-    [Fact]
-    public async Task GetById_ExistingEntity_Returns200WithData()
-    {
-        var id = await SeedCategoryAsync();
-
-        var response = await client.GetAsync($"{Route}/{id}");
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var item = await response.Content.ReadFromJsonAsync<ActivityCategoryResponse>();
-        item.Should().NotBeNull();
-        item!.Id.Should().Be(id);
-    }
-
-    [Fact]
-    public async Task GetById_WithoutAuth_Returns401()
-    {
-        
-
-        var response = await anonClient.GetAsync($"{Route}/1");
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task GetById_NonExistingEntity_Returns404()
-    {
-        var response = await client.GetAsync($"{Route}/999999999");
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    public override async Task DisposeAsync()
-    {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        db.ActivityCategories.RemoveRange(
-            db.ActivityCategories.Where(c => c.UserId == userId));
-        await db.SaveChangesAsync();
     }
 }

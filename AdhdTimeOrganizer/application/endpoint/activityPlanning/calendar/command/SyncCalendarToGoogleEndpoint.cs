@@ -1,11 +1,11 @@
-using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Google.Apis.Calendar.v3.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar.command;
 
@@ -17,12 +17,10 @@ public class SyncCalendarToGoogleEndpoint(
     IGoogleCalendarService googleCalendarService)
     : EndpointWithoutRequest<SyncCalendarToGoogleResponse>
 {
-    
-
     public override void Configure()
     {
         Post("calendar/{id:long:required}/sync-to-google");
-        
+
         Summary(s => { s.Summary = "Sync a calendar day's planner tasks to Google Calendar"; });
     }
 

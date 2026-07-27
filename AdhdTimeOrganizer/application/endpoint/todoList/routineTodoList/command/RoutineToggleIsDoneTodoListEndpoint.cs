@@ -36,16 +36,19 @@ public class RoutineToggleIsDoneTodoListEndpoint(AppDbContext dbContext) : BaseT
                 _dbContext.Set<RoutinePeriodCompletion>().Add(completion);
         }
 
-        return periods
-            .SelectMany(p => p.RoutineTodoListColl)
-            .Where(i => ids.Contains(i.Id))
+        return Enumerable.Where(periods
+                .SelectMany(p => p.RoutineTodoListColl), i => ids.Contains(i.Id))
             .ToList();
     }
 
-    protected override void AfterItemToggled(RoutineTodoList entity, DateTime now) =>
+    protected override void AfterItemToggled(RoutineTodoList entity, DateTime now)
+    {
         RoutineResetService.UpdateItemStreak(entity, now);
+    }
 
-    protected override async Task PublishEvent(RoutineTodoList entity, CancellationToken ct) =>
+    protected override async Task PublishEvent(RoutineTodoList entity, CancellationToken ct)
+    {
         await new RoutineTodoListIsDoneChangedEvent(entity.ActivityId, entity.UserId, entity.IsDone)
             .PublishAsync(Mode.WaitForAll, ct);
+    }
 }

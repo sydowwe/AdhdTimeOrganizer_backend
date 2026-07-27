@@ -1,6 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.request.@interface;
-
-namespace AdhdTimeOrganizer.application.dto.request.extendable;
+﻿namespace AdhdTimeOrganizer.application.dto.request.extendable;
 
 public interface IActivityIdRequest
 {

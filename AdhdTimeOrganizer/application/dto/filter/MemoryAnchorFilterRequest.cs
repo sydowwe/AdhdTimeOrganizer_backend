@@ -1,8 +1,8 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class MemoryAnchorFilterRequest : IFilterRequest
+public record MemoryAnchorFilterRequest : IFilterRequest
 {
     public int? AnchorMonth { get; set; }
     public int? AnchorYear { get; set; }

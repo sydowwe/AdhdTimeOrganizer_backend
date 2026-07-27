@@ -1,8 +1,8 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class PlannerTaskFilterRequest : IFilterRequest
+public record PlannerTaskFilterRequest : IFilterRequest
 {
     public DateTime FromTimeStamp { get; set; }
     public DateTime ToTimeStamp { get; set; }

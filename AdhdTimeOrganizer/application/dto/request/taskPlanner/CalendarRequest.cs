@@ -1,7 +1,7 @@
 ﻿using AdhdTimeOrganizer.application.dto.dto;
-using AdhdTimeOrganizer.application.dto.request.@interface;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity;
+using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 

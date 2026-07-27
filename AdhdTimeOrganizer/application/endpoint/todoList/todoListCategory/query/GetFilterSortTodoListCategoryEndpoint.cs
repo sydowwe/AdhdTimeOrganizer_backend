@@ -1,10 +1,11 @@
 using AdhdTimeOrganizer.application.dto.filter;
-using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.todoList;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.request.@base.table;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoListCategory.query;
 
@@ -43,7 +44,6 @@ public class GetFilterSortTodoListCategoryEndpoint(AppDbContext dbContext)
             .AnyAsync(tl => tl.UserId == userId && tl.CategoryId == null, ct);
 
         if (hasUncategorized)
-        {
             result.Add(new TodoListCategoryResponse
             {
                 Id = -1,
@@ -52,7 +52,6 @@ public class GetFilterSortTodoListCategoryEndpoint(AppDbContext dbContext)
                 Icon = "fas fa-ellipsis",
                 Text = null
             });
-        }
 
         await Send.OkAsync(result, ct);
     }

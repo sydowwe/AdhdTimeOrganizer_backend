@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 

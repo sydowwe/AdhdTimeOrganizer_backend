@@ -1,7 +1,8 @@
 ﻿using AdhdTimeOrganizer.application.dto.dto;
-using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity;
+using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.response;
+using Sydowwe.Framework.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.application.dto.response.taskPlanner;
 
@@ -28,8 +29,9 @@ public record CalendarResponse : IdResponse, IProjectionResponse<CalendarRespons
     public required int TotalTasks { get; init; }
     public required int CompletedTasks { get; init; }
 
-    public static IQueryable<CalendarResponse> Projection(IQueryable<Calendar> query) =>
-        query.Select(c => new CalendarResponse
+    public static IQueryable<CalendarResponse> Projection(IQueryable<Calendar> query)
+    {
+        return query.Select(c => new CalendarResponse
         {
             Id = c.Id,
             Date = c.Date,
@@ -45,25 +47,7 @@ public record CalendarResponse : IdResponse, IProjectionResponse<CalendarRespons
             Weather = c.Weather,
             Notes = c.Notes,
             TotalTasks = c.Tasks.Count(),
-            CompletedTasks = c.Tasks.Count(t => t.Status == PlannerTaskStatus.Completed),
+            CompletedTasks = c.Tasks.Count(t => t.Status == PlannerTaskStatus.Completed)
         });
-
-    public static CalendarResponse FromEntity(Calendar entity) => new()
-    {
-        Id = entity.Id,
-        Date = entity.Date,
-        DayIndex = entity.Date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)entity.Date.DayOfWeek,
-        DayType = entity.DayType,
-        HolidayName = entity.HolidayName,
-        Label = entity.Label,
-        WakeUpTime = new TimeDto(entity.WakeUpTime.Hour, entity.WakeUpTime.Minute),
-        BedTime = new TimeDto(entity.BedTime.Hour, entity.BedTime.Minute),
-        AppliedTemplateId = entity.AppliedTemplateId,
-        AppliedTemplateName = entity.AppliedTemplateName,
-        Location = entity.Location,
-        Weather = entity.Weather,
-        Notes = entity.Notes,
-        TotalTasks = entity.Tasks.Count(),
-        CompletedTasks = entity.Tasks.Count(t => t.Status == PlannerTaskStatus.Completed),
-    };
+    }
 }

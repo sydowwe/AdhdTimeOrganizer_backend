@@ -1,7 +1,9 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
 
@@ -25,7 +27,7 @@ public class TaskPlannerDayTemplateConfiguration : IEntityTypeConfiguration<Task
                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
             )
             .Metadata.SetValueComparer(
-                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<string>>(
+                new ValueComparer<List<string>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
                     c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                     c => c.ToList()
@@ -36,11 +38,11 @@ public class TaskPlannerDayTemplateConfiguration : IEntityTypeConfiguration<Task
             .HasConversion(
                 v => string.Join(',', v.Select(d => d.ToString())),
                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                       .Select(d => Enum.Parse<DayOfWeek>(d))
-                       .ToList()
+                    .Select(d => Enum.Parse<DayOfWeek>(d))
+                    .ToList()
             )
             .Metadata.SetValueComparer(
-                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<DayOfWeek>>(
+                new ValueComparer<List<DayOfWeek>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
                     c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                     c => c.ToList()

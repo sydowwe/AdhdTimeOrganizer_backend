@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.@event;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.eventHandler;
 
@@ -15,8 +16,6 @@ public class ActivityCreatedIsOnTodoListEventHandler(IServiceScopeFactory scopeF
         var todoList = new TodoListItem { UserId = eventModel.UserId, ActivityId = eventModel.ActivityId, TaskPriorityId = eventModel.TaskPriorityId };
         var result = await dbContext.AddEntityAsync(todoList, ct);
         if (result.Failed)
-        {
             logger.LogError(result.ErrorMessage);
-        }
     }
 }

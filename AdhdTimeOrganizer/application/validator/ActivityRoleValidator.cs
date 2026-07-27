@@ -1,7 +1,7 @@
-﻿using AdhdTimeOrganizer.application.dto.request.@base;
+using AdhdTimeOrganizer.application.dto.request.activity;
 
 namespace AdhdTimeOrganizer.application.validator;
 
-public class ActivityRoleValidator : NameTextColorIconValidator<NameTextColorIconRequest>
+public class ActivityRoleValidator : NameTextColorIconValidator<ActivityRoleRequest>
 {
 }

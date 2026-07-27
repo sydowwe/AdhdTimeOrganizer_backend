@@ -1,10 +1,10 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Services;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.extService.googleCalendar;
 
@@ -12,9 +12,8 @@ public class GoogleCalendarService(IConfiguration configuration) : IGoogleCalend
 {
     private const string CalendarScope = "https://www.googleapis.com/auth/calendar.events";
 
-    private GoogleAuthorizationCodeFlow CreateFlow()
-    {
-        return new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
+    private GoogleAuthorizationCodeFlow CreateFlow() =>
+        new(new GoogleAuthorizationCodeFlow.Initializer
         {
             ClientSecrets = new ClientSecrets
             {
@@ -23,7 +22,6 @@ public class GoogleCalendarService(IConfiguration configuration) : IGoogleCalend
             },
             Scopes = [CalendarScope]
         });
-    }
 
     public string GetAuthUrl()
     {

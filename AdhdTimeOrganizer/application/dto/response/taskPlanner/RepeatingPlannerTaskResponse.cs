@@ -1,8 +1,9 @@
 using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.response.activity;
-using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.response;
+using Sydowwe.Framework.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.application.dto.response.taskPlanner;
 
@@ -24,8 +25,9 @@ public record RepeatingPlannerTaskResponse : IdResponse, IProjectionResponse<Rep
     public DateOnly? ActiveToDate { get; init; }
     public required IEnumerable<string> ScheduledForDayTypes { get; init; }
 
-    public static IQueryable<RepeatingPlannerTaskResponse> Projection(IQueryable<RepeatingPlannerTask> query) =>
-        query.Select(t => new RepeatingPlannerTaskResponse
+    public static IQueryable<RepeatingPlannerTaskResponse> Projection(IQueryable<RepeatingPlannerTask> query)
+    {
+        return query.Select(t => new RepeatingPlannerTaskResponse
         {
             Id = t.Id,
             Activity = new ActivityResponse
@@ -79,59 +81,5 @@ public record RepeatingPlannerTaskResponse : IdResponse, IProjectionResponse<Rep
             ActiveToDate = t.ActiveToDate,
             ScheduledForDayTypes = t.ScheduledForDayTypes
         });
-
-    public static RepeatingPlannerTaskResponse FromEntity(RepeatingPlannerTask entity) => new()
-    {
-        Id = entity.Id,
-        Activity = new ActivityResponse
-        {
-            Id = entity.Activity.Id,
-            Name = entity.Activity.Name,
-            Text = entity.Activity.Text,
-            IsUnavoidable = entity.Activity.IsUnavoidable,
-            IsOnTodoList = false,
-            Role = new ActivityRoleResponse
-            {
-                Id = entity.Activity.Role.Id,
-                Name = entity.Activity.Role.Name,
-                Text = entity.Activity.Role.Text,
-                Color = entity.Activity.Role.Color,
-                Icon = entity.Activity.Role.Icon
-            },
-            Category = entity.Activity.Category != null
-                ? new ActivityCategoryResponse
-                {
-                    Id = entity.Activity.Category.Id,
-                    Name = entity.Activity.Category.Name,
-                    Text = entity.Activity.Category.Text,
-                    Color = entity.Activity.Category.Color,
-                    Icon = entity.Activity.Category.Icon,
-                    Role = null
-                }
-                : null
-        },
-        Importance = entity.Importance != null
-            ? new TaskImportanceResponse
-            {
-                Id = entity.Importance.Id,
-                Text = entity.Importance.Text,
-                Color = entity.Importance.Color,
-                Icon = entity.Importance.Icon,
-                Importance = entity.Importance.Importance
-            }
-            : null,
-        StartTime = new TimeDto(entity.StartTime.Hour, entity.StartTime.Minute),
-        EndTime = new TimeDto(entity.EndTime.Hour, entity.EndTime.Minute),
-        IsBackground = entity.IsBackground,
-        Location = entity.Location,
-        Notes = entity.Notes,
-        Color = entity.Activity.Role.Color,
-        IsActive = entity.IsActive,
-        RecurrenceType = entity.RecurrenceType,
-        ScheduledDays = entity.ScheduledDays,
-        ScheduledDates = entity.ScheduledDates,
-        ActiveFromDate = entity.ActiveFromDate,
-        ActiveToDate = entity.ActiveToDate,
-        ScheduledForDayTypes = entity.ScheduledForDayTypes
-    };
+    }
 }

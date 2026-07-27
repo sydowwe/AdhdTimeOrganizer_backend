@@ -69,7 +69,7 @@ public class RepeatingPlannerTaskValidator : Validator<RepeatingPlannerTaskReque
             .Must(x => x.ActiveFromDate!.Value <= x.ActiveToDate!.Value)
             .WithMessage("ActiveFromDate must be on or before ActiveToDate.")
             .When(x => x.RecurrenceType == RecurrenceType.DateRange
-                        && x.ActiveFromDate.HasValue && x.ActiveToDate.HasValue);
+                       && x.ActiveFromDate.HasValue && x.ActiveToDate.HasValue);
 
         // DayType: ScheduledForDayTypes must be non-empty with valid DayType names
         RuleFor(x => x.ScheduledForDayTypes)

@@ -1,26 +1,27 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class UserPlannerSettingsSeeder(
     AppDbContext dbContext,
-    ILogger<UserPlannerSettingsSeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<UserPlannerSettingsSeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "UserPlannerSettings";
     public int Order => 5;
 
-    private static UserPlannerSettings Default(long userId) => new()
-    {
-        UserId = userId,
-        RemindersEnabled = true,
-        ReminderMinutesBefore = 10,
-        DetailsPanelExpandedByDefault = true,
-        ArrowKeyNavEnabled = true,
-        PredefinedSkipReasons = []
-    };
+    private static UserPlannerSettings Default(long userId) =>
+        new()
+        {
+            UserId = userId,
+            RemindersEnabled = true,
+            ReminderMinutesBefore = 10,
+            DetailsPanelExpandedByDefault = true,
+            ArrowKeyNavEnabled = true,
+            PredefinedSkipReasons = []
+        };
 
     public async Task SetupDefaults(long userId, CancellationToken ct = default)
     {

@@ -1,21 +1,22 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity.profile;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityProjectProfileSeeder(
     AppDbContext dbContext,
-    ILogger<ActivityProjectProfileSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<ActivityProjectProfileSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "ActivityDiyProfile";
     public int Order => 11;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<ActivityProjectProfile>();
+        await dbContext.TruncateTableCascadeAsync<ActivityProjectProfile>();
     }
 
     public async Task SeedForUser(long userId)
@@ -33,7 +34,10 @@ public class ActivityProjectProfileSeeder(
             return;
         }
 
-        long? GetId(string name) => activities.FirstOrDefault(a => a.Name == name)?.Id;
+        long? GetId(string name)
+        {
+            return activities.FirstOrDefault(a => a.Name == name)?.Id;
+        }
 
         var profiles = new List<ActivityProjectProfile>();
 
@@ -41,7 +45,8 @@ public class ActivityProjectProfileSeeder(
             bool isMessy, List<string> materials, List<string> tools, ReadinessStatus readiness)
         {
             var activityId = GetId(name);
-            if (activityId == null) return;
+            if (activityId == null)
+                return;
             profiles.Add(new ActivityProjectProfile
             {
                 ActivityId = activityId.Value,

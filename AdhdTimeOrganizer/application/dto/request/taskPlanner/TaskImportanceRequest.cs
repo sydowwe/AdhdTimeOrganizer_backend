@@ -1,17 +1,16 @@
-using System.ComponentModel.DataAnnotations;
 using AdhdTimeOrganizer.application.dto.request.@base;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 
 public record TaskImportanceRequest : TextColorRequest, IMyRequest<TaskImportance>
 {
-    [Required]
     public short Importance { get; init; }
 
     public TaskImportance ToEntity => new()
     {
+        UserId = 0,
         Text = Text,
         Color = Color,
         Importance = Importance

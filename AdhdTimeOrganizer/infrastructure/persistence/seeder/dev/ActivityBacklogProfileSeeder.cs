@@ -1,23 +1,24 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.domain.model.entity.@base.core;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityBacklogProfileSeeder(
     AppDbContext dbContext,
-    ILogger<ActivityBacklogProfileSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<ActivityBacklogProfileSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "ActivityBacklogProfile";
     public int Order => 10;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<ActivityBacklogProfile>();
+        await dbContext.TruncateTableCascadeAsync<ActivityBacklogProfile>();
     }
 
     public async Task SeedForUser(long userId)
@@ -42,7 +43,10 @@ public class ActivityBacklogProfileSeeder(
         var costIds = await EnsureLookups<ActivityExpectedCostTier>(userId,
             [("Free", 1), ("Cheap", 2), ("Moderate", 3), ("Expensive", 4)]);
 
-        long? GetActivityId(string name) => activities.FirstOrDefault(a => a.Name == name)?.Id;
+        long? GetActivityId(string name)
+        {
+            return activities.FirstOrDefault(a => a.Name == name)?.Id;
+        }
 
         var profiles = new List<ActivityBacklogProfile>();
 
@@ -51,7 +55,8 @@ public class ActivityBacklogProfileSeeder(
             int durationMinutes, bool isRepeatable)
         {
             var activityId = GetActivityId(name);
-            if (activityId == null) return;
+            if (activityId == null)
+                return;
             profiles.Add(new ActivityBacklogProfile
             {
                 ActivityId = activityId.Value,
@@ -67,16 +72,16 @@ public class ActivityBacklogProfileSeeder(
             });
         }
 
-        Add("Gaming Session",      "Indoor",  "None",  EnergyLevel.Low,    EffortType.Mental,   "Free",     1, null, 120, true);
-        Add("Watch Movie/Series",  "Indoor",  "None",  EnergyLevel.Low,    EffortType.Mental,   "Free",     1, null, 120, true);
-        Add("Meditation",          "Indoor",  "None",  EnergyLevel.Low,    null,                "Free",     1, 1,   30,  true);
-        Add("Journaling",          "Indoor",  "None",  EnergyLevel.Medium, EffortType.Mental,   "Free",     1, 1,   45,  true);
-        Add("Coffee with Friends", "Any",     "None",  EnergyLevel.Medium, null,                "Cheap",    2, 6,   90,  true);
-        Add("Read Technical Book", "Indoor",  "None",  EnergyLevel.Medium, EffortType.Mental,   "Free",     1, null, 60,  false);
-        Add("Online Course",       "Indoor",  "Snow",  EnergyLevel.High,   EffortType.Mental,   "Expensive",1, null, 90,  true);
-        Add("Grocery Shopping",    "Outdoor", "Sunny", EnergyLevel.Medium, EffortType.Physical, "Moderate", 1, 2,   60,  true);
-        Add("Morning Exercise",    "Outdoor", "Dry",   EnergyLevel.High,   EffortType.Physical, "Free",     1, null, 60,  true);
-        Add("Video Call Parents",  "Any",     "None",  EnergyLevel.Low,    null,                "Free",     2, 5,   45,  true);
+        Add("Gaming Session", "Indoor", "None", EnergyLevel.Low, EffortType.Mental, "Free", 1, null, 120, true);
+        Add("Watch Movie/Series", "Indoor", "None", EnergyLevel.Low, EffortType.Mental, "Free", 1, null, 120, true);
+        Add("Meditation", "Indoor", "None", EnergyLevel.Low, null, "Free", 1, 1, 30, true);
+        Add("Journaling", "Indoor", "None", EnergyLevel.Medium, EffortType.Mental, "Free", 1, 1, 45, true);
+        Add("Coffee with Friends", "Any", "None", EnergyLevel.Medium, null, "Cheap", 2, 6, 90, true);
+        Add("Read Technical Book", "Indoor", "None", EnergyLevel.Medium, EffortType.Mental, "Free", 1, null, 60, false);
+        Add("Online Course", "Indoor", "Snow", EnergyLevel.High, EffortType.Mental, "Expensive", 1, null, 90, true);
+        Add("Grocery Shopping", "Outdoor", "Sunny", EnergyLevel.Medium, EffortType.Physical, "Moderate", 1, 2, 60, true);
+        Add("Morning Exercise", "Outdoor", "Dry", EnergyLevel.High, EffortType.Physical, "Free", 1, null, 60, true);
+        Add("Video Call Parents", "Any", "None", EnergyLevel.Low, null, "Free", 2, 5, 45, true);
 
         await dbContext.Set<ActivityBacklogProfile>().AddRangeAsync(profiles);
         await dbContext.SaveChangesAsync();
@@ -85,7 +90,7 @@ public class ActivityBacklogProfileSeeder(
     }
 
     private async Task<Dictionary<string, long>> EnsureLookups<T>(long userId, (string Text, int SortOrder)[] entries)
-        where T : BaseLookup
+        where T : BaseLookupWithUser
     {
         var existing = await dbContext.Set<T>()
             .Where(l => l.UserId == userId)
@@ -93,7 +98,8 @@ public class ActivityBacklogProfileSeeder(
 
         foreach (var (text, sortOrder) in entries)
         {
-            if (existing.ContainsKey(text)) continue;
+            if (existing.ContainsKey(text))
+                continue;
             var entity = (T)Activator.CreateInstance(typeof(T))!;
             entity.Text = text;
             entity.SortOrder = sortOrder;

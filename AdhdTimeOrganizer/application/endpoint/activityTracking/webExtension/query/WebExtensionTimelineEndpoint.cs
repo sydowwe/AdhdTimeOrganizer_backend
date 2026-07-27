@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.timeline;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
@@ -106,7 +106,8 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
             for (var offset = -ContextWindowRadius; offset <= ContextWindowRadius; offset++)
             {
                 var idx = i + offset;
-                if (idx < 0 || idx >= sortedMinutes.Count) continue;
+                if (idx < 0 || idx >= sortedMinutes.Count)
+                    continue;
 
                 var neighborMinute = sortedMinutes[idx];
 
@@ -130,10 +131,8 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
                 currentMinute, primary.Domain, primary.Url, secondsSelector(primary)));
 
             foreach (var other in ordered.Skip(1))
-            {
                 secondaryMinutes.Add(new MinuteEntry(
                     other.WindowStart, other.Domain, other.Url, secondsSelector(other)));
-            }
         }
 
         // Step 3: Build primary sessions chronologically (no overlaps since one domain per minute)
@@ -183,7 +182,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
                     StartedAt = min.WindowStart,
                     EndedAt = windowEnd,
                     DurationSeconds = 60,
-                    TotalSeconds = min.Seconds,
+                    TotalSeconds = min.Seconds
                 };
             }
         }
@@ -212,13 +211,15 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
             {
                 for (var j = i + 1; j < Math.Min(i + 4, sessions.Count); j++)
                 {
-                    if (sessions[j].Domain != sessions[i].Domain) continue;
+                    if (sessions[j].Domain != sessions[i].Domain)
+                        continue;
 
                     var gapDuration = 0;
                     for (var k = i + 1; k < j; k++)
                         gapDuration += sessions[k].DurationSeconds;
 
-                    if (gapDuration > thresholdMinutes * 60) continue;
+                    if (gapDuration > thresholdMinutes * 60)
+                        continue;
 
                     // Move gap sessions to detail
                     for (var k = i + 1; k < j; k++)
@@ -230,7 +231,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
                         EndedAt = sessions[j].EndedAt,
                         DurationSeconds = (int)(sessions[j].EndedAt - sessions[i].StartedAt).TotalSeconds,
                         TotalSeconds = sessions[i].TotalSeconds + sessions[j].TotalSeconds,
-                        Url = sessions[i].Url ?? sessions[j].Url,
+                        Url = sessions[i].Url ?? sessions[j].Url
                     };
 
                     // Remove gap sessions and sessions[j]
@@ -239,7 +240,8 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
                     break;
                 }
 
-                if (merged) break;
+                if (merged)
+                    break;
             }
         } while (merged);
 
@@ -251,7 +253,8 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
     /// </summary>
     private static List<TimelineSession> MergeAdjacentSessions(List<TimelineSession> sessions)
     {
-        if (sessions.Count == 0) return sessions;
+        if (sessions.Count == 0)
+            return sessions;
 
         sessions = sessions.OrderBy(s => s.StartedAt).ThenBy(s => s.Domain).ToList();
         var result = new List<TimelineSession> { sessions[0] };
@@ -269,7 +272,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
                     EndedAt = newEnd,
                     DurationSeconds = (int)(newEnd - last.StartedAt).TotalSeconds,
                     TotalSeconds = last.TotalSeconds + current.TotalSeconds,
-                    Url = last.Url ?? current.Url,
+                    Url = last.Url ?? current.Url
                 };
             }
             else
@@ -322,7 +325,7 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
                         StartedAt = record.WindowStart,
                         EndedAt = windowEnd,
                         DurationSeconds = 60,
-                        TotalSeconds = record.BackgroundSeconds,
+                        TotalSeconds = record.BackgroundSeconds
                     };
                 }
             }
@@ -346,7 +349,8 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
     /// </summary>
     private static List<TimelineSession> BridgeGaps(List<TimelineSession> sessions)
     {
-        if (sessions.Count <= 1) return sessions;
+        if (sessions.Count <= 1)
+            return sessions;
 
         var result = new List<TimelineSession> { sessions[0] };
 
@@ -357,19 +361,15 @@ public class WebExtensionTimelineEndpoint(AppDbContext dbContext)
             var gapMinutes = (current.StartedAt - last.EndedAt).TotalMinutes;
 
             if (gapMinutes <= ContextSwitchThresholdMinutes)
-            {
                 result[^1] = last with
                 {
                     EndedAt = current.EndedAt,
                     DurationSeconds = (int)(current.EndedAt - last.StartedAt).TotalSeconds,
                     TotalSeconds = last.TotalSeconds + current.TotalSeconds,
-                    Url = last.Url ?? current.Url,
+                    Url = last.Url ?? current.Url
                 };
-            }
             else
-            {
                 result.Add(current);
-            }
         }
 
         return result;

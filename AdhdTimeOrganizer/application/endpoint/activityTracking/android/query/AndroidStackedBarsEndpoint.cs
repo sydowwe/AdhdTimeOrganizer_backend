@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.android.dashboard;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.android.query;
 
@@ -38,9 +38,7 @@ public class AndroidStackedBarsEndpoint(AppDbContext db) : Endpoint<AndroidStack
         var windows = BuildWindows(sessions, from, to, req.WindowMinutes);
 
         if (req.MinSeconds is > 0)
-        {
             windows = FilterByMinSeconds(windows, req.MinSeconds.Value);
-        }
 
         await Send.ResponseAsync(windows.OrderBy(w => w.WindowStart), cancellation: ct);
     }
@@ -82,14 +80,12 @@ public class AndroidStackedBarsEndpoint(AppDbContext db) : Endpoint<AndroidStack
                 .ToList();
 
             if (apps.Count > 0)
-            {
                 windows.Add(new AndroidStackedBarsWindow
                 {
                     WindowStart = windowStart,
                     WindowEnd = windowEnd,
                     Apps = apps
                 });
-            }
 
             windowStart = windowEnd;
         }
@@ -108,14 +104,12 @@ public class AndroidStackedBarsEndpoint(AppDbContext db) : Endpoint<AndroidStack
                 var below = w.Apps.Where(a => a.Seconds < minSeconds).ToList();
 
                 if (below.Count > 0)
-                {
                     above.Add(new AndroidWindowApp
                     {
                         PackageName = "_other",
                         AppLabel = "_other",
                         Seconds = below.Sum(a => a.Seconds)
                     });
-                }
 
                 return new AndroidStackedBarsWindow
                 {

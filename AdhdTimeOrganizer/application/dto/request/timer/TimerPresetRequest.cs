@@ -1,12 +1,10 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.entity.timer;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.timer;
 
 public record TimerPresetRequest : IMyRequest<TimerPreset>
 {
-    [Required]
     public required int Duration { get; init; }
 
     public long? ActivityId { get; init; }

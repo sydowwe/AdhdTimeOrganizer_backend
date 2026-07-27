@@ -1,14 +1,14 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
+﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class RoutineTimePeriodSeeder(
     AppDbContext dbContext,
-    ILogger<RoutineTimePeriodSeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<RoutineTimePeriodSeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "RoutineTimePeriod";
     public int Order => 3;
@@ -53,9 +53,7 @@ public class RoutineTimePeriodSeeder(
             .ToListAsync(ct);
 
         if (defaults.Count != existing.Count)
-        {
             return false;
-        }
 
         for (var i = 0; i < defaults.Count; i++)
         {

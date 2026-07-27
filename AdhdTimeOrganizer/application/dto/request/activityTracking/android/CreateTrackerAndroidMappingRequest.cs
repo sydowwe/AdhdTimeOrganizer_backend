@@ -1,6 +1,6 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
+using Sydowwe.Framework.application.dto.request.@interface;
+using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.application.dto.request.activityTracking.android;
 
@@ -21,6 +21,7 @@ public record CreateTrackerAndroidMappingRequest : ICreateRequest<TrackerAndroid
 
     public TrackerAndroidMappingByPattern ToEntity => new()
     {
+        UserId = 0,
         PackageName = PackageName,
         PackageNameMatchType = PackageNameMatchType,
         AppLabel = AppLabel,
@@ -29,6 +30,6 @@ public record CreateTrackerAndroidMappingRequest : ICreateRequest<TrackerAndroid
         IsIgnored = IsIgnored,
         ActivityId = ActivityId,
         RoleId = RoleId,
-        CategoryId = CategoryId,
+        CategoryId = CategoryId
     };
 }

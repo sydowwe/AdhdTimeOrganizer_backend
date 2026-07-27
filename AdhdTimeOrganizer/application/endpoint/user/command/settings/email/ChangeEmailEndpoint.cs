@@ -1,43 +1,13 @@
-﻿using AdhdTimeOrganizer.application.dto.request.user;
-using AdhdTimeOrganizer.application.helper;
-using AdhdTimeOrganizer.application.preprocessor;
-using AdhdTimeOrganizer.domain.extServiceContract.user;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
+using Sydowwe.Framework.application.endpoint.user.command.auth;
+using Sydowwe.Framework.domain.extServiceContract.user;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.settings.email;
 
 public class ChangeEmailEndpoint(
     UserManager<User> userManager,
-    IUserEmailSenderService emailSender)
-    : Endpoint<ChangeEmailRequest, EmptyResponse>
+    IUserEmailSenderService<User> emailSender)
+    : BaseChangeEmailEndpoint<User>(userManager, emailSender)
 {
-    public override void Configure()
-    {
-        Patch("user/change-email");
-        PreProcessor<VerifyUserPreProcessor<VerifyUserRequest>>();
-        Summary(s => { s.Summary = "Change user email address"; });
-    }
-
-    public override async Task HandleAsync(ChangeEmailRequest req, CancellationToken ct)
-    {
-        var user = HttpContext.GetVerifiedUser();
-
-        // Check if email is already taken
-        var existingUser = await userManager.FindByEmailAsync(req.NewEmail);
-        if (existingUser is not null)
-        {
-            AddError(r => r.NewEmail, "Email address is already in use");
-            await Send.ErrorsAsync(400, ct);
-            return;
-        }
-
-        // Generate email change token and send confirmation email
-        var token = await userManager.GenerateChangeEmailTokenAsync(user, req.NewEmail);
-
-        await emailSender.SendEmailChangeConfirmationAsync(user, req.NewEmail, token);
-
-        await Send.NoContentAsync(ct);
-    }
 }

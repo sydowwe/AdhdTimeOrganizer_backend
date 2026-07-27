@@ -1,17 +1,15 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.application.dto.request.taskPlanner.template;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 
 public record RepeatingPlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<RepeatingPlannerTask>
 {
-    [Required]
     public required bool IsActive { get; init; }
 
-    [Required]
+
     public required RecurrenceType RecurrenceType { get; init; }
 
     public IEnumerable<string> ScheduledDays { get; init; } = [];
@@ -22,6 +20,7 @@ public record RepeatingPlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<R
 
     public RepeatingPlannerTask ToEntity => new()
     {
+        UserId = 0,
         StartTime = StartTime.ToTimeOnly(),
         EndTime = EndTime.ToTimeOnly(),
         IsBackground = IsBackground,

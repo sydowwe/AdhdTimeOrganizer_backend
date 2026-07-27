@@ -1,8 +1,8 @@
-using AdhdTimeOrganizer.application.dto.filter;
+﻿using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.todoList;
-using AdhdTimeOrganizer.application.endpoint.@base.read.pageFilterSort;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.todoList.query;
 
@@ -15,11 +15,9 @@ public class FilterSortTodoListEndpoint(AppDbContext dbContext)
             query = query.Where(tl => tl.Name.Contains(filter.Name));
 
         if (filter.CategoryId.HasValue)
-        {
             query = filter.CategoryId.Value == -1
                 ? query.Where(tl => tl.CategoryId == null)
                 : query.Where(tl => tl.CategoryId == filter.CategoryId.Value);
-        }
 
         return query;
     }

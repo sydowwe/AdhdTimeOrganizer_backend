@@ -1,8 +1,9 @@
 using AdhdTimeOrganizer.application.dto.dto;
-using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.application.dto.response.generic;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.response;
+using Sydowwe.Framework.application.dto.response.@base;
+using Sydowwe.Framework.application.dto.response.generic;
 
 namespace AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 
@@ -21,8 +22,9 @@ public record TaskPlannerDayTemplateResponse : IdResponse, IProjectionResponse<T
     public Location? SuggestedLocation { get; init; }
     public required List<string> Tags { get; init; }
 
-    public static IQueryable<TaskPlannerDayTemplateResponse> Projection(IQueryable<TaskPlannerDayTemplate> query) =>
-        query.Select(t => new TaskPlannerDayTemplateResponse
+    public static IQueryable<TaskPlannerDayTemplateResponse> Projection(IQueryable<TaskPlannerDayTemplate> query)
+    {
+        return query.Select(t => new TaskPlannerDayTemplateResponse
         {
             Id = t.Id,
             Name = t.Name,
@@ -38,24 +40,10 @@ public record TaskPlannerDayTemplateResponse : IdResponse, IProjectionResponse<T
             SuggestedLocation = t.SuggestedLocation,
             Tags = t.Tags
         });
+    }
 
-    public static TaskPlannerDayTemplateResponse FromEntity(TaskPlannerDayTemplate entity) => new()
+    public static IQueryable<SelectOptionResponse> SelectOptionProjection(IQueryable<TaskPlannerDayTemplate> query)
     {
-        Id = entity.Id,
-        Name = entity.Name,
-        Description = entity.Description,
-        Icon = entity.Icon,
-        IsActive = entity.IsActive,
-        DefaultWakeUpTime = entity.DefaultWakeUpTime != null ? new TimeDto(entity.DefaultWakeUpTime.Value.Hour, entity.DefaultWakeUpTime.Value.Minute) : null,
-        DefaultBedTime = entity.DefaultBedTime != null ? new TimeDto(entity.DefaultBedTime.Value.Hour, entity.DefaultBedTime.Value.Minute) : null,
-        UsageCount = entity.UsageCount,
-        LastUsedAt = entity.LastUsedAt,
-        SuggestedForDayType = entity.SuggestedForDayType,
-        ScheduledDays = entity.ScheduledDays,
-        SuggestedLocation = entity.SuggestedLocation,
-        Tags = entity.Tags
-    };
-
-    public static IQueryable<SelectOptionResponse> SelectOptionProjection(IQueryable<TaskPlannerDayTemplate> query) =>
-        query.Select(t => new SelectOptionResponse { Id = t.Id, Text = t.Name });
+        return query.Select(t => new SelectOptionResponse { Id = t.Id, Text = t.Name });
+    }
 }

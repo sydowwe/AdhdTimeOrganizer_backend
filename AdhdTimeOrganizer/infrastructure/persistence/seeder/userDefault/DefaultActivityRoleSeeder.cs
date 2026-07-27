@@ -1,14 +1,14 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class DefaultActivityRoleSeeder(
     AppDbContext dbContext,
-    ILogger<DefaultActivityRoleSeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<DefaultActivityRoleSeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "DefaultActivityRole";
     public int Order => 4;
@@ -48,9 +48,7 @@ public class DefaultActivityRoleSeeder(
         var existing = await dbContext.ActivityRoles.Where(ar => ar.UserId == userId).OrderBy(ar => ar.Id).Take(defaults.Count).ToListAsync(ct);
 
         if (defaults.Count != existing.Count)
-        {
             return false;
-        }
 
         for (var i = 0; i < defaults.Count; i++)
         {

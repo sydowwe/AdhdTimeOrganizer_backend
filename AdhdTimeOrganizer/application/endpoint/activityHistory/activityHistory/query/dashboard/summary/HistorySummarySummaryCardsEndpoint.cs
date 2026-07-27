@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.summary;
 using AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard.summary;
 
@@ -58,11 +58,9 @@ public class HistorySummarySummaryCardsEndpoint(AppDbContext db) : Endpoint<Hist
 
         // For sameWeekday, filter to matching weekdays
         if (baselineWeekdayFilter != null)
-        {
             baselineRecords = baselineRecords
                 .Where(ah => baselineWeekdayFilter.Contains(ah.StartTimestamp.DayOfWeek))
                 .ToList();
-        }
 
         // Compute baseline days for daily average
         var baselineDays = ComputeBaselineDays(baselineFrom, from, req.Baseline, baselineRecords, baselineWeekdayFilter);
@@ -81,9 +79,7 @@ public class HistorySummarySummaryCardsEndpoint(AppDbContext db) : Endpoint<Hist
 
             double? percentChange = null;
             if (!isNew && baselineDailyAvg > 0)
-            {
                 percentChange = Math.Round((double)(currentDailyAvg - baselineDailyAvg) / baselineDailyAvg * 100, 1);
-            }
 
             return new HistorySummaryCard
             {
@@ -112,9 +108,7 @@ public class HistorySummarySummaryCardsEndpoint(AppDbContext db) : Endpoint<Hist
 
         double? periodPercentChange = null;
         if (previousTotal > 0)
-        {
             periodPercentChange = Math.Round((double)(currentTotal - previousTotal) / previousTotal * 100, 1);
-        }
 
         var response = new HistorySummaryCardsResponse
         {
@@ -156,6 +150,7 @@ public class HistorySummarySummaryCardsEndpoint(AppDbContext db) : Endpoint<Hist
             weekdays.Add(current.DayOfWeek);
             current = current.AddDays(1);
         }
+
         return weekdays;
     }
 
@@ -172,7 +167,8 @@ public class HistorySummarySummaryCardsEndpoint(AppDbContext db) : Endpoint<Hist
             case "sameweekday":
                 return 8 * (weekdayFilter?.Count ?? 1);
             case "alltime":
-                if (baselineRecords.Count == 0) return 1;
+                if (baselineRecords.Count == 0)
+                    return 1;
                 var minDate = baselineRecords.Min(ah => ah.StartTimestamp).Date;
                 var maxDate = currentFrom.Date;
                 var days = (long)(maxDate - minDate).TotalDays;

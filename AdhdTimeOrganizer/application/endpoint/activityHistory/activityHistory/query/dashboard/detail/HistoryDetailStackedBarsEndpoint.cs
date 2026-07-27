@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.detail;
 using AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard.detail;
 

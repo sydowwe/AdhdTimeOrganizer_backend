@@ -1,8 +1,7 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.application.@event;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
@@ -13,6 +12,9 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.security;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.infrastructure.security;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.command;
 
@@ -31,7 +33,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
         });
         Validator<DesktopActivityHeartbeatValidator>();
         Group<ActivityTrackingDesktopGroup>();
-        Policies("ActivityTracking");
+        Policies(PortalAuthorizationPolicies.ActivityTracking);
     }
 
     public override async Task HandleAsync(DesktopActivityWindowDto req, CancellationToken ct)
@@ -64,7 +66,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
                 ActiveSeconds = entry.ActiveSeconds,
                 BackgroundSeconds = entry.BackgroundSeconds,
                 IsPlayingSound = entry.IsPlayingSound,
-                ActiveMonitor = entry.ActiveMonitor,
+                ActiveMonitor = entry.ActiveMonitor
             };
 
             dbContext.DesktopActivityEntries.Add(record);
@@ -93,7 +95,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
                         ActivityId = activityId,
                         StartTimestamp = req.WindowStart,
                         EndTimestamp = windowEnd,
-                        Length = new IntTime(entry.ActiveSeconds),
+                        Length = new IntTime(entry.ActiveSeconds)
                     });
                 }
             }
@@ -119,7 +121,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
         {
             var histories = await dbContext.ActivityHistories
                 .Where(h => h.UserId == userId && h.ActivityId == activityId
-                         && h.StartTimestamp >= todayStart && h.StartTimestamp <= todayEnd)
+                                               && h.StartTimestamp >= todayStart && h.StartTimestamp <= todayEnd)
                 .ToListAsync(ct);
 
             var totalSecondsToday = histories.Sum(h => h.Length.TotalSeconds);
@@ -127,9 +129,9 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
             var plannerTask = await dbContext.PlannerTasks
                 .Include(pt => pt.Calendar)
                 .Where(pt => pt.UserId == userId && pt.ActivityId == activityId
-                          && pt.Calendar.Date == today
-                          && pt.Status != PlannerTaskStatus.Completed
-                          && pt.Status != PlannerTaskStatus.Cancelled)
+                                                 && pt.Calendar.Date == today
+                                                 && pt.Status != PlannerTaskStatus.Completed
+                                                 && pt.Status != PlannerTaskStatus.Cancelled)
                 .FirstOrDefaultAsync(ct);
 
             if (plannerTask != null)
@@ -141,10 +143,8 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
                 await dbContext.SaveChangesAsync(ct);
 
                 if (wasCompleted)
-                {
                     await new PlannerTaskIsDoneChangedEvent(activityId, userId, true, plannerTask.TodolistItemId)
                         .PublishAsync(Mode.WaitForAll, ct);
-                }
             }
             else
             {
@@ -157,7 +157,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
     {
         var todoItem = await dbContext.TodoListItems
             .FirstOrDefaultAsync(i => i.UserId == userId && i.ActivityId == activityId
-                                   && !i.IsDone && i.SuggestedTime != null, ct);
+                                                         && !i.IsDone && i.SuggestedTime != null, ct);
 
         if (todoItem != null && totalSecondsToday >= todoItem.SuggestedTime!.TotalSeconds)
         {
@@ -169,7 +169,7 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
 
         var routineItem = await dbContext.RoutineTodoLists
             .FirstOrDefaultAsync(r => r.UserId == userId && r.ActivityId == activityId
-                                   && !r.IsDone && r.SuggestedTime != null, ct);
+                                                         && !r.IsDone && r.SuggestedTime != null, ct);
 
         if (routineItem != null && totalSecondsToday >= routineItem.SuggestedTime!.TotalSeconds)
         {
@@ -200,7 +200,8 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
 
     private static bool MatchesString(string? value, string pattern, PatternMatchType matchType)
     {
-        if (value == null) return false;
+        if (value == null)
+            return false;
         return matchType switch
         {
             PatternMatchType.Exact => string.Equals(value, pattern, StringComparison.OrdinalIgnoreCase),

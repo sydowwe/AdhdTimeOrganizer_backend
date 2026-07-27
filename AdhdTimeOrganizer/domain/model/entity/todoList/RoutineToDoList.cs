@@ -1,4 +1,3 @@
-
 namespace AdhdTimeOrganizer.domain.model.entity.todoList;
 
 public class RoutineTodoList : BaseTodoListItem

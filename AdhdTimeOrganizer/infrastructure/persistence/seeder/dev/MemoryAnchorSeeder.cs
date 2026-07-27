@@ -1,21 +1,22 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class MemoryAnchorSeeder(
     AppDbContext dbContext,
-    ILogger<MemoryAnchorSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<MemoryAnchorSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "MemoryAnchor";
     public int Order => 13;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<MemoryAnchor>();
+        await dbContext.TruncateTableCascadeAsync<MemoryAnchor>();
     }
 
     public async Task SeedForUser(long userId)
@@ -58,7 +59,7 @@ public class MemoryAnchorSeeder(
 
         string[] notes =
         [
-            "Finally managed to do this consistently — felt great!",
+            "Finally managed to do this consistently â€” felt great!",
             "Struggled at first but found my rhythm",
             "Best session yet, very productive",
             "Surprised how much I enjoyed this",
@@ -73,7 +74,7 @@ public class MemoryAnchorSeeder(
             "Connected with something important to me",
             "Saw tangible results for the first time",
             "This changed my perspective",
-            "Flow state — lost track of time completely",
+            "Flow state â€” lost track of time completely",
             "Shared the experience with someone special",
             "Overcame a mental block I had been carrying",
             "Felt proud of myself for following through",

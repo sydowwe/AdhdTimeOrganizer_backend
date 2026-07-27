@@ -25,9 +25,7 @@ public class TodoListItemIsDoneChangedEventHandler(IServiceScopeFactory scopeFac
             return;
 
         foreach (var task in tasks)
-        {
             task.Status = eventModel.NewIsDone ? PlannerTaskStatus.Completed : PlannerTaskStatus.NotStarted;
-        }
 
         await dbContext.SaveChangesAsync(ct);
     }

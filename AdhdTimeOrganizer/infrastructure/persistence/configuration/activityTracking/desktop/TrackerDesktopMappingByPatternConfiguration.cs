@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityTracking.desktop;
 
@@ -14,14 +15,14 @@ public class TrackerDesktopMappingByPatternConfiguration : IEntityTypeConfigurat
         builder.Property(x => x.ProductName).HasMaxLength(200);
         builder.Property(x => x.WindowTitle).HasMaxLength(255);
 
-        builder.HasOne(e=>e.Activity).WithOne(a=>a.TrackerDesktopMappingByPattern)
-            .HasForeignKey<TrackerDesktopMappingByPattern>(e=>e.ActivityId);
+        builder.HasOne(e => e.Activity).WithOne(a => a.TrackerDesktopMappingByPattern)
+            .HasForeignKey<TrackerDesktopMappingByPattern>(e => e.ActivityId);
 
-        builder.HasOne(e=>e.Role).WithMany(e=>e.TrackerDesktopMappingByPatternList)
-            .HasForeignKey(e=>e.RoleId);
+        builder.HasOne(e => e.Role).WithMany(e => e.TrackerDesktopMappingByPatternList)
+            .HasForeignKey(e => e.RoleId);
 
-        builder.HasOne(e=>e.Category).WithMany(e=>e.TrackerDesktopMappingByPatternList)
-            .HasForeignKey(e=>e.CategoryId);
+        builder.HasOne(e => e.Category).WithMany(e => e.TrackerDesktopMappingByPatternList)
+            .HasForeignKey(e => e.CategoryId);
 
         builder.IsManyWithOneUser(e => e.TrackerDesktopMappingByPatternList);
 

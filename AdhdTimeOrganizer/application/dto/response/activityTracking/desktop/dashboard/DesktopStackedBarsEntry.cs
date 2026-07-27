@@ -1,6 +1,6 @@
 namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard;
 
-public class DesktopStackedBarsEntry
+public record DesktopStackedBarsEntry
 {
     public required string ProcessName { get; set; }
     public string? ProductName { get; set; }

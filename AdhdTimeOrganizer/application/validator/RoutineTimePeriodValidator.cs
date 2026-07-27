@@ -6,8 +6,7 @@ namespace AdhdTimeOrganizer.application.validator;
 
 public class RoutineTimePeriodValidator : Validator<RoutineTimePeriodRequest>
 {
-    private static bool IsWeeklyAligned(int lengthInDays) =>
-        lengthInDays <= 7 || lengthInDays % 7 == 0;
+    private static bool IsWeeklyAligned(int lengthInDays) => lengthInDays <= 7 || lengthInDays % 7 == 0;
 
     public RoutineTimePeriodValidator()
     {

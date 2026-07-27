@@ -1,9 +1,9 @@
 ﻿using AdhdTimeOrganizer.application.endpointGroups;
-using AdhdTimeOrganizer.application.extensions;
-using AdhdTimeOrganizer.domain.model.valueObject;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.valueObject;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query;
 

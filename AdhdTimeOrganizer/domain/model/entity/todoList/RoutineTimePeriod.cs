@@ -1,10 +1,12 @@
-using AdhdTimeOrganizer.domain.model.entity.@base;
-using AdhdTimeOrganizer.domain.model.entityInterface;
+using AdhdTimeOrganizer.domain.model.entity.user;
+using Sydowwe.Framework.domain.entityInterface;
 
 namespace AdhdTimeOrganizer.domain.model.entity.todoList;
 
-public class RoutineTimePeriod : BaseTextColorEntity, IEntityWithIsHidden
+public class RoutineTimePeriod : BaseEntityWithUser, IEntityWithIsHidden, IBaseTextColorEntity
 {
+    public required string Text { get; set; }
+    public required string Color { get; set; }
     public bool IsHidden { get; set; }
     public required int LengthInDays { get; set; }
     public required int ResetAnchorDay { get; set; }

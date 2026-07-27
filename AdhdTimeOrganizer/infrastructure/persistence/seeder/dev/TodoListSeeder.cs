@@ -1,24 +1,25 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.helper;
+﻿using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using AdhdTimeOrganizer.infrastructure.settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class TodoListItemSeeder(
     AppDbContext dbContext,
     IOptions<TodoListSettings> settings,
-    ILogger<TodoListItemSeeder> logger) : IScopedService, IDevDatabaseSeeder
+    ILogger<TodoListItemSeeder> logger) : IScopedService, IPerUserDevSeeder
 {
     public string SeederName => "TodoListItem";
     public int Order => 10;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<TodoListItem>();
+        await dbContext.TruncateTableCascadeAsync<TodoListItem>();
     }
 
 

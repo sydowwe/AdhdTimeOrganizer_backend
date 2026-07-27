@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.summary;
 using AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query.dashboard.summary;
 
@@ -79,13 +79,15 @@ public class HistorySummaryStackedBarsEndpoint(AppDbContext db) : Endpoint<Histo
         {
             var dayStart = day.Add(startOffset);
             var dayEnd = day.Add(endOffset);
-            if (dayEnd <= dayStart) dayEnd = dayEnd.AddDays(1);
+            if (dayEnd <= dayStart)
+                dayEnd = dayEnd.AddDays(1);
 
             var current = dayStart;
             while (current < dayEnd)
             {
                 var next = current.AddMinutes(windowMinutes);
-                if (next > dayEnd) next = dayEnd;
+                if (next > dayEnd)
+                    next = dayEnd;
                 windows.Add((current, next));
                 current = current.AddMinutes(windowMinutes);
             }
@@ -103,10 +105,12 @@ public class HistorySummaryStackedBarsEndpoint(AppDbContext db) : Endpoint<Histo
         while (current < to)
         {
             var next = current.AddDays(windowDays);
-            if (next > to) next = to;
+            if (next > to)
+                next = to;
             windows.Add((current, next));
             current = current.AddDays(windowDays);
         }
+
         return windows;
     }
 

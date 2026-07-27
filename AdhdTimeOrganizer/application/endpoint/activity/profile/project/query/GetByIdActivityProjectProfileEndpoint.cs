@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.application.dto.response.activity.profile;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.profile.project.query;
 
@@ -37,6 +37,6 @@ public class GetByIdActivityProjectProfileEndpoint(AppDbContext dbContext)
             return;
         }
 
-        await Send.OkAsync(ActivityProjectProfileResponse.FromEntity(entity), ct);
+        await Send.OkAsync(ActivityProjectProfileResponse.Projection(new[] { entity }.AsQueryable()).Single(), ct);
     }
 }

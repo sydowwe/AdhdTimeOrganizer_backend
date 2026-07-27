@@ -1,12 +1,12 @@
 using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.summaryCards;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
@@ -60,15 +60,11 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
         IEnumerable<DomainTimeData> filteredDomains;
 
         if (req.TopN.HasValue)
-        {
             // Original behavior: return top N
             filteredDomains = allDomains.Take(req.TopN.Value);
-        }
         else
-        {
             // Default: return top 5
             filteredDomains = allDomains.Take(5);
-        }
 
         // 7. Build response with comparisons
         var response = filteredDomains.Select(d => BuildDomainSummary(d, baselineData)).ToList();
@@ -94,7 +90,8 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
         BaselineType baseline)
     {
         var currentDays = (int)(currentTo - currentFrom).TotalDays;
-        if (currentDays < 1) currentDays = 1;
+        if (currentDays < 1)
+            currentDays = 1;
 
         return baseline switch
         {
@@ -114,13 +111,13 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
                 // Go back 8 weeks, will filter to same weekday in query
                 currentFrom.AddDays(-56),
                 currentFrom,
-                8  // 8 same weekdays
+                8 // 8 same weekdays
             ),
 
             BaselineType.AllTime => (
-                DateTime.MinValue,  // Or user's first activity date
+                DateTime.MinValue, // Or user's first activity date
                 currentFrom,
-                -1  // Special flag: calculate actual days from data
+                -1 // Special flag: calculate actual days from data
             ),
 
             _ => (currentFrom.AddDays(-7), currentFrom, 7)
@@ -156,7 +153,8 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
             days = (int)(maxDate - minDate).TotalDays + 1;
         }
 
-        if (days <= 0) days = 1;  // Prevent division by zero
+        if (days <= 0)
+            days = 1; // Prevent division by zero
 
         // Group by domain and calculate daily averages
         return data
@@ -186,30 +184,35 @@ public class WebExtensionSummaryCardsEndpoint(AppDbContext db) : Endpoint<Summar
             Domain = currentData.Domain,
             IsNew = isNew,
 
-            Active = currentData.ActiveSeconds > 0 ? new ActivityStatDto
-            {
-                Seconds = currentData.ActiveSeconds,
-                AverageSeconds = isNew ? null : baseline!.AverageActiveSeconds,
-                PercentChange = isNew || baseline!.AverageActiveSeconds == 0
-                    ? null
-                    : CalculatePercentChange(currentData.ActiveSeconds, baseline.AverageActiveSeconds)
-            } : null,
+            Active = currentData.ActiveSeconds > 0
+                ? new ActivityStatDto
+                {
+                    Seconds = currentData.ActiveSeconds,
+                    AverageSeconds = isNew ? null : baseline!.AverageActiveSeconds,
+                    PercentChange = isNew || baseline!.AverageActiveSeconds == 0
+                        ? null
+                        : CalculatePercentChange(currentData.ActiveSeconds, baseline.AverageActiveSeconds)
+                }
+                : null,
 
-            Background = currentData.BackgroundSeconds > 0 ? new ActivityStatDto
-            {
-                Seconds = currentData.BackgroundSeconds,
-                AverageSeconds = isNew ? null : baseline!.AverageBackgroundSeconds,
-                PercentChange = isNew || baseline!.AverageBackgroundSeconds == 0
-                    ? null
-                    : CalculatePercentChange(currentData.BackgroundSeconds, baseline.AverageBackgroundSeconds)
-            } : null
+            Background = currentData.BackgroundSeconds > 0
+                ? new ActivityStatDto
+                {
+                    Seconds = currentData.BackgroundSeconds,
+                    AverageSeconds = isNew ? null : baseline!.AverageBackgroundSeconds,
+                    PercentChange = isNew || baseline!.AverageBackgroundSeconds == 0
+                        ? null
+                        : CalculatePercentChange(currentData.BackgroundSeconds, baseline.AverageBackgroundSeconds)
+                }
+                : null
         };
     }
 
     private static double CalculatePercentChange(int current, int average)
     {
-        if (average == 0) return current > 0 ? 100.0 : 0.0;
-        return Math.Round(((double)(current - average) / average) * 100, 1);
+        if (average == 0)
+            return current > 0 ? 100.0 : 0.0;
+        return Math.Round((double)(current - average) / average * 100, 1);
     }
 }
 

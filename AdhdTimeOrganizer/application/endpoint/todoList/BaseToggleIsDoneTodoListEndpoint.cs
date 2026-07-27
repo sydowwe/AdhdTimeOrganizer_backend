@@ -9,13 +9,11 @@ namespace AdhdTimeOrganizer.application.endpoint.todoList;
 public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbContext) : Endpoint<ToggleIsDoneRequest>
     where TEntity : BaseTodoListItem
 {
-    
-
     public override void Configure()
     {
         var entityName = typeof(TEntity).Name;
         Patch($"/{entityName.Kebaberize()}/toggle-is-done");
-        
+
         Summary(s =>
         {
             s.Summary = $"Toggles {entityName} IsDone status";
@@ -113,10 +111,8 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbC
         {
             entity.IsDone = forceValue ?? !entity.IsDone;
             if (entity.Steps.Count != 0)
-            {
                 foreach (var step in entity.Steps)
                     step.IsDone = entity.IsDone;
-            }
         }
     }
 

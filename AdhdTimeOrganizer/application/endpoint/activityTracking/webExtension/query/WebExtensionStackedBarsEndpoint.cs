@@ -1,11 +1,11 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.stackedBars;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
@@ -44,9 +44,7 @@ public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<
 
         // 4. Apply minimum seconds filter
         if (req.MinSeconds is > 0)
-        {
             aggregated = FilterByMinSecondsWithOther(aggregated, req.MinSeconds.Value);
-        }
 
         // 5. Build response
         var response = aggregated
@@ -73,14 +71,12 @@ public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<
 
                 // Combine small activities into "Other" bucket
                 if (belowThreshold.Count > 0)
-                {
                     aboveThreshold.Add(new WebExtensionStackedBarsEntry
                     {
                         Domain = "_other",
                         ActiveSeconds = belowThreshold.Sum(x => x.ActiveSeconds),
                         BackgroundSeconds = belowThreshold.Sum(x => x.BackgroundSeconds)
                     });
-                }
 
                 return new WebExtensionStackedBarsWindow
                 {
@@ -135,8 +131,8 @@ public class WebExtensionStackedBarsEndpoint(AppDbContext dbContext) : Endpoint<
         // Round down to nearest window boundary
         // e.g., 09:07 with 15-min windows -> 09:00
         // e.g., 09:18 with 15-min windows -> 09:15
-        var totalMinutes = (int)(time.TimeOfDay.TotalMinutes);
-        var alignedMinutes = (totalMinutes / windowMinutes) * windowMinutes;
+        var totalMinutes = (int)time.TimeOfDay.TotalMinutes;
+        var alignedMinutes = totalMinutes / windowMinutes * windowMinutes;
         return time.Date.AddMinutes(alignedMinutes);
     }
 

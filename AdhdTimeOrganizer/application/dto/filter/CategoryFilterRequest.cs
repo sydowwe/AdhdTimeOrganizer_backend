@@ -1,8 +1,8 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class CategoryFilterRequest : IFilterRequest
+public record CategoryFilterRequest : IFilterRequest
 {
     public string? Name { get; set; }
     public string? Text { get; set; }

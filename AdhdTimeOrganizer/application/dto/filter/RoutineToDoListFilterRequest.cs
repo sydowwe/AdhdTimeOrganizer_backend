@@ -1,8 +1,8 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class RoutineTodoListFilterRequest : IFilterRequest
+public record RoutineTodoListFilterRequest : IFilterRequest
 {
     public long? ActivityId { get; set; }
     public long? TimePeriodId { get; set; }

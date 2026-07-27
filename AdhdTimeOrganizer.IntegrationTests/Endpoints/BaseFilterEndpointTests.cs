@@ -1,74 +1,41 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.Testing;
+using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-// Tests BaseFilterEndpoint via GetFilteredSortedCalendarEndpoint
-public class BaseFilterEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
+// Tests BaseFilterEndpoint via FilterCalendarEndpoint ("/calendar/filter")
+[Collection("Postgres")]
+public class FilterCalendarEndpointTests(AppDbContextFixture fixture)
+    : BaseFilterEndpointTests(fixture)
 {
-    private const string Route = "calendar/filter";
+    protected override string EndpointUrl => "api/calendar/filter";
 
-    private async Task SeedCalendarAsync()
+    protected override async Task<long> SeedEntityAsync(DbContext db)
     {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        db.Calendars.Add(new Calendar
+        var calendar = new Calendar
         {
             Date = DateOnly.FromDateTime(DateTime.Today),
             DayType = DayType.Workday,
             WakeUpTime = new TimeOnly(7, 0),
             BedTime = new TimeOnly(23, 0),
-            UserId = userId
-        });
-        await db.SaveChangesAsync();
-    }
-
-    [Fact]
-    public async Task Filter_ValidRequest_Returns200WithList()
-    {
-        await SeedCalendarAsync();
-        var request = new
-        {
-            From = DateOnly.FromDateTime(DateTime.Today.AddDays(-1)).ToString("yyyy-MM-dd"),
-            Until = DateOnly.FromDateTime(DateTime.Today.AddDays(1)).ToString("yyyy-MM-dd")
+            UserId = FakeLoggedUserService.TestUserId
         };
-
-        var response = await client.PostAsJsonAsync(Route, request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var json = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(json);
-        doc.RootElement.GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
-    }
-
-    [Fact]
-    public async Task Filter_WithoutAuth_Returns401()
-    {
-        
-        var request = new
-        {
-            From = "2024-01-01",
-            Until = "2024-12-31"
-        };
-
-        var response = await anonClient.PostAsJsonAsync(Route, request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    public override async Task DisposeAsync()
-    {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        db.Calendars.RemoveRange(
-            db.Calendars.Where(c => c.UserId == userId));
+        ((AppDbContext)db).Calendars.Add(calendar);
         await db.SaveChangesAsync();
+        return calendar.Id;
     }
+
+    // CalendarFilter.From/Until are -- the base's empty-object default would 400.
+    protected override object EmptyFilterPayload() =>
+        new
+        {
+            From = DateOnly.FromDateTime(DateTime.Today.AddDays(-1)),
+            Until = DateOnly.FromDateTime(DateTime.Today.AddDays(1))
+        };
 }

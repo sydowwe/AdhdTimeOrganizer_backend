@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.application.dto.response.activity;
-using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using Sydowwe.Framework.application.endpoint.@base.read;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.category.query;
 

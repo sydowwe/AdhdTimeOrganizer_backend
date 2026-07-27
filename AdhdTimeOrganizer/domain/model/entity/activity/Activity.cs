@@ -1,16 +1,19 @@
+using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
+using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
-using AdhdTimeOrganizer.domain.model.entity.@base;
-using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
-using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.entity.user;
+using Sydowwe.Framework.domain.entityInterface;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activity;
 
-public class Activity : BaseNameTextEntity
+public class Activity : BaseEntityWithUser, IBaseNameTextEntity
 {
+    public required string Name { get; set; }
+    public string? Text { get; set; }
     public bool IsUnavoidable { get; set; }
 
     public long RoleId { get; set; }
@@ -35,7 +38,7 @@ public class Activity : BaseNameTextEntity
 
     public Activity Clone()
     {
-        var cloned = (Activity)this.MemberwiseClone();
+        var cloned = (Activity)MemberwiseClone();
         cloned.Id = 0; // Reset ID for new entity
         return cloned;
     }

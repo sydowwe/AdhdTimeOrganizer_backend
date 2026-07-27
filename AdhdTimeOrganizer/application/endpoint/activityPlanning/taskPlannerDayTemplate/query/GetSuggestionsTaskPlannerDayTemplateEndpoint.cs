@@ -1,12 +1,12 @@
 using AdhdTimeOrganizer.application.dto.response.suggestion;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.suggestion;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.taskPlannerDayTemplate.query;
 
@@ -19,8 +19,8 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext
     public override void Configure()
     {
         Get("/task-planner-day-template/suggestions/{calendarId:long:required}");
-        
-        
+
+
         Summary(s =>
         {
             s.Summary = "Get template suggestions for a date";
@@ -41,14 +41,15 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext
             await Send.ErrorsAsync(404, ct);
             return;
         }
+
         var date = calendar.Date;
         var userId = User.GetId();
         var isoDayOfWeek = date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
 
         var patterns = await dbContext.Set<TemplateSuggestionPattern>()
             .Where(p => p.UserId == userId &&
-                ((p.PatternType == 0 && p.PatternValue == isoDayOfWeek) ||
-                 (p.PatternType == 1 && p.PatternValue == (int)calendar.DayType)))
+                        ((p.PatternType == 0 && p.PatternValue == isoDayOfWeek) ||
+                         (p.PatternType == 1 && p.PatternValue == (int)calendar.DayType)))
             .Include(p => p.Template)
             .ToListAsync(ct);
 
@@ -56,7 +57,7 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(AppDbContext dbContext
             .OrderByDescending(p => p.OccurrenceCount)
             .Select(p => new TemplateSuggestionResponse
             {
-                Template = TaskPlannerDayTemplateResponse.FromEntity(p.Template),
+                Template = TaskPlannerDayTemplateResponse.Projection(new[] { p.Template }.AsQueryable()).Single(),
                 PatternType = p.PatternType,
                 PatternLabel = p.PatternType == 0
                     ? DayNames[p.PatternValue - 1]

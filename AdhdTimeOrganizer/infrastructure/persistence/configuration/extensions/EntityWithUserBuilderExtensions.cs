@@ -1,65 +1,31 @@
-﻿using System.Linq.Expressions;
-using AdhdTimeOrganizer.domain.model.entity.@base;
+using System.Linq.Expressions;
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.entityInterface;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.domain.entity.user;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 
-public static class EntityWIthUserBuilderExtensions
+/// <summary>
+/// Closes Framework's generic <c>IsManyWithOneUser&lt;TUser, TEntity&gt;</c> /
+/// <c>IsOneWithOneUser&lt;TUser, TEntity&gt;</c> over this portal's single <see cref="User"/> type.
+/// C# can't infer <c>TUser</c> from a constraint, so without these shims every call site would have
+/// to spell out both type arguments. The behaviour lives in Framework — don't reimplement it here.
+/// </summary>
+public static class EntityWithUserBuilderExtensions
 {
-    public static ReferenceCollectionBuilder<User, TEntity> IsManyWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, IEnumerable<TEntity>?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser, IEntityWithId
+    extension<TEntity>(EntityTypeBuilder<TEntity> builder) where TEntity : BaseEntityWithUser<User>
     {
-       return builder.HasOne(r => r.User)
-           .WithMany(navigationProperty)
-           .HasForeignKey(r => r.UserId).IsRequired()
-           .OnDelete(deleteBehavior);
-    }
-    public static ReferenceReferenceBuilder<TEntity,User> IsOneWithOneUser<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<User, TEntity?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade) where TEntity : class, IEntityWithUser, IEntityWithId
-    {
-        return builder.HasOne(r => r.User)
-            .WithOne(navigationProperty)
-            .HasForeignKey<TEntity>(r => r.UserId).IsRequired()
-            .OnDelete(deleteBehavior);
-    }
-
-    public static void BaseNameTextEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder, bool isNameUnique = true) where TEntity : BaseNameTextEntity
-    {
-        builder.BaseEntityConfigure();
-        builder.Property(r => r.Name).HasMaxLength(100).IsUnicode().IsRequired();
-        builder.Property(r => r.Text).HasMaxLength(1000).IsUnicode();
-        if (isNameUnique)
+        public ReferenceCollectionBuilder<User, TEntity> IsManyWithOneUser(Expression<Func<User, IEnumerable<TEntity>?>>? navigationProperty = null, DeleteBehavior deleteBehavior = DeleteBehavior.Cascade)
         {
-            builder.HasIndex(r => new { r.UserId, r.Name })
-                .IsUnique();
+            return builder.IsManyWithOneUser<User, TEntity>(navigationProperty, deleteBehavior);
         }
-    }
-    public static void BaseTextColorEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder, bool isTextUnique = true) where TEntity : BaseTextColorEntity
-    {
-        builder.BaseEntityConfigure();
-        builder.Property(r => r.Text).HasMaxLength(100).IsUnicode().IsRequired();
-        builder.Property(r => r.Color).HasMaxLength(100).IsRequired();
-        if (isTextUnique)
-        {
-            builder.HasIndex(r => new { r.UserId, r.Text })
-                .IsUnique();
-        }
-    }
-    public static void BaseTextColorIconEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder, bool isTextUnique = true) where TEntity : BaseTextColorIconEntity
-    {
-        builder.BaseEntityConfigure();
-        builder.Property(r => r.Icon).HasMaxLength(50);
-    }
-    public static void BaseNameTextColorEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder) where TEntity : BaseNameTextColorEntity
-    {
-        builder.BaseNameTextEntityConfigure();
-        builder.Property(r => r.Color).HasMaxLength(7).IsRequired();
-    }
 
-    public static void BaseNameTextColorIconEntityConfigure<TEntity>(this EntityTypeBuilder<TEntity> builder) where TEntity : BaseNameTextColorIconEntity
-    {
-        builder.BaseNameTextColorEntityConfigure();
-        builder.Property(r => r.Icon).HasMaxLength(50);
+        public ReferenceReferenceBuilder<TEntity, User> IsOneWithOneUser(Expression<Func<User, TEntity?>>? navigationProperty = null,
+            DeleteBehavior deleteBehavior = DeleteBehavior.Cascade)
+        {
+            return builder.IsOneWithOneUser<User, TEntity>(navigationProperty, deleteBehavior);
+        }
     }
 }

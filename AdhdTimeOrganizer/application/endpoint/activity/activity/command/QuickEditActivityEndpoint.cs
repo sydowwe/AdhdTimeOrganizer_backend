@@ -2,18 +2,17 @@ using AdhdTimeOrganizer.application.dto.request.activity;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activity.activity.command;
 
 public class QuickEditActivityEndpoint(AppDbContext dbContext) : Endpoint<QuickEditActivityRequest>
 {
-    
-
     public override void Configure()
     {
         Put("/activity/{id:long:required}/quick-edit");
         Validator<QuickEditActivityValidator>();
-        
+
         Summary(s =>
         {
             s.Summary = "Quick edit activity";

@@ -1,10 +1,10 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.pieChart;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.query;
 
@@ -61,7 +61,7 @@ public class WebExtensionPieChartEndpoint(AppDbContext db) : Endpoint<PieChartRe
 
         if (req.MinPercent.HasValue && totalSeconds > 0)
         {
-            var minSeconds = (totalSeconds * req.MinPercent.Value) / 100.0;
+            var minSeconds = totalSeconds * req.MinPercent.Value / 100.0;
             var domainsAboveThreshold = domainGroups
                 .Where(x => x.TotalSeconds >= minSeconds)
                 .ToList();

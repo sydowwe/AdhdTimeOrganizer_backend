@@ -1,82 +1,25 @@
-using System.Net;
-using System.Net.Http.Json;
-using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.Testing;
+using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-// Tests BaseFilterSortEndpoint via GetFilterSortTodoListEndpoint
-public class BaseFilterSortEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
+// Tests BaseFilterSortEndpoint via FilterSortTodoListEndpoint ("/todo-list/filter-sort")
+[Collection("Postgres")]
+public class FilterSortTodoListEndpointTests(AppDbContextFixture fixture)
+    : BaseFilterSortEndpointTests(fixture)
 {
-    private const string Route = "todo-list/filter-sort";
+    protected override string EndpointUrl => "api/todo-list/filter-sort";
 
-    private async Task SeedTodoListsAsync()
+    protected override async Task<long> SeedEntityAsync(DbContext db)
     {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        db.TodoLists.AddRange(
-            new TodoList { Name = "List Alpha", UserId = userId },
-            new TodoList { Name = "List Beta", UserId = userId });
+        var todoList = new TodoList { Name = "List Alpha", UserId = FakeLoggedUserService.TestUserId };
+        ((AppDbContext)db).TodoLists.Add(todoList);
         await db.SaveChangesAsync();
-    }
-
-    [Fact]
-    public async Task FilterSort_ValidRequest_Returns200WithList()
-    {
-        await SeedTodoListsAsync();
-        var request = new
-        {
-            SortBy = Array.Empty<object>(),
-            UseFilter = false,
-            Filter = new { }
-        };
-
-        var response = await client.PostAsJsonAsync(Route, request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var items = await response.Content.ReadFromJsonAsync<List<TodoListResponse>>();
-        items.Should().NotBeNull();
-        items!.Count.Should().BeGreaterThanOrEqualTo(2);
-    }
-
-    [Fact]
-    public async Task FilterSort_WithFilter_Returns200WithFilteredList()
-    {
-        await SeedTodoListsAsync();
-        var request = new
-        {
-            SortBy = Array.Empty<object>(),
-            UseFilter = true,
-            Filter = new { Name = "Alpha" }
-        };
-
-        var response = await client.PostAsJsonAsync(Route, request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var items = await response.Content.ReadFromJsonAsync<List<TodoListResponse>>();
-        items.Should().NotBeNull();
-        items!.Should().OnlyContain(i => i.Name.Contains("Alpha"));
-    }
-
-    [Fact]
-    public async Task FilterSort_WithoutAuth_Returns401()
-    {
-        
-
-        var response = await anonClient.PostAsJsonAsync(Route, new { SortBy = Array.Empty<object>(), UseFilter = false, Filter = new { } });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    public override async Task DisposeAsync()
-    {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        db.TodoLists.RemoveRange(
-            db.TodoLists.Where(t => t.UserId == userId));
-        await db.SaveChangesAsync();
+        return todoList.Id;
     }
 }

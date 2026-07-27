@@ -1,11 +1,11 @@
-using AdhdTimeOrganizer.application.dto.request.activityTracking.heartbeat;
-using AdhdTimeOrganizer.application.extensions;
+﻿using AdhdTimeOrganizer.application.dto.request.activityTracking.heartbeat;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.infrastructure.security;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.security;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.webExtension.command;
 
@@ -67,7 +67,7 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
                     Url = activity.Url,
                     ActiveSeconds = activity.ActiveSeconds,
                     BackgroundSeconds = activity.BackgroundSeconds,
-                    IsFinal = req.IsFinal,
+                    IsFinal = req.IsFinal
                 };
 
                 dbContext.WebExtensionActivityEntries.Add(record);

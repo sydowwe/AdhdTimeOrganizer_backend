@@ -1,28 +1,29 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class ActivityLocationTypeDevSeeder(
     AppDbContext dbContext,
-    ILogger<ActivityLocationTypeDevSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<ActivityLocationTypeDevSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "ActivityLocationTypeDev";
     public int Order => 5;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<ActivityLocationType>();
+        await dbContext.TruncateTableCascadeAsync<ActivityLocationType>();
     }
 
     public async Task SeedForUser(long userId)
     {
         (string Text, int SortOrder)[] custom =
         [
-            ("Remote",            4),
-            ("Co-working Space",  5)
+            ("Remote", 4),
+            ("Co-working Space", 5)
         ];
 
         var existing = await dbContext.ActivityLocationTypes
@@ -35,7 +36,8 @@ public class ActivityLocationTypeDevSeeder(
             .Select(c => new ActivityLocationType { UserId = userId, Text = c.Text, SortOrder = c.SortOrder })
             .ToList();
 
-        if (toAdd.Count == 0) return;
+        if (toAdd.Count == 0)
+            return;
 
         await dbContext.ActivityLocationTypes.AddRangeAsync(toAdd);
         await dbContext.SaveChangesAsync();

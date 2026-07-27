@@ -1,7 +1,7 @@
-using AdhdTimeOrganizer.application.dto.response.@base;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
-
+using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.response;
+using Sydowwe.Framework.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.application.dto.response.activity.profile;
 
@@ -16,8 +16,9 @@ public record ActivityProjectProfileResponse : IdResponse, IProjectionResponse<A
     public required List<string> RequiredTools { get; init; }
     public required ReadinessStatus ReadinessStatus { get; init; }
 
-    public static IQueryable<ActivityProjectProfileResponse> Projection(IQueryable<ActivityProjectProfile> query) =>
-        query.Select(e => new ActivityProjectProfileResponse
+    public static IQueryable<ActivityProjectProfileResponse> Projection(IQueryable<ActivityProjectProfile> query)
+    {
+        return query.Select(e => new ActivityProjectProfileResponse
         {
             Id = e.Id,
             ActivityId = e.ActivityId,
@@ -27,20 +28,7 @@ public record ActivityProjectProfileResponse : IdResponse, IProjectionResponse<A
             IsMessy = e.IsMessy,
             MaterialsNeeded = e.MaterialsNeeded,
             RequiredTools = e.RequiredTools,
-            ReadinessStatus = e.ReadinessStatus,
+            ReadinessStatus = e.ReadinessStatus
         });
-
-    public static ActivityProjectProfileResponse FromEntity(ActivityProjectProfile e) =>
-        new()
-        {
-            Id = e.Id,
-            ActivityId = e.ActivityId,
-            DifficultyLevel = e.DifficultyLevel,
-            ProjectArea = e.ProjectArea,
-            EstimatedHours = e.EstimatedHours,
-            IsMessy = e.IsMessy,
-            MaterialsNeeded = e.MaterialsNeeded,
-            RequiredTools = e.RequiredTools,
-            ReadinessStatus = e.ReadinessStatus,
-        };
+    }
 }

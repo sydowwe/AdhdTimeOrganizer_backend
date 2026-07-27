@@ -2,10 +2,12 @@
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.infrastructure.persistence;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.activityHistory;
 
-public class DesktopActivityEntryConfiguration: IEntityTypeConfiguration<DesktopActivityEntry>
+public class DesktopActivityEntryConfiguration : IEntityTypeConfiguration<DesktopActivityEntry>
 {
     public void Configure(EntityTypeBuilder<DesktopActivityEntry> builder)
     {

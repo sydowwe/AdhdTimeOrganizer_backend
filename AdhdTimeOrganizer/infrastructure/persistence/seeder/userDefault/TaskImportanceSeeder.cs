@@ -1,27 +1,31 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class TaskImportanceSeeder(
     AppDbContext dbContext,
-    ILogger<TaskImportanceSeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<TaskImportanceSeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "TaskImportance";
     public int Order => 2;
 
     private static List<TaskImportance> Defaults(long userId) =>
     [
-        new() { UserId = userId,
+        new()
+        {
+            UserId = userId,
             Text = "Critical",
             Color = ColorPalette.Red,
             Icon = "fas fa-exclamation-triangle",
             Importance = 999
         },
-        new() { UserId = userId,
+        new()
+        {
+            UserId = userId,
             Text = "Optional",
             Color = ColorPalette.Zinc,
             Icon = "fas fa-question-circle",
@@ -61,9 +65,7 @@ public class TaskImportanceSeeder(
             .ToListAsync(ct);
 
         if (defaults.Count != existing.Count)
-        {
             return false;
-        }
 
         for (var i = 0; i < defaults.Count; i++)
         {

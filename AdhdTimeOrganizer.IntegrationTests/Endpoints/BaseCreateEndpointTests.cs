@@ -1,54 +1,15 @@
-using System.Net;
-using System.Net.Http.Json;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-public class BaseCreateEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
+[Collection("Postgres")]
+public class CreateActivityCategoryEndpointTests(AppDbContextFixture fixture)
+    : BaseCreateEndpointTests(fixture)
 {
-    private const string Route = "activity-category";
+    protected override string EndpointUrl => "api/activity-category";
 
-    [Fact]
-    public async Task Create_ValidRequest_Returns201WithId()
-    {
-        var request = new { Name = "Test Category", Color = "#FF0000", Text = "desc" };
-
-        var response = await client.PostAsJsonAsync(Route, request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var id = await response.Content.ReadFromJsonAsync<long>();
-        id.Should().BeGreaterThan(0);
-    }
-
-    [Fact]
-    public async Task Create_WithoutAuth_Returns401()
-    {
-        
-        var request = new { Name = "Test", Color = "#FF0000" };
-
-        var response = await anonClient.PostAsJsonAsync(Route, request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task Create_MissingRequiredField_Returns400()
-    {
-        var request = new { Name = (string?)null, Color = "#FF0000" };
-
-        var response = await client.PostAsJsonAsync(Route, request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    public override async Task DisposeAsync()
-    {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        db.ActivityCategories.RemoveRange(
-            db.ActivityCategories.Where(c => c.UserId == userId));
-        await db.SaveChangesAsync();
-    }
+    protected override Task<object> BuildValidPayloadAsync(DbContext db) => Task.FromResult<object>(new { Name = "Test Category", Color = "#FF0000", Text = "desc" });
 }

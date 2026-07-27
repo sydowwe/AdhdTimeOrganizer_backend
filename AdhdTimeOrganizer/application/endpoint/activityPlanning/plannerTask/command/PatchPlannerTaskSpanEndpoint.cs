@@ -1,13 +1,12 @@
 ﻿using AdhdTimeOrganizer.application.dto.request.taskPlanner;
-using AdhdTimeOrganizer.application.dto.response.taskPlanner;
-using AdhdTimeOrganizer.application.endpoint.@base.command;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.command;
 
-public class PatchPlannerTaskSpanEndpoint(AppDbContext dbContext) : BasePatchEndpoint<PlannerTask, PlannerTaskChangeSpanRequest, PlannerTaskResponse>(dbContext)
+public class PatchPlannerTaskSpanEndpoint(AppDbContext dbContext) : BasePatchEndpoint<PlannerTask, PlannerTaskChangeSpanRequest>(dbContext)
 {
     public override void Configure()
     {

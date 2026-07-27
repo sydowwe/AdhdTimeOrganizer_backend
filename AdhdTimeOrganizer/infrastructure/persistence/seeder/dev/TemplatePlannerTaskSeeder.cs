@@ -1,20 +1,21 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;
 
 public class TemplatePlannerTaskSeeder(
     AppDbContext dbContext,
-    ILogger<TemplatePlannerTaskSeeder> logger) : IDevDatabaseSeeder, IScopedService
+    ILogger<TemplatePlannerTaskSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "TemplatePlannerTask";
     public int Order => 12;
 
     public async Task TruncateTable()
     {
-        await dbContext.TruncateTableAsync<TemplatePlannerTask>();
+        await dbContext.TruncateTableCascadeAsync<TemplatePlannerTask>();
     }
 
     public async Task SeedForUser(long userId)
@@ -75,7 +76,6 @@ public class TemplatePlannerTaskSeeder(
         if (homeOfficeTemplate != null)
         {
             if (morningExercise != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = homeOfficeTemplate.Id,
@@ -88,10 +88,8 @@ public class TemplatePlannerTaskSeeder(
                     Notes = "Morning workout to start the day",
                     UserId = userId
                 });
-            }
 
             if (dailyStandup != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = homeOfficeTemplate.Id,
@@ -104,10 +102,8 @@ public class TemplatePlannerTaskSeeder(
                     Notes = "Daily team sync",
                     UserId = userId
                 });
-            }
 
             if (featureDev != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = homeOfficeTemplate.Id,
@@ -120,10 +116,8 @@ public class TemplatePlannerTaskSeeder(
                     Notes = "Deep work session",
                     UserId = userId
                 });
-            }
 
             if (mealPrep != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = homeOfficeTemplate.Id,
@@ -135,10 +129,8 @@ public class TemplatePlannerTaskSeeder(
                     Location = "Home",
                     UserId = userId
                 });
-            }
 
             if (bugFixing != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = homeOfficeTemplate.Id,
@@ -151,10 +143,8 @@ public class TemplatePlannerTaskSeeder(
                     Notes = "Bug fixing session",
                     UserId = userId
                 });
-            }
 
             if (codeReview != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = homeOfficeTemplate.Id,
@@ -167,10 +157,8 @@ public class TemplatePlannerTaskSeeder(
                     Notes = "Review PRs",
                     UserId = userId
                 });
-            }
 
             if (sleepRoutine != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = homeOfficeTemplate.Id,
@@ -182,14 +170,12 @@ public class TemplatePlannerTaskSeeder(
                     Location = "Home",
                     UserId = userId
                 });
-            }
         }
 
         // Office Day template tasks
         if (officeTemplate != null)
         {
             if (dailyStandup != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = officeTemplate.Id,
@@ -202,10 +188,8 @@ public class TemplatePlannerTaskSeeder(
                     Notes = "Daily team sync",
                     UserId = userId
                 });
-            }
 
             if (featureDev != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = officeTemplate.Id,
@@ -218,10 +202,8 @@ public class TemplatePlannerTaskSeeder(
                     Notes = "Focused work time",
                     UserId = userId
                 });
-            }
 
             if (codeReview != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = officeTemplate.Id,
@@ -233,14 +215,12 @@ public class TemplatePlannerTaskSeeder(
                     Location = "Office",
                     UserId = userId
                 });
-            }
         }
 
         // Relaxed Weekend template tasks
         if (relaxedWeekendTemplate != null)
         {
             if (morningExercise != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = relaxedWeekendTemplate.Id,
@@ -252,10 +232,8 @@ public class TemplatePlannerTaskSeeder(
                     Location = "Home",
                     UserId = userId
                 });
-            }
 
             if (houseCleaning != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = relaxedWeekendTemplate.Id,
@@ -267,10 +245,8 @@ public class TemplatePlannerTaskSeeder(
                     Location = "Home",
                     UserId = userId
                 });
-            }
 
             if (groceryShopping != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = relaxedWeekendTemplate.Id,
@@ -282,10 +258,8 @@ public class TemplatePlannerTaskSeeder(
                     Location = "Store",
                     UserId = userId
                 });
-            }
 
             if (sideProject != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = relaxedWeekendTemplate.Id,
@@ -298,10 +272,8 @@ public class TemplatePlannerTaskSeeder(
                     Notes = "Work on personal projects",
                     UserId = userId
                 });
-            }
 
             if (gaming != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = relaxedWeekendTemplate.Id,
@@ -314,10 +286,8 @@ public class TemplatePlannerTaskSeeder(
                     Notes = "Relaxation time",
                     UserId = userId
                 });
-            }
 
             if (watchMovie != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = relaxedWeekendTemplate.Id,
@@ -329,10 +299,8 @@ public class TemplatePlannerTaskSeeder(
                     Location = "Home",
                     UserId = userId
                 });
-            }
 
             if (meditation != null)
-            {
                 templateTasks.Add(new TemplatePlannerTask
                 {
                     TemplateId = relaxedWeekendTemplate.Id,
@@ -344,7 +312,6 @@ public class TemplatePlannerTaskSeeder(
                     Location = "Home",
                     UserId = userId
                 });
-            }
         }
 
         await dbContext.TemplatePlannerTasks.AddRangeAsync(templateTasks);

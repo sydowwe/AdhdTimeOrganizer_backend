@@ -7,32 +7,26 @@ using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.domain.model.entityInterface;
-using AdhdTimeOrganizer.domain.model.@enum;
-using Microsoft.AspNetCore.Identity;
+using Sydowwe.Framework.domain.entity.user;
+using Sydowwe.Framework.domain.entityInterface;
 
 namespace AdhdTimeOrganizer.domain.model.entity.user;
 
-public sealed class User : IdentityUser<long>, IBaseTableEntity
+// IBaseTableEntity is satisfied entirely by the bases (Id from IdentityUser<long>, the timestamps from
+// BaseUser); it is kept so the app's own BaseEntityConfigure/EnumColumn helpers still apply to this table.
+public sealed class User : BaseUser, IBaseTableEntity
 {
-    public DateTime CreatedTimestamp { get; set; }
-    public DateTime ModifiedTimestamp { get; set; }
-    public required AvailableLocales CurrentLocale { get; set; }
-    public required TimeZoneInfo Timezone { get; set; }
     public string? GoogleOAuthUserId { get; set; }
     public string? GoogleCalendarRefreshToken { get; set; }
     public bool HasExtensionAccess { get; set; } = false;
-    public DateTime? LastLoginAt { get; set; }
-    public AppThemeEnum Theme { get; set; } = AppThemeEnum.System;
     public int FirstDayOfWeek { get; set; } = 1;
-    public bool AskBeforeDelete { get; set; } = true;
 
 
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
-    public bool HasPassword => PasswordHash != null;
 
     [NotMapped]
     public override string? PhoneNumber { get; set; }
+
     [NotMapped]
     public override bool PhoneNumberConfirmed { get; set; }
 
@@ -53,7 +47,11 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
     public ICollection<TaskPriority> TaskPriorityList { get; set; } = new List<TaskPriority>();
     public ICollection<PlannerTask> PlannerTaskList { get; set; } = new List<PlannerTask>();
     public ICollection<RoutineTodoList> RoutineTodoListColl { get; set; } = new List<RoutineTodoList>();
+
     public ICollection<RoutineTimePeriod> RoutineTimePeriodList { get; set; } = new List<RoutineTimePeriod>();
+
+    // Framework's RefreshToken (Sydowwe.Framework.domain.entity.user) carries no User navigation, so
+    // this collection is configured from the principal end in RefreshTokenConfiguration.
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public UserPlannerSettings? PlannerSettings { get; set; }
 
@@ -70,9 +68,7 @@ public sealed class User : IdentityUser<long>, IBaseTableEntity
         {
             base.Email = value;
             if (value != null)
-            {
                 UserName = value;
-            }
         }
     }
 }

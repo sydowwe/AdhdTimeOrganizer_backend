@@ -1,70 +1,34 @@
-using System.Net;
-using System.Net.Http.Json;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.Testing;
+using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-// Tests BaseToggleIsHiddenEndpoint via ToggleIsHiddenRoutineTimePeriodEndpoint
-public class BaseToggleIsHiddenEndpointTests(TestWebApplicationFactory factory) : IntegrationTestBase(factory)
+// Tests BaseToggleIsHiddenEndpoint via ToggleIsHiddenRoutineTimePeriodEndpoint ("/routine-time-period/toggle-is-hidden")
+[Collection("Postgres")]
+public class ToggleIsHiddenRoutineTimePeriodEndpointTests(AppDbContextFixture fixture)
+    : BaseToggleIsHiddenEndpointTests(fixture)
 {
-    private const string Route = "routine-time-period/toggle-is-hidden";
+    protected override string EndpointUrl => "api/routine-time-period/toggle-is-hidden";
 
-    private async Task<long> SeedRoutineTimePeriodAsync()
+    protected override async Task<long> SeedEntityAsync(DbContext db)
     {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
         var period = new RoutineTimePeriod
         {
             Text = "Test Period",
-            UserId = userId,
+            Color = "#000000",
+            UserId = FakeLoggedUserService.TestUserId,
             LengthInDays = 7,
             ResetAnchorDay = 1,
             StreakThreshold = 5,
             StreakGraceDays = 1
         };
-        db.RoutineTimePeriods.Add(period);
+        ((AppDbContext)db).RoutineTimePeriods.Add(period);
         await db.SaveChangesAsync();
         return period.Id;
-    }
-
-    [Fact]
-    public async Task ToggleIsHidden_ExistingEntity_Returns204()
-    {
-        var id = await SeedRoutineTimePeriodAsync();
-        var request = new { Ids = new[] { id } };
-
-        var response = await client.PatchAsJsonAsync(Route, request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-    }
-
-    [Fact]
-    public async Task ToggleIsHidden_WithoutAuth_Returns401()
-    {
-        
-
-        var response = await anonClient.PatchAsJsonAsync(Route, new { Ids = new[] { 1L } });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task ToggleIsHidden_NonExistingEntity_Returns404()
-    {
-        var response = await client.PatchAsJsonAsync(Route, new { Ids = new[] { 999999999L } });
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    public override async Task DisposeAsync()
-    {
-        var db = CreateDbContext();
-        var userId = await GetTestUserIdAsync();
-        db.RoutineTimePeriods.RemoveRange(
-            db.RoutineTimePeriods.Where(p => p.UserId == userId));
-        await db.SaveChangesAsync();
     }
 }

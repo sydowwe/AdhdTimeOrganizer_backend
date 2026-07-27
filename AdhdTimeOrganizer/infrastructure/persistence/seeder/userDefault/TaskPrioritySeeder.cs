@@ -1,14 +1,14 @@
-using AdhdTimeOrganizer.config.dependencyInjection;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
+﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.@enum;
-using AdhdTimeOrganizer.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class TaskPrioritySeeder(
     AppDbContext dbContext,
-    ILogger<TaskPrioritySeeder> logger) : IScopedService, IUserDefaultSeeder
+    ILogger<TaskPrioritySeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "TaskPriority";
     public int Order => 1;
@@ -53,9 +53,7 @@ public class TaskPrioritySeeder(
             .ToListAsync(ct);
 
         if (defaults.Count != existing.Count)
-        {
             return false;
-        }
 
         for (var i = 0; i < defaults.Count; i++)
         {

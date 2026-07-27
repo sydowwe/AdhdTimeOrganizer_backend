@@ -1,9 +1,9 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.filter;
 
-public class ActivityProjectProfileFilterRequest : IFilterRequest
+public record ActivityProjectProfileFilterRequest : IFilterRequest
 {
     public DifficultyLevel? DifficultyLevel { get; set; }
     public ReadinessStatus? ReadinessStatus { get; set; }

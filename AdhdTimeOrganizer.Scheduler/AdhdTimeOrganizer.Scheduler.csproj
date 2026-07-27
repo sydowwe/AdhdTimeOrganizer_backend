@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Brings Quartz core + the DI configurator (IServiceCollectionQuartzConfigurator) and the
+             hosted-service options the host applies via Scheduler's centralised defaults. -->
+        <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.1"/>
+        <!-- Dashboard exports render XLSX with the same engine the existing Export* endpoints use
+             (AttendanceExportService). CSV uses no dependency. -->
+        <PackageReference Include="Syncfusion.XlsIO.Net.Core" Version="33.2.8"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\MojaDigitalnaFirma.Kernel\MojaDigitalnaFirma.Kernel.csproj"/>
+        <ProjectReference Include="..\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Exposes the internal trigger-building seam (SchedulerService.ApplySchedule / ResolveTimeZone)
+             to the test project so the DST fire-time test can compute fire times without a Quartz scheduler. -->
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>AdhdTimeOrganizer.IntegrationTests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
+</Project>

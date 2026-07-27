@@ -1,10 +1,10 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard.pieChart;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.query.dashboard;
 
@@ -61,14 +61,13 @@ public class DesktopPieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest
 
         if (req.MinPercent.HasValue && totalSeconds > 0)
         {
-            var minSeconds = (totalSeconds * req.MinPercent.Value) / 100.0;
+            var minSeconds = totalSeconds * req.MinPercent.Value / 100.0;
             var above = processGroups.Where(x => x.TotalSeconds >= minSeconds).ToList();
             var below = processGroups.Where(x => x.TotalSeconds < minSeconds).ToList();
 
             result = above;
 
             if (below.Count > 0)
-            {
                 result.Add(new DesktopPieDataDto
                 {
                     ProcessName = "Other",
@@ -79,7 +78,6 @@ public class DesktopPieChartEndpoint(AppDbContext db) : Endpoint<PieChartRequest
                     WindowTitles = below.SelectMany(x => x.WindowTitles).Distinct().ToList(),
                     Entries = below.Sum(x => x.Entries)
                 });
-            }
         }
         else
         {

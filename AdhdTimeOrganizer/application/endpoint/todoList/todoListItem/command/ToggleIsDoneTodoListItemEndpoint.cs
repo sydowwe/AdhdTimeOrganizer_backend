@@ -10,13 +10,17 @@ public class ToggleIsDoneTodoListItemEndpoint(AppDbContext dbContext) : BaseTogg
 {
     private readonly AppDbContext _dbContext = dbContext;
 
-    protected override Task<List<TodoListItem>> FetchAndPrepare(ICollection<long> ids, DateTime now, CancellationToken ct) =>
-        _dbContext.Set<TodoListItem>()
+    protected override Task<List<TodoListItem>> FetchAndPrepare(ICollection<long> ids, DateTime now, CancellationToken ct)
+    {
+        return _dbContext.Set<TodoListItem>()
             .Where(e => ids.Contains(e.Id))
             .Include(e => e.Steps)
             .ToListAsync(ct);
+    }
 
-    protected override async Task PublishEvent(TodoListItem entity, CancellationToken ct) =>
+    protected override async Task PublishEvent(TodoListItem entity, CancellationToken ct)
+    {
         await new TodoListItemIsDoneChangedEvent(entity.Id, entity.IsDone)
             .PublishAsync(Mode.WaitForAll, ct);
+    }
 }

@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.@base;
+using Sydowwe.Framework.application.dto.request.@base;
 
 namespace AdhdTimeOrganizer.application.dto.request.activity;
 

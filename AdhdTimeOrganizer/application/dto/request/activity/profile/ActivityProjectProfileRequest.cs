@@ -1,20 +1,19 @@
-using System.ComponentModel.DataAnnotations;
-using AdhdTimeOrganizer.application.dto.request.@interface;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
+using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.activity.profile;
 
 public record ActivityProjectProfileRequest : IMyRequest<ActivityProjectProfile>
 {
-    [Required] public long ActivityId { get; init; }
-    [Required] public DifficultyLevel DifficultyLevel { get; init; }
-    [Required] public string ProjectArea { get; init; } = null!;
-    [Required] public decimal EstimatedHours { get; init; }
-    [Required] public bool IsMessy { get; init; }
+    public long ActivityId { get; init; }
+    public DifficultyLevel DifficultyLevel { get; init; }
+    public string ProjectArea { get; init; } = null!;
+    public decimal EstimatedHours { get; init; }
+    public bool IsMessy { get; init; }
     public List<string> MaterialsNeeded { get; init; } = [];
     public List<string> RequiredTools { get; init; } = [];
-    [Required] public ReadinessStatus ReadinessStatus { get; init; }
+    public ReadinessStatus ReadinessStatus { get; init; }
 
     public ActivityProjectProfile ToEntity => new()
     {
@@ -25,7 +24,7 @@ public record ActivityProjectProfileRequest : IMyRequest<ActivityProjectProfile>
         IsMessy = IsMessy,
         MaterialsNeeded = MaterialsNeeded,
         RequiredTools = RequiredTools,
-        ReadinessStatus = ReadinessStatus,
+        ReadinessStatus = ReadinessStatus
     };
 
     public void UpdateEntity(ActivityProjectProfile e)

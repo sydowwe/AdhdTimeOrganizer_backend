@@ -1,6 +1,6 @@
-using AdhdTimeOrganizer.application.dto.request.@interface;
-using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
+using Sydowwe.Framework.application.dto.request.@interface;
+using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
 
@@ -28,6 +28,7 @@ public record CreateTrackerDesktopMappingRequest : ICreateRequest<TrackerDesktop
 
     public TrackerDesktopMappingByPattern ToEntity => new()
     {
+        UserId = 0,
         ProcessName = ProcessName,
         ProcessNameMatchType = ProcessNameMatchType,
         ProductName = ProductName,
@@ -38,6 +39,6 @@ public record CreateTrackerDesktopMappingRequest : ICreateRequest<TrackerDesktop
         IsIgnored = IsIgnored,
         ActivityId = ActivityId,
         RoleId = RoleId,
-        CategoryId = CategoryId,
+        CategoryId = CategoryId
     };
 }

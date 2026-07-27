@@ -1,30 +1,10 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.user;
-using FastEndpoints;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using Microsoft.AspNetCore.Identity;
+using Sydowwe.Framework.application.endpoint.user.command.twoFactor;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.settings._2fa;
 
-/// <summary>
-/// Returns the current user's two-factor authentication status.
-/// </summary>
 public class GetTwoFactorAuthStatusEndpoint(UserManager<User> userManager)
-    : EndpointWithoutRequest<bool>
+    : BaseGetTwoFactorAuthStatusEndpoint<User>(userManager)
 {
-    public override void Configure()
-    {
-        Get("/user/2fa/status");
-        Summary(s => { s.Summary = "Get two-factor authentication status"; });
-    }
-
-    public override async Task HandleAsync(CancellationToken ct)
-    {
-        var user = await userManager.GetUserAsync(User);
-        if (user is null)
-        {
-            await Send.UnauthorizedAsync(ct);
-            return;
-        }
-
-        await Send.OkAsync(user.TwoFactorEnabled, ct);
-    }
 }

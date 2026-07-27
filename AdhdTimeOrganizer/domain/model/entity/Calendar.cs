@@ -33,7 +33,9 @@ public class Calendar : BaseEntityWithUser
     // Future: Events, TodoLists, Habits, etc.
 
     public int DayIndex => Date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)Date.DayOfWeek;
+
     public bool IsWeekend => DayIndex is 6 or 7;
+
     // Completion tracking
     public int TotalTasks => Tasks.Count;
     public int CompletedTasks => Tasks.Count(t => t.IsDone);

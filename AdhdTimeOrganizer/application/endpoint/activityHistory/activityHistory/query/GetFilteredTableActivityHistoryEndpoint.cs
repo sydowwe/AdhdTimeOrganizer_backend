@@ -1,12 +1,13 @@
 using AdhdTimeOrganizer.application.dto.filter.history;
-using AdhdTimeOrganizer.application.dto.request.@base.table;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
-using AdhdTimeOrganizer.application.extensions;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.request.@base.table;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityHistory.activityHistory.query;
 
@@ -14,7 +15,6 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext)
     : Endpoint<BaseFilterSortPaginateRequest<ActivityHistoryFilterRequest>, List<ActivityHistoryListGroupedByDateResponse>>
 {
     public virtual string EndpointPath => "gird";
-
 
 
     public override void Configure()
@@ -25,7 +25,7 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext)
         {
             s.Summary = $"Get filtered and paginated {entityName} list";
             s.Description = $"Retrieves a filtered, paginated and sorted list of {entityName}";
-            
+
 
             s.Response<List<ActivityHistoryListGroupedByDateResponse>>(200, "Success");
             s.Response(400, "Bad request");
@@ -41,9 +41,7 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext)
             query = query.FilteredByUser(User.GetId());
 
             if (req is { UseFilter: true, Filter: not null })
-            {
                 query = ApplyCustomFiltering(query, req.Filter);
-            }
 
             var history = await ActivityHistoryResponse.Projection(query)
                 .GroupBy(hr => hr.StartTimestamp.ToUniversalTime().Date)
@@ -77,9 +75,7 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext)
     protected IQueryable<ActivityHistory> ApplyCustomFiltering(IQueryable<ActivityHistory> query, ActivityHistoryFilterRequest filter)
     {
         if (filter.ActivityId.HasValue)
-        {
             query = query.Where(ah => ah.ActivityId == filter.ActivityId.Value);
-        }
 
         if (filter.RoleId.HasValue)
             query = query.Where(h => h.Activity.CategoryId == filter.RoleId);
@@ -94,9 +90,7 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext)
 
             query = query.Where(ah => ah.Activity.TodoListItems != null == filter.IsFromTodoList.Value);
             if (filter.TaskPriorityId.HasValue && filter.IsFromTodoList.Value)
-            {
                 query = query.Where(ah => ah.Activity.TodoListItems.Any(tli => tli.TaskPriorityId == filter.TaskPriorityId.Value));
-            }
         }
 
         if (filter.IsFromRoutineTodoList.HasValue)
@@ -105,25 +99,17 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext)
 
             query = query.Where(h => h.Activity.RoutineTodoLists.Any() == filter.IsFromRoutineTodoList.Value);
             if (filter.RoutineTimePeriodId.HasValue && filter.IsFromRoutineTodoList.Value)
-            {
                 query = query.Where(h => h.Activity.RoutineTodoLists.Any(rtd => rtd.TimePeriodId == filter.RoutineTimePeriodId.Value));
-            }
         }
 
         if (filter.IsUnavoidable.HasValue)
-        {
             query = query.Where(h => h.Activity.IsUnavoidable == filter.IsUnavoidable);
-        }
 
         if (filter.DateFrom.HasValue)
-        {
             query = query.Where(h => h.StartTimestamp >= filter.DateFrom);
-        }
 
         if (filter.DateTo.HasValue)
-        {
             query = query.Where(h => h.StartTimestamp <= filter.DateTo);
-        }
 
         if (filter.HoursBack.HasValue)
         {
@@ -132,14 +118,10 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext)
         }
 
         if (filter.MinLength != null)
-        {
             query = query.Where(ah => ah.Length >= filter.MinLength);
-        }
 
         if (filter.MaxLength != null)
-        {
             query = query.Where(ah => ah.Length <= filter.MaxLength);
-        }
 
         return query;
     }

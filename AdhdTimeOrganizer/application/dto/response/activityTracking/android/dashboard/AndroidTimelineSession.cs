@@ -1,6 +1,6 @@
 namespace AdhdTimeOrganizer.application.dto.response.activityTracking.android.dashboard;
 
-public class AndroidTimelineSession
+public record AndroidTimelineSession
 {
     public long Id { get; set; }
     public required string PackageName { get; init; }

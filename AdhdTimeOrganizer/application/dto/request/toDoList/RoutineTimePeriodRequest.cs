@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.@base;
-using AdhdTimeOrganizer.application.dto.request.@interface;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;
 
@@ -25,7 +25,7 @@ public record RoutineTimePeriodRequest : TextColorRequest, ICreateRequest<Routin
     public int HistoryDepth { get; init; } = 16;
 
 
-    public RoutineTimePeriod ToEntity => new RoutineTimePeriod
+    public RoutineTimePeriod ToEntity => new()
     {
         Text = Text,
         Color = Color,
@@ -37,6 +37,7 @@ public record RoutineTimePeriodRequest : TextColorRequest, ICreateRequest<Routin
         HistoryDepth = HistoryDepth,
         UserId = 0
     };
+
     public void UpdateEntity(RoutineTimePeriod entity)
     {
         throw new NotImplementedException();
