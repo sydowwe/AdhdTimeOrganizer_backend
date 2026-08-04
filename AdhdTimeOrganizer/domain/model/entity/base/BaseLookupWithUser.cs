@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity.user;
 using Sydowwe.Framework.domain.entity.@base;
 
-namespace AdhdTimeOrganizer.domain.model.entity.@base.core;
+namespace AdhdTimeOrganizer.domain.model.entity.@base;
 
 /// <summary>
 /// Closes Framework's <see cref="BaseLookupWithUser{TUser}"/> over this portal's <see cref="User"/>.

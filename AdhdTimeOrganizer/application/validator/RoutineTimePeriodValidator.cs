@@ -21,6 +21,15 @@ public class RoutineTimePeriodValidator : Validator<RoutineTimePeriodRequest>
             .Must((req, v) => v < req.LengthInDays)
             .WithMessage("StreakGraceDays must be less than LengthInDays.");
 
+        // Mirrors ck_routine_time_period_reminder_lead_days_range. Null is the "no nudge" default and skips the
+        // rule entirely; a lead >= LengthInDays would open the window at or before the period starts, making
+        // the nudge permanent — which also leaves a one-day period with no valid lead at all.
+        RuleFor(x => x.ReminderLeadDays)
+            .GreaterThanOrEqualTo(1)
+            .Must((req, v) => v!.Value < req.LengthInDays)
+            .WithMessage("ReminderLeadDays must be less than LengthInDays.")
+            .When(x => x.ReminderLeadDays.HasValue);
+
         // Weekly-aligned: 0 = rolling, 1–7 = Mon–Sun
         RuleFor(x => x.ResetAnchorDay)
             .InclusiveBetween(0, 7)

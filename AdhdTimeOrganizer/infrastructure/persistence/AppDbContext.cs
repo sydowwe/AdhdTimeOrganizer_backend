@@ -6,6 +6,7 @@ using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.domain.model.entity.reminder;
 using AdhdTimeOrganizer.domain.model.entity.suggestion;
 using AdhdTimeOrganizer.domain.model.entity.timer;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
@@ -63,6 +64,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<PlannerTaskPattern> PlannerTaskPatterns { get; set; }
     public DbSet<ActivityHistoryPattern> ActivityHistoryPatterns { get; set; }
     public DbSet<TemplateSuggestionPattern> TemplateSuggestionPatterns { get; set; }
+    public DbSet<Reminder> Reminders { get; set; }
 
     // --- Notifications module ---
     public DbSet<Notification> Notifications { get; set; }

@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
-using AdhdTimeOrganizer.infrastructure.persistence.converter;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
+using Sydowwe.Framework.infrastructure.persistence.converter;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.todoList;
 

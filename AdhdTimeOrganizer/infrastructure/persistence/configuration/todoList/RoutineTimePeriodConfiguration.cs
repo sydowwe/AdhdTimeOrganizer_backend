@@ -49,6 +49,13 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
             "ck_routine_time_period_history_depth_range",
             "\"history_depth\" >= 1 AND \"history_depth\" <= 100"));
 
+        // NULL = no lead-time nudge, which is the default. A lead that reaches back past the start of the
+        // period would make the nudge permanent, so it is capped below the period length — which also means a
+        // one-day period admits no lead at all and can only ever be NULL.
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_routine_time_period_reminder_lead_days_range",
+            "\"reminder_lead_days\" IS NULL OR (\"reminder_lead_days\" >= 1 AND \"reminder_lead_days\" < \"length_in_days\")"));
+
         builder.HasMany(r => r.RoutineTodoListColl)
             .WithOne(t => t.RoutineTimePeriod)
             .HasForeignKey(t => t.TimePeriodId)

@@ -10,6 +10,7 @@ using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.repeatingPlannerTask.query;

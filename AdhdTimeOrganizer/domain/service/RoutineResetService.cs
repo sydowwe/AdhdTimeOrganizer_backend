@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.@enum;
 
 namespace AdhdTimeOrganizer.domain.service;
 
@@ -69,6 +70,50 @@ public static class RoutineResetService
         }
     }
 
+    /// <summary>How many days before <see cref="RoutineTimePeriod.StreakGraceUntil"/> the grace warning fires.</summary>
+    public const int GraceWarningLeadDays = 1;
+
+    /// <summary>A lead-time nudge that is due: the reset it is about, and how far off that reset is.</summary>
+    public readonly record struct RoutineNudge(DateTime NextReset, int DaysLeft);
+
+    /// <summary>
+    /// Whether this period is inside its lead-time window and has not been nudged for this reset yet. Pure —
+    /// the caller decides whether there is anything left to nudge <i>about</i> (an all-done period is skipped
+    /// without marking, so un-ticking an item tomorrow still earns the nudge) and marks
+    /// <see cref="RoutineTimePeriod.EndingSoonNotifiedFor"/> only once a notification actually goes out.
+    /// <para>
+    /// Returns null once <c>now</c> reaches the reset itself: from that point the reset job owns the period,
+    /// and a "3 days left" nudge racing the reset that clears the items would be worse than silence.
+    /// </para>
+    /// </summary>
+    public static RoutineNudge? EvaluateEndingSoon(RoutineTimePeriod period, DateTime now)
+    {
+        if (period.ReminderLeadDays is not { } leadDays)
+            return null;
+
+        var nextReset = ComputeNextReset(period);
+        if (period.EndingSoonNotifiedFor == nextReset)
+            return null;
+
+        if (now < nextReset.AddDays(-leadDays) || now >= nextReset)
+            return null;
+
+        // Ceiling, never floor: a reset twelve hours out is "1 day left", not "0 days left".
+        return new RoutineNudge(nextReset, (int)Math.Ceiling((nextReset - now).TotalDays));
+    }
+
+    /// <summary>
+    /// Whether the period's grace window is about to lapse and has not been warned about yet. Keyed on the
+    /// grace instant itself, so a later failed period opening a fresh window is a fresh warning.
+    /// </summary>
+    public static bool ShouldWarnGraceExpiring(RoutineTimePeriod period, DateTime now)
+    {
+        if (period.StreakGraceUntil is not { } graceUntil || period.GraceNotifiedFor == graceUntil)
+            return false;
+
+        return now >= graceUntil.AddDays(-GraceWarningLeadDays) && now < graceUntil;
+    }
+
     /// <summary>
     /// Breaks the streak if the grace period has expired. Should be called before TryReset on every access.
     /// Returns true if the period was modified.
@@ -105,16 +150,24 @@ public static class RoutineResetService
     }
 
     /// <summary>
-    /// Resets items if the period has elapsed. Evaluates period streak before clearing.
-    /// Returns a <see cref="RoutinePeriodCompletion"/> record if a reset occurred, otherwise null.
+    /// The result of a reset that actually happened: the history row to persist, and what the reset did to the
+    /// streak. The outcome is returned rather than re-derived by callers because only this method sees the
+    /// streak on both sides of the evaluation.
     /// </summary>
-    public static RoutinePeriodCompletion? TryReset(RoutineTimePeriod period, IList<RoutineTodoList> items, DateTime now)
+    public readonly record struct RoutinePeriodReset(RoutinePeriodCompletion Completion, StreakOutcome Outcome);
+
+    /// <summary>
+    /// Resets items if the period has elapsed. Evaluates period streak before clearing.
+    /// Returns the completion record plus the streak outcome if a reset occurred, otherwise null.
+    /// </summary>
+    public static RoutinePeriodReset? TryReset(RoutineTimePeriod period, IList<RoutineTodoList> items, DateTime now)
     {
         var nextReset = ComputeNextReset(period);
         if (now < nextReset)
             return null;
 
         var completedCount = 0;
+        var outcome = StreakOutcome.NotEvaluated;
         if (items.Count > 0)
         {
             completedCount = items.Count(i => i.IsDone);
@@ -126,15 +179,18 @@ public static class RoutineResetService
                 if (period.Streak > period.BestStreak)
                     period.BestStreak = period.Streak;
                 period.StreakGraceUntil = null;
+                outcome = StreakOutcome.Extended;
             }
             else if (period.StreakGraceDays > 0)
             {
                 period.StreakGraceUntil = nextReset.AddDays(period.StreakGraceDays);
+                outcome = StreakOutcome.OnGrace;
             }
             else
             {
                 period.Streak = 0;
                 period.StreakGraceUntil = null;
+                outcome = StreakOutcome.Broken;
             }
         }
 
@@ -151,15 +207,21 @@ public static class RoutineResetService
         var periodEnd = DateOnly.FromDateTime(nextReset);
         period.LastResetAt = nextReset;
 
-        return new RoutinePeriodCompletion
-        {
-            TimePeriodId = period.Id,
-            PeriodStart = periodEnd.AddDays(-period.LengthInDays),
-            PeriodEnd = periodEnd,
-            CompletedCount = completedCount,
-            TotalCount = items.Count,
-            CreatedAt = now
-        };
+        // The window this reset closed is over, so any nudge mark for it is spent — clearing it here is what
+        // lets the next cycle earn its own nudge (the mark is compared against a freshly computed instant).
+        period.EndingSoonNotifiedFor = null;
+
+        return new RoutinePeriodReset(
+            new RoutinePeriodCompletion
+            {
+                TimePeriodId = period.Id,
+                PeriodStart = periodEnd.AddDays(-period.LengthInDays),
+                PeriodEnd = periodEnd,
+                CompletedCount = completedCount,
+                TotalCount = items.Count,
+                CreatedAt = now
+            },
+            outcome);
     }
 
     /// <summary>

@@ -4,7 +4,7 @@ using Sydowwe.Framework.application.endpoint.user.command.auth;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
 using Sydowwe.Framework.domain.serviceContract;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.auth;
 
 /// <summary>
 /// First-login 2FA provisioning for the web client: reads the partial-auth cookie written by the

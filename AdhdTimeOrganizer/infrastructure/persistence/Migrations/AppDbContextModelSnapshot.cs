@@ -1057,6 +1057,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("DayType")
                         .HasDatabaseName("ix_calendar_day_type");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_calendar_user_id");
+
                     b.HasIndex("UserId", "Date")
                         .IsUnique()
                         .HasDatabaseName("ix_calendar_user_id_date");
@@ -1129,6 +1132,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("RoleId")
                         .HasDatabaseName("ix_activity_role_id");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_user_id");
+
                     b.HasIndex("UserId", "CategoryId")
                         .HasDatabaseName("ix_activity_user_id_category_id");
 
@@ -1200,6 +1206,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_activity_category");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_category_user_id");
+
                     b.HasIndex("UserId", "Name")
                         .IsUnique()
                         .HasDatabaseName("ix_activity_category_user_id_name");
@@ -1265,6 +1274,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_activity_role");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_role_user_id");
+
                     b.HasIndex("UserId", "Name")
                         .IsUnique()
                         .HasDatabaseName("ix_activity_role_user_id_name");
@@ -1315,6 +1327,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_activity_expected_cost_tier");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_expected_cost_tier_user_id");
 
                     b.HasIndex("UserId", "Text")
                         .IsUnique()
@@ -1367,6 +1382,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_activity_experience_type");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_experience_type_user_id");
+
                     b.HasIndex("UserId", "Text")
                         .IsUnique()
                         .HasDatabaseName("ix_activity_experience_type_user_id_text");
@@ -1418,6 +1436,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_activity_location_type");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_location_type_user_id");
+
                     b.HasIndex("UserId", "Text")
                         .IsUnique()
                         .HasDatabaseName("ix_activity_location_type_user_id_text");
@@ -1468,6 +1489,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_activity_weather_dependency");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_weather_dependency_user_id");
 
                     b.HasIndex("UserId", "Text")
                         .IsUnique()
@@ -1829,6 +1853,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("ActivityId")
                         .HasDatabaseName("ix_activity_history_activity_id");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_history_user_id");
+
                     b.HasIndex("UserId", "ActivityId", "StartTimestamp")
                         .IsUnique()
                         .HasDatabaseName("ix_activity_history_user_id_activity_id_start_timestamp");
@@ -1949,6 +1976,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("TodolistItemId")
                         .HasDatabaseName("ix_planner_task_todolist_item_id");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_planner_task_user_id");
+
                     b.HasIndex("UserId", "CalendarId", "StartTime")
                         .HasDatabaseName("ix_planner_task_user_id_calendar_id_start_time");
 
@@ -2061,6 +2091,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("RecurrenceType")
                         .HasDatabaseName("ix_repeating_planner_task_recurrence_type");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_repeating_planner_task_user_id");
 
                     b.HasIndex("UserId", "IsActive")
                         .HasDatabaseName("ix_repeating_planner_task_user_id_is_active");
@@ -2224,6 +2257,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("SuggestedForDayType")
                         .HasDatabaseName("ix_task_planner_day_template_suggested_for_day_type");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_task_planner_day_template_user_id");
 
                     b.HasIndex("UserId", "Name")
                         .HasDatabaseName("ix_task_planner_day_template_user_id_name");
@@ -2472,6 +2508,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_android_session_data");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_android_session_data_user_id");
+
                     b.HasIndex("UserId", "PackageName")
                         .HasDatabaseName("ix_android_session_data_user_id_package_name");
 
@@ -2547,6 +2586,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasKey("Id", "RecordDate")
                         .HasName("pk_web_extension_activity_entry");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_web_extension_activity_entry_user_id");
 
                     b.HasIndex("UserId", "WindowStart")
                         .HasDatabaseName("ix_web_extension_activity_entry_user_id_window_start");
@@ -2643,6 +2685,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("RoleId")
                         .HasDatabaseName("ix_tracker_android_mapping_by_pattern_role_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_tracker_android_mapping_by_pattern_user_id");
 
                     b.HasIndex("UserId", "PackageName", "AppLabel")
                         .IsUnique()
@@ -2745,6 +2790,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasKey("Id", "RecordDate")
                         .HasName("pk_desktop_activity_entry");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_desktop_activity_entry_user_id");
 
                     b.HasIndex("UserId", "WindowStart")
                         .HasDatabaseName("ix_desktop_activity_entry_user_id_window_start");
@@ -2851,6 +2899,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("RoleId")
                         .HasDatabaseName("ix_tracker_desktop_mapping_by_pattern_role_id");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_tracker_desktop_mapping_by_pattern_user_id");
+
                     b.HasIndex("UserId", "ProcessName", "ProductName", "WindowTitle")
                         .IsUnique()
                         .HasDatabaseName("ix_tracker_desktop_mapping_by_pattern_user_id_process_name_pro");
@@ -2869,6 +2920,80 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                             t.HasCheckConstraint("CK_TrackerDesktopMappingByPattern_WindowTitleMatchType", "window_title IS NULL OR window_title_match_type IS NOT NULL");
                         });
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.reminder.Reminder", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.PrimitiveCollection<string>("LeadOffsetsMinutes")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("lead_offsets_minutes");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("note");
+
+                    b.Property<long?>("PlannerTaskId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("planner_task_id");
+
+                    b.Property<string>("Recurrence")
+                        .HasColumnType("text")
+                        .HasColumnName("recurrence");
+
+                    b.Property<DateTime>("RemindAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("remind_at");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reminder");
+
+                    b.HasIndex("PlannerTaskId")
+                        .HasDatabaseName("ix_reminder_planner_task_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_reminder_user_id");
+
+                    b.HasIndex("UserId", "RemindAt")
+                        .HasDatabaseName("ix_reminder_user_id_remind_at");
+
+                    b.ToTable("reminder", "public");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.suggestion.ActivityHistoryPattern", b =>
@@ -3201,6 +3326,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnName("created_timestamp")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("EndingSoonNotifiedFor")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ending_soon_notified_for");
+
+                    b.Property<DateTime?>("GraceNotifiedFor")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("grace_notified_for");
+
                     b.Property<int>("HistoryDepth")
                         .HasColumnType("integer")
                         .HasColumnName("history_depth");
@@ -3222,6 +3355,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_timestamp")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<int?>("ReminderLeadDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("reminder_lead_days");
 
                     b.Property<int>("ResetAnchorDay")
                         .HasColumnType("integer")
@@ -3278,6 +3415,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                             t.HasCheckConstraint("ck_routine_time_period_history_depth_range", "\"history_depth\" >= 1 AND \"history_depth\" <= 100");
 
                             t.HasCheckConstraint("ck_routine_time_period_length_in_days_range", "\"length_in_days\" >= 1 AND \"length_in_days\" <= 365");
+
+                            t.HasCheckConstraint("ck_routine_time_period_reminder_lead_days_range", "\"reminder_lead_days\" IS NULL OR (\"reminder_lead_days\" >= 1 AND \"reminder_lead_days\" < \"length_in_days\")");
 
                             t.HasCheckConstraint("ck_routine_time_period_reset_anchor_day_range", "(\"length_in_days\" <= 7 OR \"length_in_days\" % 7 = 0 AND \"reset_anchor_day\" BETWEEN 1 AND 7) OR (\"length_in_days\" > 7 AND \"length_in_days\" % 7 <> 0 AND \"reset_anchor_day\" BETWEEN 1 AND 30)");
 
@@ -3388,6 +3527,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("TimePeriodId")
                         .HasDatabaseName("ix_routine_todo_list_time_period_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_routine_todo_list_user_id");
 
                     b.HasIndex("UserId", "TimePeriodId")
                         .HasDatabaseName("ix_routine_todo_list_user_id_time_period_id");
@@ -3532,6 +3674,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("CategoryId")
                         .HasDatabaseName("ix_todo_list_category_id");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_todo_list_user_id");
+
                     b.HasIndex("UserId", "Name")
                         .IsUnique()
                         .HasDatabaseName("ix_todo_list_user_id_name");
@@ -3596,6 +3741,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_todo_list_category");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_todo_list_category_user_id");
 
                     b.HasIndex("UserId", "Name")
                         .IsUnique()
@@ -3694,6 +3842,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("TodoListId")
                         .HasDatabaseName("ix_todo_list_item_todo_list_id");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_todo_list_item_user_id");
+
                     b.HasIndex("UserId", "TaskPriorityId")
                         .HasDatabaseName("ix_todo_list_item_user_id_task_priority_id");
 
@@ -3775,10 +3926,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
-
-                    b.Property<DateTime?>("LastLoginAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_login_at");
 
                     b.Property<string>("Locale")
                         .IsRequired()
@@ -4813,6 +4960,26 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.reminder.Reminder", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activityPlanning.PlannerTask", "PlannerTask")
+                        .WithMany()
+                        .HasForeignKey("PlannerTaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_reminder_planner_task_planner_task_id");
+
+                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                        .WithMany("Reminders")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reminder_user_user_id");
+
+                    b.Navigation("PlannerTask");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.suggestion.ActivityHistoryPattern", b =>
                 {
                     b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
@@ -5286,6 +5453,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("PlannerTaskList");
 
                     b.Navigation("RefreshTokens");
+
+                    b.Navigation("Reminders");
 
                     b.Navigation("RoleList");
 

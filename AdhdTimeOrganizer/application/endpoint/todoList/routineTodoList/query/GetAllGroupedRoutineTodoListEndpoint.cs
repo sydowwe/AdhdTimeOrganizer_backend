@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.application.dto.response.todoList;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.service;
+using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,8 @@ using Sydowwe.Framework.application.extensions;
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.query;
 
 public class GetAllGroupedRoutineTodoListEndpoint(
-    AppDbContext dbContext) : EndpointWithoutRequest<IEnumerable<RoutineTodoListGroupedResponse>>
+    AppDbContext dbContext,
+    IRoutinePeriodNotificationService notifier) : EndpointWithoutRequest<IEnumerable<RoutineTodoListGroupedResponse>>
 {
     public override void Configure()
     {
@@ -42,15 +44,17 @@ public class GetAllGroupedRoutineTodoListEndpoint(
 
         var changed = false;
         var newCompletions = new List<RoutinePeriodCompletion>();
+        var reset = new List<(RoutineTimePeriod Period, RoutineResetService.RoutinePeriodReset Result)>();
         foreach (var period in periods)
         {
             var items = period.RoutineTodoListColl.ToList();
             changed |= RoutineResetService.CheckGrace(period, now);
-            var completion = RoutineResetService.TryReset(period, items, now);
-            if (completion != null)
+            var result = RoutineResetService.TryReset(period, items, now);
+            if (result is { } r)
             {
                 changed = true;
-                newCompletions.Add(completion);
+                newCompletions.Add(r.Completion);
+                reset.Add((period, r));
             }
         }
 
@@ -59,6 +63,12 @@ public class GetAllGroupedRoutineTodoListEndpoint(
             dbContext.Set<RoutinePeriodCompletion>().AddRange(newCompletions);
             await dbContext.SaveChangesAsync(ct);
         }
+
+        // This read applies resets lazily, so it is a real reset site and owes the same summary the nightly job
+        // sends — whichever path reaches the elapsed period first is the one that announces it. Raised after the
+        // commit and best-effort, so it cannot fail the request the user is waiting on.
+        foreach (var (period, result) in reset)
+            await notifier.NotifyPeriodEndedAsync(period, result.Completion, result.Outcome, ct);
 
         var periodIds = periods.Select(p => p.Id).ToList();
         var completions = await dbContext.RoutinePeriodCompletions

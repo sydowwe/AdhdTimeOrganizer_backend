@@ -44,6 +44,8 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbC
         dbContext.Set<TEntity>().UpdateRange(itemsToToggle);
         await dbContext.SaveChangesAsync(ct);
 
+        await AfterSave(ct);
+
         foreach (var entity in itemsToToggle)
             await PublishEvent(entity, ct);
 
@@ -59,6 +61,13 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(AppDbContext dbC
     protected virtual void AfterItemToggled(TEntity entity, DateTime now)
     {
     }
+
+    /// <summary>
+    /// Runs once after the toggle has been committed. For side effects that must not be able to roll the
+    /// toggle back — announcing something that has already happened, rather than changing what happens.
+    /// <see cref="FetchAndPrepare"/> is the place to record what such a hook needs to act on.
+    /// </summary>
+    protected virtual Task AfterSave(CancellationToken ct) => Task.CompletedTask;
 
     protected abstract Task PublishEvent(TEntity entity, CancellationToken ct);
 

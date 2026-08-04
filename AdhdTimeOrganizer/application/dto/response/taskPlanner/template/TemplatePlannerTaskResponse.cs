@@ -1,6 +1,7 @@
 ﻿using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.dto.response;
 
 namespace AdhdTimeOrganizer.application.dto.response.taskPlanner.template;

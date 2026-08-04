@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.service;
 using FluentAssertions;
 using Xunit;
@@ -302,7 +303,8 @@ public class RoutineResetServiceTests
         var result = RoutineResetService.TryReset(period, new List<RoutineTodoList>(), DateTime.UtcNow);
 
         result.Should().NotBeNull();
-        result!.TotalCount.Should().Be(0);
+        result!.Value.Completion.TotalCount.Should().Be(0);
+        result.Value.Outcome.Should().Be(StreakOutcome.NotEvaluated);
         period.Streak.Should().Be(3);
     }
 
@@ -317,11 +319,11 @@ public class RoutineResetServiceTests
             MakeItem(false)
         };
 
-        var completion = RoutineResetService.TryReset(period, items, DateTime.UtcNow);
+        var result = RoutineResetService.TryReset(period, items, DateTime.UtcNow);
 
-        completion.Should().NotBeNull();
-        completion!.CompletedCount.Should().Be(2);
-        completion.TotalCount.Should().Be(3);
+        result.Should().NotBeNull();
+        result!.Value.Completion.CompletedCount.Should().Be(2);
+        result.Value.Completion.TotalCount.Should().Be(3);
     }
 
     [Fact]
@@ -342,6 +344,153 @@ public class RoutineResetServiceTests
             i.IsDone.Should().BeFalse();
             i.DoneCount.Should().Be(0);
         });
+    }
+
+    // ─── TryReset streak outcome ─────────────────────────────────────────────
+    // The outcome is what the end-of-period notification says about the streak, so a wrong one is a wrong
+    // message to the user rather than a wrong row. Each branch of the streak evaluation is pinned.
+
+    [Theory]
+    [InlineData(true, 0, StreakOutcome.Extended)]
+    [InlineData(false, 3, StreakOutcome.OnGrace)]
+    [InlineData(false, 0, StreakOutcome.Broken)]
+    public void TryReset_Batch_ReportsStreakOutcome(bool itemsDone, int graceDays, StreakOutcome expected)
+    {
+        var period = MakePeriod(7, streakThreshold: 80, graceDays: graceDays, lastResetAt: DateTime.UtcNow.AddDays(-8));
+        period.Streak = 4;
+
+        var result = RoutineResetService.TryReset(period, [MakeItem(itemsDone), MakeItem(itemsDone)], DateTime.UtcNow);
+
+        result.Should().NotBeNull();
+        result!.Value.Outcome.Should().Be(expected);
+    }
+
+    /// <summary>
+    /// The mark is scoped to one cycle. Without this the next cycle's nudge would be compared against a mark
+    /// left over from the previous one and — for a rolling period, where the recomputed instant can coincide —
+    /// could be suppressed entirely.
+    /// </summary>
+    [Fact]
+    public void TryReset_Batch_ClearsTheEndingSoonMark()
+    {
+        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-8));
+        period.EndingSoonNotifiedFor = DateTime.UtcNow.AddDays(-1);
+
+        RoutineResetService.TryReset(period, [MakeItem()], DateTime.UtcNow);
+
+        period.EndingSoonNotifiedFor.Should().BeNull();
+    }
+
+    // ─── EvaluateEndingSoon ──────────────────────────────────────────────────
+
+    [Fact]
+    public void EvaluateEndingSoon_NoLeadConfigured_ReturnsNull()
+    {
+        // ReminderLeadDays is null by default — opting in is what turns the nudge on.
+        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-6));
+
+        RoutineResetService.EvaluateEndingSoon(period, DateTime.UtcNow).Should().BeNull();
+    }
+
+    [Fact]
+    public void EvaluateEndingSoon_OutsideWindow_ReturnsNull()
+    {
+        // Reset is 6 days out, lead is 2 — the window has not opened yet.
+        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-1));
+        period.ReminderLeadDays = 2;
+
+        RoutineResetService.EvaluateEndingSoon(period, DateTime.UtcNow).Should().BeNull();
+    }
+
+    [Fact]
+    public void EvaluateEndingSoon_InsideWindow_ReturnsNudgeWithDaysLeft()
+    {
+        var now = new DateTime(2024, 1, 6, 12, 0, 0, DateTimeKind.Utc);
+        // Rolling 7-day period last reset on the 1st → next reset 2024-01-08 00:00, i.e. 1.5 days out.
+        var period = MakePeriod(7, lastResetAt: new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        period.ReminderLeadDays = 3;
+
+        var nudge = RoutineResetService.EvaluateEndingSoon(period, now);
+
+        nudge.Should().NotBeNull();
+        nudge!.Value.NextReset.Should().Be(new DateTime(2024, 1, 8, 0, 0, 0, DateTimeKind.Utc));
+        // Ceiling, so a reset a day and a half out never reads as "0 days left".
+        nudge.Value.DaysLeft.Should().Be(2);
+    }
+
+    [Fact]
+    public void EvaluateEndingSoon_AlreadyNotifiedForThisReset_ReturnsNull()
+    {
+        var now = new DateTime(2024, 1, 6, 12, 0, 0, DateTimeKind.Utc);
+        var period = MakePeriod(7, lastResetAt: new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        period.ReminderLeadDays = 3;
+        period.EndingSoonNotifiedFor = RoutineResetService.ComputeNextReset(period);
+
+        RoutineResetService.EvaluateEndingSoon(period, now).Should().BeNull();
+    }
+
+    /// <summary>
+    /// Past the reset the period belongs to the reset path, and a "2 days left" nudge racing the reset that
+    /// clears the items would be worse than saying nothing.
+    /// </summary>
+    [Fact]
+    public void EvaluateEndingSoon_PastTheReset_ReturnsNull()
+    {
+        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-8));
+        period.ReminderLeadDays = 3;
+
+        RoutineResetService.EvaluateEndingSoon(period, DateTime.UtcNow).Should().BeNull();
+    }
+
+    // ─── ShouldWarnGraceExpiring ─────────────────────────────────────────────
+
+    [Fact]
+    public void ShouldWarnGraceExpiring_NoGraceWindow_ReturnsFalse()
+    {
+        RoutineResetService.ShouldWarnGraceExpiring(MakePeriod(), DateTime.UtcNow).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ShouldWarnGraceExpiring_GraceStillFarOff_ReturnsFalse()
+    {
+        var period = MakePeriod();
+        period.StreakGraceUntil = DateTime.UtcNow.AddDays(3);
+
+        RoutineResetService.ShouldWarnGraceExpiring(period, DateTime.UtcNow).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ShouldWarnGraceExpiring_WithinLead_ReturnsTrue()
+    {
+        var period = MakePeriod();
+        period.StreakGraceUntil = DateTime.UtcNow.AddHours(12);
+
+        RoutineResetService.ShouldWarnGraceExpiring(period, DateTime.UtcNow).Should().BeTrue();
+    }
+
+    /// <summary>Once the window has lapsed there is nothing to warn about — CheckGrace has already broken it.</summary>
+    [Fact]
+    public void ShouldWarnGraceExpiring_AlreadyLapsed_ReturnsFalse()
+    {
+        var period = MakePeriod();
+        period.StreakGraceUntil = DateTime.UtcNow.AddHours(-1);
+
+        RoutineResetService.ShouldWarnGraceExpiring(period, DateTime.UtcNow).Should().BeFalse();
+    }
+
+    /// <summary>Keyed on the grace instant, so a second failed period opening a new window warns again.</summary>
+    [Fact]
+    public void ShouldWarnGraceExpiring_MarkAppliesOnlyToTheWindowItWasSetFor()
+    {
+        var period = MakePeriod();
+        period.StreakGraceUntil = DateTime.UtcNow.AddHours(12);
+        period.GraceNotifiedFor = period.StreakGraceUntil;
+
+        RoutineResetService.ShouldWarnGraceExpiring(period, DateTime.UtcNow).Should().BeFalse();
+
+        period.StreakGraceUntil = DateTime.UtcNow.AddHours(18);
+
+        RoutineResetService.ShouldWarnGraceExpiring(period, DateTime.UtcNow).Should().BeTrue();
     }
 
     // ─── UpdateItemStreak ────────────────────────────────────────────────────

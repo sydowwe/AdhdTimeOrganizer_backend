@@ -1,4 +1,5 @@
 ﻿using AdhdTimeOrganizer.application.dto.dto;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;

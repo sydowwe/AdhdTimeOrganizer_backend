@@ -30,6 +30,14 @@ public static class NotificationChannelDefaults
         // until fixed, so at the failure throttle's 1 hour this would be 24 mails a day. If that window is
         // ever shortened, revisit this line.
         NotificationType.ScheduledJobOverdue
+        // NOT NotificationType.PersonalReminder, deliberately. It is a self-set nudge the user already sees
+        // in-app and on the device; mailing every "call the dentist at 15:00" would make the inbox the noisy
+        // surface this table exists to protect. The user can still opt in with a NotificationPreference row.
+        //
+        // NOT the three Routine* types either, for the same reason and more so: they recur on every period of
+        // every routine the user keeps, so email-default-on would be the single noisiest thing in this table.
+        // They are opt-in per period already (RoutineTimePeriod.ReminderLeadDays), and a user who does want
+        // them mailed opts in per channel like any other type.
     ];
 
     /// <summary>True when the channel fires for this type without an explicit preference row.</summary>

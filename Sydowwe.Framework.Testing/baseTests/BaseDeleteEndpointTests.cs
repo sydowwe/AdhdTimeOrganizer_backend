@@ -19,6 +19,12 @@ public abstract class BaseDeleteEndpointTests(IPostgresFixture fixture)
     // Return null (default) if this endpoint has no ownership scoping — the IDOR test is then skipped.
     protected virtual Task<long?> SeedEntityOwnedByOtherUserAsync(DbContext db) => Task.FromResult<long?>(null);
 
+    // What a refused cross-user delete answers. Default 403, matching BaseDeleteEndpoint.AuthorizeAsync.
+    // Override to 404 for entities carrying a global user query filter: the row is filtered out of the
+    // lookup entirely, so the endpoint answers "not found" and the authorization hook never runs. Same
+    // hook, same reasoning as BaseGetByIdEndpointTests.UnauthorizedStatus.
+    protected virtual HttpStatusCode UnauthorizedStatus => HttpStatusCode.Forbidden;
+
     [Fact]
     public async Task HappyPath_Admin_Returns204()
     {
@@ -60,8 +66,8 @@ public abstract class BaseDeleteEndpointTests(IPostgresFixture fixture)
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
-    public async Task NotOwner_Returns403()
+    [Fact(DisplayName = "Cross-user delete of someone else's row is refused (403, or 404 where a query filter hides it)")]
+    public async Task NotOwner_IsRefused()
     {
         await using var db = CreateDbContext();
         var id = await SeedEntityOwnedByOtherUserAsync(db);
@@ -70,6 +76,6 @@ public abstract class BaseDeleteEndpointTests(IPostgresFixture fixture)
 
         var response = await CreateClient().DeleteAsync($"{EndpointUrl}/{id}");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(UnauthorizedStatus);
     }
 }

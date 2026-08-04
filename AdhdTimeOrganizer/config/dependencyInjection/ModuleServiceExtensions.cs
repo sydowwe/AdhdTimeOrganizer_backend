@@ -19,19 +19,28 @@ namespace AdhdTimeOrganizer.config.dependencyInjection;
 /// <summary>
 /// Registers the services of the Notifications / Reminders / Scheduler modules.
 /// <para>
-/// These modules mark their services with <b>Sydowwe.Framework's</b> lifetime interfaces, not this
-/// project's identically-named ones, so <see cref="DependencyInjectionExtensions.AddDependencyInjection"/>
-/// does not see them. Until the two marker sets are reconciled, both scans have to run.
-/// </para>
-/// <para>
 /// The assembly list is explicit rather than <c>AppDomain.CurrentDomain.GetAssemblies()</c>: the CLR loads
 /// an assembly lazily on first type use, so a module whose types have not been touched yet would silently
-/// contribute nothing to a scan taken at startup.
+/// contribute nothing to a scan taken at startup. That reliability is why this scan exists at all.
+/// </para>
+/// <para>
+/// <b>This is the only scan that may cover these assemblies.</b> The modules mark their services with the
+/// same <c>Sydowwe.Framework</c> lifetime interfaces
+/// <see cref="DependencyInjectionExtensions.AddDependencyInjection"/> scans for, so once the CLR has loaded
+/// them they also show up in its <c>AppDomain</c> sweep — registering every module service a second time.
+/// Single resolutions survive that (last wins), but anything resolved as <c>IEnumerable&lt;T&gt;</c>
+/// silently doubles: two <c>ReminderScanJobHandler</c>s means the dispatch scan runs twice per fire, and
+/// two of each seeder means every seeder runs twice. <see cref="ModuleAssemblies"/> is therefore excluded
+/// from that sweep — keep the two lists joined rather than duplicating the exclusion.
 /// </para>
 /// </summary>
 public static class ModuleServiceExtensions
 {
-    private static readonly Assembly[] ModuleAssemblies =
+    /// <summary>
+    /// The module assemblies this extension owns the scanning of. Read by
+    /// <see cref="DependencyInjectionExtensions"/> to exclude them from its <c>AppDomain</c> sweep.
+    /// </summary>
+    internal static readonly Assembly[] ModuleAssemblies =
     [
         typeof(Notification).Assembly,
         typeof(ReminderDefinition).Assembly,

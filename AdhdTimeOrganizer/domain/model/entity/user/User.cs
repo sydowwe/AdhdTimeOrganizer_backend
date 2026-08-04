@@ -6,6 +6,7 @@ using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.domain.model.entity.reminder;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.entityInterface;
@@ -59,6 +60,7 @@ public sealed class User : BaseUser, IBaseTableEntity
     public ICollection<TrackerDesktopMappingByPattern> TrackerDesktopMappingByPatternList { get; set; } = new List<TrackerDesktopMappingByPattern>();
     public ICollection<TrackerAndroidMappingByPattern> TrackerAndroidMappingByPatternList { get; set; } = new List<TrackerAndroidMappingByPattern>();
     public ICollection<MemoryAnchor> MemoryAnchors { get; set; } = new List<MemoryAnchor>();
+    public ICollection<Reminder> Reminders { get; set; } = new List<Reminder>();
 
 
     public override string? Email

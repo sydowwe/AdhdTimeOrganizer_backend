@@ -30,6 +30,43 @@ helpers. The old `EndpointHelper` / `DateTimeExtensions` name collisions are gon
 are now `PortalEndpointHelper` and `TimeOnlyExtensions`. The portal/framework reconciliation is
 finished; there is no outstanding duplicate to merge.
 
+# Composition Root (module wiring)
+
+The Notifications / Reminders / Scheduler modules are wired in `AdhdTimeOrganizer/config/dependencyInjection/`
+and `Program.cs`. `AdhdTimeOrganizer.IntegrationTests/Modules/ModuleWiringTests.cs` pins all of it —
+run it after touching anything below, because none of these break the build.
+
+- **Two marker scans, non-overlapping assembly sets — keep them that way.**
+  `DependencyInjectionExtensions.AddDependencyInjection` sweeps `AppDomain.CurrentDomain.GetAssemblies()`;
+  `ModuleServiceExtensions.AddModuleServices` scans an explicit `ModuleAssemblies` list (explicit because
+  the CLR loads lazily, so a module nothing has touched yet contributes nothing to an `AppDomain` sweep).
+  Both look for the **same** `Sydowwe.Framework` lifetime interfaces, so the sweep now `Except`s
+  `ModuleAssemblies`. Drop that and every module service is registered twice: single resolutions still work
+  (last wins), but every `IEnumerable<T>` doubles — two `ReminderScanJobHandler`s means the dispatch scan
+  runs twice per fire, two of each seeder means every seeder runs twice. Nothing throws or logs.
+- **Generic-over-`TUser` services can't be scanned** — `NotificationService<User>` and
+  `IDeferredNotificationDispatcher` are closed by hand in `AddModuleServices`, same as the framework user
+  services in `AddDependencyInjection`.
+- **Module services take a plain `DbContext`** (that's how they stay host-agnostic), so `AddModuleServices`
+  aliases `DbContext` → `AppDbContext`. Without it ~34 of them fail to activate.
+- **FastEndpoints discovery is an explicit assembly list** in `Program.cs`. A module missing from it is not
+  an error — its endpoints just 404.
+- **Boot reconciliation:** each module's `…ScheduledJobsRegistrar` is an `IHostedService` that upserts its
+  recurring jobs through Kernel's `IScheduler`. Required on **every** boot — the Quartz RAM job store drops
+  all triggers on restart.
+- **`IQuietHoursReader` must resolve to Notifications' `QuietHoursReader`.** Reminders ships
+  `NoQuietHoursReader` for hosts without Notifications; it carries no lifetime marker on purpose, because an
+  auto-registered no-op would silently disable quiet hours everywhere.
+- **Account deletion fans out over `ISubjectDataEraser`** (`DeleteUserAccountEndpoint.BeforeDeleteAsync`).
+  The host FKs cascade only `notification` / `notification_preference` / `push_subscription`; every other
+  user-keyed module table is deliberately FK-free and would outlive the account. Erasers mutate the ambient
+  `DbContext` and never commit — `UserManager.DeleteAsync`'s own `SaveChanges` (same scoped context) is the
+  transaction.
+- **Config precedence is env-over-JSON.** `Program.cs` re-adds `appsettings.json` after `CreateBuilder` to
+  fix the base path, which put JSON *after* the environment provider; `AddEnvironmentVariables()` is
+  re-added last to restore the standard order. Module secrets use `Section__Key`
+  (`PushNotification__VapidPrivateKey`) and would otherwise be shadowed by an appsettings placeholder.
+
 # Entity Conventions
 
 The base hierarchy is **Framework-only** — `Sydowwe.Framework/domain/entity/`, with the marker
@@ -251,10 +288,10 @@ request: `TRequest : ICreateRequest<TEntity>` exposes `TEntity ToEntity`;
 |---|---|---|
 | `BaseCreateEndpoint<TEntity, TRequest>` | POST | Standard create — `req.ToEntity`, saves, returns new `Id` (201). Hooks: `BeforeMapping`/`AfterMapping`/`AfterSave` |
 | `BaseUpdateEndpoint<TEntity, TRequest>` | PUT `/{id}` | Standard full update — `req.UpdateEntity(entity)` (transactional). Hooks: `BeforeMapping`/`UpdateEntityAsync`/`AfterMapping`/`AfterSave` |
-| `BasePatchEndpoint<TEntity, TRequest, TResponse>` | PATCH `/{id}` | Partial update — implement `Mapping(entity, req)` |
-| `BaseDeleteEndpoint<TEntity>` | DELETE `/{id}` | Single entity hard delete by id |
+| `BasePatchEndpoint<TEntity, TRequest, TResponse>` | PATCH `/{id}` | Partial update — implement `Mapping(entity, req)`. Hook: `AfterSave` |
+| `BaseDeleteEndpoint<TEntity>` | DELETE `/{id}` | Single entity hard delete by id. Hooks: `BeforeDeleteAsync` (read what the delete/cascade is about to destroy) / `AfterSave` |
 | `BaseSoftDeleteEndpoint<TEntity>` | DELETE `/{id}` | Soft delete (`ISoftDeletable.IsActive = false`) |
-| `BaseBatchDeleteEndpoint<TEntity>` | POST `/batch-delete` | Delete multiple entities by id list |
+| `BaseBatchDeleteEndpoint<TEntity>` | POST `/batch-delete` | Delete multiple entities by id list. Hooks: `BeforeDeleteAsync` / `AfterSave`, both taking the whole batch |
 | `BaseToggleIsHiddenEndpoint<TEntity>` | PATCH `/toggle-is-hidden` | Toggle `IsHidden` on entities implementing `IEntityWithIsHidden` |
 
 **Reads** (`endpoint/base/read/`)

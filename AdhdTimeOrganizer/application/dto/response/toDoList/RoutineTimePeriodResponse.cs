@@ -1,6 +1,6 @@
-using AdhdTimeOrganizer.application.dto.response.@base;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Sydowwe.Framework.application.dto.response;
+using Sydowwe.Framework.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.application.dto.response.todoList;
 
@@ -15,6 +15,10 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
     public int BestStreak { get; init; }
     public DateTime? LastResetAt { get; init; }
     public int HistoryDepth { get; init; }
+
+    /// <summary>Days before the reset to nudge about unfinished items; null = this period sends no nudge.</summary>
+    public int? ReminderLeadDays { get; init; }
+
     public DateTime NextResetAt { get; init; }
     public List<PeriodCompletionRecord> CompletionHistory { get; init; } = [];
 
@@ -33,7 +37,8 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
             Streak = entity.Streak,
             BestStreak = entity.BestStreak,
             LastResetAt = entity.LastResetAt,
-            HistoryDepth = entity.HistoryDepth
+            HistoryDepth = entity.HistoryDepth,
+            ReminderLeadDays = entity.ReminderLeadDays
         });
     }
 }

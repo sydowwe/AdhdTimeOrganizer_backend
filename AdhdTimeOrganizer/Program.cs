@@ -51,11 +51,17 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // Configure configuration sources
+    // Configure configuration sources. Re-added over CreateBuilder's own so the base path is the deployed
+    // output directory rather than the working directory.
     builder.Configuration
         .SetBasePath(AppContext.BaseDirectory)
         .AddJsonFile("appsettings.json", false, true)
-        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true);
+        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
+        // Last source wins, so the two JSON files above would otherwise override the environment — the
+        // reverse of the standard precedence, and it silently breaks every documented `Section__Key`
+        // override (docs/notificationSetup.md configures the VAPID private key exactly that way, and
+        // appsettings placeholders would shadow it). Re-adding the provider here restores env-over-JSON.
+        .AddEnvironmentVariables();
 
     // Configure Serilog
     builder.Logging.ClearProviders();
@@ -153,6 +159,15 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             .ForJob("routine-reset", "routine")
             .WithIdentity("routine-reset-trigger", "routine")
             .WithCronSchedule("0 0 2 * * ?")); // 2:00 AM daily
+
+        q.AddJob<RoutinePeriodNudgeJob>(opts =>
+            opts.WithIdentity("routine-nudge", "routine"));
+
+        // 9:00, not 2:00: unlike the reset above, this one is addressed to a person who is meant to act on it.
+        q.AddTrigger(opts => opts
+            .ForJob("routine-nudge", "routine")
+            .WithIdentity("routine-nudge-trigger", "routine")
+            .WithCronSchedule("0 0 9 * * ?")); // 9:00 AM daily
     });
     services.AddQuartzHostedService(SchedulerQuartzConfig.ConfigureSchedulerHostedService);
 

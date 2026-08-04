@@ -2,6 +2,7 @@
 using AdhdTimeOrganizer.domain.model.@enum;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;

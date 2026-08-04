@@ -3,7 +3,6 @@ using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.application.@event;
 using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.domain.helper;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.@enum;
@@ -14,6 +13,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.infrastructure.security;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityTracking.desktop.command;

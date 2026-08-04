@@ -52,6 +52,8 @@ public abstract class BasePatchEndpoint<TEntity, TRequest>(
             dbContext.Set<TEntity>().Update(entity);
             await dbContext.SaveChangesAsync(ct);
 
+            await AfterSave(entity, ct);
+
             await Send.NoContentAsync(ct);
         }
         catch (Exception ex)
@@ -69,4 +71,10 @@ public abstract class BasePatchEndpoint<TEntity, TRequest>(
     /// Return <c>false</c> to respond 403. Default allows everyone the role check already let through.
     /// </summary>
     protected virtual Task<bool> AuthorizeAsync(TEntity entity, CancellationToken ct = default) => Task.FromResult(true);
+
+    /// <summary>
+    /// Runs after the patch commits. Mirrors the hook on the create/update bases; use it for effects that must
+    /// not happen if the save failed (publishing the new state to another module, for one).
+    /// </summary>
+    protected virtual Task AfterSave(TEntity entity, CancellationToken ct = default) => Task.CompletedTask;
 }

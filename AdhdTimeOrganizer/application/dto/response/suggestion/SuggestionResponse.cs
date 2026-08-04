@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.dto.dto;
 using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.domain.model.@enum;
+using Sydowwe.Framework.application.dto.dto;
 
 namespace AdhdTimeOrganizer.application.dto.response.suggestion;
 

@@ -45,8 +45,12 @@ public abstract class BaseDeleteEndpoint<TEntity>(DbContext dbContext) : Endpoin
                 return;
             }
 
+            await BeforeDeleteAsync(entity, ct);
+
             dbContext.Set<TEntity>().Remove(entity);
             await dbContext.SaveChangesAsync(ct);
+
+            await AfterSave(entity, ct);
 
             await Send.NoContentAsync(ct);
         }
@@ -63,4 +67,18 @@ public abstract class BaseDeleteEndpoint<TEntity>(DbContext dbContext) : Endpoin
     /// Return <c>false</c> to respond 403. Default allows everyone the role check already let through.
     /// </summary>
     protected virtual Task<bool> AuthorizeAsync(TEntity entity, CancellationToken ct = default) => Task.FromResult(true);
+
+    /// <summary>
+    /// Runs after authorization but <b>before</b> the row is removed — the only place to read state that the
+    /// delete (or a cascade off it) is about to destroy, e.g. the ids of dependent rows an out-of-database
+    /// system still has to be told about. Pair it with <see cref="AfterSave"/>, which fires once the delete
+    /// has actually committed.
+    /// </summary>
+    protected virtual Task BeforeDeleteAsync(TEntity entity, CancellationToken ct = default) => Task.CompletedTask;
+
+    /// <summary>
+    /// Runs after the delete commits. Mirrors the hook on the create/update bases; use it for effects that
+    /// must not happen if the delete failed.
+    /// </summary>
+    protected virtual Task AfterSave(TEntity entity, CancellationToken ct = default) => Task.CompletedTask;
 }

@@ -20,11 +20,20 @@ public static class DependencyInjectionExtensions
     /// <c>Distinct</c> keeps it from being scanned twice — Scrutor would otherwise register every
     /// framework service twice, and anything resolved as <c>IEnumerable&lt;T&gt;</c> would run twice.
     /// </para>
+    /// <para>
+    /// The Notifications / Reminders / Scheduler assemblies are excluded for that same reason:
+    /// <see cref="ModuleServiceExtensions"/> scans them from an explicit list (lazy loading makes their
+    /// presence here a coin flip), and they mark their services with these very same interfaces — so
+    /// whenever the CLR had loaded them by this point, both scans registered every module service and every
+    /// <c>IEnumerable&lt;T&gt;</c> consumer got two of each. <c>ReminderScanJobHandler</c> was the visible
+    /// casualty: two registrations, so the reminder dispatch scan ran twice on every fire.
+    /// </para>
     /// </summary>
     private static Assembly[] ScannedAssemblies =>
         AppDomain.CurrentDomain.GetAssemblies()
             .Append(typeof(IScopedService).Assembly)
             .Distinct()
+            .Except(ModuleServiceExtensions.ModuleAssemblies)
             .ToArray();
 
     public static IServiceCollection AddDependencyInjection(this IServiceCollection services)

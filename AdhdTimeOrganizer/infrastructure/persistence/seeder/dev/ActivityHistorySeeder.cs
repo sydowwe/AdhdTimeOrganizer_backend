@@ -1,7 +1,7 @@
-﻿using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.model.entity.activityHistory;
+﻿using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;

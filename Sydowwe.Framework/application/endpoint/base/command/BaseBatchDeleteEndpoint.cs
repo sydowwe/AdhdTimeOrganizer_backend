@@ -56,8 +56,12 @@ public abstract class BaseBatchDeleteEndpoint<TEntity>(DbContext dbContext) : En
                     return;
                 }
 
+            await BeforeDeleteAsync(entities, ct);
+
             dbContext.Set<TEntity>().RemoveRange(entities);
             await dbContext.SaveChangesAsync(ct);
+
+            await AfterSave(entities, ct);
 
             await Send.NoContentAsync(ct);
         }
@@ -75,4 +79,14 @@ public abstract class BaseBatchDeleteEndpoint<TEntity>(DbContext dbContext) : En
     /// Default allows everyone the role check already let through.
     /// </summary>
     protected virtual Task<bool> AuthorizeAsync(TEntity entity, CancellationToken ct = default) => Task.FromResult(true);
+
+    /// <summary>
+    /// Runs after authorization but <b>before</b> the rows are removed — the only place to read state the
+    /// delete (or a cascade off it) is about to destroy. Batch counterpart of the single-delete hook; pair it
+    /// with <see cref="AfterSave"/>.
+    /// </summary>
+    protected virtual Task BeforeDeleteAsync(IReadOnlyList<TEntity> entities, CancellationToken ct = default) => Task.CompletedTask;
+
+    /// <summary>Runs once the batch delete commits. Use for effects that must not happen if it failed.</summary>
+    protected virtual Task AfterSave(IReadOnlyList<TEntity> entities, CancellationToken ct = default) => Task.CompletedTask;
 }

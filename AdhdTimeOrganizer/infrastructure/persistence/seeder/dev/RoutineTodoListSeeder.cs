@@ -1,10 +1,10 @@
-﻿using AdhdTimeOrganizer.domain.helper;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
+﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using AdhdTimeOrganizer.infrastructure.settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.dev;

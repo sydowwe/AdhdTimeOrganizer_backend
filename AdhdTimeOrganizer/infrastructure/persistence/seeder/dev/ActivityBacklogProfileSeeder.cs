@@ -1,6 +1,6 @@
 ﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
-using AdhdTimeOrganizer.domain.model.entity.@base.core;
+using AdhdTimeOrganizer.domain.model.entity.@base;
 using AdhdTimeOrganizer.domain.model.@enum;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;

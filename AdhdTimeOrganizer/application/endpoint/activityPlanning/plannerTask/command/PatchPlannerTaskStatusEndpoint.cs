@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.application.@event;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
@@ -10,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.command;
 
-public class PatchPlannerTaskStatusEndpoint(AppDbContext dbContext) : Endpoint<PatchPlannerTaskStatusRequest>
+public class PatchPlannerTaskStatusEndpoint(AppDbContext dbContext, IReminderRegistrationService reminders) : Endpoint<PatchPlannerTaskStatusRequest>
 {
     public override void Configure()
     {
@@ -66,6 +67,12 @@ public class PatchPlannerTaskStatusEndpoint(AppDbContext dbContext) : Endpoint<P
 
             dbContext.Set<PlannerTask>().Update(entity);
             await dbContext.SaveChangesAsync(ct);
+
+            // Finishing or calling off a task retires the reminder attached to it: a nudge about something
+            // already dealt with is pure noise, and acting on the task is the user cancelling it implicitly.
+            // Moving back to NotStarted/InProgress re-registers it — the same call covers both directions,
+            // because the decision lives in the registration service, not here.
+            await reminders.SyncForPlannerTasksAsync([entity.Id], ct);
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             if (entity.Calendar.Date == today)

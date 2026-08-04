@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.application.helper;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Humanizer;
@@ -14,7 +15,8 @@ using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.plannerTask.command;
 
-public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext) : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
+public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext, IReminderRegistrationService reminders)
+    : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
 {
     public override void Configure()
     {
@@ -88,7 +90,20 @@ public class ApplyTemplatePlannerTaskEndpoint(AppDbContext dbContext) : Endpoint
             }
 
             dbContext.PlannerTasks.AddRange(newTasks);
+
+            // Every conflict resolution except Ignore removes existing tasks (MergeOverwrite removes and
+            // re-adds carved segments), and each removal cascades that task's reminders away. Reading the
+            // ChangeTracker instead of threading a list through the four branches keeps this correct even if
+            // a new resolution mode is added later — whatever it deletes is seen here.
+            var removedTaskIds = dbContext.ChangeTracker.Entries<PlannerTask>()
+                .Where(e => e.State == EntityState.Deleted)
+                .Select(e => e.Entity.Id)
+                .ToList();
+            var orphanedReminderIds = await reminders.GetReminderIdsForPlannerTasksAsync(removedTaskIds, ct);
+
             await dbContext.SaveChangesAsync(ct);
+
+            await reminders.CancelManyAsync(orphanedReminderIds, ct);
 
             var updatedTasks = await PlannerTaskResponse.Projection(dbContext.PlannerTasks.Where(t => t.CalendarId == calendar.Id).WithIncludes().OrderBy(t => t.StartTime)).ToListAsync(ct);
 

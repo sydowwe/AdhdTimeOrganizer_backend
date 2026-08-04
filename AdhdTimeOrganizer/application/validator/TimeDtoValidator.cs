@@ -1,6 +1,7 @@
 ﻿using AdhdTimeOrganizer.application.dto.dto;
 using FastEndpoints;
 using FluentValidation;
+using Sydowwe.Framework.application.dto.dto;
 
 namespace AdhdTimeOrganizer.application.validator;
 

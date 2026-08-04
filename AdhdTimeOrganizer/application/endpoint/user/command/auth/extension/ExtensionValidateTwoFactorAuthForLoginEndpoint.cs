@@ -8,7 +8,7 @@ using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
 using Sydowwe.Framework.domain.serviceContract;
 
-namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
+namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.extension;
 
 /// <summary>
 /// Second step of the extension login. Same validation as the web endpoint — the framework base owns

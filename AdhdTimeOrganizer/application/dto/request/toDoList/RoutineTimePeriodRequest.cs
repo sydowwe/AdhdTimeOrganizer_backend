@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.application.dto.request.@base;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
+using Sydowwe.Framework.application.dto.request.@base;
 using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;
@@ -24,6 +24,12 @@ public record RoutineTimePeriodRequest : TextColorRequest, ICreateRequest<Routin
     /// <summary>1–100 — how many past periods to include in completion history.</summary>
     public int HistoryDepth { get; init; } = 16;
 
+    /// <summary>
+    /// 1 to LengthInDays-1 — how many days before the reset to be nudged about unfinished items.
+    /// <c>null</c> (the default) = no nudge for this period.
+    /// </summary>
+    public int? ReminderLeadDays { get; init; }
+
 
     public RoutineTimePeriod ToEntity => new()
     {
@@ -35,11 +41,32 @@ public record RoutineTimePeriodRequest : TextColorRequest, ICreateRequest<Routin
         StreakThreshold = StreakThreshold,
         StreakGraceDays = StreakGraceDays,
         HistoryDepth = HistoryDepth,
+        ReminderLeadDays = ReminderLeadDays,
         UserId = 0
     };
 
     public void UpdateEntity(RoutineTimePeriod entity)
     {
-        throw new NotImplementedException();
+        // Both inputs to RoutineResetService.ComputeNextReset. Read before the assignments below overwrite them:
+        // if either moves, the reset instant moves with it and the nudge mark keyed to the old one is stale.
+        // Clearing it unconditionally would instead re-nudge on every unrelated edit (a colour change mid-window).
+        var scheduleChanged = entity.LengthInDays != LengthInDays || entity.ResetAnchorDay != ResetAnchorDay;
+
+        entity.Text = Text;
+        entity.Color = Color;
+        entity.LengthInDays = LengthInDays;
+        entity.IsHidden = IsHidden;
+        entity.ResetAnchorDay = ResetAnchorDay;
+        entity.StreakThreshold = StreakThreshold;
+        entity.StreakGraceDays = StreakGraceDays;
+        entity.HistoryDepth = HistoryDepth;
+        entity.ReminderLeadDays = ReminderLeadDays;
+
+        if (scheduleChanged)
+            entity.EndingSoonNotifiedFor = null;
+
+        // Streak, BestStreak, LastResetAt, StreakGraceUntil and GraceNotifiedFor are owned by
+        // RoutineResetService and the nudge sweep — deliberately not writable from a request, so that editing a
+        // period cannot hand anyone a streak or silence a warning.
     }
 }
