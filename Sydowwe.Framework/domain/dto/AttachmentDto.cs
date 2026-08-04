@@ -1,6 +1,6 @@
 ﻿using Sydowwe.Framework.domain.@enum;
 
-namespace AdhdTimeOrganizer.domain.model.dto;
+namespace Sydowwe.Framework.domain.dto;
 
 public record AttachmentDto
 {

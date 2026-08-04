@@ -10,7 +10,7 @@ namespace Sydowwe.Framework.application.endpoint.@base.command;
 public abstract class BaseDeleteEndpoint<TEntity>(DbContext dbContext) : EndpointWithoutRequest
     where TEntity : class, IEntityWithId
 {
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     public virtual string Route => typeof(TEntity).Name.Kebaberize();
 

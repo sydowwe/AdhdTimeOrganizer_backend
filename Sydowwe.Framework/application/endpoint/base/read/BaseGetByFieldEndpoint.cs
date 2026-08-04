@@ -13,7 +13,7 @@ public abstract class BaseGetByFieldEndpoint<TEntity, TResponse>(DbContext dbCon
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse, IProjectionResponse<TResponse, TEntity>
 {
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     protected abstract string FieldName { get; }
 

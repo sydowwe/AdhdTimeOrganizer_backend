@@ -14,7 +14,7 @@ public abstract class BaseGetByIdEndpoint<TEntity, TResponse>(DbContext dbContex
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse, IProjectionResponse<TResponse, TEntity>
 {
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     public override void Configure()
     {

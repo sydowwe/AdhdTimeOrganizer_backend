@@ -1,6 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.response.@base;
-
-namespace Sydowwe.Framework.application.dto.response.@base;
+﻿namespace Sydowwe.Framework.application.dto.response.@base;
 
 public record NameTextColorIconResponse : NameTextIconResponse
 {

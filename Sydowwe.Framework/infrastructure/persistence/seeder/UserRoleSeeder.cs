@@ -2,16 +2,25 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.domain.auth;
 using Sydowwe.Framework.domain.entity.user;
-using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 
 namespace Sydowwe.Framework.infrastructure.persistence.seeder;
 
 /// <summary>
-/// Seeds the three <see cref="UserRoleEnum"/> roles. App-wide default rather than a fixture, so it
-/// updates in place instead of truncating: <c>user_role</c> is the parent of every user↔role
-/// assignment, and wiping it cascades those away — including the root admin's.
+/// Seeds the roles declared by the deployment's <see cref="IRoleCatalog"/> — the framework no longer
+/// knows any role names of its own, so a host's catalog is the single source of truth for both the
+/// rows seeded here and the gates enforced by <c>EndpointExtensions</c>. They cannot drift.
+///
+/// <para>App-wide default rather than a fixture, so it updates in place instead of truncating:
+/// <c>user_role</c> is the parent of every user-to-role assignment, and wiping it cascades those
+/// away — including the root admin's.</para>
+///
+/// <para><b>Renaming a role is not a code change.</b> Role names are persisted on <c>user_role</c>,
+/// on the assignment table, and (in this solution) on business columns such as <c>job_title.role</c>.
+/// This seeder matches existing rows <i>by name</i>, so a renamed role is seeded as a NEW row and
+/// every account keeps the old one — silently losing all access. Rename via a data migration first.</para>
 /// </summary>
 public class UserRoleSeeder(RoleManager<UserRole> roleManager, ILogger<UserRoleSeeder> logger)
     : IScopedService, IAppWideDefaultSeeder
@@ -21,33 +30,18 @@ public class UserRoleSeeder(RoleManager<UserRole> roleManager, ILogger<UserRoleS
 
     public async Task Seed(bool overrideData = false)
     {
-        List<UserRole> roles =
-        [
-            new()
+        var roles = FrameworkRoles.Catalog.All
+            .Select(definition => new UserRole
             {
-                Name = nameof(UserRoleEnum.User),
-                Description = "User role",
-                IsDefault = true,
-                RoleLevel = 1,
-                IsAssignable = true
-            },
-            new()
-            {
-                Name = nameof(UserRoleEnum.Admin),
-                Description = "Local admin role",
-                IsDefault = false,
-                RoleLevel = 3,
-                IsAssignable = false
-            },
-            new()
-            {
-                Name = nameof(UserRoleEnum.Root),
-                Description = "App administrator role",
-                IsDefault = false,
-                RoleLevel = 4,
-                IsAssignable = false
-            }
-        ];
+                Name = definition.Name,
+                Description = definition.Description,
+                IsDefault = definition.IsDefault,
+                // The tier IS the level - keeping a separately hand-numbered RoleLevel is how the
+                // two silently disagree after someone adds a role in only one of the two places.
+                RoleLevel = (int)definition.Tier,
+                IsAssignable = definition.IsAssignable
+            })
+            .ToList();
 
         foreach (var role in roles)
             try

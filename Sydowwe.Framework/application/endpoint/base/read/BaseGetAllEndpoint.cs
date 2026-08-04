@@ -13,7 +13,7 @@ public abstract class BaseGetAllEndpoint<TEntity, TResponse>(DbContext dbContext
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse, IProjectionResponse<TResponse, TEntity>
 {
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     public virtual string? RouteParam => null;
 

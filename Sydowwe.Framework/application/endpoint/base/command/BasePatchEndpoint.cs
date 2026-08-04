@@ -13,7 +13,7 @@ public abstract class BasePatchEndpoint<TEntity, TRequest>(
     where TEntity : class, IEntityWithId
     where TRequest : class, IPatchRequest
 {
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     public override void Configure()
     {

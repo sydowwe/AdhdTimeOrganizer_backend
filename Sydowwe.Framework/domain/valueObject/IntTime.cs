@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AdhdTimeOrganizer.domain.helper;
+namespace Sydowwe.Framework.domain.valueObject;
 
 public record IntTime
 {
@@ -41,9 +41,9 @@ public record IntTime
     public static bool operator <=(IntTime left, IntTime right) => left.TotalSeconds <= right.TotalSeconds;
 }
 
-public static class MyIntTimeExtensions
+public static class IntTimeExtensions
 {
-    public static IntTime ToMyIntTime(this TimeSpan timeSpan) => new(timeSpan.Hours, timeSpan.Minutes);
+    public static IntTime ToIntTime(this TimeSpan timeSpan) => new(timeSpan.Hours, timeSpan.Minutes);
 
     public static bool IsNullOrZero(this IntTime? time) => time is null || time.TotalSeconds == 0;
 }

@@ -11,7 +11,7 @@ namespace Sydowwe.Framework.application.endpoint.@base.command.misc;
 public abstract class BaseToggleIsHiddenEndpoint<TEntity>(DbContext dbContext) : Endpoint<IdListRequest>
     where TEntity : class, IEntityWithId, IEntityWithIsHidden
 {
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     public override void Configure()
     {

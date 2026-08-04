@@ -1,7 +1,10 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.extServiceContract.user;
@@ -51,8 +54,45 @@ public abstract partial class BaseDbContext<TUser>(DbContextOptions options, ILo
             .IsRequired()
             .OnDelete(DeleteBehavior.Cascade);
 
+        ApplyUserScopingIfEnabled(modelBuilder);
+
         OnModelCreatingPartial(modelBuilder);
     }
+
+    /// <summary>
+    /// Applies the optional per-user global query filter, gated on <see cref="UserScopingOptions"/>.
+    /// Off unless a deployment binds <c>UserScoping:Enabled = true</c>, so this is a no-op for hosts
+    /// that never opt in.
+    ///
+    /// <para>Options are pulled from the application service provider rather than a constructor
+    /// parameter so that no host has to change its context signature to gain the switch. A
+    /// design-time factory has no application provider, so migrations are always generated with
+    /// scoping off — which is correct: query filters are a query-time concern and never appear in
+    /// the migration model, so there is no snapshot drift either way.</para>
+    ///
+    /// <para>Override <see cref="UserScopingExcludedTypes"/> to exempt entities in code.</para>
+    /// </summary>
+    private void ApplyUserScopingIfEnabled(ModelBuilder modelBuilder)
+    {
+        var appServices = options.FindExtension<CoreOptionsExtension>()?.ApplicationServiceProvider;
+        var scopingOptions = appServices?.GetService<IOptions<UserScopingOptions>>()?.Value;
+
+        var filtered = modelBuilder.ApplyUserQueryFilters(loggedUserService, scopingOptions, UserScopingExcludedTypes);
+
+        // Logged once per model build. A global filter that silently narrows every read is the
+        // hardest scoping bug to diagnose from the outside — the startup log is where someone
+        // debugging "the admin grid is empty" will actually look.
+        if (filtered.Count > 0)
+            logger.LogWarning("Per-user query scoping is ENABLED for {Count} entities: {Entities}", filtered.Count, string.Join(", ", filtered));
+    }
+
+    /// <summary>
+    /// Entities exempt from per-user query scoping in code (as opposed to
+    /// <see cref="UserScopingOptions.ExcludedEntities"/>, which exempts them per deployment).
+    /// Override in a concrete context for entities that are user-owned as data but are legitimately
+    /// read across users by the application itself.
+    /// </summary>
+    protected virtual IEnumerable<Type>? UserScopingExcludedTypes => null;
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 

@@ -1,6 +1,6 @@
-﻿using AdhdTimeOrganizer.application.dto.dto;
+﻿using Sydowwe.Framework.application.dto.dto;
 
-namespace AdhdTimeOrganizer.domain.extension;
+namespace Sydowwe.Framework.domain.extension;
 
 public static class TimeOnlyExtensions
 {

@@ -19,7 +19,7 @@ public abstract class BaseFilterEndpoint<TEntity, TResponse, TFilter>(DbContext 
     where TResponse : class, IIdResponse, IProjectionResponse<TResponse, TEntity>
     where TFilter : class, IFilterRequest
 {
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     public virtual string EndpointPath => "filter";
 

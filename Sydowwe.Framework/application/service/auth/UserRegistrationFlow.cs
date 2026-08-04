@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.auth;
 using Sydowwe.Framework.domain.entity.user;
-using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.result;
 using Sydowwe.Framework.domain.serviceContract;
 
@@ -118,7 +118,9 @@ public static class UserRegistrationFlow
                     duplicate ? "User already exists" : "Failed to register user: " + Describe(identityResult));
             }
 
-            identityResult = await userManager.AddToRoleAsync(newUser, nameof(UserRoleEnum.User));
+            // The deployment's catalog decides which role a new account gets - the framework has no
+            // role names of its own to fall back on.
+            identityResult = await userManager.AddToRoleAsync(newUser, FrameworkRoles.Catalog.DefaultRoleName);
             if (!identityResult.Succeeded)
                 return await Fail(UserRegistrationOutcome.RoleAssignmentFailed,
                     "Failed to add user to role: " + Describe(identityResult));

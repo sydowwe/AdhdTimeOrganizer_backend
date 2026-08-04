@@ -11,7 +11,7 @@ domain-specific wrappers such as `RefreshAttendanceViewAsync` live in their own 
 
 ## Dependency seams
 
-- **Consumed by:** every `AdhdTimeOrganizer.*` module and every
+- **Consumed by:** every consuming solution's `*.Core.*` module and every
   `*.AdminPortal`. They derive entities from the base hierarchy, derive endpoints from the base endpoints, and derive a concrete `BaseDbContext`.
 - **Exposes to hosts:** `BaseDbContext` (abstract `partial`, with an
   `OnModelCreatingPartial` hook), the DI marker interfaces, and the four seeder-manager

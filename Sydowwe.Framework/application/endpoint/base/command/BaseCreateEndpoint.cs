@@ -18,7 +18,7 @@ public abstract class BaseCreateEndpoint<TEntity, TRequest>(DbContext dbContext)
     /// </summary>
     protected DbContext DbContext => dbContext;
 
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     public virtual string Route => $"/{typeof(TEntity).Name.Kebaberize()}";
 

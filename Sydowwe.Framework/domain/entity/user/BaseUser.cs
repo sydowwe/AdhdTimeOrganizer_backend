@@ -13,7 +13,7 @@ public abstract class BaseUser : IdentityUser<long>, IEntityWithId
     public AppThemeEnum Theme { get; set; } = AppThemeEnum.Light;
     public AvailableLocales Locale { get; set; } = AvailableLocales.Sk;
 
-    public required TimeZoneInfo Timezone { get; set; }
+    public TimeZoneInfo Timezone { get; set; } = TimeZoneInfo.Utc;
 
     public bool AskBeforeDelete { get; set; } = true;
 

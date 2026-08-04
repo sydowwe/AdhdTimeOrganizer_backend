@@ -19,7 +19,7 @@ namespace Sydowwe.Framework.application.endpoint.user.read;
 public abstract class BaseUserRoleGetAllSelectOptionsEndpoint(DbContext dbContext)
     : BaseGetSelectOptionsEndpoint<UserRole>(dbContext)
 {
-    public override string[] AllowedRoles() => IEndpoint.GetAdminRole();
+    public override string[] AllowedRoles() => this.GetAdminRole();
 
     protected override IQueryable<SelectOptionResponse> Map(IQueryable<UserRole> query) =>
         query.Select(e => new SelectOptionResponse(e.Id, e.Name!));

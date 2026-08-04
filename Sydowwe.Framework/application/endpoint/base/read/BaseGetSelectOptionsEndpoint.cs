@@ -11,7 +11,7 @@ namespace Sydowwe.Framework.application.endpoint.@base.read;
 public abstract class BaseGetSelectOptionsEndpoint<TEntity>(DbContext dbContext) : EndpointWithoutRequest<List<SelectOptionResponse>>
     where TEntity : class, IEntityWithId
 {
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     public virtual string AddedRouteParam => string.Empty;
 

@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.domain.model.@enum;
+﻿namespace Sydowwe.Framework.domain.@enum;
 
 public static class ColorPalette
 {

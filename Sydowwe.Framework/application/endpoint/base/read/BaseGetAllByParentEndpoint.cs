@@ -13,7 +13,7 @@ public abstract class BaseGetAllByParentEndpoint<TEntity, TResponse>(DbContext d
     where TEntity : class, IEntityWithId
     where TResponse : class, IIdResponse, IProjectionResponse<TResponse, TEntity>
 {
-    public virtual string[] AllowedRoles() => IEndpoint.GetUserRole();
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     protected abstract string ParentName { get; }
 

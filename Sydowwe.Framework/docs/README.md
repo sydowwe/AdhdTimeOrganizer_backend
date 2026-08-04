@@ -8,7 +8,7 @@
 
 `Sydowwe.Framework` is a reusable, **cross-solution** framework (not a feature module). It owns the building blocks that don't belong to any one business domain: the base entity hierarchy, the
 abstract `BaseDbContext`, EF Core builder and CRUD helper extensions, the audit-log interceptor, the generic FastEndpoints base classes, ASP.NET Identity + JWT/2FA authentication, the seeder
-framework, and the `Result` type. Portals (`*.AdminPortal`) and Core modules (`AdhdTimeOrganizer.*`) reference it and specialize its abstractions.
+framework, and the `Result` type. Portals (`*.AdminPortal`) and each consuming solution's Core modules (`*.Core.*`) reference it and specialize its abstractions.
 
 It targets `net10.0`, EF Core 10 on Npgsql/Postgres, and FastEndpoints 8.
 
