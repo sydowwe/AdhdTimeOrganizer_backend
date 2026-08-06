@@ -7,7 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
     </ItemGroup>
 
 </Project>

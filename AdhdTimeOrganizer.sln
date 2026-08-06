@@ -4,9 +4,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer", "AdhdTi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.IntegrationTests", "AdhdTimeOrganizer.IntegrationTests\AdhdTimeOrganizer.IntegrationTests.csproj", "{B1C2D3E4-F5A6-7890-ABCD-EF1234567890}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Framework", "Sydowwe.Framework\Sydowwe.Framework.csproj", "{12D71E51-0E71-40C0-AAC5-A7578E7F2C78}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Framework", "framework\Sydowwe.Framework\Sydowwe.Framework.csproj", "{12D71E51-0E71-40C0-AAC5-A7578E7F2C78}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Framework.Testing", "Sydowwe.Framework.Testing\Sydowwe.Framework.Testing.csproj", "{8B295DA7-E1AE-4694-A774-D493937CA7C5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Framework.Testing", "framework\Sydowwe.Framework.Testing\Sydowwe.Framework.Testing.csproj", "{8B295DA7-E1AE-4694-A774-D493937CA7C5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Notifications", "AdhdTimeOrganizer.Notifications\AdhdTimeOrganizer.Notifications.csproj", "{8BBA7A35-FF8F-474F-A076-AB3D9787DF9F}"
 EndProject

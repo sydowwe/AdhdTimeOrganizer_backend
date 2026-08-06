@@ -1,6 +1,0 @@
-namespace Sydowwe.Framework.domain.entityInterface;
-
-public interface IEntityWithName : IEntity
-{
-    public string Name { get; set; }
-}

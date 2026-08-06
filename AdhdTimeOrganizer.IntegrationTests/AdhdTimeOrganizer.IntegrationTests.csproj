@@ -30,7 +30,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\AdhdTimeOrganizer\AdhdTimeOrganizer.csproj"/>
-        <ProjectReference Include="..\Sydowwe.Framework.Testing\Sydowwe.Framework.Testing.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework.Testing\Sydowwe.Framework.Testing.csproj"/>
     </ItemGroup>
 
 </Project>

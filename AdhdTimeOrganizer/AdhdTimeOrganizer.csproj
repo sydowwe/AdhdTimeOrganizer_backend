@@ -75,7 +75,7 @@
          the .NET SDK silently ignores (Resource is a WPF item type) - they never reached the output. -->
 
     <ItemGroup>
-        <ProjectReference Include="..\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
         <ProjectReference Include="..\MojaDigitalnaFirma.Kernel\MojaDigitalnaFirma.Kernel.csproj"/>
         <ProjectReference Include="..\AdhdTimeOrganizer.Notifications\AdhdTimeOrganizer.Notifications.csproj"/>
         <ProjectReference Include="..\AdhdTimeOrganizer.Reminders\AdhdTimeOrganizer.Reminders.csproj"/>

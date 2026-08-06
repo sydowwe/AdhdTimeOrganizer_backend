@@ -8,7 +8,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\MojaDigitalnaFirma.Kernel\MojaDigitalnaFirma.Kernel.csproj"/>
-        <ProjectReference Include="..\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
     </ItemGroup>
 
 </Project>
