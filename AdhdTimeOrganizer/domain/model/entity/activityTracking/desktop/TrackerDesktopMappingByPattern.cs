@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using Sydowwe.Framework.domain.@enum;
 

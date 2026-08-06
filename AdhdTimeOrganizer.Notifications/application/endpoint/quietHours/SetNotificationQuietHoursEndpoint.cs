@@ -20,7 +20,7 @@ public class SetNotificationQuietHoursEndpoint(DbContext dbContext) : Endpoint<S
     public override void Configure()
     {
         Put("/notification-quiet-hours");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Set my quiet-hours window";

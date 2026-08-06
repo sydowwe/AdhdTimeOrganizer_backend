@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity;
+using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
@@ -16,18 +16,16 @@ using AdhdTimeOrganizer.Notifications.domain.entity;
 using AdhdTimeOrganizer.Reminders.domain.entity;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Sydowwe.Framework.domain.entity.user;
+using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.extServiceContract.user;
-using Sydowwe.Framework.infrastructure.persistence;
+using Sydowwe.Framework.infrastructure;
 using Sydowwe.Framework.infrastructure.persistence.configuration;
-using RefreshToken = Sydowwe.Framework.domain.entity.user.RefreshToken;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence;
 
 public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILoggedUserService loggedUserService, ILogger<AppDbContext> logger)
-    : IdentityDbContext<User, UserRole, long>(options)
+    : BaseDbContext<User>(options, loggedUserService, logger)
 {
     public DateOnly CurrentPartitionDate => DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-2);
 
@@ -59,7 +57,6 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<TrackerAndroidMappingByPattern> TrackerAndroidMappingByPattern { get; set; }
     public DbSet<TimerPreset> TimerPresets { get; set; }
     public DbSet<PomodoroTimerPreset> PomodoroTimerPresets { get; set; }
-    public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<UserPlannerSettings> UserPlannerSettings { get; set; }
     public DbSet<PlannerTaskPattern> PlannerTaskPatterns { get; set; }
     public DbSet<ActivityHistoryPattern> ActivityHistoryPatterns { get; set; }
@@ -84,19 +81,48 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<ScheduledJob> ScheduledJobs { get; set; }
     public DbSet<ScheduledJobRun> ScheduledJobRuns { get; set; }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    /// <summary>
+    /// Excluded from the automatic per-user filter because it needs a combined one — see
+    /// <see cref="OnModelCreating"/>.
+    /// </summary>
+    protected override IEnumerable<Type> UserScopingExcludedTypes => [typeof(WebExtensionActivityEntry)];
+
+    /// <summary>
+    /// This database has the Identity claim/login tables, so they are mapped rather than ignored
+    /// (Framework's default). The other three keep the base's names.
+    /// </summary>
+    protected override void ConfigureIdentityModel(ModelBuilder modelBuilder)
     {
-        modelBuilder.HasDefaultSchema("public");
-
-        base.OnModelCreating(modelBuilder);
-
         modelBuilder.Entity<IdentityUserClaim<long>>(entity => entity.ToTable("user_claim"));
         modelBuilder.Entity<IdentityUserLogin<long>>(entity => entity.ToTable("user_login"));
         modelBuilder.Entity<IdentityUserToken<long>>(entity => entity.ToTable("user_token"));
         modelBuilder.Entity<IdentityUserRole<long>>(entity => entity.ToTable("user__role"));
         modelBuilder.Entity<IdentityRoleClaim<long>>(entity => entity.ToTable("user_role_claim"));
+    }
 
+    /// <summary>
+    /// Business audit rows only (explicit IAuditService.LogAsync calls — login, 2FA, password
+    /// change). Applied one entity at a time on purpose, instead of Framework's whole-assembly sweep:
+    /// the rest of the Framework audit machinery, the partitioned `audit_log` written by
+    /// AuditSaveChangesInterceptor, is deliberately NOT wired up here, and mapping it would create a
+    /// table nothing writes to — hence the explicit Ignore of the base's AuditLogs set.
+    /// </summary>
+    protected override void ApplyFrameworkConfigurations(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Ignore<AuditLog>();
+        modelBuilder.ApplyConfiguration(new BusinessAuditLogEntityConfiguration());
+    }
 
+    /// <summary>
+    /// No-op: <see cref="RefreshTokenConfiguration"/> configures the FK itself, from the principal
+    /// end, so that <c>User.RefreshTokens</c> is the navigation rather than a second relationship.
+    /// </summary>
+    protected override void ConfigureRefreshTokenUserFk(ModelBuilder modelBuilder)
+    {
+    }
+
+    protected override void ApplyHostConfigurations(ModelBuilder modelBuilder)
+    {
         // Module configurations first, then the app's — the app supplies the host-side FKs to User that
         // the modules deliberately leave unconfigured (they don't know the concrete user type).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(Notification).Assembly);
@@ -104,18 +130,16 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ScheduledJob).Assembly);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UserEntityConfiguration).Assembly);
+    }
 
-        // Business audit rows (explicit IAuditService.LogAsync calls — login, 2FA, password change).
-        // Applied one entity at a time on purpose: the rest of the Framework audit machinery, the
-        // partitioned `audit_log` written by AuditSaveChangesInterceptor, is deliberately NOT wired up
-        // here, and mapping it would create a table nothing writes to.
-        modelBuilder.ApplyConfiguration(new BusinessAuditLogEntityConfiguration());
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // Schema, Identity mapping, framework configurations, this context's own configurations and
+        // the per-user query filters all come from BaseDbContext, in that order.
+        base.OnModelCreating(modelBuilder);
 
-        // Apply user-scoped filter to all IEntityWithUser entities except WebExtensionActivityEntry
-        // which needs a combined filter below.
-        modelBuilder.ApplyUserQueryFilters(loggedUserService, [typeof(WebExtensionActivityEntry)]);
-
-        // WebExtensionActivityEntry needs both the partition date filter and the user filter.
+        // WebExtensionActivityEntry needs both the partition date filter and the user filter, so it
+        // is excluded from the automatic one above and gets the combined filter here.
         if (loggedUserService != null)
             modelBuilder.Entity<WebExtensionActivityEntry>()
                 .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate &&
@@ -124,21 +148,14 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
             modelBuilder.Entity<WebExtensionActivityEntry>()
                 .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate);
 
-        OnModelCreatingPartial(modelBuilder);
+        OnAppModelCreatingPartial(modelBuilder);
     }
 
-    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+    partial void OnAppModelCreatingPartial(ModelBuilder modelBuilder);
 
     // In your DbContext configuration
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.LogTo(Console.WriteLine, LogLevel.Information);
-    }
-
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        this.BaseSaveChangesAsync();
-        this.BaseWithUserEntitySaveChangesAsync(loggedUserService, logger);
-        return await base.SaveChangesAsync(cancellationToken);
     }
 }

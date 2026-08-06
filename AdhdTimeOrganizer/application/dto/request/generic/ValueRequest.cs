@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.request.generic;
+namespace AdhdTimeOrganizer.application.dto.request.generic;
 
 public record ValueRequest
 {

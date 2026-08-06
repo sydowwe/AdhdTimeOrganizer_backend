@@ -29,7 +29,7 @@ public class GetMyUpcomingRemindersEndpoint(DbContext dbContext)
     public override void Configure()
     {
         Post("/reminder-dashboard/my-upcoming");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "My upcoming reminders (recipient self-service)");
     }
 

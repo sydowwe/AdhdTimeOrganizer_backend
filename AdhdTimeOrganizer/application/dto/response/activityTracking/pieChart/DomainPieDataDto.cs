@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.response.activityTracking.pieChart;
+namespace AdhdTimeOrganizer.application.dto.response.activityTracking.pieChart;
 
 public record DomainPieDataDto
 {

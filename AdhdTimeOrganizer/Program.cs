@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Net;
 using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.application.endpoint.@base;
@@ -33,6 +33,7 @@ using Serilog;
 using Serilog.Events;
 using Sydowwe.Framework.application.middleware;
 using Sydowwe.Framework.config;
+using Sydowwe.Framework.domain.auth;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.extService.user.auth;
 using Sydowwe.Framework.infrastructure.persistence;
@@ -107,6 +108,12 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     // Interceptors
     services.AddScoped<SuggestionPatternRefreshInterceptor>();
 
+    // Per-user global query filters (BaseDbContext). Framework defaults this off; in this portal every
+    // row belongs to exactly one user and nothing reads across users, so it is on by default here.
+    // Bound after the code default so a deployment can still switch it off via UserScoping:Enabled.
+    services.Configure<UserScopingOptions>(options => options.Enabled = true);
+    services.Configure<UserScopingOptions>(configuration.GetSection(UserScopingOptions.SectionName));
+
     // Database configuration
     services.AddDbContext<AppDbContext>((sp, options) =>
         options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly(typeof(AdhdTimeOrganizer.Program).Assembly.FullName))
@@ -120,6 +127,10 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     services.AddModuleServices(configuration);
 
     // Identity services
+
+    // Role catalog. Must precede AddFastEndpoints() -- endpoint Configure() resolves its role gate
+    // through FrameworkRoles during registration, and an unconfigured catalog throws there.
+    FrameworkRoles.Configure(PortalRoleCatalog.Create(), RoleTier.User);
 
     // FastEndpoints
     // Restrict discovery to this assembly -- without it, any other FastEndpoints-using assembly loaded
@@ -246,7 +257,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
         options.DefaultRequestCulture = new RequestCulture(defaultCulture);
     });
 
-    // Forwarded headers â€” KnownProxies loaded from config so clients cannot spoof X-Forwarded-For
+    // Forwarded headers — KnownProxies loaded from config so clients cannot spoof X-Forwarded-For
     services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -269,7 +280,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
 
         logger.LogInformation("Starting database seeding...");
 
-        // Four passes, in this order â€” later passes need what earlier ones create. Every call is
+        // Four passes, in this order — later passes need what earlier ones create. Every call is
         // commented out on purpose: seeding is run deliberately, not on every boot. The dev passes
         // truncate, so never uncomment them outside the `isDevelopment` guard.
 
@@ -279,7 +290,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         var appWideDefaults = scopedServices.GetRequiredService<IAppWideDefaultSeederManager>();
         // await appWideDefaults.SeedAllAsync();
 
-        // 2. Replay per-user defaults across existing accounts â€” for when a default's definition
+        // 2. Replay per-user defaults across existing accounts — for when a default's definition
         //    changed after those accounts were created. `overrideData: true` rewrites the users'
         //    existing default rows in place, keeping their ids.
         var perUserDefaults = scopedServices.GetRequiredService<IPerUserDefaultSeederManager>();
@@ -297,7 +308,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
             // await perUserDev.SeedAllForRootAdminAsync(true);
         }
 
-        // 4. App-wide dev fixtures â€” the module ones (notifications, reminders), which pick their own
+        // 4. App-wide dev fixtures — the module ones (notifications, reminders), which pick their own
         //    owners through ISeedUserProvider rather than being handed a single user.
         var appWideDev = scopedServices.GetRequiredService<IAppWideDevSeederManager>();
         if (isDevelopment)
@@ -327,11 +338,11 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
     // Must be first so real client IP is resolved before any logging
     app.UseForwardedHeaders();
     // Stamp the client-IP header from the (now-resolved) RemoteIpAddress so Throttle() keys are
-    // non-spoofable. Must stay directly after UseForwardedHeaders â€” see TrustedIpMiddleware.
+    // non-spoofable. Must stay directly after UseForwardedHeaders — see TrustedIpMiddleware.
     app.UseTrustedClientIpHeader();
     app.UseHttpsRedirection();
 
-    // Swallow client-disconnect cancellations â€” not a server error
+    // Swallow client-disconnect cancellations — not a server error
     app.Use(async (context, next) =>
     {
         try
@@ -403,7 +414,7 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
 
             // Extension access is deny-by-default: every endpoint except those explicitly marked
             // [AllowExtensionClients] gets the refusing policy. This must be applied per endpoint
-            // rather than via AuthorizationOptions.FallbackPolicy â€” the Roles() call above gives every
+            // rather than via AuthorizationOptions.FallbackPolicy — the Roles() call above gives every
             // endpoint authorization metadata, and an endpoint carrying any such metadata never
             // reaches the fallback, which is why the fallback silently protected nothing.
             if (!ep.EndpointType.IsDefined(typeof(AllowExtensionClientsAttribute), true))

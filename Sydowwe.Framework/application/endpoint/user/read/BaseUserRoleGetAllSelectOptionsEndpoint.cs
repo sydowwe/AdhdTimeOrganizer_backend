@@ -1,4 +1,4 @@
-﻿using FastEndpoints;
+using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.response.generic;
 using Sydowwe.Framework.application.endpoint.@base.read;
@@ -19,7 +19,7 @@ namespace Sydowwe.Framework.application.endpoint.user.read;
 public abstract class BaseUserRoleGetAllSelectOptionsEndpoint(DbContext dbContext)
     : BaseGetSelectOptionsEndpoint<UserRole>(dbContext)
 {
-    public override string[] AllowedRoles() => this.GetAdminRole();
+    protected override string[] AllowedRoles() => this.GetAdminRole();
 
     protected override IQueryable<SelectOptionResponse> Map(IQueryable<UserRole> query) =>
         query.Select(e => new SelectOptionResponse(e.Id, e.Name!));

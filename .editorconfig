@@ -1,2 +1,20 @@
-﻿[*]
+# Stop here — do not inherit C:\Users\jakub\RiderProjects\.editorconfig
+# (it only sets dead Mapperly RMG* severities; Mapperly was removed).
+root = true
+
+[*]
+# LF everywhere, on every machine, same as Linux.
 end_of_line = lf
+# utf-8 means UTF-8 *without* BOM (utf-8-bom is the BOM variant).
+# This overrides Rider's "add BOM for new files under Windows" default.
+charset = utf-8
+insert_final_newline = false
+trim_trailing_whitespace = true
+
+# Trailing whitespace is significant in markdown (hard line breaks).
+[*.md]
+trim_trailing_whitespace = false
+
+# Windows-only scripts genuinely need CRLF to run.
+[*.{cmd,bat,ps1}]
+end_of_line = crlf

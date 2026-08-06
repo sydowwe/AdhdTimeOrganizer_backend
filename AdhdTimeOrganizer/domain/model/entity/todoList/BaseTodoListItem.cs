@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.@base;
+using AdhdTimeOrganizer.domain.model.entity.@base;
 using AdhdTimeOrganizer.domain.model.entityInterface;
 using Sydowwe.Framework.domain.valueObject;
 

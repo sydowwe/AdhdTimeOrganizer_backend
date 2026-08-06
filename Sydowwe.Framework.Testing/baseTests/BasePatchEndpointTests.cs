@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +9,7 @@ namespace Sydowwe.Framework.Testing.baseTests;
 public abstract class BasePatchEndpointTests(IPostgresFixture fixture)
     : PostgresTestBase(fixture)
 {
-    // e.g. "/api/complaint" â€” /{id} is appended by the tests
+    // e.g. "/api/complaint" — /{id} is appended by the tests
     protected abstract string EndpointUrl { get; }
 
     // Seed one entity and return its id.

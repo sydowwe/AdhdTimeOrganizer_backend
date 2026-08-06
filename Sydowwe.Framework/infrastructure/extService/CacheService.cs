@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Distributed;
 using Sydowwe.Framework.domain.helper;
 
 namespace Sydowwe.Framework.infrastructure.extService;

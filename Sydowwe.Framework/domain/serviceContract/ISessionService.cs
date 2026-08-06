@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.domain.serviceContract;
+namespace Sydowwe.Framework.domain.serviceContract;
 
 public interface ISessionService
 {

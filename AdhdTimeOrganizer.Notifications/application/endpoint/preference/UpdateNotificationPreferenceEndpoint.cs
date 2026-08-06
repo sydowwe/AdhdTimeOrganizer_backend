@@ -14,7 +14,7 @@ public class UpdateNotificationPreferenceEndpoint(DbContext dbContext) : Endpoin
     public override void Configure()
     {
         Put("/notification-preference");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Enable or disable a notification channel for a notification type");
     }
 

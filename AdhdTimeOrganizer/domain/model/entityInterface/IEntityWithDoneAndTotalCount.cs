@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.domain.model.entityInterface;
+namespace AdhdTimeOrganizer.domain.model.entityInterface;
 
 public interface IEntityWithDoneAndTotalCount
 {

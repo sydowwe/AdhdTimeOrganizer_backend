@@ -21,7 +21,7 @@ public class DismissReminderOccurrenceEndpoint(DbContext dbContext) : Endpoint<D
     public override void Configure()
     {
         Post("/reminder-dashboard/dismiss");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Dismiss one of my upcoming reminder occurrences";

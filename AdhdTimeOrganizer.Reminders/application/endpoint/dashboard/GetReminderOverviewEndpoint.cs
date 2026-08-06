@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
+using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
 using AdhdTimeOrganizer.Reminders.domain.entity;
 using AdhdTimeOrganizer.Reminders.domain.@enum;
 using FastEndpoints;
@@ -8,7 +8,7 @@ using Sydowwe.Framework.domain.helper;
 namespace AdhdTimeOrganizer.Reminders.application.endpoint.dashboard;
 
 /// <summary>
-/// The reminders overview roll-up (GET <c>/reminder-dashboard/overview</c>) â€” upcoming counts by owner module /
+/// The reminders overview roll-up (GET <c>/reminder-dashboard/overview</c>) — upcoming counts by owner module /
 /// kind / next-7-days, recent dispatch outcomes, currently paused/cancelled definitions, and the effective
 /// <c>Failed</c>-needing-attention count. Pure aggregate reads over the stored scheduler state + the append-only
 /// log; no recomputation. Open to any signed-in user (User/Admin/Root).
@@ -18,7 +18,7 @@ public class GetReminderOverviewEndpoint(DbContext dbContext) : EndpointWithoutR
     public override void Configure()
     {
         Get("/reminder-dashboard/overview");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Reminders overview roll-up (admin)");
     }
 

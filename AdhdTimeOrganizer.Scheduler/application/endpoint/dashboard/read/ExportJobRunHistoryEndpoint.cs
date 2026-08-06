@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dashboard;
+using AdhdTimeOrganizer.Scheduler.application.dashboard;
 using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJobRun;
 using AdhdTimeOrganizer.Scheduler.application.export;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
@@ -21,7 +21,7 @@ public class ExportJobRunHistoryEndpoint(DbContext dbContext, ISchedulerExportSe
     public override void Configure()
     {
         Post("/scheduler-dashboard/run-history/export");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Dashboard: export the run history (xlsx/csv)");
     }
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;

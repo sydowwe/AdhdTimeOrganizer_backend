@@ -17,7 +17,7 @@ public class SubscribePushEndpoint(DbContext dbContext, IAuditService auditServi
     public override void Configure()
     {
         Post("/push-subscription");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Register a Web Push subscription for the current user");
     }
 

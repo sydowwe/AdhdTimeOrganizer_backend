@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using AdhdTimeOrganizer.infrastructure.settings;
 using Microsoft.EntityFrameworkCore;

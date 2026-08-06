@@ -1,4 +1,4 @@
-﻿using FastEndpoints;
+using FastEndpoints;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
 using Sydowwe.Framework.domain.helper;
 

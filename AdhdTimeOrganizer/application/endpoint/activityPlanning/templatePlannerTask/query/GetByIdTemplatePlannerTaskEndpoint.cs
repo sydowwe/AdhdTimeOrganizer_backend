@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
+using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Sydowwe.Framework.application.endpoint.@base.read;

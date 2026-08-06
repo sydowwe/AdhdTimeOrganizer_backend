@@ -17,7 +17,7 @@ public class GetMyNotificationQuietHoursEndpoint(DbContext dbContext)
     public override void Configure()
     {
         Get("/notification-quiet-hours");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Get my quiet-hours window (null when none is set)");
     }
 

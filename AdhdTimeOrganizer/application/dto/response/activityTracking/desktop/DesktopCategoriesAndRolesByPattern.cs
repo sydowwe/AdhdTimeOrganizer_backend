@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.application.dto.response.generic;
+using Sydowwe.Framework.application.dto.response.generic;
 
 namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
 

@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.application.dto.dto;
+using Sydowwe.Framework.application.dto.dto;
 
 namespace Sydowwe.Framework.domain.extension;
 

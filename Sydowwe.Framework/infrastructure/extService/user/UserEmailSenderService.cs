@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.extServiceContract.user;

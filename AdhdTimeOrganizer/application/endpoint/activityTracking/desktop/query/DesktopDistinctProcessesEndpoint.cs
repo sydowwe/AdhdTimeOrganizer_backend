@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.endpointGroups;
+using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;

@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
+using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
 using FastEndpoints;
 using MojaDigitalnaFirma.Kernel.scheduling;
@@ -15,7 +15,7 @@ namespace AdhdTimeOrganizer.Scheduler.application.endpoint.scheduledJob.command;
 /// <remarks>
 /// Trigger-now doesn't mutate the registry, so the CRUD audit interceptor sees nothing and the resulting
 /// <c>ScheduledJobRun</c> is <c>[NoAudit]</c> with no <c>UserId</c> (the dispatcher runs unauthenticated). We
-/// therefore emit a business-audit event from the endpoint â€” where the admin principal IS present â€” so the
+/// therefore emit a business-audit event from the endpoint — where the admin principal IS present — so the
 /// privileged "fire arbitrary background work" act is attributable. <c>JobKey</c> is non-PII (safe to log).
 /// </remarks>
 public class TriggerJobNowEndpoint(IScheduler scheduler, IAuditService auditService) : Endpoint<JobKeyRequest>
@@ -23,7 +23,7 @@ public class TriggerJobNowEndpoint(IScheduler scheduler, IAuditService auditServ
     public override void Configure()
     {
         Post("/scheduled-job/trigger-now");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Fire a recurring job once immediately, off-schedule";

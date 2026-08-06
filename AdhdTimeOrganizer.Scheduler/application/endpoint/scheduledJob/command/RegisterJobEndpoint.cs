@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
+using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
 using FastEndpoints;
 using MojaDigitalnaFirma.Kernel.scheduling;
 using Sydowwe.Framework.domain.helper;
@@ -7,7 +7,7 @@ namespace AdhdTimeOrganizer.Scheduler.application.endpoint.scheduledJob.command;
 
 /// <summary>
 /// Diagnostic / manual-ops register (idempotent upsert by JobKey). Owners normally register from their own
-/// startup hosted service against <see cref="IScheduler"/> directly â€” this endpoint is for ad-hoc admin use.
+/// startup hosted service against <see cref="IScheduler"/> directly — this endpoint is for ad-hoc admin use.
 /// Open to any signed-in user (User/Admin/Root).
 /// </summary>
 public class RegisterJobEndpoint(IScheduler scheduler) : Endpoint<RegisterJobRequest>
@@ -15,7 +15,7 @@ public class RegisterJobEndpoint(IScheduler scheduler) : Endpoint<RegisterJobReq
     public override void Configure()
     {
         Post("/scheduled-job/register");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Register (idempotent upsert) a recurring job by JobKey";

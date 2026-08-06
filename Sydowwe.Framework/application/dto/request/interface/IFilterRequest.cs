@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.application.dto.request.@interface;
+namespace Sydowwe.Framework.application.dto.request.@interface;
 
 public interface IFilterRequest
 {

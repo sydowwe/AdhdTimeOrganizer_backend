@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dashboard;
+using AdhdTimeOrganizer.Scheduler.application.dashboard;
 using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJobRun;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
 using FastEndpoints;
@@ -21,7 +21,7 @@ public class GetJobRunHistoryEndpoint(DbContext dbContext)
     public override void Configure()
     {
         Post("/scheduler-dashboard/run-history");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Dashboard: filtered/paginated append-only run history";

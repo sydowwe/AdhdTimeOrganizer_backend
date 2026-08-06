@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -57,10 +57,10 @@ public abstract class PostgresContainerFixture<TProgram, TDbContext> : IPostgres
     /// <summary>Construct the portal's concrete DbContext (the only thing the generic can't do itself).</summary>
     protected abstract TDbContext NewDbContext(DbContextOptions<TDbContext> options, ILoggedUserService user);
 
-    /// <summary>Runs once after <c>EnsureCreated</c> â€” create materialized views / objects EF skips. Default: nothing.</summary>
+    /// <summary>Runs once after <c>EnsureCreated</c> — create materialized views / objects EF skips. Default: nothing.</summary>
     protected virtual Task OnSchemaCreatedAsync(TDbContext db) => Task.CompletedTask;
 
-    /// <summary>Runs after initial create AND after every Respawn reset â€” seed the baseline (test user, etc.). Default: nothing.</summary>
+    /// <summary>Runs after initial create AND after every Respawn reset — seed the baseline (test user, etc.). Default: nothing.</summary>
     protected virtual Task SeedFixtureAsync(TDbContext db) => Task.CompletedTask;
 
     /// <summary>Runs after every Respawn reset (e.g. REFRESH MATERIALIZED VIEW). Default: nothing.</summary>

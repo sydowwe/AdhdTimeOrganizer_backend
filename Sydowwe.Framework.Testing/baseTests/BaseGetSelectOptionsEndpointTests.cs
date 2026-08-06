@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
@@ -10,7 +10,7 @@ namespace Sydowwe.Framework.Testing.baseTests;
 public abstract class BaseGetSelectOptionsEndpointTests(IPostgresFixture fixture)
     : PostgresTestBase(fixture)
 {
-    // e.g. "/api/leave-type/all-options" â€” trailing slash optional, framework collapses it.
+    // e.g. "/api/leave-type/all-options" — trailing slash optional, framework collapses it.
     protected abstract string EndpointUrl { get; }
 
     // Seed one entity and return its id; the happy-path test verifies it appears in the options.

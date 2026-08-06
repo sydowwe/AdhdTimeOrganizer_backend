@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dashboard;
+using AdhdTimeOrganizer.Scheduler.application.dashboard;
 using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
 using FastEndpoints;
@@ -23,7 +23,7 @@ public class GetScheduledJobsOverviewEndpoint(DbContext dbContext)
     public override void Configure()
     {
         Post("/scheduler-dashboard/jobs-overview");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Dashboard: filtered/paginated registered-jobs overview";

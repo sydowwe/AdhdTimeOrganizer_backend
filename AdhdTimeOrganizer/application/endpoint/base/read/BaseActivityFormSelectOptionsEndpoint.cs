@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.response.activity;
+using AdhdTimeOrganizer.application.dto.response.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

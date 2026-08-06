@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.response.activityTracking.stackedBars;
+namespace AdhdTimeOrganizer.application.dto.response.activityTracking.stackedBars;
 
 public record WebExtensionStackedBarsEntry
 {

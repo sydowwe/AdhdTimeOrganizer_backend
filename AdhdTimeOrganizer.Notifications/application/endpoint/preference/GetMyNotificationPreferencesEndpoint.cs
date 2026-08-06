@@ -20,7 +20,7 @@ public class GetMyNotificationPreferencesEndpoint(DbContext dbContext)
     public override void Configure()
     {
         Get("/notification-preference/mine");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Get the current user's effective notification preference matrix");
     }
 

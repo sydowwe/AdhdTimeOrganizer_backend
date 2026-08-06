@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.domain.entity.@base;
+using Sydowwe.Framework.domain.entity.@base;
 
 namespace Sydowwe.Framework.domain.extServiceContract;
 

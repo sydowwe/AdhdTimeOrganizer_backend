@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.request.timer;
+using AdhdTimeOrganizer.application.dto.request.timer;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.timer;
 using AdhdTimeOrganizer.infrastructure.persistence;

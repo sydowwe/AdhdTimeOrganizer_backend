@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.filter.history;
+using AdhdTimeOrganizer.application.dto.filter.history;
 using AdhdTimeOrganizer.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;

@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.timer;
+using AdhdTimeOrganizer.domain.model.entity.timer;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Sydowwe.Framework.application.endpoint.@base.command;
 

@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.domain.helper;
+namespace Sydowwe.Framework.domain.helper;
 
 public static class DirectoryPathsHelper
 {

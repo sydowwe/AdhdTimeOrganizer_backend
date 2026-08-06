@@ -1,4 +1,4 @@
-﻿using FastEndpoints;
+using FastEndpoints;
 using FluentValidation;
 using Sydowwe.Framework.application.dto.request.@base;
 

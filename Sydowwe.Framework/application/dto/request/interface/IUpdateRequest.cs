@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.domain.entityInterface;
+using Sydowwe.Framework.domain.entityInterface;
 
 namespace Sydowwe.Framework.application.dto.request.@interface;
 

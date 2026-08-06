@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
@@ -16,7 +16,7 @@ public abstract class BaseFilterEndpointTests(IPostgresFixture fixture)
     // Seed one entity and return its id.
     protected abstract Task<long> SeedEntityAsync(DbContext db);
 
-    // Build the filter payload (TFilter, IFilterRequest shape). Default is an empty object â€” endpoints
+    // Build the filter payload (TFilter, IFilterRequest shape). Default is an empty object — endpoints
     // that don't tolerate that should override.
     protected virtual object EmptyFilterPayload() => new { };
 

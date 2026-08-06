@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.application.dto.response.@base;
+namespace Sydowwe.Framework.application.dto.response.@base;
 
 public record BaseGridResponse<TResponse> where TResponse : class, IIdResponse
 {

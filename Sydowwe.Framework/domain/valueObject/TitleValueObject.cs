@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.domain.valueObject;
+namespace Sydowwe.Framework.domain.valueObject;
 
 public class TitleValueObject
 {

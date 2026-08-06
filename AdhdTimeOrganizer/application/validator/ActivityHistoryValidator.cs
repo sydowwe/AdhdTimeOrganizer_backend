@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.request.history;
+using AdhdTimeOrganizer.application.dto.request.history;
 using FastEndpoints;
 using FluentValidation;
 

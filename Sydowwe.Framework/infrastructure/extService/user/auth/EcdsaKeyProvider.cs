@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using Microsoft.IdentityModel.Tokens;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;

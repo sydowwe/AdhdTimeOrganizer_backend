@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 
 /// <summary>
 /// Development fixtures owned by one user — the demo activities, todo lists and history that make a

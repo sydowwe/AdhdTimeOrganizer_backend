@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.domain.entity.@base;
 using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.entityInterface;

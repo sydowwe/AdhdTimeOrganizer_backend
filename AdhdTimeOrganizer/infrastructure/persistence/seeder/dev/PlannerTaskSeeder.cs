@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.@enum;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
@@ -93,10 +93,10 @@ public class PlannerTaskSeeder(
             calendar.BedTime = new TimeOnly(23, 0);
             calendar.Weather = calendar.Date.Month switch
             {
-                12 or 1 or 2 => "Cold â„ï¸",
-                3 or 4 or 5 => "Mild ðŸŒ¤ï¸",
-                6 or 7 or 8 => "Hot â˜€ï¸",
-                _ => "Cool ðŸ‚"
+                12 or 1 or 2 => "Cold ❄️",
+                3 or 4 or 5 => "Mild 🌤️",
+                6 or 7 or 8 => "Hot ☀️",
+                _ => "Cool 🍂"
             };
             calendar.Notes = isWeekend ? "Weekend - relaxed schedule" : "Workday - stay focused";
 

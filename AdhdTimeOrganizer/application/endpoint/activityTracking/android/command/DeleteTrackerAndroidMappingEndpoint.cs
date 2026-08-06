@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.endpointGroups;
+using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Sydowwe.Framework.application.endpoint.@base.command;

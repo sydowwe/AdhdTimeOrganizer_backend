@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 
 namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
 

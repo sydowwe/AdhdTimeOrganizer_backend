@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.domain.extension;
+namespace Sydowwe.Framework.domain.extension;
 
 public static class DateTimeExtensions
 {

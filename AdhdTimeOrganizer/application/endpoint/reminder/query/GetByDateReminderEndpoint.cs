@@ -32,7 +32,7 @@ public class GetByDateReminderEndpoint(AppDbContext dbContext) : Endpoint<GetRem
     public override void Configure()
     {
         Get("/reminder/by-date/{date}");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Get reminders for a day";

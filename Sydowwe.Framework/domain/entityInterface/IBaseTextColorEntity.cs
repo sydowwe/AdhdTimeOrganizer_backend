@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.domain.entityInterface;
+namespace Sydowwe.Framework.domain.entityInterface;
 
 public interface IBaseTextColorEntity : IBaseTableEntity
 {

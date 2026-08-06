@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -34,29 +34,63 @@ public abstract partial class BaseDbContext<TUser>(DbContextOptions options, ILo
         // The concrete TUser is the only mapped entity for the user table.
         modelBuilder.Ignore<BaseUser>();
 
+        ConfigureIdentityModel(modelBuilder);
+
+        ApplyFrameworkConfigurations(modelBuilder);
+
+        ConfigureRefreshTokenUserFk(modelBuilder);
+
+        // Host configurations run before scoping on purpose: the filter loop walks the entity types
+        // already in the model, so an entity that only enters it through a host configuration (or a
+        // navigation one of them discovers) would otherwise never be filtered.
+        ApplyHostConfigurations(modelBuilder);
+
+        ApplyUserScopingIfEnabled(modelBuilder);
+
+        OnModelCreatingPartial(modelBuilder);
+    }
+
+    /// <summary>
+    /// Maps the Identity satellite tables. Override to change the mapping — a host whose database
+    /// already has <c>user_claim</c> / <c>user_login</c> tables maps them instead of ignoring them.
+    /// </summary>
+    protected virtual void ConfigureIdentityModel(ModelBuilder modelBuilder)
+    {
         modelBuilder.Ignore<IdentityUserLogin<long>>();
         modelBuilder.Ignore<IdentityUserClaim<long>>();
         modelBuilder.Entity<IdentityUserToken<long>>(entity => entity.ToTable("user_token"));
         modelBuilder.Entity<IdentityUserRole<long>>(entity => entity.ToTable("user__role"));
         modelBuilder.Entity<IdentityRoleClaim<long>>(entity => entity.ToTable("user_role_claim"));
+    }
 
-        // Audit log configurations live in the Framework assembly.
-        // User entity configuration lives in the Core assembly (see AppCoreDbContext).
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AuditLogEntityConfiguration).Assembly);
+    /// <summary>
+    /// Applies the Framework assembly's own entity configurations (audit logs). Override in a host
+    /// that deliberately does not map all of them — see <c>AppDbContext</c>, which maps
+    /// <c>business_audit_log</c> but not the partitioned <c>audit_log</c>.
+    /// <para>User entity configuration lives in the host assembly, not here.</para>
+    /// </summary>
+    protected virtual void ApplyFrameworkConfigurations(ModelBuilder modelBuilder)
+        => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AuditLogEntityConfiguration).Assembly);
 
-        // RefreshToken always belongs to a user. The FK is configured here (not in the
-        // RefreshToken entity configuration) because only here is the concrete user type
-        // known — TUser — since the abstract BaseUser is excluded from the model above.
-        modelBuilder.Entity<RefreshToken>()
+    /// <summary>
+    /// RefreshToken always belongs to a user. The FK is configured here (not in the RefreshToken
+    /// entity configuration) because only here is the concrete user type known — TUser — since the
+    /// abstract BaseUser is excluded from the model above. Override (to a no-op) in a host that
+    /// configures the relationship itself, e.g. to give the principal end a navigation.
+    /// </summary>
+    protected virtual void ConfigureRefreshTokenUserFk(ModelBuilder modelBuilder)
+        => modelBuilder.Entity<RefreshToken>()
             .HasOne<TUser>()
             .WithMany()
             .HasForeignKey(rt => rt.UserId)
             .IsRequired()
             .OnDelete(DeleteBehavior.Cascade);
 
-        ApplyUserScopingIfEnabled(modelBuilder);
-
-        OnModelCreatingPartial(modelBuilder);
+    /// <summary>
+    /// The host's own entity configurations. Runs after the Framework's and before user scoping.
+    /// </summary>
+    protected virtual void ApplyHostConfigurations(ModelBuilder modelBuilder)
+    {
     }
 
     /// <summary>

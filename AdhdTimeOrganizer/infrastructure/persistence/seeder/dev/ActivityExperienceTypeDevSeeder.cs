@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;

@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.domain.model.@enum;
+namespace AdhdTimeOrganizer.domain.model.@enum;
 
 public enum PlannerTaskStatus
 {

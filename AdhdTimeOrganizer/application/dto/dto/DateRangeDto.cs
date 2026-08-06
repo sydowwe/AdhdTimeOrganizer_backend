@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.@enum;
+using AdhdTimeOrganizer.application.dto.@enum;
 using FluentValidation;
 
 namespace AdhdTimeOrganizer.application.dto.dto;

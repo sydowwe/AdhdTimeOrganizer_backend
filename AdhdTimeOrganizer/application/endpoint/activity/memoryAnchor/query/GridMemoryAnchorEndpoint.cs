@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.filter;
+using AdhdTimeOrganizer.application.dto.filter;
 using AdhdTimeOrganizer.application.dto.response.activity.memoryAnchor;
 using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
 using AdhdTimeOrganizer.infrastructure.persistence;

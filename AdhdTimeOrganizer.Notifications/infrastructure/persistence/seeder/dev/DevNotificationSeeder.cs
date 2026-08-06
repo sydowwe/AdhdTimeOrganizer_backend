@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Notifications.domain.entity;
+using AdhdTimeOrganizer.Notifications.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MojaDigitalnaFirma.Kernel.notification;
@@ -48,7 +48,7 @@ public class DevNotificationSeeder(DbContext dbContext, ISeedUserIdProvider seed
             {
                 UserId = primaryId,
                 Type = NotificationType.DeadlineApproaching,
-                PayloadJson = """{"title":"NaplÃ¡novanÃ¡ aktivita â€“ blÃ­Å¾i sa zaÄiatok"}""",
+                PayloadJson = """{"title":"Naplánovaná aktivita – blíži sa začiatok"}""",
                 IsRead = false
             },
             new()
@@ -78,7 +78,7 @@ public class DevNotificationSeeder(DbContext dbContext, ISeedUserIdProvider seed
             {
                 UserId = primaryId,
                 Type = NotificationType.Test,
-                PayloadJson = """{"message":"Testovacia notifikÃ¡cia pre administrÃ¡tora."}""",
+                PayloadJson = """{"message":"Testovacia notifikácia pre administrátora."}""",
                 IsRead = true
             },
 
@@ -94,7 +94,7 @@ public class DevNotificationSeeder(DbContext dbContext, ISeedUserIdProvider seed
             {
                 UserId = secondaryId,
                 Type = NotificationType.Test,
-                PayloadJson = """{"message":"Testovacia notifikÃ¡cia."}""",
+                PayloadJson = """{"message":"Testovacia notifikácia."}""",
                 IsRead = true
             }
         };
@@ -104,7 +104,7 @@ public class DevNotificationSeeder(DbContext dbContext, ISeedUserIdProvider seed
 
         // CreatedTimestamp is auto-stamped to UtcNow on insert (BaseSaveChangesAsync), so every row
         // would otherwise share one instant and the bell (ordered by CreatedTimestamp DESC) would have
-        // no meaningful order. Stagger it in a second pass â€” on Modified state only ModifiedTimestamp is
+        // no meaningful order. Stagger it in a second pass — on Modified state only ModifiedTimestamp is
         // re-stamped, so these CreatedTimestamp values survive. ReadAt is derived to always follow creation.
         var now = DateTime.UtcNow;
         for (var i = 0; i < notifications.Count; i++)

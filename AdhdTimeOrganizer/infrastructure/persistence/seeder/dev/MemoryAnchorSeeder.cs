@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
+using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
@@ -59,7 +59,7 @@ public class MemoryAnchorSeeder(
 
         string[] notes =
         [
-            "Finally managed to do this consistently â€” felt great!",
+            "Finally managed to do this consistently — felt great!",
             "Struggled at first but found my rhythm",
             "Best session yet, very productive",
             "Surprised how much I enjoyed this",
@@ -74,7 +74,7 @@ public class MemoryAnchorSeeder(
             "Connected with something important to me",
             "Saw tangible results for the first time",
             "This changed my perspective",
-            "Flow state â€” lost track of time completely",
+            "Flow state — lost track of time completely",
             "Shared the experience with someone special",
             "Overcame a mental block I had been carrying",
             "Felt proud of myself for following through",

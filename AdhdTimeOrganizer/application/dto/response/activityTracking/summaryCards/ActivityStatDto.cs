@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.response.activityTracking.summaryCards;
+namespace AdhdTimeOrganizer.application.dto.response.activityTracking.summaryCards;
 
 public record ActivityStatDto
 {

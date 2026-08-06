@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.domain.model.entity.user;
 using Sydowwe.Framework.domain.serviceContract;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.AspNetCore.Identity;

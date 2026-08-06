@@ -1,4 +1,4 @@
-﻿using FastEndpoints;
+using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using Sydowwe.Framework.application.dto.response.user;
 using Sydowwe.Framework.domain.entity.user;

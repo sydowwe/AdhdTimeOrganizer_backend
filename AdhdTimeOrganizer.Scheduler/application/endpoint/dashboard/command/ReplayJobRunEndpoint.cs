@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.domain.entity;
+using AdhdTimeOrganizer.Scheduler.domain.entity;
 using AdhdTimeOrganizer.Scheduler.domain.serviceContract;
 using FastEndpoints;
 using Sydowwe.Framework.application.dto.request.generic;
@@ -12,15 +12,15 @@ namespace AdhdTimeOrganizer.Scheduler.application.endpoint.dashboard.command;
 /// <summary>
 /// Replay a past run (POST <c>/scheduler-dashboard/run/{id}/replay</c>): re-run it <i>through</i> the phase-03
 /// dispatcher with the original run's snapshotted payload, recorded as a new <c>Replay</c> run linked via
-/// <c>ReplaysRunId</c> â€” the original row is never mutated. Thin wrapper over
+/// <c>ReplaysRunId</c> — the original row is never mutated. Thin wrapper over
 /// <see cref="IScheduledRunReplayer"/>; builds no context and writes no run row itself. The dispatcher owns
 /// the per-key concurrency gate, so a replay overlapping a live run of the same job is vetoed there.
-/// <b>Replaying a non-idempotent job repeats its side effects</b> â€” the handler owns effect-idempotency.
+/// <b>Replaying a non-idempotent job repeats its side effects</b> — the handler owns effect-idempotency.
 /// Open to any signed-in user (User/Admin/Root).
 /// <para>
 /// Replay doesn't mutate the registry, so the CRUD audit interceptor sees nothing and the new
 /// <c>ScheduledJobRun</c> is <c>[NoAudit]</c> with no <c>UserId</c>. Because replaying a non-idempotent job
-/// repeats side effects, we emit a business-audit event here â€” where the admin principal IS present â€” so the
+/// repeats side effects, we emit a business-audit event here — where the admin principal IS present — so the
 /// act is attributable. The original run id is non-PII (safe to log).
 /// </para>
 /// </summary>
@@ -29,7 +29,7 @@ public class ReplayJobRunEndpoint(IScheduledRunReplayer replayer, IAuditService 
     public override void Configure()
     {
         Post("/scheduler-dashboard/run/{id}/replay");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Dashboard: replay a past run through the dispatcher (new linked Replay run)";

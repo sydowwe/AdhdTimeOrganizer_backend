@@ -12,7 +12,7 @@ public class MarkReadNotificationEndpoint(DbContext dbContext) : EndpointWithout
     public override void Configure()
     {
         Patch("/notification/{id}/read");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Mark a notification as read");
     }
 

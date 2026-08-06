@@ -1,1 +1,28 @@
-﻿* text=auto eol=lf
+# LF in the repository AND in the working tree, on every OS.
+# eol=lf beats core.autocrlf, so a machine with autocrlf=true still gets LF
+# checked out — no "whole file modified" noise in the local changes view.
+* text=auto eol=lf
+
+# Windows-only scripts genuinely need CRLF to run.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Never touch these, whatever the content sniffer decides.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.dll   binary
+*.exe   binary
+*.pfx   binary
+*.snk   binary

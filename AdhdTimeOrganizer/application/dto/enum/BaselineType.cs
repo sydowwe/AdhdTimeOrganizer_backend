@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.@enum;
+namespace AdhdTimeOrganizer.application.dto.@enum;
 
 public enum BaselineType
 {

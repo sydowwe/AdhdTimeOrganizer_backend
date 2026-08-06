@@ -13,7 +13,7 @@ public class UnsubscribePushEndpoint(DbContext dbContext) : Endpoint<Unsubscribe
     public override void Configure()
     {
         Post("/push-subscription/unsubscribe");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Remove the current user's Web Push subscription");
     }
 

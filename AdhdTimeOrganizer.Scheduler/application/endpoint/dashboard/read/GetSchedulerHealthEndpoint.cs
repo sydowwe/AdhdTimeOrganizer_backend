@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dashboard;
+using AdhdTimeOrganizer.Scheduler.application.dashboard;
 using AdhdTimeOrganizer.Scheduler.application.dto.health;
 using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
@@ -12,7 +12,7 @@ namespace AdhdTimeOrganizer.Scheduler.application.endpoint.dashboard.read;
 
 /// <summary>
 /// Scheduler health (GET <c>/scheduler-dashboard/health</c>): the "needs attention" view. Status counts, recent
-/// run outcomes over a 24h window, and the three actionable lists â€” failed last run, overdue (Active past the
+/// run outcomes over a 24h window, and the three actionable lists — failed last run, overdue (Active past the
 /// grace margin), and orphaned (handler no longer registered). The run log is the source of truth: the recent
 /// outcomes come straight off it. Open to any signed-in user (User/Admin/Root).
 /// </summary>
@@ -24,8 +24,8 @@ public class GetSchedulerHealthEndpoint(DbContext dbContext, IEnumerable<ISchedu
     public override void Configure()
     {
         Get("/scheduler-dashboard/health");
-        Roles(IEndpoint.GetUserRole());
-        Summary(s => s.Summary = "Dashboard: scheduler health â€” failed / overdue / orphaned jobs");
+        Roles(this.GetUserRole());
+        Summary(s => s.Summary = "Dashboard: scheduler health — failed / overdue / orphaned jobs");
     }
 
     public override async Task HandleAsync(CancellationToken ct)
@@ -54,8 +54,8 @@ public class GetSchedulerHealthEndpoint(DbContext dbContext, IEnumerable<ISchedu
             .ToListAsync(ct);
 
         // Orphaned = a still-relevant registry row whose handler key no longer resolves to a registered handler
-        // (its owning module was removed/renamed). A deliberately Removed job is excluded â€” it is not actionable.
-        // The key set is small and in-memory, so EF translates the negated Contains to a SQL NOT IN â€” no need
+        // (its owning module was removed/renamed). A deliberately Removed job is excluded — it is not actionable.
+        // The key set is small and in-memory, so EF translates the negated Contains to a SQL NOT IN — no need
         // to materialize every live job and filter on the request thread.
         var registeredKeys = handlers.Select(h => h.Key).ToList();
         var orphanedJobs = await ScheduledJobDto

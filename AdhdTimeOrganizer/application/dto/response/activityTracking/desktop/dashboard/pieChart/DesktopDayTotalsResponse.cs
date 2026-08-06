@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard.pieChart;
+namespace AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard.pieChart;
 
 public record DesktopDayTotalsResponse
 {

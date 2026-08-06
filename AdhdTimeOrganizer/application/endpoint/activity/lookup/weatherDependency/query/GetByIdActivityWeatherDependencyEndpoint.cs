@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Sydowwe.Framework.application.dto.response.generic;
 using Sydowwe.Framework.application.endpoint.@base.read;

@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.request.history;
+using AdhdTimeOrganizer.application.dto.request.history;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;

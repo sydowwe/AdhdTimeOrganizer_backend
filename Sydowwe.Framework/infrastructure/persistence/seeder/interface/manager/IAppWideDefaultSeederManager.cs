@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
+namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
 
 /// <summary>
 /// Runs the <see cref="IAppWideDefaultSeeder"/>s — production data every environment needs.

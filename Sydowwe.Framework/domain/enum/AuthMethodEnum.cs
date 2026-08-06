@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.domain.@enum;
+namespace Sydowwe.Framework.domain.@enum;
 
 /// <summary>
 /// How a session was originally authenticated. Persisted on <c>refresh_token.auth_method</c> as an

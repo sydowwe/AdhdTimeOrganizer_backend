@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
+using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
 using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +12,7 @@ namespace AdhdTimeOrganizer.Reminders.application.endpoint.dashboard;
 
 /// <summary>
 /// Upcoming (not-yet-fired) reminders across all modules (POST <c>/reminder-dashboard/upcoming</c>), paged /
-/// filtered / sorted. <b>One row per active definition, showing its single soonest <c>NextOccurrenceAt</c></b> â€”
+/// filtered / sorted. <b>One row per active definition, showing its single soonest <c>NextOccurrenceAt</c></b> —
 /// later occurrences of recurring / multi-offset reminders are deliberately <b>not</b> expanded (that would be
 /// recomputation and isn't SQL-translatable). Open to any signed-in user (User/Admin/Root), and it spans EVERY
 /// user's reminders with no user scoping — acceptable single-user, a leak once this app is multi-tenant; the
@@ -26,7 +26,7 @@ public class GetUpcomingRemindersEndpoint(DbContext dbContext)
     public override void Configure()
     {
         Post("/reminder-dashboard/upcoming");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Upcoming reminders across all modules (admin)");
     }
 

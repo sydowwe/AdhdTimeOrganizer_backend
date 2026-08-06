@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
+using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 using FastEndpoints;
 using MojaDigitalnaFirma.Kernel.notification.payload;
 using MojaDigitalnaFirma.Kernel.reminders;
@@ -8,7 +8,7 @@ namespace AdhdTimeOrganizer.Reminders.application.endpoint.reminderDefinition.co
 
 /// <summary>
 /// Diagnostic / manual-ops register (idempotent upsert by the reminder key). Owning modules normally register
-/// from their own code against <see cref="IReminderRegistry"/> directly â€” this endpoint is for ad-hoc admin
+/// from their own code against <see cref="IReminderRegistry"/> directly — this endpoint is for ad-hoc admin
 /// use. Open to any signed-in user (User/Admin/Root).
 /// </summary>
 public class RegisterReminderEndpoint(IReminderRegistry registry)
@@ -17,7 +17,7 @@ public class RegisterReminderEndpoint(IReminderRegistry registry)
     public override void Configure()
     {
         Post("/reminder-definition/register");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Register (idempotent upsert) a reminder by its key";
@@ -28,7 +28,7 @@ public class RegisterReminderEndpoint(IReminderRegistry registry)
 
     public override async Task HandleAsync(RegisterReminderRequest req, CancellationToken ct)
     {
-        // Per-type required fields the flatâ†’typed mapping would otherwise paper over (e.g. a one-shot with no
+        // Per-type required fields the flat→typed mapping would otherwise paper over (e.g. a one-shot with no
         // DueAt). The registry re-validates everything else (uniqueness, cron validity, resolver/renderer keys).
         switch (req.ScheduleType)
         {
@@ -49,7 +49,7 @@ public class RegisterReminderEndpoint(IReminderRegistry registry)
         if (PayloadPersonDataNames.ContainsPersonData(req.Payload) is { } offendingPath)
             AddError(r => r.Payload,
                 $"Payload property '{offendingPath}' looks like person data. A reminder payload carries ids and " +
-                "non-person scalars only â€” the display name is resolved at render time.");
+                "non-person scalars only — the display name is resolved at render time.");
 
         if (ValidationFailed)
         {

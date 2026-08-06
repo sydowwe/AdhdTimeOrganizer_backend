@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJobRun;
+using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJobRun;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +17,7 @@ public class GetJobRunByIdEndpoint(DbContext dbContext) : Endpoint<IdRequest, Sc
     public override void Configure()
     {
         Get("/scheduler-dashboard/run/{id}");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Dashboard: single run detail with payload + replay lineage";

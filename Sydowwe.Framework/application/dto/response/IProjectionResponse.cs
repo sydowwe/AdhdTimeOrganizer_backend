@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.application.dto.response;
+namespace Sydowwe.Framework.application.dto.response;
 
 public interface IProjectionResponse<out TResponse, in TEntity>
     where TResponse : class

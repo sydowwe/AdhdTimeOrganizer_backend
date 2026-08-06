@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

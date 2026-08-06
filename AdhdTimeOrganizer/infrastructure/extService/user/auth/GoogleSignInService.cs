@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
+using AdhdTimeOrganizer.domain.extServiceContract.user.auth;
 using Google.Apis.Auth;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;

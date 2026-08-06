@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -16,7 +16,7 @@ namespace Sydowwe.Framework.Testing;
 /// <summary>
 /// Portal-agnostic test host factory. <c>TProgram</c> is the portal's entry point (its global <c>Program</c>).
 /// <para>Pass <c>roles</c> = the role claims the test user should have (e.g. <c>["Admin","User"]</c>),
-/// or <c>null</c> to register no auth handler at all â€” requests then hit the real auth layer and
+/// or <c>null</c> to register no auth handler at all — requests then hit the real auth layer and
 /// protected endpoints return 401 (unauthenticated).</para>
 /// <para>Pass <c>userId</c> to log the test in as a non-default user (useful for cross-user IDOR / ownership tests).</para>
 /// </summary>

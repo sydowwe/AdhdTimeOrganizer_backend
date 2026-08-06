@@ -12,7 +12,7 @@ public class DeleteNotificationEndpoint(DbContext dbContext) : EndpointWithoutRe
     public override void Configure()
     {
         Delete("/notification/{id}");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Delete one of the current user's notifications");
     }
 

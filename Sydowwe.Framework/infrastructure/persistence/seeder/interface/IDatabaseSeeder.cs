@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 
 /// <summary>
 /// Identity of a seeder — nothing else. Deliberately carries no seeding entry point: the four

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.serviceContract;

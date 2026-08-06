@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.application.dto.request.generic;
+using Sydowwe.Framework.application.dto.request.generic;
 using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace Sydowwe.Framework.application.dto.request.@base.table;

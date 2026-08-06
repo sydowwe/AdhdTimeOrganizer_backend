@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.application.dto.request.@interface;
+using Sydowwe.Framework.application.dto.request.@interface;
 using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;

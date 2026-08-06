@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Sydowwe.Framework.domain.helper;
 
 namespace Sydowwe.Framework.application.extensions;

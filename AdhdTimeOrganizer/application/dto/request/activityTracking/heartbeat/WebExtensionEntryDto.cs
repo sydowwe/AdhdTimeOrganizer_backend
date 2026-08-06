@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.request.activityTracking.heartbeat;
+namespace AdhdTimeOrganizer.application.dto.request.activityTracking.heartbeat;
 
 public record WebExtensionEntryDto
 {

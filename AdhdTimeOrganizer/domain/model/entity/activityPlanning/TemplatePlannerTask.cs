@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 public class TemplatePlannerTask : BasePlannerTask
 {

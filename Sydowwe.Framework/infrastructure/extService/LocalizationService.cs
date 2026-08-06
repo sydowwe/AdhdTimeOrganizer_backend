@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Reflection;
 using System.Resources;
 using Sydowwe.Framework.domain.serviceContract;

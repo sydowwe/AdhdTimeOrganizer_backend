@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
+using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 using FastEndpoints;
 using MojaDigitalnaFirma.Kernel.reminders;
 using Sydowwe.Framework.domain.helper;
@@ -11,7 +11,7 @@ public class PauseReminderEndpoint(IReminderRegistry registry) : Endpoint<Remind
     public override void Configure()
     {
         Post("/reminder-definition/pause");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Pause a reminder by its key";

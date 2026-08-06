@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.request.extendable;
+namespace AdhdTimeOrganizer.application.dto.request.extendable;
 
 public interface IActivityIdRequest
 {

@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Sydowwe.Framework.application.endpoint.@base.command.misc;
 

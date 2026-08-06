@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.@enum;
 

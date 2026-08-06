@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.endpoint.@base.read;
+using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;

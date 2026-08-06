@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -8,7 +8,7 @@ namespace Sydowwe.Framework.Testing.baseTests;
 public abstract class BaseDeleteEndpointTests(IPostgresFixture fixture)
     : PostgresTestBase(fixture)
 {
-    // e.g. "/api/stock-type" â€” /{id} is appended by the tests
+    // e.g. "/api/stock-type" — /{id} is appended by the tests
     protected abstract string EndpointUrl { get; }
 
     // Seed one entity; return its id.

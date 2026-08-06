@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.domain.@enum;
 
 namespace Sydowwe.Framework.Testing;
 

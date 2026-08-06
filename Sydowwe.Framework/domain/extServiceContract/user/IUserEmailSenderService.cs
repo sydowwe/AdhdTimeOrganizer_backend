@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.domain.entity.user;
+using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.serviceContract;
 
 namespace Sydowwe.Framework.domain.extServiceContract.user;

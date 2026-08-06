@@ -18,7 +18,7 @@ public class GetMyNotificationsEndpoint(
     public override void Configure()
     {
         Get("/notification/mine");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Get the current user's recent notifications");
     }
 

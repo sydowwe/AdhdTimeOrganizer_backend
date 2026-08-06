@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 
 /// <summary>
 /// Production data that is not owned by any user and must exist in <b>every</b> environment —

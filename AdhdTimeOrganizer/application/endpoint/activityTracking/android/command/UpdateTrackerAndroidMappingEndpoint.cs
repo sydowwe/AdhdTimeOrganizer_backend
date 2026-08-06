@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
+using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.application.endpointGroups;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;

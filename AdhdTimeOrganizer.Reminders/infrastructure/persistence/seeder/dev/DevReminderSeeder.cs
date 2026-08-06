@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.domain.entity;
+using AdhdTimeOrganizer.Reminders.domain.entity;
 using AdhdTimeOrganizer.Reminders.domain.@enum;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -44,7 +44,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
 
         // --- Definitions ---
 
-        // 1 â€” OneShot: contract expiry, Active, next occurrence in 2 days (upcoming)
+        // 1 — OneShot: contract expiry, Active, next occurrence in 2 days (upcoming)
         var contractExpiry = new ReminderDefinition
         {
             OwnerModule = "Zmluvy",
@@ -52,7 +52,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             SubjectId = "42",
             Kind = "ExpiryWarning",
             TemplateKey = "contract.expiry-warning",
-            PayloadJson = """{"contractNumber":"ZML-2026-042","title":"DodÃ¡vka kancelÃ¡rskych potrieb"}""",
+            PayloadJson = """{"contractNumber":"ZML-2026-042","title":"Dodávka kancelárskych potrieb"}""",
             NotificationType = NotificationType.DeadlineApproaching,
             ScheduleType = ReminderScheduleType.OneShot,
             DueAt = now.AddDays(30),
@@ -69,7 +69,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             ]
         };
 
-        // 2 â€” OneShot: contract obligation overdue (NextOccurrenceAt in the past â€” scanner would pick this up).
+        // 2 — OneShot: contract obligation overdue (NextOccurrenceAt in the past — scanner would pick this up).
         //     Targeted at an employee user so the next scan delivers a real notification to the employee
         //     (the only immediately-firing reminder for the employee-facing FE).
         var obligationOverdue = new ReminderDefinition
@@ -79,7 +79,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             SubjectId = "7",
             Kind = "ObligationDue",
             TemplateKey = "contract.obligation-due",
-            PayloadJson = """{"contractNumber":"ZML-2026-010","obligationTitle":"ZaslaÅ¥ kvartÃ¡lny report"}""",
+            PayloadJson = """{"contractNumber":"ZML-2026-010","obligationTitle":"Zaslať kvartálny report"}""",
             NotificationType = NotificationType.DeadlineApproaching,
             ScheduleType = ReminderScheduleType.OneShot,
             DueAt = now.AddHours(1),
@@ -90,7 +90,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             LeadOffsets = [new ReminderLeadOffset { OffsetMinutes = -120 }]
         };
 
-        // 3 â€” RecurringInterval: weekly stock review (Active)
+        // 3 — RecurringInterval: weekly stock review (Active)
         var weeklyStock = new ReminderDefinition
         {
             OwnerModule = "Inventory",
@@ -110,7 +110,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             Recipients = [new ReminderRecipient { UserId = primaryId }]
         };
 
-        // 4 â€” RecurringInterval: monthly HR events digest (Active, two recipients)
+        // 4 — RecurringInterval: monthly HR events digest (Active, two recipients)
         var monthlyHr = new ReminderDefinition
         {
             OwnerModule = "EmployeeModule",
@@ -134,7 +134,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             ]
         };
 
-        // 5 â€” RecurringCron: registratÃºra disposal check on the 1st of each month (Active)
+        // 5 — RecurringCron: registratúra disposal check on the 1st of each month (Active)
         var disposalCron = new ReminderDefinition
         {
             OwnerModule = "Registratura",
@@ -153,7 +153,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             Recipients = [new ReminderRecipient { UserId = primaryId }]
         };
 
-        // 6 â€” Paused: travel settlement deadline (employee on leave, paused by HR)
+        // 6 — Paused: travel settlement deadline (employee on leave, paused by HR)
         var pausedSettlement = new ReminderDefinition
         {
             OwnerModule = "CestovneNahrady",
@@ -172,7 +172,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             LeadOffsets = [new ReminderLeadOffset { OffsetMinutes = -1440 }] // 1 day before
         };
 
-        // 7 â€” Cancelled: contract deleted before reminder fired
+        // 7 — Cancelled: contract deleted before reminder fired
         var cancelledReminder = new ReminderDefinition
         {
             OwnerModule = "Zmluvy",
@@ -192,7 +192,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             LeadOffsets = [new ReminderLeadOffset { OffsetMinutes = -10080 }] // 7 days before
         };
 
-        // 8 â€” Completed: one-shot fully dispatched
+        // 8 — Completed: one-shot fully dispatched
         var completedReminder = new ReminderDefinition
         {
             OwnerModule = "Zmluvy",
@@ -200,7 +200,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             SubjectId = "5",
             Kind = "PublicationDeadline",
             TemplateKey = "contract.publication-deadline",
-            PayloadJson = """{"contractNumber":"ZML-2025-005","title":"SprÃ¡va IT infraÅ¡truktÃºry"}""",
+            PayloadJson = """{"contractNumber":"ZML-2025-005","title":"Správa IT infraštruktúry"}""",
             NotificationType = NotificationType.DeadlineApproaching,
             ScheduleType = ReminderScheduleType.OneShot,
             DueAt = now.AddDays(-10),
@@ -213,7 +213,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
             LeadOffsets = [new ReminderLeadOffset { OffsetMinutes = -10080 }]
         };
 
-        // 9 â€” RecurringInterval + ResolverStrategy: daily leave-approval digest resolved to the subject's
+        // 9 — RecurringInterval + ResolverStrategy: daily leave-approval digest resolved to the subject's
         //      manager at dispatch time. Exercises the resolver-key recipient path (no explicit Recipients),
         //      the custom-renderer branch (NotificationType == null), and EndsAt / DigestKey / ChannelHint.
         var resolverDigest = new ReminderDefinition
@@ -250,7 +250,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
 
         // --- Dispatch history (after definitions are saved so IDs are available) ---
 
-        // Weekly stock review â€” last week's successful dispatch. Kept as a local so its EF-assigned Id can be
+        // Weekly stock review — last week's successful dispatch. Kept as a local so its EF-assigned Id can be
         // read after the first save and referenced by the Reversed correction row in the second save below.
         var weeklyStockSent = new ReminderDispatch
         {
@@ -266,7 +266,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
 
         var dispatches = new List<ReminderDispatch>
         {
-            // Completed contract publication â€” the dispatch that finalised it
+            // Completed contract publication — the dispatch that finalised it
             new()
             {
                 ReminderDefinitionId = completedReminder.Id,
@@ -281,7 +281,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
 
             weeklyStockSent,
 
-            // Weekly stock review â€” the week before, skipped because no recipients resolved
+            // Weekly stock review — the week before, skipped because no recipients resolved
             new()
             {
                 ReminderDefinitionId = weeklyStock.Id,
@@ -295,7 +295,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
                 CorrelationId = Guid.NewGuid().ToString()
             },
 
-            // Monthly HR digest â€” last month's dispatch
+            // Monthly HR digest — last month's dispatch
             new()
             {
                 ReminderDefinitionId = monthlyHr.Id,
@@ -308,7 +308,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
                 CorrelationId = Guid.NewGuid().ToString()
             },
 
-            // Monthly HR digest â€” the month before, dispatch errored (logged, not silently dropped)
+            // Monthly HR digest — the month before, dispatch errored (logged, not silently dropped)
             new()
             {
                 ReminderDefinitionId = monthlyHr.Id,
@@ -326,7 +326,7 @@ public class DevReminderSeeder(DbContext dbContext, ISeedUserIdProvider seedUser
         dbContext.AddRange(dispatches);
         await dbContext.SaveChangesAsync();
 
-        // Step 2: a correction that reverses the weekly stock Sent row (sent in error â€” wrong stock snapshot).
+        // Step 2: a correction that reverses the weekly stock Sent row (sent in error — wrong stock snapshot).
         // Corrections are append-only reversal rows linked via ReversesDispatchId, never updates/deletes.
         var weeklyStockReversal = new ReminderDispatch
         {

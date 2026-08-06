@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
+using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
 using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 using AdhdTimeOrganizer.Reminders.domain.serviceContract;
 using FastEndpoints;
@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.Reminders.application.endpoint.dashboard;
 
 /// <summary>
 /// Downloads the upcoming-reminders list as a file (<c>?format=csv</c>, default csv). Reuses the exact same
-/// filtered query as <see cref="GetUpcomingRemindersEndpoint"/> â€” only the rendering differs â€” so the file can
+/// filtered query as <see cref="GetUpcomingRemindersEndpoint"/> — only the rendering differs — so the file can
 /// never drift from the API. Open to any signed-in user (User/Admin/Root). Ordered soonest-first, no paging (whole result set).
 /// </summary>
 public class ExportUpcomingRemindersEndpoint(DbContext dbContext, IReminderExportService exportService)
@@ -19,7 +19,7 @@ public class ExportUpcomingRemindersEndpoint(DbContext dbContext, IReminderExpor
     public override void Configure()
     {
         Post("/reminder-dashboard/upcoming/export");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Export upcoming reminders (CSV)");
     }
 

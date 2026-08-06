@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
+using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.read;

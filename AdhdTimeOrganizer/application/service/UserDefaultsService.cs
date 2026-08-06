@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.domain.serviceContract;
+using Sydowwe.Framework.domain.serviceContract;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.result;
 using Sydowwe.Framework.infrastructure.persistence;

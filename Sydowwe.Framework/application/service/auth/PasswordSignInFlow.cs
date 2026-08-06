@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Sydowwe.Framework.config;
 using Sydowwe.Framework.domain.entity.user;
-using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.serviceContract;
 
 namespace Sydowwe.Framework.application.service.auth;

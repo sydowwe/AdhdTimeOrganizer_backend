@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
@@ -12,7 +12,7 @@ public abstract class BaseGridEndpointTests(IPostgresFixture fixture)
 {
     protected abstract string EndpointUrl { get; }
 
-    // Called inside HappyPath_ReturnsSeededEntity â€” seed your entity and return its id.
+    // Called inside HappyPath_ReturnsSeededEntity — seed your entity and return its id.
     // Emp (if attendance) is already set via SeedAsync before this runs.
     protected abstract Task<long> SeedEntityAsync(DbContext db);
 

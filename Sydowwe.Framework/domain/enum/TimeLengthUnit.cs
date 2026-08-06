@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.domain.@enum;
+namespace Sydowwe.Framework.domain.@enum;
 
 public enum TimeLengthUnit
 {

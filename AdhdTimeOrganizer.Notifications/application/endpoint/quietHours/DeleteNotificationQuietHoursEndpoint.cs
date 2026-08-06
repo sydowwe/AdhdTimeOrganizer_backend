@@ -21,7 +21,7 @@ public class DeleteNotificationQuietHoursEndpoint(DbContext dbContext) : Endpoin
     public override void Configure()
     {
         Delete("/notification-quiet-hours");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Clear my quiet-hours window";

@@ -1,4 +1,4 @@
-﻿# Modules
+# Modules
 
 Registry of feature modules in this solution. Each module documents itself with
 the four-file convention described in [`document-module`](../.claude/commands/document-module.md):

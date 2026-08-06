@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
+using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
 using FastEndpoints;
 using MojaDigitalnaFirma.Kernel.scheduling;
 using Sydowwe.Framework.domain.helper;
@@ -11,7 +11,7 @@ public class ResumeJobEndpoint(IScheduler scheduler) : Endpoint<JobKeyRequest>
     public override void Configure()
     {
         Post("/scheduled-job/resume");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Resume a paused recurring job by JobKey";

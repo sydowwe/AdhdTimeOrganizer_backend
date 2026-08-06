@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
+using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
 using AdhdTimeOrganizer.Reminders.application.dto.reminderDispatch;
 using AdhdTimeOrganizer.Reminders.domain.entity;
 using AdhdTimeOrganizer.Reminders.domain.serviceContract;
@@ -20,7 +20,7 @@ public class ExportReminderDispatchHistoryEndpoint(DbContext dbContext, IReminde
     public override void Configure()
     {
         Post("/reminder-dashboard/dispatch-history/export");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Export reminder dispatch history (CSV)");
     }
 

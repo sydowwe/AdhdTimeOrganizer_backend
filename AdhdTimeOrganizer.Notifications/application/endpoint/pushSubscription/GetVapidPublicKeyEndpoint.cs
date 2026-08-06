@@ -18,7 +18,7 @@ public class GetVapidPublicKeyEndpoint(IOptions<PushNotificationOptions> options
     public override void Configure()
     {
         Get("/push-subscription/vapid-public-key");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Get the VAPID public key for Web Push subscription");
     }
 

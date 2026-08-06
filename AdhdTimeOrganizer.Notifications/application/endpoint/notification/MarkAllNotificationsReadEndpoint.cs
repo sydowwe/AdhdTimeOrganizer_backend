@@ -16,7 +16,7 @@ public class MarkAllNotificationsReadEndpoint(DbContext dbContext) : EndpointWit
     public override void Configure()
     {
         Post("/notification/read-all");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Mark all of the current user's notifications as read");
     }
 

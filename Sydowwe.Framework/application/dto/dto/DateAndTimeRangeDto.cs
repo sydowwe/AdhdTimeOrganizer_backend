@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.application.dto.dto;
+namespace Sydowwe.Framework.application.dto.dto;
 
 public record DateAndTimeRangeDto
 {

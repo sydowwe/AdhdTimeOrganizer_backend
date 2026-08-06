@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.application.dto.request.@base;
+namespace Sydowwe.Framework.application.dto.request.@base;
 
 public record ChangeDisplayOrderRequest
 {

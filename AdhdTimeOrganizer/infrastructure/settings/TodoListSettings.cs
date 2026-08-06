@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.infrastructure.settings;
+namespace AdhdTimeOrganizer.infrastructure.settings;
 
 public record TodoListSettings
 {

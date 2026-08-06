@@ -1,4 +1,4 @@
-﻿using FastEndpoints;
+using FastEndpoints;
 using FastEndpoints.Swagger;
 
 namespace AdhdTimeOrganizer.application.endpointGroups;

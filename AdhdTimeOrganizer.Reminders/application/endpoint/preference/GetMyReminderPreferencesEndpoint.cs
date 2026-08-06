@@ -20,7 +20,7 @@ public class GetMyReminderPreferencesEndpoint(DbContext dbContext) : EndpointWit
     public override void Configure()
     {
         Get("/reminder-preference");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Get my reminder preferences (per-kind opt-outs)");
     }
 

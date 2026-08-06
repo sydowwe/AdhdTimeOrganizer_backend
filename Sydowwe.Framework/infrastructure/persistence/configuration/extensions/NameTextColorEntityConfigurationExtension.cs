@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sydowwe.Framework.domain.entityInterface;
 
 namespace Sydowwe.Framework.infrastructure.persistence.configuration.extensions;

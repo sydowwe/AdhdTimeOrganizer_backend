@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.android;
 using AdhdTimeOrganizer.application.endpointGroups;

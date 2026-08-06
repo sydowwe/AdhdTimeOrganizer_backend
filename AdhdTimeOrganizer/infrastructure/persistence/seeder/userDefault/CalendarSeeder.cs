@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity;
+using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.@enum;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
@@ -122,29 +122,29 @@ public class CalendarSeeder(
         var holidays = new Dictionary<DateOnly, string>
         {
             // Fixed holidays
-            { new DateOnly(year, 1, 1), "DeÅˆ vzniku Slovenskej republiky / NovÃ½ rok" },
-            { new DateOnly(year, 1, 6), "Zjavenie PÃ¡na (Traja krÃ¡li)" },
-            { new DateOnly(year, 5, 1), "Sviatok prÃ¡ce" },
-            { new DateOnly(year, 5, 8), "DeÅˆ vÃ­Å¥azstva nad faÅ¡izmom" },
-            { new DateOnly(year, 7, 5), "Sviatok svÃ¤tÃ©ho Cyrila a Metoda" },
-            { new DateOnly(year, 8, 29), "VÃ½roÄie SNP" },
-            { new DateOnly(year, 9, 1), "DeÅˆ Ãšstavy Slovenskej republiky" },
-            { new DateOnly(year, 9, 15), "SedembolestnÃ¡ Panna MÃ¡ria" },
-            { new DateOnly(year, 11, 1), "Sviatok VÅ¡etkÃ½ch svÃ¤tÃ½ch" },
-            { new DateOnly(year, 11, 17), "DeÅˆ boja za slobodu a demokraciu" },
-            { new DateOnly(year, 12, 24), "Å tedrÃ½ deÅˆ" },
-            { new DateOnly(year, 12, 25), "PrvÃ½ sviatok vianoÄnÃ½" },
-            { new DateOnly(year, 12, 26), "DruhÃ½ sviatok vianoÄnÃ½" }
+            { new DateOnly(year, 1, 1), "Deň vzniku Slovenskej republiky / Nový rok" },
+            { new DateOnly(year, 1, 6), "Zjavenie Pána (Traja králi)" },
+            { new DateOnly(year, 5, 1), "Sviatok práce" },
+            { new DateOnly(year, 5, 8), "Deň víťazstva nad fašizmom" },
+            { new DateOnly(year, 7, 5), "Sviatok svätého Cyrila a Metoda" },
+            { new DateOnly(year, 8, 29), "Výročie SNP" },
+            { new DateOnly(year, 9, 1), "Deň Ústavy Slovenskej republiky" },
+            { new DateOnly(year, 9, 15), "Sedembolestná Panna Mária" },
+            { new DateOnly(year, 11, 1), "Sviatok Všetkých svätých" },
+            { new DateOnly(year, 11, 17), "Deň boja za slobodu a demokraciu" },
+            { new DateOnly(year, 12, 24), "Štedrý deň" },
+            { new DateOnly(year, 12, 25), "Prvý sviatok vianočný" },
+            { new DateOnly(year, 12, 26), "Druhý sviatok vianočný" }
         };
 
         // Moveable holidays (Easter-based)
         var easterDate = CalculateEaster(year);
 
-        // Good Friday (VeÄ¾kÃ½ piatok) - 2 days before Easter
-        holidays.Add(easterDate.AddDays(-2), "VeÄ¾kÃ½ piatok");
+        // Good Friday (Veľký piatok) - 2 days before Easter
+        holidays.Add(easterDate.AddDays(-2), "Veľký piatok");
 
-        // Easter Monday (VeÄ¾konoÄnÃ½ pondelok) - 1 day after Easter
-        holidays.Add(easterDate.AddDays(1), "VeÄ¾konoÄnÃ½ pondelok");
+        // Easter Monday (Veľkonočný pondelok) - 1 day after Easter
+        holidays.Add(easterDate.AddDays(1), "Veľkonočný pondelok");
 
         return holidays;
     }
@@ -157,27 +157,27 @@ public class CalendarSeeder(
         var holidays = new Dictionary<DateOnly, string>
         {
             // Fixed holidays
-            { new DateOnly(year, 1, 1), "Den obnovy samostatnÃ©ho ÄeskÃ©ho stÃ¡tu / NovÃ½ rok" },
-            { new DateOnly(year, 5, 1), "SvÃ¡tek prÃ¡ce" },
-            { new DateOnly(year, 5, 8), "Den vÃ­tÄ›zstvÃ­" },
-            { new DateOnly(year, 7, 5), "Den slovanskÃ½ch vÄ›rozvÄ›stÅ¯ Cyrila a MetodÄ›je" },
-            { new DateOnly(year, 7, 6), "Den upÃ¡lenÃ­ mistra Jana Husa" },
-            { new DateOnly(year, 9, 28), "Den ÄeskÃ© stÃ¡tnosti" },
-            { new DateOnly(year, 10, 28), "Den vzniku samostatnÃ©ho ÄeskoslovenskÃ©ho stÃ¡tu" },
+            { new DateOnly(year, 1, 1), "Den obnovy samostatného českého státu / Nový rok" },
+            { new DateOnly(year, 5, 1), "Svátek práce" },
+            { new DateOnly(year, 5, 8), "Den vítězství" },
+            { new DateOnly(year, 7, 5), "Den slovanských věrozvěstů Cyrila a Metoděje" },
+            { new DateOnly(year, 7, 6), "Den upálení mistra Jana Husa" },
+            { new DateOnly(year, 9, 28), "Den české státnosti" },
+            { new DateOnly(year, 10, 28), "Den vzniku samostatného československého státu" },
             { new DateOnly(year, 11, 17), "Den boje za svobodu a demokracii" },
-            { new DateOnly(year, 12, 24), "Å tÄ›drÃ½ den" },
-            { new DateOnly(year, 12, 25), "1. svÃ¡tek vÃ¡noÄnÃ­" },
-            { new DateOnly(year, 12, 26), "2. svÃ¡tek vÃ¡noÄnÃ­" }
+            { new DateOnly(year, 12, 24), "Štědrý den" },
+            { new DateOnly(year, 12, 25), "1. svátek vánoční" },
+            { new DateOnly(year, 12, 26), "2. svátek vánoční" }
         };
 
         // Moveable holidays (Easter-based)
         var easterDate = CalculateEaster(year);
 
-        // Good Friday (VelkÃ½ pÃ¡tek) - 2 days before Easter
-        holidays.Add(easterDate.AddDays(-2), "VelkÃ½ pÃ¡tek");
+        // Good Friday (Velký pátek) - 2 days before Easter
+        holidays.Add(easterDate.AddDays(-2), "Velký pátek");
 
-        // Easter Monday (VelikonoÄnÃ­ pondÄ›lÃ­) - 1 day after Easter
-        holidays.Add(easterDate.AddDays(1), "VelikonoÄnÃ­ pondÄ›lÃ­");
+        // Easter Monday (Velikonoční pondělí) - 1 day after Easter
+        holidays.Add(easterDate.AddDays(1), "Velikonoční pondělí");
 
         return holidays;
     }

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Sydowwe.Framework.domain.entityInterface;
 using Sydowwe.Framework.domain.@enum;

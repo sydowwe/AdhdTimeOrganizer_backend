@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.endpoint.@base.read;
+using AdhdTimeOrganizer.application.endpoint.@base.read;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;

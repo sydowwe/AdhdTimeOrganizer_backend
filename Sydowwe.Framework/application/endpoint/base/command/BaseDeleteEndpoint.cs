@@ -1,4 +1,4 @@
-﻿using FastEndpoints;
+using FastEndpoints;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.domain.entityInterface;

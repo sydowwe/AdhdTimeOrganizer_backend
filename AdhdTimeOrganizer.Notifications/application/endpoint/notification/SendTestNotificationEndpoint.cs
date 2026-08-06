@@ -18,7 +18,7 @@ public class SendTestNotificationEndpoint(INotificationService notificationServi
     public override void Configure()
     {
         Post("/notification/test");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Send a (configurable) test notification to the current user");
     }
 

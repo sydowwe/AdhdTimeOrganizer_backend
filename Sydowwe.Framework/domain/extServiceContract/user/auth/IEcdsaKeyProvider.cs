@@ -1,4 +1,4 @@
-﻿using Microsoft.IdentityModel.Tokens;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Sydowwe.Framework.domain.extServiceContract.user.auth;
 

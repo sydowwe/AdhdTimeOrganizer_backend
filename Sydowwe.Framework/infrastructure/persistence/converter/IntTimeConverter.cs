@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sydowwe.Framework.domain.valueObject;
 
 namespace Sydowwe.Framework.infrastructure.persistence.converter;

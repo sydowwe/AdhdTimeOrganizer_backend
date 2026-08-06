@@ -21,7 +21,7 @@ public class SnoozeReminderOccurrenceEndpoint(DbContext dbContext) : Endpoint<Sn
     public override void Configure()
     {
         Post("/reminder-dashboard/snooze");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Snooze one of my upcoming reminder occurrences";

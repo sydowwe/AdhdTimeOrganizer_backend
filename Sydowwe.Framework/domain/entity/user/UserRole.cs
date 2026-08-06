@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Sydowwe.Framework.domain.entityInterface;
 
 namespace Sydowwe.Framework.domain.entity.user;

@@ -1,4 +1,4 @@
-﻿namespace AdhdTimeOrganizer.application.dto.response.activityTracking.timeline;
+namespace AdhdTimeOrganizer.application.dto.response.activityTracking.timeline;
 
 public record TimelineSession
 {

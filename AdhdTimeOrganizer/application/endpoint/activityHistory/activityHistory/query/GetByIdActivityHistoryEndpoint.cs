@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.application.dto.response.activityHistory;
+using AdhdTimeOrganizer.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Sydowwe.Framework.application.endpoint.@base.read;

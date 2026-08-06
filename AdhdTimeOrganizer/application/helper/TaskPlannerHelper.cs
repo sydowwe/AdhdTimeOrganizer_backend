@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.application.helper;

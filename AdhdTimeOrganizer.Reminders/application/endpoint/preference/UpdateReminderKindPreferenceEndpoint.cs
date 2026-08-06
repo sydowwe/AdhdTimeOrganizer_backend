@@ -17,7 +17,7 @@ public class UpdateReminderKindPreferenceEndpoint(DbContext dbContext) : Endpoin
     public override void Configure()
     {
         Put("/reminder-preference/kind");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Enable or mute reminders of a given kind for me");
     }
 

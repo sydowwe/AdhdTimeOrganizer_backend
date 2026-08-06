@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
+using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 using AdhdTimeOrganizer.Reminders.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.read;

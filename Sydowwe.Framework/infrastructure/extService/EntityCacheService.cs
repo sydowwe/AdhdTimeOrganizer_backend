@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Distributed;
 using Sydowwe.Framework.domain.entity.@base;
 using Sydowwe.Framework.domain.extServiceContract;
 using Sydowwe.Framework.domain.extServiceContract.user;

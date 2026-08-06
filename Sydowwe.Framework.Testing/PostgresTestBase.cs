@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -21,7 +21,7 @@ public abstract class PostgresTestBase(IPostgresFixture fixture) : IAsyncLifetim
 
     protected static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
-    // Prevent the runtime from following the auth-challenge redirect â€” tests need to observe the 401/403
+    // Prevent the runtime from following the auth-challenge redirect — tests need to observe the 401/403
     // directly. Used for the role-restricted and unauthenticated clients below.
     private static readonly WebApplicationFactoryClientOptions NoRedirect = new() { AllowAutoRedirect = false };
 
@@ -38,7 +38,7 @@ public abstract class PostgresTestBase(IPostgresFixture fixture) : IAsyncLifetim
 
     protected HttpClient CreateRootRoleClient() => fixture.RootFactory.CreateClient(NoRedirect);
 
-    // No auth handler registered â†’ real auth layer challenges anonymous requests with 401.
+    // No auth handler registered → real auth layer challenges anonymous requests with 401.
     protected HttpClient CreateUnauthenticatedClient() => fixture.UnauthenticatedFactory.CreateClient(NoRedirect);
 
     // For tests that need a different test user id (cross-employee IDOR / ownership checks) or that

@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
+using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
 using AdhdTimeOrganizer.Reminders.application.dto.reminderDispatch;
 using AdhdTimeOrganizer.Reminders.domain.entity;
 using FastEndpoints;
@@ -12,7 +12,7 @@ using Sydowwe.Framework.infrastructure.persistence;
 namespace AdhdTimeOrganizer.Reminders.application.endpoint.dashboard;
 
 /// <summary>
-/// The append-only dispatch log (POST <c>/reminder-dashboard/dispatch-history</c>) â€” a straight projection of the
+/// The append-only dispatch log (POST <c>/reminder-dashboard/dispatch-history</c>) — a straight projection of the
 /// ledger, <b>reversals included</b>, paged / filtered / sorted by reminder, owner, recipient, outcome and
 /// dispatched-at range. Shows the skip/fail reason + the immutable recipient snapshot. The dispatch log is the
 /// audit trail / source of truth. Open to any signed-in user (User/Admin/Root). Default order: most recently dispatched first.
@@ -25,7 +25,7 @@ public class GetReminderDispatchHistoryEndpoint(DbContext dbContext)
     public override void Configure()
     {
         Post("/reminder-dashboard/dispatch-history");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Reminder dispatch history / audit log (admin)");
     }
 

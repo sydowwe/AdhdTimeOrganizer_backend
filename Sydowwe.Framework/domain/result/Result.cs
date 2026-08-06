@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.domain.result;
+namespace Sydowwe.Framework.domain.result;
 
 public interface IResult
 {

@@ -14,7 +14,7 @@ public class GetUnreadNotificationCountEndpoint(DbContext dbContext)
     public override void Configure()
     {
         Get("/notification/unread-count");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s => s.Summary = "Get the current user's unread notification count");
     }
 

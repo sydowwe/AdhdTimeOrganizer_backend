@@ -1,4 +1,4 @@
-﻿namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+namespace Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 
 /// <summary>
 /// Development fixtures that are not scoped to a single user — either genuinely global demo data,

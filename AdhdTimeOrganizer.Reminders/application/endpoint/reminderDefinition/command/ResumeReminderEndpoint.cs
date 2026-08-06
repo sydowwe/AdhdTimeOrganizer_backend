@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
+using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 using FastEndpoints;
 using MojaDigitalnaFirma.Kernel.reminders;
 using Sydowwe.Framework.domain.helper;
@@ -11,7 +11,7 @@ public class ResumeReminderEndpoint(IReminderRegistry registry) : Endpoint<Remin
     public override void Configure()
     {
         Post("/reminder-definition/resume");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Resume a paused reminder by its key";

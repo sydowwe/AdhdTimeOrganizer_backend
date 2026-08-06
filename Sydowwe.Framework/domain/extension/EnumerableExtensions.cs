@@ -1,4 +1,4 @@
-﻿using Sydowwe.Framework.domain.result;
+using Sydowwe.Framework.domain.result;
 
 namespace Sydowwe.Framework.domain.extension;
 

@@ -1,4 +1,4 @@
-﻿using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
+using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
 using FastEndpoints;
 using MojaDigitalnaFirma.Kernel.scheduling;
 using Sydowwe.Framework.domain.helper;
@@ -11,7 +11,7 @@ public class PauseJobEndpoint(IScheduler scheduler) : Endpoint<JobKeyRequest>
     public override void Configure()
     {
         Post("/scheduled-job/pause");
-        Roles(IEndpoint.GetUserRole());
+        Roles(this.GetUserRole());
         Summary(s =>
         {
             s.Summary = "Pause a recurring job by JobKey";
