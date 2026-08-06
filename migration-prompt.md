@@ -110,5 +110,5 @@ second consumer is worse than leaving it where it is.
   It is why `TwoFactorMode.Required` is currently unusable (`auth-state.md`).
 - Does anything here need `IAuditService`, given auditing is **not wired up** in this solution
   (`CLAUDE.md` → Auditing)? Don't build on it as if it records anything today.
-- Are the two `docs/` copies (`Sydowwe.Framework/docs/architecture.md`, root `docs/`) going to need
+- Are the two `docs/` copies (`framework/Sydowwe.Framework/docs/architecture.md`, root `docs/`) going to need
   updating, and is the root one still the untrusted foreign copy?

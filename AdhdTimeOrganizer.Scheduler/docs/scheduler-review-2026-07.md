@@ -81,7 +81,7 @@ below and the FIXED blocks in L1/L2/C1/B4). **Still open: D2 + D5** (follow-ups 
   (`ScheduledJobRun` is `[NoAudit]`).
 - **Configurable (2026-07-20, reminders follow-up 01).** The `RetentionYears` / `KeepLastRunsPerJob`
   **constants were replaced by `SchedulerRetentionOptions`** — a subclass of the shared
-  `Sydowwe.Framework/…/retention/RetentionOptions.cs` (section `SchedulerRetention`), so a deployment can lengthen the window or freeze the ledger (`Enabled = false`) without a rebuild. Defaults are
+  `framework/Sydowwe.Framework/…/retention/RetentionOptions.cs` (section `SchedulerRetention`), so a deployment can lengthen the window or freeze the ledger (`Enabled = false`) without a rebuild. Defaults are
   unchanged at 3 years / keep last 20 per job. Two tests added (kill switch, non-default floor).
   <br>**The query itself was deliberately left as plain LINQ.** That follow-up first routed it through a shared generic `DeleteExpiredKeepingLastNAsync` helper; that was reverted the same day. The
   helper absorbed only the trivial half (age + keep-last-N) into expression-tree machinery that left the type system, while the `ReplaysRunId` lineage guard — the part that actually differs per

@@ -1,10 +1,10 @@
 # Result Error Codes → HTTP Status
 
 Shared reference for every module. `ResultErrorType`
-(`Sydowwe.Framework/domain/result/ResultErrorType.cs`) is the error channel of the
+(`framework/Sydowwe.Framework/domain/result/ResultErrorType.cs`) is the error channel of the
 `Result` / `Result<T>` pattern. The **authoritative** enum→HTTP mapping is
 `EndpointHelper.ToStatusCode(ResultErrorType?)`
-(`Sydowwe.Framework/domain/helper/EndpointHelper.cs`) — when in doubt, that switch
+(`framework/Sydowwe.Framework/domain/helper/EndpointHelper.cs`) — when in doubt, that switch
 wins over this doc.
 
 ## How to use it
@@ -67,7 +67,7 @@ helper.)
 ## Where the DB ones come from
 
 `DbUtils.HandleException`
-(`Sydowwe.Framework/infrastructure/persistence/DatabaseExceptionUtils.cs`) is what
+(`framework/Sydowwe.Framework/infrastructure/persistence/DatabaseExceptionUtils.cs`) is what
 the `DbContextHelper` CRUD helpers call to turn a Postgres exception into a typed
 `ResultErrorType`. Notable Postgres `SqlState` → error-type mappings:
 

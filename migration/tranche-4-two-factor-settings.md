@@ -36,7 +36,7 @@ public record AuthenticatorSetupResponse
 Framework already has a superset:
 
 ```csharp
-// Sydowwe.Framework/application/dto/response/user/TwoFactorAuthResponse.cs
+// framework/Sydowwe.Framework/application/dto/response/user/TwoFactorAuthResponse.cs
 public record TwoFactorAuthResponse : IMyResponse
 {
     public required bool TwoFactorEnabled { get; init; }

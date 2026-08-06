@@ -10,15 +10,15 @@ differ from the plan below, are recorded here so they are not re-litigated.
 
 ## What landed
 
-- `Sydowwe.Framework/application/service/auth/UserRegistrationFlow.cs` — **the real deliverable.**
+- `framework/Sydowwe.Framework/application/service/auth/UserRegistrationFlow.cs` — **the real deliverable.**
   Identity insert → `User` role → optional in-transaction step → `IUserDefaultsService` → commit, in
   one transaction, with `UserRegistrationResult.StatusCode` owning the 409/400/500 mapping.
-- `Sydowwe.Framework/application/endpoint/user/command/auth/BaseRegisterUserEndpoint.cs` — captcha,
+- `framework/Sydowwe.Framework/application/endpoint/user/command/auth/BaseRegisterUserEndpoint.cs` — captcha,
   duplicate pre-check, the flow (2FA provisioning passed as the in-transaction step), confirmation
   email after commit. Hook: `AfterUserCreatedAsync`.
-- `Sydowwe.Framework/application/endpoint/user/command/settings/BaseDeleteUserAccountEndpoint.cs` —
+- `framework/Sydowwe.Framework/application/endpoint/user/command/settings/BaseDeleteUserAccountEndpoint.cs` —
   hooks `BeforeDeleteAsync(user)` / `AfterDeleteAsync(userId)`, both no-ops today.
-- `Sydowwe.Framework/application/dto/request/user/BasePasswordRegistrationRequest.cs` —
+- `framework/Sydowwe.Framework/application/dto/request/user/BasePasswordRegistrationRequest.cs` —
   `RegistrationRequest` + `Password` + `RecaptchaToken` + abstract `ToEntity`.
 - `AdhdTimeOrganizer.IntegrationTests/Auth/RegistrationTests.cs` — first coverage this route has had.
 

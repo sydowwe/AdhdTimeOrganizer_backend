@@ -14,7 +14,7 @@ diff is empty, and this tranche's diff is exactly one added route.
 
 ## What exists
 
-`Sydowwe.Framework/application/endpoint/user/command/auth/BaseSetupTwoFactorForLoginEndpoint.cs` is
+`framework/Sydowwe.Framework/application/endpoint/user/command/auth/BaseSetupTwoFactorForLoginEndpoint.cs` is
 complete and abstract:
 
 - Route `POST auth/login/2fa/setup`, `AllowAnonymous()`, `Throttle(10, 60, ThrottleHeaderKey)`

@@ -5,7 +5,9 @@ read its `docs/summary.md`** — it orients you and points to the navigation ind
 `docs/domain-map.md` so you open only the files you need.
 
 Modules with docs today: `AdhdTimeOrganizer.Notifications`, `AdhdTimeOrganizer.Reminders`,
-`AdhdTimeOrganizer.Scheduler`, `Sydowwe.Framework`, `Sydowwe.Framework.Testing`.
+`AdhdTimeOrganizer.Scheduler`, plus `framework/Sydowwe.Framework` and
+`framework/Sydowwe.Framework.Testing` — the last two live inside the `framework/` submodule, so
+their docs are versioned in that repo, not this one.
 
 > `docs/modules.md`, `docs/extendingVanillaForCustomers.md` and `docs/testing.md` at the repo root
 > were copied from the MojaDigitalnaFirma solution and describe modules/types that do **not** exist
@@ -14,13 +16,28 @@ Modules with docs today: `AdhdTimeOrganizer.Notifications`, `AdhdTimeOrganizer.R
 # Solution Layout
 
 - `AdhdTimeOrganizer` — the portal (entities, endpoints, `AppDbContext`, migrations).
-- `Sydowwe.Framework` — the shared framework, used by **the portal and the modules alike**. Base
-  entities, base endpoints, builder extensions, DbContext helpers, seeders, auth services.
+- `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding two projects:
+  - `framework/Sydowwe.Framework` — the shared framework, used by **the portal and the modules
+    alike**. Base entities, base endpoints, builder extensions, DbContext helpers, seeders, auth
+    services.
+  - `framework/Sydowwe.Framework.Testing` — the shared test infrastructure.
 - `AdhdTimeOrganizer.Notifications` / `.Reminders` / `.Scheduler` — opt-in module projects built on
   the `Sydowwe.Framework` primitives.
-- `AdhdTimeOrganizer.IntegrationTests` + `Sydowwe.Framework.Testing`.
+- `AdhdTimeOrganizer.IntegrationTests`.
 - `MojaDigitalnaFirma.Kernel` and `AdhdTimeOrganizer/reference/mojaCore/` are reference/foreign
   code — don't extend them.
+
+⚠ **`framework/` is a submodule, so editing it is a two-repo operation.** A change there is committed
+and pushed in the `Sydowwe.Framework` repo *first*; the parent then records the new commit sha as a
+gitlink, which is its own commit here. `git status` in the parent shows only "modified: framework
+(new commits)" — never the individual files — so a framework edit left uncommitted in the submodule
+is invisible to the parent's diff and will not travel with a parent push.
+
+Clone with `git clone --recurse-submodules`. An existing checkout that predates the split needs
+`git submodule update --init` or the solution will not restore — `framework/` is simply empty.
+
+Namespaces did **not** change with the move: the code is still `Sydowwe.Framework.*`, and only the
+on-disk paths gained the `framework/` prefix.
 
 **Which copy to use: there is one copy.** The portal's parallel set of primitives was deleted in the
 framework reconciliation — reach for `Sydowwe.Framework.*` from portal code too. What still lives in
@@ -69,8 +86,8 @@ run it after touching anything below, because none of these break the build.
 
 # Entity Conventions
 
-The base hierarchy is **Framework-only** — `Sydowwe.Framework/domain/entity/`, with the marker
-interfaces in `Sydowwe.Framework/domain/entityInterface/`. The portal keeps no copies, only two
+The base hierarchy is **Framework-only** — `framework/Sydowwe.Framework/domain/entity/`, with the marker
+interfaces in `framework/Sydowwe.Framework/domain/entityInterface/`. The portal keeps no copies, only two
 closing shims (below). Portal and module entities alike derive from:
 
 - `base/BaseEntity.cs` — `long Id` only (implements `IEntityWithId`), for SQL views /
@@ -127,7 +144,7 @@ Sydowwe.Framework.infrastructure.persistence.configuration.extensions`.
     high-sensitivity strings. Stores a versioned token in a `text` column; randomized, so the column
     **cannot** be filtered/sorted/uniqued — use only for fields read by row id. Key comes from the
     `FIELD_ENCRYPTION_KEY` env var (base64, 32 bytes; in `.env`, never the repo). See
-    `Sydowwe.Framework/infrastructure/persistence/encryption/`. Currently unused by any entity here.
+    `framework/Sydowwe.Framework/infrastructure/persistence/encryption/`. Currently unused by any entity here.
 
   ⚠ **Table-name gotcha in `BaseEntityConfigure`:** it derives the table name with
   `.Replace("Read", "")` on the *whole* class name, not a suffix strip. No entity in this solution
@@ -150,7 +167,7 @@ Sydowwe.Framework.infrastructure.persistence.configuration.extensions`.
 
 # DbContext Helpers
 
-`Sydowwe.Framework/infrastructure/persistence/DbContextExtensions.cs` is the single copy — the
+`framework/Sydowwe.Framework/infrastructure/persistence/DbContextExtensions.cs` is the single copy — the
 portal's own was deleted in the framework reconciliation, so portal and module code both use this
 one. It exposes `DbContextHelper` — Result-returning CRUD helpers that wrap `SaveChanges` with
 `DbUtils.HandleException`:
@@ -164,7 +181,7 @@ one. It exposes `DbContextHelper` — Result-returning CRUD helpers that wrap `S
 
 # Seeding
 
-One copy, in `Sydowwe.Framework/infrastructure/persistence/seeder/` — portal and module seeders both
+One copy, in `framework/Sydowwe.Framework/infrastructure/persistence/seeder/` — portal and module seeders both
 use it. Pick the seeder kind by two questions: **who owns the rows**, and **is this production data
 or a fixture**.
 
@@ -196,7 +213,7 @@ the DI scan registers it and the matching manager picks it up. No manual registr
 Append-only ledgers (`scheduled_job_run`, `reminder_dispatch`, notification history, …) need a
 retention purge or they grow forever — GDPR Art. 5(1)(e) / §13 zák. 18/2018.
 
-Bind the **policy** from `Sydowwe.Framework/infrastructure/persistence/retention/RetentionOptions.cs`
+Bind the **policy** from `framework/Sydowwe.Framework/infrastructure/persistence/retention/RetentionOptions.cs`
 (`Enabled`, `RetentionYears`, `KeepLastN` + `CutoffUtc()` / `CutoffOffset()`): subclass it per module
 with a `SectionName` and `services.Configure<>` it — see
 `AdhdTimeOrganizer.Scheduler/application/job/SchedulerRetentionOptions.cs` and
@@ -230,7 +247,7 @@ migration. Nothing is written today — don't tell yourself CRUD is being captur
 Turning it on needs all three: `options.AddInterceptors(…AuditSaveChangesInterceptor…)` in the
 `AddDbContext` callback, the audit entity configurations applied to the model, and a migration.
 `audit_log` is partitioned by `Date` (yearly RANGE, composite PK `(Id, Date)`) — governed by
-`Sydowwe.Framework/infrastructure/persistence/configuration/AuditLogEntityConfiguration.cs`
+`framework/Sydowwe.Framework/infrastructure/persistence/configuration/AuditLogEntityConfiguration.cs`
 (`FirstYear`, `YearCount`); `business_audit_log` is not partitioned.
 
 Opt-outs, for when you do write auditable entities: `[NoAudit]` on a class skips the entity
@@ -239,7 +256,7 @@ snapshots and `ChangedProperties` (use for sensitive PII fields).
 
 # Logging (no PII at the call site)
 
-`Sydowwe.Framework/domain/helper/PiiRedactor.cs` exists but is **not** wired into this app's Serilog
+`framework/Sydowwe.Framework/domain/helper/PiiRedactor.cs` exists but is **not** wired into this app's Serilog
 pipeline (`AdhdTimeOrganizer/config/SerilogConfig.cs` does no redaction). So nothing is scrubbed
 automatically — and even when wired, the redactor only matches **structured** PII it can recognize
 by shape: emails, IBANs, Slovak birth numbers. Free-text PII — names, addresses, phone numbers —
@@ -254,7 +271,7 @@ Logging entity *type* names (`typeof(T).Name`), file names, and ids is fine.
 # FastEndpoints Base Classes
 
 Before writing a custom endpoint, check whether one of the base classes in
-`Sydowwe.Framework/application/endpoint/base/` already covers the pattern. Use them when they fit;
+`framework/Sydowwe.Framework/application/endpoint/base/` already covers the pattern. Use them when they fit;
 write a plain `Endpoint<TReq, TRes>` only when they don't.
 
 **There is one copy, and portal endpoints use it too.** The portal's parallel set was deleted in the
@@ -343,7 +360,7 @@ writing a standalone auth endpoint. Those generic over `TUser` are closed on the
 | `BaseExtensionRefreshTokenEndpoint` (non-generic) | `ExtensionRefreshTokenEndpoint` — empty |
 
 Every password login transport shares one decision — `PasswordSignInFlow.RunAsync`
-(`Sydowwe.Framework/application/service/auth/`). Call it; never re-implement the branch.
+(`framework/Sydowwe.Framework/application/service/auth/`). Call it; never re-implement the branch.
 
 Its sign-up counterpart is `UserRegistrationFlow.RunAsync` (same folder): Identity insert → `User`
 role → optional in-transaction step → `IUserDefaultsService.CreateDefaultsAsync` → commit, with
@@ -360,8 +377,8 @@ migration and the SPA was updated to match. It is a `Configure`-less wrapper now
 POST verb.
 
 The four session endpoints touch no user *object*, only `User.GetId()`, so they are non-generic. Their
-`UserSessionResponse` DTO (`Sydowwe.Framework/application/dto/response/user/`) and the
-`UserAgentParser` they use (`Sydowwe.Framework/domain/helper/`) live in Framework too — the portal
+`UserSessionResponse` DTO (`framework/Sydowwe.Framework/application/dto/response/user/`) and the
+`UserAgentParser` they use (`framework/Sydowwe.Framework/domain/helper/`) live in Framework too — the portal
 copies are gone. The two revoke endpoints sit under Framework's `command/auth/` even though their
 portal subclasses live in `command/settings/`, matching how `BaseChangePasswordEndpoint` already
 splits.
@@ -388,13 +405,13 @@ this app is a plain `User`, so an admin-only default made the endpoints unreacha
 `GetAdminRole()` / `GetAdminOrHigherRoles()` on genuine admin surface.
 Role names live in one place — `UserRoleEnum` (User · Admin · Root) with the cumulative groups
 `UserRoles.UserOrHigher` / `UserRoles.AdminOrHigher` in
-`Sydowwe.Framework/domain/helper/EndpointExtensions.cs`. The bases default to
+`framework/Sydowwe.Framework/domain/helper/EndpointExtensions.cs`. The bases default to
 `IEndpoint.GetUserRole()` (`= UserRoles.UserOrHigher`); `IEndpoint.GetAdminRole()` is the
 admin-or-higher counterpart. `AdhdTimeOrganizer/application/helper/PortalEndpointHelper.cs`
 re-exports the same two arrays as `GetUserOrHigherRoles()` / `GetAdminOrHigherRoles()` and adds
 `HttpContext.GetVerifiedUser()` closed over the portal `User` — it is a convenience wrapper, not a
 second source of truth. It is named `Portal…` so it no longer collides with Framework's own
-`EndpointHelper` (`Sydowwe.Framework/domain/helper/`, the result-error → HTTP status map), which is a
+`EndpointHelper` (`framework/Sydowwe.Framework/domain/helper/`, the result-error → HTTP status map), which is a
 completely different helper. Never hard-code role strings.
 
 **User scoping — the role gate is not what keeps other users' rows out, and neither are the base
@@ -417,7 +434,7 @@ auto-scoping `FilteredByUser => true` override went with its deleted copies. Wha
 - The other reads (`GetAll`, `GetById`, `GetByField`, `GetAllByParent`, `GetSelectOptions`) don't
   scope either — use their `Filter()` / `AuthorizeAsync()` hooks.
 - `FilteredByUser(userId)` still exists as an explicit `IQueryable` extension
-  (`Sydowwe.Framework/infrastructure/persistence/QueryableEntityExtensions.cs`) and is called by hand
+  (`framework/Sydowwe.Framework/infrastructure/persistence/QueryableEntityExtensions.cs`) and is called by hand
   in ~8 portal endpoints. Nothing calls it for you.
 
 # Auth Plumbing Outside the Endpoints
@@ -425,12 +442,12 @@ auto-scoping `FilteredByUser => true` override went with its deleted copies. Wha
 Everything below moved to `Sydowwe.Framework` alongside the endpoint migration. Same rule as the
 endpoints: the *mechanism* is Framework's, anything naming a product decision stays in the portal.
 
-**Token claim names — `Sydowwe.Framework/domain/helper/AuthClaims.cs`.** `AuthMethod` (`auth_method`),
+**Token claim names — `framework/Sydowwe.Framework/domain/helper/AuthClaims.cs`.** `AuthMethod` (`auth_method`),
 `ClientType` (`client_type`), `ExtensionClientType` (`"Extension"`). `JwtService` writes them and the
 authorization handlers/policies read them; both sides reference these constants. Never re-type the
 literals — a typo does not fail the build, it silently changes who is allowed in.
 
-**Extension-client gate — `Sydowwe.Framework/infrastructure/security/ExtensionClientAuthorization.cs`.**
+**Extension-client gate — `framework/Sydowwe.Framework/infrastructure/security/ExtensionClientAuthorization.cs`.**
 `ExtensionClientRequirement`, `ExtensionClientAuthorizationHandler`, `[AllowExtensionClients]`, and the
 policy names `DenyExtensionClients` / `WebOnly` / `ExtensionOnly` on `ExtensionClientPolicies`. Deny by
 default: the endpoint configurator in `Program.cs` attaches `DenyExtensionClients` to every endpoint
@@ -449,7 +466,7 @@ never falls back, which is why the deny is attached per endpoint. (The old file 
   `"ActivityTracking"`. Renaming one does not rename the other. The `AutoTagOverride("ActivityTracking")`
   in `endpointGroups/` is a third, unrelated use — a Swagger tag. Leave it a literal.
 
-**Refresh-token cleanup — `Sydowwe.Framework/infrastructure/extService/user/auth/RefreshTokenCleanupService.cs`.**
+**Refresh-token cleanup — `framework/Sydowwe.Framework/infrastructure/extService/user/auth/RefreshTokenCleanupService.cs`.**
 `BackgroundService` next to the `RefreshTokenService` it drives; hosts register it with
 `AddHostedService<RefreshTokenCleanupService>()`. First sweep runs at **startup**, then every `Interval`
 (`protected virtual`, 24h) — a host restarting more often than the interval would otherwise never clean
@@ -457,7 +474,7 @@ up at all. Logs counts only, never a token owner.
 
 # Email Templates
 
-`Sydowwe.Framework/infrastructure/templates/email/` — `ConfirmEmail.html`, `ResetPassword.html`,
+`framework/Sydowwe.Framework/infrastructure/templates/email/` — `ConfirmEmail.html`, `ResetPassword.html`,
 `ResetPasswordCode.html`, consumed by `UserEmailSenderService`. They are **`<EmbeddedResource>`** in
 `Sydowwe.Framework.csproj` (`infrastructure\templates\email\*.html`), read via
 `Assembly.GetManifestResourceStream`, so there is no copy-to-output step and no working-directory
@@ -480,14 +497,14 @@ account was already committed. Nothing in the test suite covers mail rendering, 
   (`AdhdTimeOrganizer/application/dto/dto/TimeDto.cs`) instead of `TimeOnly`. Call `.ToTimeOnly()`
   when assigning to an entity. Validated by `application/validator/TimeDtoValidator.cs`.
 - **Module** (`Sydowwe.Framework`-based) DTOs use `MyIntTime`
-  (`Sydowwe.Framework/domain/helper/MyIntTime.cs`) — `Hours` / `Minutes` / `Seconds`, serialized as
+  (`framework/Sydowwe.Framework/domain/helper/MyIntTime.cs`) — `Hours` / `Minutes` / `Seconds`, serialized as
   those three fields, persisted as an `int` count of seconds via `MyIntTimeConverter`
-  (`Sydowwe.Framework/infrastructure/persistence/converter/`). Use `new MyIntTime(seconds)` /
+  (`framework/Sydowwe.Framework/infrastructure/persistence/converter/`). Use `new MyIntTime(seconds)` /
   `.GetInSeconds()` to convert. Don't introduce it into portal DTOs.
 
 # Testing
 
-Read `Sydowwe.Framework.Testing/docs/testing.md` for the full guide (**not** the root
+Read `framework/Sydowwe.Framework.Testing/docs/testing.md` for the full guide (**not** the root
 `docs/testing.md`, which is a foreign copy). Quick reference:
 
 - Tests run the real portal `Program` against a Postgres container (`Testcontainers.PostgreSql`),
@@ -510,7 +527,7 @@ Read `Sydowwe.Framework.Testing/docs/testing.md` for the full guide (**not** the
   test users, `CreateFactory(roles, userId)` — caller disposes. `CreateDbContext()` for
   seeding/asserting outside HTTP; override `SeedAsync(db)`.
 - For each FastEndpoints base in `endpoint/base/` there is a matching abstract test base in
-  `Sydowwe.Framework.Testing/baseTests/` (`BaseGetByIdEndpointTests`, `BaseGridEndpointTests`,
+  `framework/Sydowwe.Framework.Testing/baseTests/` (`BaseGetByIdEndpointTests`, `BaseGridEndpointTests`,
   `BaseCreateEndpointTests`, `BaseUpdateEndpointTests`, `BaseDeleteEndpointTests`,
   `BasePatchEndpointTests`, `BaseGetAllEndpointTests`, `BaseGetSelectOptionsEndpointTests`,
   `BaseFilterEndpointTests`, `BaseSortEndpointTests`, `BaseFilterSortEndpointTests`,

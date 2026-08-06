@@ -90,7 +90,7 @@ Three passes, ordered by the `Restrict` FKs — this ordering is the whole diffi
    snapshot). Opt-out via `PurgeTerminalDefinitions = false`.
 
 Passes 1–2 are each one `ExecuteDeleteAsync` in plain LINQ: age gate, keep-last-N-per-definition floor, FK guards. What *is* shared with Scheduler is the policy shape —
-`Sydowwe.Framework/…/retention/RetentionOptions.cs`. A shared generic delete helper was built and then reverted the same day: it absorbed only the trivial half into expression-tree machinery that left
+`framework/Sydowwe.Framework/…/retention/RetentionOptions.cs`. A shared generic delete helper was built and then reverted the same day: it absorbed only the trivial half into expression-tree machinery that left
 the type system, while the FK guards (the hard, per-ledger part) stayed in the callers anyway. Share the policy, not the query. **Notifications deliberately keeps its own policy** (90d read / 365d
 all / 180d stale subscriptions, daily): its windows are in days because notification rows carry payload PII, and folding it into the generic 3-year keep-last-N shape would have *loosened* a live GDPR
 control. Shared shape ≠ shared values.

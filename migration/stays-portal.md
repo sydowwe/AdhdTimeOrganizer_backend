@@ -43,7 +43,7 @@ and the same work lands with no cost to solutions that skip it.
 
 **Update 2026-07-31 (tranche 6):** the endpoint still stays portal — the supply-chain argument above
 is untouched — but its `Register(...)` no longer duplicates the create-user sequence. It calls
-`UserRegistrationFlow.RunAsync` (`Sydowwe.Framework/application/service/auth/`), which is the shared
+`UserRegistrationFlow.RunAsync` (`framework/Sydowwe.Framework/application/service/auth/`), which is the shared
 piece the `CreateNewUser` seam was going to buy, obtained without moving Google's SDK into Framework.
 Its one behavioural difference is kept locally: a duplicate address reports "Could not sign in with
 Google." rather than "User already exists", so the route does not confirm addresses to a prober.

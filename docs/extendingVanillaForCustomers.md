@@ -198,7 +198,7 @@ If a customer needs entirely new behavior with no Core counterpart, write a norm
 
 ### The marker: `IDecoratorService`
 
-`Sydowwe.Framework/config/dependencyInjection/IDecoratorService.cs` is an empty marker. Implementing it
+`framework/Sydowwe.Framework/config/dependencyInjection/IDecoratorService.cs` is an empty marker. Implementing it
 is the signal that a class **wraps an existing Core service**. It changes how the class is registered:
 
 - Implements a lifetime marker (`IScopedService` / `ISingletonService` / `ITransientService`) **but

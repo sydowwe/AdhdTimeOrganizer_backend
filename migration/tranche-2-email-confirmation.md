@@ -22,7 +22,7 @@ plumbing every solution on the framework needs.
 
 `ChangeEmailEndpoint` calls the portal's `HttpContext.GetVerifiedUser()`. Framework already has the
 generic original — `VerifiedUserAccessor.GetVerifiedUser<TUser>()` in
-`Sydowwe.Framework/application/preprocessor/VerifyUserPreProcessor.cs:83`. Straight swap; the portal
+`framework/Sydowwe.Framework/application/preprocessor/VerifyUserPreProcessor.cs:83`. Straight swap; the portal
 helper stays as the non-generic convenience wrapper it is.
 
 ## What moves alongside

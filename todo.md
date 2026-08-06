@@ -1,4 +1,4 @@
-G. Stale doc/comment cross-references. 13 spots in docs/*.md (plus one code comment in Sydowwe.Framework/application/dto/request/interface/ICreateRequest.cs:11) point at MojaDigitalnaFirma.AdminPortal* /
+G. Stale doc/comment cross-references. 13 spots in docs/*.md (plus one code comment in framework/Sydowwe.Framework/application/dto/request/interface/ICreateRequest.cs:11) point at MojaDigitalnaFirma.AdminPortal* /
 MojaDigitalnaFirma.HBCleaning.Tests paths that don't exist here. I left these deliberately — rewriting them to AdhdTimeOrganizer.* would invent paths that also don't exist. They should be fixed once you know where the
 equivalents actually live (after B/E), or the review docs deleted as other-repo history.
 

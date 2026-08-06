@@ -13,7 +13,7 @@ Deps are all Framework's: `UserManager<TUser>`, `IUserEmailSenderService<TUser>`
 `IGoogleRecaptchaService`, `IRefreshTokenService`, `TrustedIpMiddleware`.
 
 **`ResetPasswordEndpoint` is a pure lift** — its request type `ResetPasswordRequest` is *already*
-Framework's (`Sydowwe.Framework/application/dto/request/user/ResetPasswordRequest.cs`, bound in the
+Framework's (`framework/Sydowwe.Framework/application/dto/request/user/ResetPasswordRequest.cs`, bound in the
 portal via `using Sydowwe.Framework.application.dto.request.user`). Nothing to move but the endpoint.
 
 ## The one seam

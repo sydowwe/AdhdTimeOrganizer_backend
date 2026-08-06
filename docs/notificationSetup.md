@@ -79,7 +79,7 @@ Done in code — no action needed:
   the browser sends it on the WebSocket handshake, so there is no `?access_token=` / token-in-JS
   step. SPA and API are deployed same-site (same registrable domain — `app.`/`api.` subdomains are
   same-site, and the port difference doesn't matter to SameSite), so the cookie's `SameSite=Strict`
-  carries it to the handshake (set centrally in `Sydowwe.Framework/domain/helper/AuthCookies.cs`);
+  carries it to the handshake (set centrally in `framework/Sydowwe.Framework/domain/helper/AuthCookies.cs`);
   the host's `CookiePolicyOptions.MinimumSameSitePolicy` is `Unspecified` so it doesn't rewrite it.
   (If the SPA is ever served from a *different registrable domain* than the API, that's genuinely
   cross-site — switch the cookie to `SameSite=None; Secure` and revisit CSRF.)

@@ -92,7 +92,7 @@ Recommended: 1 now + 2 as the convention for future types; 3 only if the owner w
 >
 > **Reviewed again 2026-07-20 (reminders follow-up 01, "centralize ledger retention") — kept as-is.**
 > That task centralized the retention *policy shape* across Scheduler + Reminders
-> (`Sydowwe.Framework/…/retention/RetentionOptions.cs`) and proposed converting this handler to the
+> (`framework/Sydowwe.Framework/…/retention/RetentionOptions.cs`) and proposed converting this handler to the
 > same "3 years, keep last N per `UserId`" shape. **Deliberately not done.** These windows are in *days*
 > precisely because notification rows carry payload PII, so adopting the generic 3-year keep-last-N shape
 > would have loosened a live GDPR control from 90 days to 3 years and overridden the 2026-07-06 owner

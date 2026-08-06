@@ -504,7 +504,7 @@ rows still referenced:
 
 Passes 1–2 are each one `ExecuteDeleteAsync` written as plain LINQ: age gate → keep-last-N floor (`Count(newer => …) >= keepLastN`) → that pass's FK guards. There is deliberately **no shared delete
 helper** — what's shared with the Scheduler run-log purge is the *policy shape*
-(`Sydowwe.Framework/…/retention/RetentionOptions.cs`), not the query, because the FK guards are the part that differs per ledger and can't be abstracted. `ExecuteDeleteAsync` is correct here — both
+(`framework/Sydowwe.Framework/…/retention/RetentionOptions.cs`), not the query, because the FK guards are the part that differs per ledger and can't be abstracted. `ExecuteDeleteAsync` is correct here — both
 ledgers are
 `[NoAudit]`, and a retention purge must not write audit rows describing what it just erased.
 
@@ -561,7 +561,7 @@ Reminder data is now visible to both GDPR surfaces, and **neither addition lives
 
 - Ledger retention: `Core.Reminders/application/job/PurgeExpiredReminderLedgersJobHandler.cs` +
   `ReminderRetentionOptions.cs`; registered via `RemindersScheduledJobsRegistrar.RetentionPurgeRegistration`; shared policy shape in
-  `Sydowwe.Framework/infrastructure/persistence/retention/RetentionOptions.cs`. Tests:
+  `framework/Sydowwe.Framework/infrastructure/persistence/retention/RetentionOptions.cs`. Tests:
   `…/integration/reminders/PurgeExpiredReminderLedgersJobHandlerTests.cs`.
 - Build plan: `prompts/reminders/` (orchestration in `00-orchestration.md`).
 - Dashboard reads/exports: `Core.Reminders/application/endpoint/dashboard/` (`GetUpcomingRemindersEndpoint`,

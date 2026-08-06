@@ -22,7 +22,7 @@ the 2FA endpoints, `change-password`) are rate-limited with FastEndpoints `Throt
 trustworthy if a proxy you control sets it — otherwise a caller just sends a fresh value per
 request and the throttle never accumulates (brute-force protection becomes useless).
 
-The app hardens this in two steps (`Sydowwe.Framework/config/ForwardedHeadersExtensions.cs`):
+The app hardens this in two steps (`framework/Sydowwe.Framework/config/ForwardedHeadersExtensions.cs`):
 
 1. `AddTrustedForwardedHeaders()` — configures `UseForwardedHeaders` to resolve the client IP
    into `HttpContext.Connection.RemoteIpAddress`, trusting **only** the proxy networks you
@@ -80,7 +80,7 @@ Set via the container environment (or a `.env` loaded by `DotNetEnv` in developm
 ### `FIELD_ENCRYPTION_KEY` (GDPR Art. 32 column encryption)
 
 `Employee.BirthNumber` and `Employee.Iban` are encrypted at rest via an EF Core value converter
-(`Sydowwe.Framework/infrastructure/persistence/encryption/`). The key is **required** — the app throws on
+(`framework/Sydowwe.Framework/infrastructure/persistence/encryption/`). The key is **required** — the app throws on
 startup without it.
 
 - Generate a fresh key per deployment: `openssl rand -base64 32`. **Each database has its own key.**
