@@ -1,6 +1,6 @@
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Quartz;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Scheduler.infrastructure;
 

@@ -2,7 +2,7 @@ namespace AdhdTimeOrganizer.Reminders.domain.@enum;
 
 /// <summary>
 /// The lifecycle state of a <c>ReminderDefinition</c>. Internal stored state — NOT part of the
-/// <c>Kernel.reminders</c> contract. The scanner (phase 03) only acts on <see cref="Active"/> rows;
+/// <c>Sydowwe.Framework.Contracts.reminders</c> contract. The scanner (phase 03) only acts on <see cref="Active"/> rows;
 /// <see cref="Paused"/>/<see cref="Cancelled"/> are control states set by the registry (phase 02),
 /// and <see cref="Completed"/> is set when a one-shot's offsets are all dispatched or a recurring
 /// reminder passes its end.

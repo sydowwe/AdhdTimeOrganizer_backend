@@ -1,7 +1,7 @@
 using FastEndpoints;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.notification.payload;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Notifications.application.endpoint.notification;

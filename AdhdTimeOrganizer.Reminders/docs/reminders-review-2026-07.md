@@ -1,6 +1,6 @@
 # Reminders — Legal & Product Audit (2026-07)
 
-> Scope: `AdhdTimeOrganizer.Reminders` + its `Kernel.reminders` contract. This is a **delta
+> Scope: `AdhdTimeOrganizer.Reminders` + its `Sydowwe.Framework.Contracts.reminders` contract. This is a **delta
 > audit** against the phase-01→05b build (see `docs/summary.md`) and the sibling infra audits
 > ([Scheduler](../../AdhdTimeOrganizer.Scheduler/docs/scheduler-review-2026-07.md),
 > [Notifications](../../AdhdTimeOrganizer.Notifications/docs/notifications-review-2026-07.md)).
@@ -35,11 +35,11 @@ Recorded from the owner review of Part 4. Nothing below is built in this audit p
   **Notifications was left on its own day-based policy**, likewise for the reason given there.
 - **D-Q3 / D-Q4 / D-Q5 (→ C1 / L2-doc / cron-TZ). Handled in the Scheduler module.** The DST/timezone fix (adding an optional timezone to the schedule/cron surface — Scheduler D3/B4), the
   `[AuditIgnore]` + "no free-text PII in payloads" contract-doc hardening (Scheduler D4), and the ability to **pass a timezone** through the schedule spec are all being solved in
-  `AdhdTimeOrganizer.Scheduler/docs/scheduler-review-2026-07.md`. Reminders inherits the cron fix automatically — it evaluates `RecurringCron` through `Kernel.scheduling.ICronEvaluator`, whose only
+  `AdhdTimeOrganizer.Scheduler/docs/scheduler-review-2026-07.md`. Reminders inherits the cron fix automatically — it evaluates `RecurringCron` through `Sydowwe.Framework.Contracts.scheduling.ICronEvaluator`, whose only
   implementation is `Core.Scheduler`'s `CronEvaluator`; when the Scheduler work threads a timezone into that surface, Reminders' `ReminderOccurrenceCalculator.NextCron` picks it up. **No
   Reminders-local action** — C1 (Part 3) and the L2 payload-doc hardening are closed here as
   "deferred to Scheduler." The L2 *erasure hook* (nulling recipient ids for an anonymized user) is a separate Reminders question — and it turned out **not** to fold into L1/B2's purge (age ≠ on
-  demand). It shipped 2026-07-20 as the Kernel `ISubjectDataEraser` fan-out; see L2.
+  demand). It shipped 2026-07-20 as the `Sydowwe.Framework.Contracts` `ISubjectDataEraser` fan-out; see L2.
 - **D-Q6 (→ L3). RoPA + DSAR fold-in — owned by the GDPR module.** Add one `ProcessingActivity` (RoPA)
   row for scheduled-reminder dispatch and include a user's reminder recipiency in the DSAR export. Self-contained build prompt: `prompts/reminders-ropa-dsar.md`. Sequenced to land once the first real
   producer (B1) is live so there is actual data to export.
@@ -119,14 +119,14 @@ that `Payload` must carry **ids only, never free-text PII** (same rule as the lo
 `IReminderErasure` hook the `EmployeeErasureService` calls to null out recipient rows / snapshots for an anonymized user id. Decide with the owner whether pseudonymous recipient ids need erasure at
 all.
 
-**Done (2026-07-20, follow-up 03).** Fix direction (b), as a Kernel fan-out rather than a Reminders-specific hook. ⚠️ Its "(or have L1's purge double as the erasure path)" half was **wrong** and is
+**Done (2026-07-20, follow-up 03).** Fix direction (b), as a Contracts fan-out rather than a Reminders-specific hook. ⚠️ Its "(or have L1's purge double as the erasure path)" half was **wrong** and is
 corrected in B2 below: retention deletes by *age*, erasure by *subject, on demand* — different axis, different mechanism. Fix direction (a) shipped separately — see the block below.
 
 **Done (2026-07-21, `prompts/payload-pii-contract.md`).** Fix direction (a), and it went further than
 "harden the contract doc": the rule is now **type-enforced, not documented**. `ReminderRegistration.Payload`
-is `IReminderPayload` and `RenderedReminder.Payload` is `INotificationPayload` (both Kernel markers), so an owner physically cannot register an anonymous object carrying a name. The rule itself is
+is `IReminderPayload` and `RenderedReminder.Payload` is `INotificationPayload` (both `Sydowwe.Framework.Contracts` markers), so an owner physically cannot register an anonymous object carrying a name. The rule itself is
 stated **once**, in
-`Kernel/notification/payload/INotificationPayload.cs`, and `ReminderDefinition.PayloadJson`'s XML doc now points at it instead of conceding it "can carry free-text third-party PII" — that sentence is
+`Sydowwe.Framework.Contracts/notification/payload/INotificationPayload.cs`, and `ReminderDefinition.PayloadJson`'s XML doc now points at it instead of conceding it "can carry free-text third-party PII" — that sentence is
 gone, because it is no longer true. `PayloadPiiContractGuardTests` (HBCleaning.Tests) reflects over every type implementing either marker across all modules and fails on a person-data property name,
 SK + EN.
 
@@ -137,7 +137,7 @@ SK + EN.
 The `PayloadJson` residual noted in this L2's heading is therefore narrower than it was: nothing new can be written into it, but rows persisted before 2026-07-21 were never scrubbed, and erasure still
 does not reach into payload documents (deliberately — see the enricher's design note).
 
-- **Contract:** `MojaDigitalnaFirma.Kernel/gdpr/ISubjectDataEraser.cs` (+ `SubjectErasureRequest`, carrying **both** `EmployeeId` and `UserId` — this module keys everything by `UserId`, the Employee
+- **Contract:** `Sydowwe.Framework.Contracts/gdpr/ISubjectDataEraser.cs` (+ `SubjectErasureRequest`, carrying **both** `EmployeeId` and `UserId` — this module keys everything by `UserId`, the Employee
   module by `EmployeeId`, and `Employee.UserId` bridges them once at the call site).
   `EmployeeErasureService` resolves `IEnumerable<ISubjectDataEraser>` and fans out, exactly as
   `EmployeeDataExportService` composes `IEmployeePersonalDataProvider` on the read side — **no new cross-module project reference**, and a host shipping neither module gets an empty enumerable.
@@ -194,7 +194,7 @@ DSAR-bundling decision (its own Q).
 - **Coupling choice — the provider lives in the composition project `AdhdTimeOrganizer`**
   (`infrastructure/service/`), not in `Core.Reminders`. `IEmployeePersonalDataProvider` is an
   `EmployeeModule.Contracts` type, and bridging `employeeId → UserId` needs the `Employee` entity itself — a full domain reference. `AdhdTimeOrganizer` already composes both, so **`Core.Reminders`
-  keeps its Kernel + Framework-only reference set** and `EmployeeModule` still never references Reminders. Guard tests re-run green.
+  keeps its `Sydowwe.Framework.Contracts` + Framework-only reference set** and `EmployeeModule` still never references Reminders. Guard tests re-run green.
 - **Quiet hours are out of scope here** — the window moved to Notifications (`NotificationQuietHours`)
   in notifications follow-up 05 and belongs to that module's own (still-parked) L3.
 - Tests: `DevProcessingActivitySeederTests`, `ReminderPersonalDataProviderTests`,
@@ -273,7 +273,7 @@ entry that trims the two ledgers and stale definitions on a cadence. **Fit:** th
 and doubles as the L2 erasure path. **Risk:** low; `Restrict` FKs mean purge order matters (dispatch before definition). **Effort:** ~1 phase.
 
 **Shipped** as described — see L1's Done block for the three-pass FK ordering. One scope correction: it does **not** double as the L2 erasure path. Age-based purging cannot reach a specific user's
-rows on demand, so L2 needed its own Kernel erasure contract (a TODO pointed at it from the handler's header). Built 2026-07-20 from `prompts/reminders-followups/03-erasure-hook.md` — see L2's Done
+rows on demand, so L2 needed its own `Sydowwe.Framework.Contracts` erasure contract (a TODO pointed at it from the handler's header). Built 2026-07-20 from `prompts/reminders-followups/03-erasure-hook.md` — see L2's Done
 block.
 
 ### B3 — Failure-alerting / dead-letter seam (shared with Scheduler)

@@ -3,7 +3,7 @@ namespace AdhdTimeOrganizer.Reminders.domain.@enum;
 /// <summary>
 /// Why a <c>ReminderDispatch</c> with outcome <see cref="DispatchOutcome.Skipped"/> was not sent.
 /// Populated by the scanner / dispatch policy (phases 03–04). Internal stored state, NOT part of the
-/// Kernel contract.
+/// <c>Sydowwe.Framework.Contracts</c> surface.
 /// </summary>
 public enum SkipReason
 {

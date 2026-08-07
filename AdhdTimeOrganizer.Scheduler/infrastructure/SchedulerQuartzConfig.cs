@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.Scheduler.application.job;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Quartz;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Scheduler.infrastructure;
 
@@ -9,7 +9,7 @@ namespace AdhdTimeOrganizer.Scheduler.infrastructure;
 /// keeps the one <c>services.AddQuartz(...)</c> call and invokes <see cref="AddSchedulerQuartzDefaults"/>
 /// inside it; the existing per-module <c>q.AddJob&lt;DomainJob&gt;()</c> + trigger lines stay in the host
 /// (they reference domain modules Scheduler must not <c>using</c>) until phase 05 migrates them to
-/// <see cref="MojaDigitalnaFirma.Kernel.scheduling.IScheduler"/> registration.
+/// <see cref="Sydowwe.Framework.Contracts.scheduling.IScheduler"/> registration.
 /// </summary>
 public static class SchedulerQuartzConfig
 {

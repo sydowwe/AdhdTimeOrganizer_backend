@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
 using FastEndpoints;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Scheduler.application.endpoint.scheduledJob.command;

@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Scheduler.domain.@enum;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.entity.@base;
 
@@ -59,7 +59,7 @@ public class ScheduledJobRun : BaseTableEntity
     /// <summary>
     /// The payload this run executed with (jsonb), so phase 04b's replay is faithful. A snapshot of
     /// <see cref="ScheduledJob.PayloadJson"/> and bound by the same payload PII contract — see that property,
-    /// and <see cref="Kernel.notification.payload.INotificationPayload"/> for the rule itself. Surfaced by the
+    /// and <see cref="Sydowwe.Framework.Contracts.notification.payload.INotificationPayload"/> for the rule itself. Surfaced by the
     /// run-detail endpoint, so anything written here is visible to an operator.
     /// </summary>
     public string? PayloadSnapshotJson { get; set; }

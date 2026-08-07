@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.application.endpoint.@base;
 using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.config.dependencyInjection;
+using AdhdTimeOrganizer.config.swagger;
 using AdhdTimeOrganizer.infrastructure.extService;
 using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -150,7 +151,27 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     });
     services.AddSingleton<IGlobalPostProcessor, ErrorLoggingPostProcessor>();
     if (isDevelopment)
-        services.SwaggerDocument();
+        services.SwaggerDocument(o =>
+        {
+            o.DocumentSettings = s =>
+            {
+                // ICreateRequest<TEntity>.ToEntity pulls the raw EF navigation graph into the schema — several
+                // of those graphs are cyclic and overflow the stack inside FastEndpoints' validation schema
+                // processor. See RemoveToEntitySchemaProcessor for the full explanation.
+                s.SchemaSettings.SchemaProcessors.Add(new RemoveToEntitySchemaProcessor());
+
+                // TEMP DIAGNOSTIC: FastEndpoints' own ValidationSchemaProcessor (added internally by
+                // SwaggerDocument()) still overflows the stack even with ToEntity stripped, so the recursion
+                // is inside its FluentValidation rule-tree walk, not the EF nav graph. Removing it here to
+                // confirm the crash goes away — if it does, the bug is upstream in FastEndpoints.Swagger 8.1.0
+                // and needs a real decision (upgrade/report/keep disabled), not a silent workaround.
+                var toRemove = s.SchemaSettings.SchemaProcessors
+                    .Where(p => p.GetType().Name == "ValidationSchemaProcessor")
+                    .ToList();
+                foreach (var p in toRemove)
+                    s.SchemaSettings.SchemaProcessors.Remove(p);
+            };
+        });
 
     services.AddIdentityServices();
 
@@ -171,6 +192,12 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             .WithIdentity("routine-reset-trigger", "routine")
             .WithCronSchedule("0 0 2 * * ?")); // 2:00 AM daily
 
+        // TEMP: verify manually after applying the pending migrations, remove after checking logs.
+        q.AddTrigger(opts => opts
+            .ForJob("routine-reset", "routine")
+            .WithIdentity("routine-reset-verify-trigger", "routine")
+            .StartNow());
+
         q.AddJob<RoutinePeriodNudgeJob>(opts =>
             opts.WithIdentity("routine-nudge", "routine"));
 
@@ -183,7 +210,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     services.AddQuartzHostedService(SchedulerQuartzConfig.ConfigureSchedulerHostedService);
 
     // Owner-side boot reconciliation: each module pushes its recurring-job registrations to the Scheduler
-    // via Kernel's IScheduler. Idempotent upserts by JobKey, and required on every boot because the
+    // via Sydowwe.Framework.Contracts's IScheduler. Idempotent upserts by JobKey, and required on every boot because the
     // Quartz RAM job store loses all triggers on restart.
     services.AddHostedService<NotificationsScheduledJobsRegistrar>();
     services.AddHostedService<RemindersScheduledJobsRegistrar>();
@@ -434,7 +461,7 @@ static void LoadSettingsFromConfiguration(IConfiguration configuration, IService
     );
 
     // 2FA policy. Absent config keeps the defaults: opt-in per user, and a Google sign-in counts as
-    // the second factor. See Sydowwe.Framework/config/TwoFactorOptions.cs.
+    // the second factor. See framework/Sydowwe.Framework/config/TwoFactorOptions.cs.
     services.Configure<TwoFactorOptions>(
         configuration.GetSection(TwoFactorOptions.SectionName)
     );

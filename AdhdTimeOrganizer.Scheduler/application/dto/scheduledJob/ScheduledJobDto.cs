@@ -1,8 +1,8 @@
 using AdhdTimeOrganizer.Scheduler.domain.entity;
 using AdhdTimeOrganizer.Scheduler.domain.@enum;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Sydowwe.Framework.application.dto.response;
 using Sydowwe.Framework.application.dto.response.@base;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Scheduler.application.dto.scheduledJob;
 

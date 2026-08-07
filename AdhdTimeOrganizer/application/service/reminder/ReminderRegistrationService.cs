@@ -4,10 +4,10 @@ using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.notification.payload;
-using MojaDigitalnaFirma.Kernel.reminders;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
+using Sydowwe.Framework.Contracts.reminders;
 
 namespace AdhdTimeOrganizer.application.service.reminder;
 
@@ -153,7 +153,7 @@ public class ReminderRegistrationService(
     // --- schedule mapping -------------------------------------------------------------------------
 
     /// <summary>
-    /// One-shot reminders map straight onto the Kernel's lead-offset schedule. Recurring ones cannot: the
+    /// One-shot reminders map straight onto the <c>Sydowwe.Framework.Contracts</c> lead-offset schedule. Recurring ones cannot: the
     /// contract's <see cref="ReminderSchedule.RecurringInterval"/> has no lead-offset concept at all, so the
     /// single offset a recurring reminder is allowed to carry is folded into the anchor instead. That is why
     /// <c>ReminderValidator</c> caps a recurring reminder at one offset — with two there would be no way to

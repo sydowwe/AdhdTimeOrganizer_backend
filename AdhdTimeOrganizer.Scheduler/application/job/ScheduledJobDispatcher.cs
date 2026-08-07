@@ -5,9 +5,9 @@ using AdhdTimeOrganizer.Scheduler.infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Npgsql;
 using Quartz;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Scheduler.application.job;
 
@@ -38,7 +38,7 @@ namespace AdhdTimeOrganizer.Scheduler.application.job;
 /// </para>
 /// <para>
 /// <b>Failure alerting (follow-up 05):</b> a <b>terminal</b> failure raises a push alert through the
-/// <see cref="IJobFailureNotifier"/> Kernel seam (Scheduler references no delivery module). It fires only for
+/// <see cref="IJobFailureNotifier"/> <c>Sydowwe.Framework.Contracts</c> seam (Scheduler references no delivery module). It fires only for
 /// the <b>final</b> retry of a scheduled fire failing, or a <c>HandlerNotFound</c> misconfiguration — never a
 /// non-final failure (a retry still queued) nor a manual/replay failure. Emission is gated on the job's
 /// <see cref="ScheduledJob.AlertOnFailure"/> opt-out, fired <i>after</i> the run row commits, and

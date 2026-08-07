@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Reminders.domain.@enum;
-using MojaDigitalnaFirma.Kernel.notification;
+using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.entity.@base;
 

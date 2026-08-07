@@ -2,10 +2,10 @@ using AdhdTimeOrganizer.Reminders.domain.entity;
 using AdhdTimeOrganizer.Reminders.domain.@enum;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.reminders;
-using MojaDigitalnaFirma.Kernel.user;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.reminders;
+using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 

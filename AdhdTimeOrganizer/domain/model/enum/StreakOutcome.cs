@@ -4,8 +4,8 @@ namespace AdhdTimeOrganizer.domain.model.@enum;
 /// What a period reset did to the routine's streak — the fact <c>RoutineResetService.TryReset</c> establishes
 /// as it evaluates completion against <c>StreakThreshold</c>.
 /// <para>
-/// Deliberately a portal domain enum rather than the Kernel's <c>RoutineStreakOutcome</c>, which this maps onto
-/// in <c>RoutinePeriodNotificationService</c>. They carry the same members today, but the Kernel one is a
+/// Deliberately a portal domain enum rather than <c>Sydowwe.Framework.Contracts</c>'s <c>RoutineStreakOutcome</c>, which this maps onto
+/// in <c>RoutinePeriodNotificationService</c>. They carry the same members today, but the <c>Sydowwe.Framework.Contracts</c> one is a
 /// persisted notification-payload contract (old rows deserialize against it), while this one is free to follow
 /// the streak rules wherever they go.
 /// </para>

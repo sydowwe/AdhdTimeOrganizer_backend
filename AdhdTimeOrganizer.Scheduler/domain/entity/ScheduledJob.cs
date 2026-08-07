@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Scheduler.domain.@enum;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.entity.@base;
 using Sydowwe.Framework.domain.entityInterface;
@@ -14,7 +14,7 @@ namespace AdhdTimeOrganizer.Scheduler.domain.entity;
 /// <see cref="ScheduleSpec"/>. Registry edits (pause/resume/reschedule) stay audited; the per-run
 /// observability columns are <see cref="AuditIgnoreAttribute"/> since they are rewritten on every fire
 /// (the run log already captures each run). <see cref="PayloadJson"/> is also excluded: it is opaque,
-/// convention-only PII-free (see <see cref="Kernel.scheduling.RecurringJobRegistration.Payload"/>), and
+/// convention-only PII-free (see <see cref="RecurringJobRegistration.Payload"/>), and
 /// free-text PII in it would not be caught by the audit redactor and would outlive GDPR erasure.
 /// </summary>
 public class ScheduledJob : BaseTableEntity, ISoftDeletable
@@ -39,17 +39,17 @@ public class ScheduledJob : BaseTableEntity, ISoftDeletable
     public MisfirePolicy MisfirePolicy { get; set; }
     public bool DisallowConcurrent { get; set; }
 
-    /// <summary>Max auto-retries of a failed scheduled fire (mirrors <see cref="Kernel.scheduling.RecurringJobRegistration.MaxRetries"/>). Default 3; 0 disables retries.</summary>
+    /// <summary>Max auto-retries of a failed scheduled fire (mirrors <see cref="RecurringJobRegistration.MaxRetries"/>). Default 3; 0 disables retries.</summary>
     public int MaxRetries { get; set; } = 3;
 
-    /// <summary>Whether a terminal failure raises an alert (mirrors <see cref="Kernel.scheduling.RecurringJobRegistration.AlertOnFailure"/>). Default true; false opts the job out of failure alerting.</summary>
+    /// <summary>Whether a terminal failure raises an alert (mirrors <see cref="RecurringJobRegistration.AlertOnFailure"/>). Default true; false opts the job out of failure alerting.</summary>
     public bool AlertOnFailure { get; set; } = true;
 
     /// <summary>
     /// Opaque payload (jsonb), stored verbatim so the dispatcher is self-contained and a replay can rehydrate it.
     /// <para>
     /// Bound by the payload PII contract — <b>the rule and the reasoning live on
-    /// <see cref="Kernel.notification.payload.INotificationPayload"/></b>, stated once for all three modules
+    /// <see cref="Sydowwe.Framework.Contracts.notification.payload.INotificationPayload"/></b>, stated once for all three modules
     /// that persist a payload. Scheduler is the <i>lower-risk</i> of the three and is enforced differently, on
     /// purpose: this column is handler <b>configuration</b> ("purge older than X"), not per-subject content,
     /// which is why the scheduler review rated it MEDIUM rather than HIGH. Job payloads are therefore <b>not</b>

@@ -30,7 +30,7 @@ migrations, e.g. `MojaDigitalnaFirma.AdminPortal.Sandbox/infrastructure/persiste
 > **Resolved by payload minimization** (follow-up `02-payload-minimization-employee-id.md`, fix
 > direction 2 below; direction 1 / L2 retention is follow-up 01, direction 3 declined by the owner).
 > All three call sites now persist `employeeId` instead of `employeeName`. The display name is
-> resolved per render by the new `INotificationPayloadEnricher` Kernel seam
+> resolved per render by the new `INotificationPayloadEnricher` `Sydowwe.Framework.Contracts` seam
 > (`EmployeeNamePayloadEnricher` → `GetEmployeeSummariesCommand`, one dispatch per batch, no-op
 > fallback `NoOpNotificationPayloadEnricher` via `TryAddScoped`), applied in
 > `NotificationService.NotifyAsync` and `GetMyNotificationsEndpoint` — the enriched JSON is a render
@@ -130,8 +130,8 @@ Reminders half of that follow-up, this one was a **live** gap — the module has
 (`NotificationPreference` / `PushSubscription`, both `BaseEntityWithCoreUser`) were never cascade-collected, and the FK-less ones (`Notification.UserId`, `NotificationQuietHours.UserId`) simply
 lingered.
 
-**Fixed** by `application/service/NotificationSubjectDataEraser.cs`, an implementation of the new Kernel
-`ISubjectDataEraser` fan-out (`MojaDigitalnaFirma.Kernel/gdpr/`) that `EmployeeErasureService` composes as `IEnumerable<ISubjectDataEraser>` — **no cross-module project reference**, the same inversion
+**Fixed** by `application/service/NotificationSubjectDataEraser.cs`, an implementation of the new `Sydowwe.Framework.Contracts`
+`ISubjectDataEraser` fan-out (`Sydowwe.Framework.Contracts/gdpr/`) that `EmployeeErasureService` composes as `IEnumerable<ISubjectDataEraser>` — **no cross-module project reference**, the same inversion
 `IEmployeePersonalDataProvider` uses on the read side. All four tables are **deleted** (not pseudonymized, as the Reminders side does): none is an append-only ledger — `Notification` is plain bell
 history with no dedup invariant or reversal lineage, and the other three are pure user settings. Tracked
 `RemoveRange`, not `ExecuteDeleteAsync`, because the caller owns the transaction. Failure policy is **throw** — see the contract's XML doc.
@@ -168,7 +168,7 @@ constraint in `summary.md` gotchas so a future type addition trips over it.
 > inside the window Web Push + Email are **deferred** via `Notification.DeferredUntil` and delivered by the
 > `Notifications.FlushDeferredNotifications` job once it ends. InApp and the history row are never deferred.
 > The Reminders module dropped its parallel `ReminderQuietHours` table and now reads the same window through
-> the Kernel `IQuietHoursReader` seam. See `summary.md` §Quiet hours.
+> the `Sydowwe.Framework.Contracts` `IQuietHoursReader` seam. See `summary.md` §Quiet hours.
 
 
 
@@ -256,7 +256,7 @@ Add `NotificationChannel.Email` + `IEmailSender` (SMTP, per-customer config like
 already model per-channel opt-out. **Risk:** SMTP deliverability/config support per customer deployment; HTML template maintenance. **Effort:** 1–2 phases.
 
 **Shipped** (follow-up 03, no migration — the channel enum is stored as a string):
-`NotificationChannel.Email` in Kernel; `INotificationEmailSender` +
+`NotificationChannel.Email` in `Sydowwe.Framework.Contracts`; `INotificationEmailSender` +
 `SmtpNotificationEmailSender` wrapping the framework's existing `IEmailSenderService`
 (so no new SMTP secrets — a deployment that already mails password resets is done);
 `EmailNotificationOptions` with an `IsConfigured` guard that auto-detects the `MAIL_*` env vars and short-circuits exactly like unconfigured Web Push; a third parallel dispatcher branch with bounded

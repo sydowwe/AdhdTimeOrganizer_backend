@@ -14,7 +14,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Reminders
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Scheduler", "AdhdTimeOrganizer.Scheduler\AdhdTimeOrganizer.Scheduler.csproj", "{95759481-5A5D-442B-B0E3-591CCB1B1128}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MojaDigitalnaFirma.Kernel", "MojaDigitalnaFirma.Kernel\MojaDigitalnaFirma.Kernel.csproj", "{85619205-F7AA-44B5-9512-8EB6F7F64FB3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Framework.Contracts", "framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj", "{85619205-F7AA-44B5-9512-8EB6F7F64FB3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

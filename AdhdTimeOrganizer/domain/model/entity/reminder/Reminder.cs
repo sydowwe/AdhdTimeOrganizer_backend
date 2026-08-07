@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.domain.model.entity.reminder;
 /// it is attached to.
 /// <para>
 /// <b>Scheduler state lives in the Reminders module, not here.</b> Status, next occurrence and dispatch
-/// history belong to <c>ReminderDefinition</c>, reached through the Kernel <c>IReminderRegistry</c> seam
+/// history belong to <c>ReminderDefinition</c>, reached through the <c>Sydowwe.Framework.Contracts</c> <c>IReminderRegistry</c> seam
 /// (see <c>ReminderRegistrationService</c>). Do not mirror any of it onto this row — two sources of truth
 /// for "did it fire yet" drift the first time a scan and a request interleave.
 /// </para>
@@ -51,7 +51,7 @@ public class Reminder : BaseEntityWithUser
     /// <c>[-10, 0]</c> means "ten minutes before, and again at the time". The registry rejects a positive
     /// offset, so never write <c>[10]</c> meaning "ten minutes before".
     /// <para>
-    /// A <b>recurring</b> reminder carries exactly one offset: the Kernel's recurring schedule has no
+    /// A <b>recurring</b> reminder carries exactly one offset: <c>Sydowwe.Framework.Contracts</c>'s recurring schedule has no
     /// lead-offset concept, so the single offset is folded into the recurrence anchor at registration.
     /// </para>
     /// </summary>

@@ -103,7 +103,7 @@ below and the FIXED blocks in L1/L2/C1/B4). **Still open: D2 + D5** (follow-ups 
 - **Done (2026-07-06).** `[AuditIgnore]` added to `ScheduledJob.PayloadJson` (`ScheduledJob.cs:34`). No-PII rule promoted into XML-doc on `RecurringJobRegistration.Payload`,
   `ScheduledJobContext.GetPayload`. No migration needed (interceptor-driven). Build confirmed green.
 - **Follow-up (2026-07-21, `prompts/payload-pii-contract.md`).** The rule the 07-06 fix promoted into three separate XML-docs is now **stated once**, in
-  `Kernel/notification/payload/INotificationPayload.cs`, and
+  `Sydowwe.Framework.Contracts/notification/payload/INotificationPayload.cs`, and
   `ScheduledJob.PayloadJson` / `ScheduledJobRun.PayloadSnapshotJson` point at it rather than restating a local convention. That is the whole of what changed here, deliberately.
 - ⚠️ **Residual: Scheduler job payloads are NOT type-constrained, and that is a decision, not an omission.**
   The cross-module refactor introduced `INotificationPayload` / `IReminderPayload` markers plus a reflection guard test, and closed the `object?` hole across the entire notification path.
@@ -127,7 +127,7 @@ A < 100-employee Slovak company runs this substrate headless: it wants recurring
 
 1. **Failure alerting / dead-letter (top gap).** A recurring job that starts failing — a payroll or §36 export, `AnonymizeTerminatedEmployeesJob`, a reminder scan — leaves `LastOutcome=Failed` and a
    `Failed` run row, and **nobody is notified**. `GetSchedulerHealthEndpoint` is pull-only; a company with no dedicated ops person never opens it. The substrate should raise a notification on a
-   failure (or on N consecutive failures / an overdue job) — *without* Scheduler depending on Notifications (forbidden). The clean seam already exists: emit through a `Kernel` notification contract or
+   failure (or on N consecutive failures / an overdue job) — *without* Scheduler depending on Notifications (forbidden). The clean seam already exists: emit through a `Sydowwe.Framework.Contracts` notification contract or
    let an owner-side handler subscribe. **This is the single most valuable addition for the segment.**
 2. **Automatic retry on transient failure.** Today a failed fire simply waits for the next scheduled fire; `MisfirePolicy` covers *missed* fires (process down), not *failed* ones. A transient DB blip
    fails a monthly job for a whole month. A small configurable retry-with-backoff (e.g. 3× over 15 min)
@@ -194,7 +194,7 @@ health view's failed/overdue signals are blind to the majority of live recurring
 - **Q1 (→ L1, recommended first).** Ship `Scheduler.PurgeExpiredRunLogs` (self-hosted on the substrate)? If yes, what retention window — **24 months**, or tie it to the audit-log retention you already
   run? And keep-last-N-per-job floor so no job's history fully empties?
 - **Q2 (→ Part 2 #1, highest product value).** Add **failure alerting**? If yes, the seam decision:
-  Scheduler emits via a `Kernel` notification contract (Scheduler stays decoupled, one new contract), **or** owners opt in per job (a flag on `RecurringJobRegistration` + an owner-side subscriber).
+  Scheduler emits via a `Sydowwe.Framework.Contracts` notification contract (Scheduler stays decoupled, one new contract), **or** owners opt in per job (a flag on `RecurringJobRegistration` + an owner-side subscriber).
   Which fits your decoupling posture? And the trigger: first failure, or N consecutive / overdue-past-margin?
 - **Q3 (→ C1, blocks phase 05 quality).** Add an optional **timezone** to `ScheduleSpec`
   (default `Europe/Bratislava` for calendar intervals)? This should land **before** phase 05 migrates the attendance calendar-boundary jobs, or those migrations risk shifting *when* a job runs — a bug
@@ -217,13 +217,13 @@ The substrate only pays off once it's authoritative. 7 of 8 tracked jobs (2× `C
 l.294-304). Migrate one owner per commit per the existing recipe. **Risk:** the `StartNow` startup- catch-up triggers (`RetryPendingStorageDeletions`, `MarkLeaveDone`) and calendar-boundary jobs must
 preserve *when* they fire — do C1/Q3 first. **Effort:** ~1 phase per owning module (Core, Employee, Attendance) + a shared timezone seam phase.
 
-### B2 — Failure-alerting seam (Scheduler → Notifications via Kernel) — **✅ DONE 2026-07-19**
+### B2 — Failure-alerting seam (Scheduler → Notifications via Contracts) — **✅ DONE 2026-07-19**
 
 The Part-2 #1 gap as a build (owner-approved D2), landed as follow-up 05 after B5's retry work. **Shipped:**
 
-- **Kernel seam** `IJobFailureNotifier.NotifyJobFailedAsync(JobFailureAlert)` (+ the PII-free
+- **`Sydowwe.Framework.Contracts` seam** `IJobFailureNotifier.NotifyJobFailedAsync(JobFailureAlert)` (+ the PII-free
   `JobFailureAlert` record — `JobKey` / `OwnerModule` / `ErrorType` / `RunId` / `FailedAtUtc`, never the raw `ErrorMessage`). Scheduler is the producer; **it still references no domain module** — the
-  arrow is Scheduler → `Kernel` ← Notifications, exactly like `IScheduler`.
+  arrow is Scheduler → `Sydowwe.Framework.Contracts` ← Notifications, exactly like `IScheduler`.
 - **Per-job opt-out** `AlertOnFailure` (default **true**) on `RecurringJobRegistration` → `ScheduledJob`
   (+ EF config `HasDefaultValue(true).ValueGeneratedNever()` so an opt-out `false` actually persists — the same inverted trap as `MaxRetries`) → `ScheduledJobDto` + `RegisterJobRequest`. No
   `Importance` enum — a single bool, as decided.
@@ -318,4 +318,4 @@ a null
 | 2        | B1 — finish phase-05 migration (7 jobs)                                  | 3-4    | preserve wall-clock fire time (set `"Europe/Bratislava"` explicitly); `StartNow` catch-up                                                                                                   |
 | ~~3~~ ✅ | B3 — self-retention purge job (**done 2026-07-06**)                      | 1      | `ReplaysRunId` Restrict FK — handled via lineage exclusion                                                                                                                                  |
 | ~~4~~ ✅ | B5 — auto-retry-with-backoff (+ one-shot) (**done 2026-07-19**)          | 1-2    | dedup-index / `DisallowConcurrent` interaction — handled via null `ScheduledFireTime`; one-shot boot re-fire handled via occurrence dedup                                                   |
-| ~~5~~ ✅ | B2 — failure-alerting seam (**done 2026-07-19**)                         | 1-2    | stayed decoupled via the Kernel `IJobFailureNotifier` seam; fires only on a *terminal* failure (final retry / unarmable retry / `HandlerNotFound`), throttled per key to avoid alert storms |
+| ~~5~~ ✅ | B2 — failure-alerting seam (**done 2026-07-19**)                         | 1-2    | stayed decoupled via the `Sydowwe.Framework.Contracts` `IJobFailureNotifier` seam; fires only on a *terminal* failure (final retry / unarmable retry / `HandlerNotFound`), throttled per key to avoid alert storms |

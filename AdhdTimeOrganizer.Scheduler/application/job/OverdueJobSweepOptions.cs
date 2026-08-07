@@ -1,4 +1,4 @@
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Scheduler.application.job;
 

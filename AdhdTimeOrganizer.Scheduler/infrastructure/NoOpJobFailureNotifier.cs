@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Scheduler.infrastructure;
 

@@ -2,19 +2,19 @@ using AdhdTimeOrganizer.Scheduler.domain.entity;
 using AdhdTimeOrganizer.Scheduler.domain.@enum;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Quartz;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.domain.result;
 using Sydowwe.Framework.infrastructure.persistence;
-using IScheduler = MojaDigitalnaFirma.Kernel.scheduling.IScheduler;
+using IScheduler = Sydowwe.Framework.Contracts.scheduling.IScheduler;
 
 namespace AdhdTimeOrganizer.Scheduler.infrastructure;
 
 /// <summary>
 /// The Core.Scheduler implementation of the <see cref="Quartz.IScheduler"/> contract: it turns a
-/// <see cref="Kernel.scheduling.RecurringJobRegistration"/> into a registry row + a live Quartz trigger pointing at the
+/// <see cref="RecurringJobRegistration"/> into a registry row + a live Quartz trigger pointing at the
 /// single durable dispatcher job, idempotently keyed by <see cref="ScheduledJob.JobKey"/>.
 /// <para>
 /// Auto-registered via the <see cref="IScopedService"/> marker (like NotificationService) and safe to call

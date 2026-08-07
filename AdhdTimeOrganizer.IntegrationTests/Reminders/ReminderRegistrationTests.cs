@@ -14,8 +14,8 @@ using AdhdTimeOrganizer.Reminders.domain.@enum;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.Testing;
 using Xunit;
 

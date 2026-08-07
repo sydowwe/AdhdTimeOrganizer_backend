@@ -11,7 +11,7 @@ using AdhdTimeOrganizer.Reminders.infrastructure.scheduling;
 using AdhdTimeOrganizer.Scheduler.application.job;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
 using Microsoft.EntityFrameworkCore;
-using MojaDigitalnaFirma.Kernel.notification;
+using Sydowwe.Framework.Contracts.notification;
 using FrameworkDi = Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.config.dependencyInjection;

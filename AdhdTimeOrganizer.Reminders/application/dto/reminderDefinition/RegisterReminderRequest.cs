@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.reminders;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.reminders;
 
 namespace AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 

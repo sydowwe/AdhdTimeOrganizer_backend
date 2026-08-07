@@ -2,13 +2,13 @@ using System.Linq.Expressions;
 using AdhdTimeOrganizer.Notifications.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.gdpr;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.gdpr;
 
 namespace AdhdTimeOrganizer.Notifications.application.service;
 
 // Notifications' recipient-side slice of a GDPR Art. 17 erasure (notifications review L1/L2 — reminders
-// follow-up 03). Reached through the Kernel ISubjectDataEraser fan-out, so EmployeeModule keeps no
+// follow-up 03). Reached through the Sydowwe.Framework.Contracts ISubjectDataEraser fan-out, so EmployeeModule keeps no
 // reference to this module. Mutates the ambient DbContext and never commits — the caller owns the
 // transaction (see the contract's XML doc).
 //

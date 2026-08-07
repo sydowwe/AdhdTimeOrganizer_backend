@@ -2,7 +2,7 @@ using AdhdTimeOrganizer.Notifications.application.job;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Notifications.infrastructure.scheduling;
 
@@ -15,7 +15,7 @@ namespace AdhdTimeOrganizer.Notifications.infrastructure.scheduling;
 /// duplicates (and is <i>required</i>, since the RAM job store drops all triggers on restart).
 /// <para>
 /// Wired once in the shared <c>AddCore</c>, so both the vanilla Sandbox and the HBCleaning host get it.
-/// Quartz itself belongs to the Scheduler module — this module depends only on Kernel + Framework and
+/// Quartz itself belongs to the Scheduler module — this module depends only on <c>Sydowwe.Framework.Contracts</c> + Framework and
 /// reaches the substrate through the <see cref="IScheduler"/> contract, so a host that never wires
 /// Quartz simply fails to register (logged, never fatal). See <c>StartAsync</c>.
 /// </para>
@@ -61,10 +61,10 @@ public sealed class NotificationsScheduledJobsRegistrar(
         await using var scope = services.CreateAsyncScope();
 
         // Resolution and registration share one try/catch, matching RemindersScheduledJobsRegistrar —
-        // the satellite-module shape. This module references only Kernel + Framework, so it cannot test
+        // the satellite-module shape. This module references only Sydowwe.Framework.Contracts + Framework, so it cannot test
         // `GetService<ISchedulerFactory>() is null` the way CoreScheduledJobsRegistrar does; that guard
         // is available to Core only because Core already carries the Quartz package. Quartz belongs to
-        // the Scheduler module, and modules reach it through the Kernel IScheduler contract.
+        // the Scheduler module, and modules reach it through the Sydowwe.Framework.Contracts IScheduler contract.
         //
         // Deliberately logged at Error, not swallowed at Debug: on a Quartz-less host (the vanilla
         // Sandbox) resolving IScheduler throws, because AddCore's factory resolves ISchedulerFactory

@@ -3,14 +3,14 @@ using AdhdTimeOrganizer.Reminders.domain.entity;
 using AdhdTimeOrganizer.Reminders.domain.@enum;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.gdpr;
-using MojaDigitalnaFirma.Kernel.reminders;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.gdpr;
+using Sydowwe.Framework.Contracts.reminders;
 
 namespace AdhdTimeOrganizer.Reminders.application.service;
 
 // Reminders' recipient-side slice of a GDPR Art. 17 erasure (reminders audit 2026-07, finding L2 —
-// reminders follow-up 03). Reached through the Kernel ISubjectDataEraser fan-out, so EmployeeModule keeps
+// reminders follow-up 03). Reached through the Sydowwe.Framework.Contracts ISubjectDataEraser fan-out, so EmployeeModule keeps
 // no reference to this module. Mutates the ambient DbContext and never commits — the caller owns the
 // transaction (see the contract's XML doc).
 //

@@ -17,11 +17,11 @@ using AdhdTimeOrganizer.Scheduler.application.job;
 using AdhdTimeOrganizer.Scheduler.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using MojaDigitalnaFirma.Kernel.gdpr;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.notification.payload;
-using MojaDigitalnaFirma.Kernel.reminders;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.gdpr;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
+using Sydowwe.Framework.Contracts.reminders;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
@@ -285,7 +285,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
     // ---- GDPR erasure fan-out --------------------------------------------------------------------
 
     /// <summary>
-    /// Both modules' erasers are reachable through the Kernel fan-out that <c>DeleteUserAccountEndpoint</c>
+    /// Both modules' erasers are reachable through the <c>Sydowwe.Framework.Contracts</c> fan-out that <c>DeleteUserAccountEndpoint</c>
     /// drives. Resolving an empty enumerable is a valid state for a host shipping neither module, which is
     /// exactly why it cannot be left to fail loudly — this app ships both.
     /// </summary>
@@ -339,7 +339,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
     // ---- end to end -----------------------------------------------------------------------------
 
     /// <summary>
-    /// The Notifications module writes history through the Kernel contract, with no authenticated user —
+    /// The Notifications module writes history through the <c>Sydowwe.Framework.Contracts</c> contract, with no authenticated user —
     /// the way every background caller reaches it.
     /// </summary>
     [Fact]
@@ -362,7 +362,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
 
     /// <summary>
     /// The one that proves all three modules are joined to this app: register a reminder that is already due
-    /// through the Kernel registry, fire the Reminders scan handler, and the Notifications module ends up
+    /// through the <c>Sydowwe.Framework.Contracts</c> registry, fire the Reminders scan handler, and the Notifications module ends up
     /// holding a history row for the recipient — plus a <c>Sent</c> row in the append-only dispatch ledger.
     /// </summary>
     [Fact]

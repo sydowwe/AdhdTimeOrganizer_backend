@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.Notifications.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.user;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 

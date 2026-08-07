@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using MojaDigitalnaFirma.Kernel.user;
+using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
 namespace MojaDigitalnaFirma.Core.infrastructure.persistence.configuration.extensions;

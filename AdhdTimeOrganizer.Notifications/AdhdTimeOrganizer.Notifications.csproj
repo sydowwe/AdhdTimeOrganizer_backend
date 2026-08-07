@@ -12,7 +12,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
-        <ProjectReference Include="..\MojaDigitalnaFirma.Kernel\MojaDigitalnaFirma.Kernel.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>
     </ItemGroup>
 
 </Project>

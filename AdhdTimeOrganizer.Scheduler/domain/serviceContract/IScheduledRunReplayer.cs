@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.Scheduler.domain.serviceContract;
 /// payload and id. The dispatcher builds the context, applies the per-key concurrency gate and writes the
 /// new, linked run row — this service builds no context and writes no run row.
 /// <para>
-/// Replay is an operator/dashboard concern, so it is deliberately <b>not</b> on the Kernel
+/// Replay is an operator/dashboard concern, so it is deliberately <b>not</b> on the <c>Sydowwe.Framework.Contracts</c>
 /// <c>IScheduler</c> contract (owners register/control; they never replay). <b>Replaying a non-idempotent
 /// job repeats its side effects</b> — effect-idempotency is the handler's responsibility.
 /// </para>

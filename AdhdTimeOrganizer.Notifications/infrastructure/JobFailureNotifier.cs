@@ -1,7 +1,7 @@
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.notification.payload;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.Notifications.infrastructure;

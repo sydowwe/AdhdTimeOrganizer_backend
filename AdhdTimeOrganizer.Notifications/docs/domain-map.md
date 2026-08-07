@@ -3,7 +3,7 @@
 ## Architecture (dispatch flow)
 
 ```
-any module ──► INotificationService.NotifyAsync(recipients, type, payload)   [Kernel contract]
+any module ──► INotificationService.NotifyAsync(recipients, type, payload)   [Sydowwe.Framework.Contracts contract]
                      │   (impl: Core.Notifications/infrastructure/NotificationService)
                      ├─ resolve recipients (user / role / everyone) via UserManager<User>
                      ├─ for each recipient: load NotificationPreference, skip disabled channels
@@ -88,7 +88,7 @@ erDiagram
 `NotificationQuietHours` is **at most one row per user** (unique index on `UserId`), minutes-from-local-midnight in `Application:Timezone`, `Start > End` = overnight. It is the **single** quiet-hours
 window in the deployment:
 Reminders migrated its own `ReminderQuietHours` table into this one and reads it through
-`Kernel.notification.IQuietHoursReader`. Unlike this module's other user-keyed tables it has **no FK** to the user table — see the entity's remarks for why.
+`Sydowwe.Framework.Contracts.notification.IQuietHoursReader`. Unlike this module's other user-keyed tables it has **no FK** to the user table — see the entity's remarks for why.
 
 ## Invariants
 
@@ -139,7 +139,7 @@ a notification row is owned by its **recipient** (HR, the approving manager), so
 `IEmployeeErasureService` — which walks rows belonging to the *erased* employee — never reaches it. A name written into the JSON would outlive anonymization indefinitely (audit 2026-07, finding L1).
 
 The name is instead resolved **per render** by `INotificationPayloadEnricher`
-(`Kernel/notification/`), which runs immediately before `renderer.Render(...)` at both render points and overlays `employeeName` into the JSON in memory — the renderer itself is unchanged, and **the
+(`Sydowwe.Framework.Contracts/notification/`), which runs immediately before `renderer.Render(...)` at both render points and overlays `employeeName` into the JSON in memory — the renderer itself is unchanged, and **the
 enriched JSON is never written back**:
 
 ```
@@ -156,7 +156,7 @@ GET /notification/mine (≤50 rows) ──► enrich(all page payloads) ──�
 | Anonymized employee | Seam returns the tombstoned name, so the render degrades on its own — no backfill, no payload scrubber                                                        |
 | Unresolvable id     | Payload left untouched → name-less fallback                                                                                                                   |
 
-Core.Notifications must **not** reference Core.EmployeeModule — the contract lives in Kernel for exactly this reason. Existing rows written before this change are not backfilled; the retention purge
+Core.Notifications must **not** reference Core.EmployeeModule — the contract lives in `Sydowwe.Framework.Contracts` for exactly this reason. Existing rows written before this change are not backfilled; the retention purge
 ages them out (accepted windowed residual).
 
 #### The rule is type-enforced, not a call-site convention
@@ -166,11 +166,11 @@ Minimization used to rest on every producer *choosing* to write `new { employeeI
 
 | Piece                                                      | Where                            | What it buys                                                                                                                         |
 |------------------------------------------------------------|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| `INotificationPayload` + one record per `NotificationType` | `Kernel/notification/payload/`   | The single statement of the rule; producers can only send a declared shape                                                           |
+| `INotificationPayload` + one record per `NotificationType` | `Sydowwe.Framework.Contracts/notification/payload/` | The single statement of the rule; producers can only send a declared shape                                                           |
 | `[NotificationPayload(type)]`                              | same                             | The typed `NotifyAsync<T>` derives the kind, so type and payload cannot disagree                                                     |
-| `IReminderPayload`                                         | `Kernel/reminders/`              | Same rule on `ReminderRegistration.Payload` — **there is no Reminders exception any more**                                           |
+| `IReminderPayload`                                         | `Sydowwe.Framework.Contracts/reminders/`              | Same rule on `ReminderRegistration.Payload` — **there is no Reminders exception any more**                                           |
 | `PayloadPiiContractGuardTests`                             | `HBCleaning.Tests/unit/payload/` | Reflection over both markers; fails on a person-data property name (SK + EN). This is what stops `EmployeeName` being added tomorrow |
-| `PayloadPersonDataNames`                                   | `Kernel/notification/payload/`   | One name list, shared by the guard test and the runtime check below                                                                  |
+| `PayloadPersonDataNames`                                   | `Sydowwe.Framework.Contracts/notification/payload/`   | One name list, shared by the guard test and the runtime check below                                                                  |
 
 `employeeName` is deliberately **absent from every payload record**: it is not payload, it is the enricher's render-time overlay, and `NotificationTextRenderer` reads it off the raw document rather
 than off the record. That separation is exactly what lets the guard assert that no *persisted* payload names anybody.
@@ -231,10 +231,10 @@ SignalR hub: `/hubs/notifications`. The server pushes method `ReceiveNotificatio
 
 | Piece              | Location                                                                                                                                                                                                                                                                       |
 |--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Contract + types   | `MojaDigitalnaFirma.Kernel/notification/` — `INotificationService`, `INotificationPayloadEnricher`, `NotificationType`, `NotificationChannel`, `NotificationRecipients`, `IQuietHoursReader`, `QuietHoursWindow`, `QuietHoursPolicy`                                           |
+| Contract + types   | `Sydowwe.Framework.Contracts/notification/` — `INotificationService`, `INotificationPayloadEnricher`, `NotificationType`, `NotificationChannel`, `NotificationRecipients`, `IQuietHoursReader`, `QuietHoursWindow`, `QuietHoursPolicy`                                           |
 | Payload enrichment | `…/application/NoOpNotificationPayloadEnricher.cs` (fallback) + `Core.EmployeeModule/application/utility/EmployeeNamePayloadEnricher.cs` (real)                                                                                                                                |
 | Entities           | `…/domain/entity/` — `Notification` (incl. `DeferredUntil`), `PushSubscription`, `NotificationPreference`, `NotificationQuietHours`                                                                                                                                            |
-| Quiet hours        | entity + `…/application/endpoint/quietHours/` (3 endpoints) + `…/infrastructure/QuietHoursReader.cs` (the Kernel seam impl); window math is `Kernel.notification.QuietHoursPolicy`; the Reminders-side no-op fallback is `Core.Reminders/infrastructure/NoQuietHoursReader.cs` |
+| Quiet hours        | entity + `…/application/endpoint/quietHours/` (3 endpoints) + `…/infrastructure/QuietHoursReader.cs` (the `Sydowwe.Framework.Contracts` seam impl); window math is `Sydowwe.Framework.Contracts.notification.QuietHoursPolicy`; the Reminders-side no-op fallback is `Core.Reminders/infrastructure/NoQuietHoursReader.cs` |
 | Deferred flush     | `…/application/job/FlushDeferredNotificationsJobHandler.cs` + `…/infrastructure/IDeferredNotificationDispatcher.cs` (implemented by `NotificationService`)                                                                                                                     |
 | EF configs         | `…/infrastructure/persistence/configuration/`                                                                                                                                                                                                                                  |
 | Dispatcher         | `…/infrastructure/NotificationService.cs`                                                                                                                                                                                                                                      |

@@ -17,18 +17,18 @@ as a keyed `IScheduledJobHandler` the dispatcher invokes.
 
 ## Dependency seams
 
-- **Exposes:** the `Kernel.scheduling` contract (`IScheduler`, `IScheduledJobHandler`,
+- **Exposes:** the `Sydowwe.Framework.Contracts.scheduling` contract (`IScheduler`, `IScheduledJobHandler`,
   `RecurringJobRegistration`, `ScheduleSpec`, `ScheduledJobContext`, `ICronEvaluator`, `IJobFailureNotifier` +
-  `JobFailureAlert` + the `JobScheduleType` / `JobIntervalPreset` / `MisfirePolicy` / `TriggerSource` enums). Owners depend on the **Kernel**, never on this module — the arrow points owning module →
-  `Kernel` ← Scheduler.
-- **`IJobFailureNotifier`** (Kernel seam, follow-up 05) — the Scheduler **announces** a terminal job failure through this without ever referencing a delivery module; a consumer implements it. Live
+  `JobFailureAlert` + the `JobScheduleType` / `JobIntervalPreset` / `MisfirePolicy` / `TriggerSource` enums). Owners depend on **`Sydowwe.Framework.Contracts`**, never on this module — the arrow points owning module →
+  `Sydowwe.Framework.Contracts` ← Scheduler.
+- **`IJobFailureNotifier`** (`Sydowwe.Framework.Contracts` seam, follow-up 05) — the Scheduler **announces** a terminal job failure through this without ever referencing a delivery module; a consumer implements it. Live
   impl:
   `Core.Notifications`'s `JobFailureNotifier` (delivers to Admin + RootAdmin); `NoOpJobFailureNotifier` (this module, `TryAddScoped` fallback in `AddCore`) covers a Quartz-host that ships no
-  Notifications. Same shape as the retry seam: the arrow points Scheduler → `Kernel` ← Notifications.
+  Notifications. Same shape as the retry seam: the arrow points Scheduler → `Sydowwe.Framework.Contracts` ← Notifications.
 - **`ICronEvaluator`** (`infrastructure/CronEvaluator.cs`, `ISingletonService`) — a stateless cron validate + next-fire helper over Quartz's `CronExpression`, so the Quartz dependency stays owned here
   and consumers (e.g. the Reminders module's per-occurrence cron math) reason about cron through the contract alone. Pure expression math — no `ISchedulerFactory` — so unlike `SchedulerService` it's
   safe under the blanket DI scan even in hosts that never call `AddQuartz`.
-- **Consumes:** nothing domain-specific. Only `Kernel` + `Sydowwe.Framework`.
+- **Consumes:** nothing domain-specific. Only `Sydowwe.Framework.Contracts` + `Sydowwe.Framework`.
 - The Core-only enums `JobStatus` and `RunOutcome` live in this module (they describe stored state, not the contract).
 
 ## Gotchas — things that will bite you
@@ -66,7 +66,7 @@ as a keyed `IScheduledJobHandler` the dispatcher invokes.
 
 ## Registration & control — the `IScheduler` impl (phase 02b)
 
-`infrastructure/SchedulerService.cs` implements the `Kernel.scheduling.IScheduler` contract, auto-registered via the `IScopedService` marker and **safe with no authenticated user** (registry entities
+`infrastructure/SchedulerService.cs` implements the `Sydowwe.Framework.Contracts.scheduling.IScheduler` contract, auto-registered via the `IScopedService` marker and **safe with no authenticated user** (registry entities
 aren't user-scoped). It injects the `DbContext`, Quartz's `ISchedulerFactory`, and the set of registered
 `IScheduledJobHandler`s.
 
@@ -185,7 +185,7 @@ A `Failed` run is retried automatically, off-schedule, with **incremental (expon
 
 ### Failure alerting (phase 05-followup — B2/D2)
 
-A **terminal** job failure raises a push alert through the `Kernel.scheduling.IJobFailureNotifier` seam, turning the pull-only health view into push. Scheduler never references a delivery module.
+A **terminal** job failure raises a push alert through the `Sydowwe.Framework.Contracts.scheduling.IJobFailureNotifier` seam, turning the pull-only health view into push. Scheduler never references a delivery module.
 
 - **On by default, per-job opt-out:** `RecurringJobRegistration.AlertOnFailure` (default `true`) →
   `ScheduledJob.AlertOnFailure` (EF `HasDefaultValue(true).ValueGeneratedNever()` so an opt-out `false`
@@ -361,8 +361,8 @@ The dashboard's **controls reuse the 02b endpoints** unchanged — trigger-now /
   row,
   `ErrorType = ConcurrencyVeto`), same as any fire. **Effect-idempotency is the handler's responsibility** — replaying a non-idempotent job repeats its side effects (surfaced as a warning in the
   contract doc + the frontend prompt).
-- **Why a module-internal service, not the Kernel contract:** replay is an operator/dashboard concern; owners register/control but never replay, so `IScheduledRunReplayer` stays in `Core.Scheduler`
-  and the Kernel `IScheduler` surface stays minimal.
+- **Why a module-internal service, not the `Sydowwe.Framework.Contracts` contract:** replay is an operator/dashboard concern; owners register/control but never replay, so `IScheduledRunReplayer` stays in `Core.Scheduler`
+  and the `Sydowwe.Framework.Contracts` `IScheduler` surface stays minimal.
 
 **No frontend prompt or `.vue` views exist yet for the dashboard (04a reads + 04b actions) — the whole dashboard UI is unbuilt.** `frontend-prompts/scheduler-dashboard.md` was referenced here but
 never written.
@@ -396,7 +396,7 @@ never written.
 
 The repo's hand-wired Quartz jobs move onto this substrate **one owning module per session/commit**, never a big-bang. Only the *wiring* moves — each job's **body stays in its owning module** (a
 handler `using`s
-`Kernel.scheduling`, never `Core.Scheduler`).
+`Sydowwe.Framework.Contracts.scheduling`, never `Core.Scheduler`).
 
 > **Extra reason to finish this:** a legacy raw `IJob` does **not** get the dispatcher's ambient-scope
 > guarantee (gotchas above), so a body that dispatches a FastEndpoints command needs a local
@@ -494,6 +494,6 @@ reason: after the final retry the next scheduled attempt is twelve months away. 
 
 ## Deeper reference
 
-- `domain-map.md` — model, invariants, the Kernel contract surface, file index.
+- `domain-map.md` — model, invariants, the `Sydowwe.Framework.Contracts` surface, file index.
 - Build plan: phases 01–05 all done → `prompts/_done/scheduler/`. Audit follow-ups 01–08:
   `prompts/_done-followups/scheduler-followups/`.

@@ -1,4 +1,4 @@
-using MojaDigitalnaFirma.Kernel.reminders;
+using Sydowwe.Framework.Contracts.reminders;
 
 namespace AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 

@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Reminders.domain.@enum;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.reminders;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
+using Sydowwe.Framework.Contracts.reminders;
 using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.entity.@base;
 using Sydowwe.Framework.domain.entityInterface;
@@ -42,7 +43,7 @@ public class ReminderDefinition : BaseTableEntity, ISoftDeletable
     /// The registration's <c>Payload</c> serialised verbatim (jsonb). Schedule/recipients/key are their own columns, not part of this blob.
     /// <para>
     /// Bound by the payload PII contract — <b>the rule and the reasoning live on
-    /// <see cref="MojaDigitalnaFirma.Kernel.notification.payload.INotificationPayload"/></b>, stated once for
+    /// <see cref="INotificationPayload"/></b>, stated once for
     /// all three modules that persist a payload. This is no longer a convention: <c>ReminderRegistration.Payload</c>
     /// is typed <see cref="IReminderPayload"/>, so module code cannot register free text, and the one path that
     /// still accepts a hand-written document (the manual-ops register endpoint) rejects person-data keys at

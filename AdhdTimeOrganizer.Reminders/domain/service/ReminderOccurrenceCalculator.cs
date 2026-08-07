@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.Reminders.domain.entity;
-using MojaDigitalnaFirma.Kernel.reminders;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.reminders;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Reminders.domain.service;
 

@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.Reminders.domain.entity;
 using AdhdTimeOrganizer.Reminders.domain.@enum;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.reminders;
 using Sydowwe.Framework.application.dto.response;
 using Sydowwe.Framework.application.dto.response.@base;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.reminders;
 
 namespace AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 

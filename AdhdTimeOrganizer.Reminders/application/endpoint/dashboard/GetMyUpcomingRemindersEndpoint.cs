@@ -1,11 +1,11 @@
 using AdhdTimeOrganizer.Reminders.application.dto.dashboard;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
-using MojaDigitalnaFirma.Kernel.reminders;
 using Sydowwe.Framework.application.dto.request.@base.table;
 using Sydowwe.Framework.application.dto.request.generic;
 using Sydowwe.Framework.application.dto.response.@base;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.Contracts.reminders;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
 

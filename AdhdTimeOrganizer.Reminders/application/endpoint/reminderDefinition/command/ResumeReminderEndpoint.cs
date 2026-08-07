@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.Reminders.application.dto.reminderDefinition;
 using FastEndpoints;
-using MojaDigitalnaFirma.Kernel.reminders;
+using Sydowwe.Framework.Contracts.reminders;
 using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Reminders.application.endpoint.reminderDefinition.command;

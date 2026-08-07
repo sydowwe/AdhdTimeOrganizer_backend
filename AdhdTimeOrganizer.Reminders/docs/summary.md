@@ -1,6 +1,6 @@
 # Reminders — Agent Summary
 
-> **Status:** complete. All build phases are done — 01a (the Kernel contract), 01b (entities + EF config +
+> **Status:** complete. All build phases are done — 01a (the `Sydowwe.Framework.Contracts` contract), 01b (entities + EF config +
 > migration), 01c (read-DTO projections), 02a (the registry implementation + command endpoints), 02b
 > (the admin read/inspector endpoints), 03a (the scan handler), 03b (registering the scan with the
 > Scheduler module), 04a (dispatch policy: per-kind opt-out + quiet hours), 04b (digest batching), 05a
@@ -26,20 +26,20 @@ transport/channels/text (Notifications) or the Quartz substrate + run log (Sched
 - **Reminders** (this) = *when to send, on a schedule* — the consumer that sits on top of both.
 
 > **Crisp rule:** this module imports **no domain module**. The dependency arrow always points *into*
-> the Kernel contract: owning module → `Kernel.reminders` ← this module. If you ever want
+> the `Sydowwe.Framework.Contracts` contract: owning module → `Sydowwe.Framework.Contracts.reminders` ← this module. If you ever want
 > `using AdhdTimeOrganizer.<SomeDomain>` here, the design is wrong — stop and flag it. (A guard
 > test, `ReminderContractGuardTests`, pins the contract domain-free.)
 
 ## Dependency seams
 
-- **Exposes:** the `Kernel.reminders` contract (table below). Owning modules depend on the Kernel, never on this module.
-- **Consumes:** the Notification module **only** through `Kernel.notification`
-  (`INotificationService.NotifyAsync` to send, and `IQuietHoursReader` to read the per-user quiet-hours window Notifications now owns); the Scheduler module **only** through `Kernel.scheduling`
+- **Exposes:** the `Sydowwe.Framework.Contracts.reminders` contract (table below). Owning modules depend on `Sydowwe.Framework.Contracts`, never on this module.
+- **Consumes:** the Notification module **only** through `Sydowwe.Framework.Contracts.notification`
+  (`INotificationService.NotifyAsync` to send, and `IQuietHoursReader` to read the per-user quiet-hours window Notifications now owns); the Scheduler module **only** through `Sydowwe.Framework.Contracts.scheduling`
   (`IScheduler` + `IScheduledJobHandler`, phase 03). Nothing domain-specific.
 
-## The Kernel contract surface (phase 01a — `MojaDigitalnaFirma.Kernel/reminders/`)
+## The Contracts surface (phase 01a — `Sydowwe.Framework.Contracts/reminders/`)
 
-The only thing owning modules reference. Mirrors how `INotificationService` lives in `Kernel.notification`.
+The only thing owning modules reference. Mirrors how `INotificationService` lives in `Sydowwe.Framework.Contracts.notification`.
 
 | Type                         | Kind                        | Role                                                                                                                                                                                           |
 |------------------------------|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -53,7 +53,7 @@ The only thing owning modules reference. Mirrors how `INotificationService` live
 | `IReminderRenderer`          | interface (keyed, optional) | The **owner** may implement it to map a reminder into a `RenderedReminder` when text isn't a plain `NotificationType` (`TemplateKey` ↔ `TemplateKey`).                                         |
 | `RenderedReminder`           | record                      | A renderer's result: `(NotificationType Type, object? Payload)`.                                                                                                                               |
 | `ReminderRenderContext`      | record                      | Passed to the renderer: key, template key, payload, occurrence instant.                                                                                                                        |
-| `ScheduleType`               | enum                        | `OneShot` · `RecurringInterval` · `RecurringCron`. (Distinct from `Kernel.scheduling.ScheduleType`.)                                                                                           |
+| `ScheduleType`               | enum                        | `OneShot` · `RecurringInterval` · `RecurringCron`. (Distinct from `Sydowwe.Framework.Contracts.scheduling.ScheduleType`.)                                                                                           |
 | `ReminderIntervalPreset`     | enum                        | `Daily` · `Weekly` · `Monthly` · `Quarterly` · `Yearly` — calendar cadence (coarser than the scheduling one).                                                                                  |
 | `RecipientMode`              | enum                        | `ExplicitUsers` · `ResolverStrategy`.                                                                                                                                                          |
 
@@ -83,7 +83,7 @@ There is **no** separate `TemplateKey`→content mapping table. Dispatch ultimat
 ## Persistence model (phase 01b + 05b — `Core.Reminders/domain/`)
 
 `BaseTableEntity` descendants (module-owned infra, **not** user-scoped — a background scan/registrar with no authenticated user writes them, so they avoid the `BaseEntityWithUser` `UserId == 0` FK
-trap). All instant columns are `DateTimeOffset` → **`timestamptz`** (reminders reason about absolute instants; the Kernel `ReminderSchedule` already uses `DateTimeOffset`). Enums persist **as
+trap). All instant columns are `DateTimeOffset` → **`timestamptz`** (reminders reason about absolute instants; the `Sydowwe.Framework.Contracts` `ReminderSchedule` already uses `DateTimeOffset`). Enums persist **as
 strings** via
 `EnumColumn`, so a new `ReminderScheduleType` / `ReminderIntervalPreset` value needs no migration.
 
@@ -95,12 +95,12 @@ strings** via
 | `ReminderDispatch`         | The append-only dispatch ledger. `ReminderDefinitionId` FK (**Restrict**), `OccurrenceAt`, `DispatchedAt`, `Outcome`, `SkipReason?`, `NotificationTypeSnapshot?`, `TemplateKeySnapshot?`, `RecipientsSnapshot` (jsonb, **ids only — no PII**), `CorrelationId`, self-FK `ReversesDispatchId` (**Restrict**), and `ReminderOccurrenceActionId?` FK (**Restrict**, phase 05b) — the marker-state dedup link set only on a snoozed re-delivery.                                                                                                                                        |
 | `ReminderOccurrenceAction` | The append-only per-recipient snooze/dismiss ledger (phase 05b). `ReminderDefinitionId` FK (**Restrict**), `OccurrenceAt`, plain `UserId` (no FK), `ActionType`, `SnoozeUntil?`, `ActedAt`, self-FK `ReversesActionId` (**Restrict**). `[NoAudit]`. Indexes: `(ReminderDefinitionId, OccurrenceAt, UserId)` for the resolve-recipients drop, `(ActionType, SnoozeUntil)` for the due-snoozes source.                                                                                                                                                                                |
 
-**Runtime enums** (`domain/enum/` — internal stored state, **not** the Kernel contract):
+**Runtime enums** (`domain/enum/` — internal stored state, **not** the `Sydowwe.Framework.Contracts` surface):
 `ReminderStatus { Active, Paused, Cancelled, Completed }` ·
 `DispatchOutcome { Sent, Skipped, Failed, Reversed }` ·
 `SkipReason { AlreadyDispatched, QuietHours, NoRecipients, OptedOut, Dismissed, Snoozed, Cancelled, Other }`
 (three are **reserved** — `AlreadyDispatched` / `QuietHours` / `Cancelled` are never persisted by the current scanner; those skips happen silently with no row — see the enum's XML docs) ·
-`ReminderActionType { Snooze, Dismiss, Reversal }` (phase 05b). (`ReminderScheduleType` / `ReminderIntervalPreset` / `RecipientMode` come from `Kernel.reminders`, not redefined here.)
+`ReminderActionType { Snooze, Dismiss, Reversal }` (phase 05b). (`ReminderScheduleType` / `ReminderIntervalPreset` / `RecipientMode` come from `Sydowwe.Framework.Contracts.reminders`, not redefined here.)
 
 **Decisions baked into the config:**
 
@@ -173,10 +173,10 @@ register/resume and scan agree by construction.
   "Registry"` / `AutoTagOverride`, but **no module in this repo uses `Group`/`SubGroup`/`AutoTagOverride`** — endpoints use a route prefix and Swagger auto-tags by its first segment (e.g. Scheduler's
   `scheduled-job`). Followed the repo: routes are prefixed `/reminder-definition/…` (auto-tag `reminder-definition`), shared by the 02b reads.
 - **Cron-evaluator dependency.** `RecurringCron` occurrence math needs a cron validate + next-fire helper. The prompt's preferred path is "use a Scheduler- **contract** cron helper", which didn't
-  exist. Rather than pull a second Quartz dependency into this module (or reference `Core.Scheduler` directly — forbidden by the dependency rule), added **`ICronEvaluator` to `Kernel.scheduling`**,
+  exist. Rather than pull a second Quartz dependency into this module (or reference `Core.Scheduler` directly — forbidden by the dependency rule), added **`ICronEvaluator` to `Sydowwe.Framework.Contracts.scheduling`**,
   implemented by **`CronEvaluator` in
   `Core.Scheduler`** (the single Quartz owner, over `CronExpression`; stateless `ISingletonService`, no
-  `ISchedulerFactory` so it's safe under the scan in Quartz-less hosts). Reminders consumes it through the contract only — Quartz stays out of this module, the arrow still points into the Kernel. This
+  `ISchedulerFactory` so it's safe under the scan in Quartz-less hosts). Reminders consumes it through the contract only — Quartz stays out of this module, the arrow still points into `Sydowwe.Framework.Contracts`. This
   is *internal per-occurrence* cron, distinct from the *scan-cadence* cron handed to Scheduler in phase 03.
 
 ## Registry inspector — read endpoints (phase 02b — `…/application/endpoint/reminderDefinition/query/`)
@@ -199,7 +199,7 @@ These share the `/reminder-definition/…` route prefix (auto-tag `reminder-defi
 `IScheduledJobHandler`** (`Key = "reminders.scan"`, the `HandlerKey` constant), **not** a Quartz `IJob`:
 03b registers it as the single recurring scan job with the Scheduler module — this module never calls
 `AddQuartz`. Auto-registered via `IScopedService`. Background-safe (no authenticated user). Dispatch goes **only** through `INotificationService.NotifyAsync` (the Notification contract); recipients +
-text come **only** through the owner's Kernel strategies (`IReminderRecipientResolver` / `IReminderRenderer`, matched by `.Key` / `.TemplateKey` over the injected `IEnumerable<>`) — no domain imports.
+text come **only** through the owner's `Sydowwe.Framework.Contracts` strategies (`IReminderRecipientResolver` / `IReminderRenderer`, matched by `.Key` / `.TemplateKey` over the injected `IEnumerable<>`) — no domain imports.
 
 **"Now" is the fire instant** (`ScheduledJobContext.ActualFireTimeUtc`), not `DateTimeOffset.UtcNow`, so the scan is deterministic and a multi-fire lifecycle can be driven at controlled instants in
 tests.
@@ -255,7 +255,7 @@ failure → `Failed` + batch continues; `Paused` / `Cancelled` / `Completed` nev
 ## Registering the scan with the Scheduler module (phase 03b — `infrastructure/scheduling/`)
 
 The 03a handler is inert until something fires it. **Reminders owns no Quartz** — it never calls `AddQuartz`, owns no Quartz `IJob`, and references no Quartz assembly (guarded by
-`RemindersNoQuartzGuardTests`). It registers its recurring scan as a job with the Scheduler module through the `Kernel.scheduling`
+`RemindersNoQuartzGuardTests`). It registers its recurring scan as a job with the Scheduler module through the `Sydowwe.Framework.Contracts.scheduling`
 contract; all Quartz infra, the misfire→instruction mapping and the run log live in Scheduler. (The registrar later gained a second entry — the retention purge; see "Ledger retention" below. Still
 exactly **one trigger per module-wide job**, never one per reminder.)
 
@@ -301,9 +301,9 @@ migration `RemindersDispatchPolicy` in both portals.
 > (data-carrying migration `NotificationQuietHours` in both portals) and `SetReminderQuietHoursEndpoint` +
 > `MyReminderPreferencesResponse.QuietHours` were removed — edit the window at
 > `GET|PUT|DELETE /notification-quiet-hours`. **The scan-side behaviour below is unchanged**; only the source of
-> the window moved, to the Kernel `IQuietHoursReader` seam (`Core.Reminders/infrastructure/NoQuietHoursReader.cs`
+> the window moved, to the `Sydowwe.Framework.Contracts` `IQuietHoursReader` seam (`Core.Reminders/infrastructure/NoQuietHoursReader.cs`
 > is the no-op for a host shipping Reminders without Notifications). The window math moved with it, from
-> `ReminderQuietHoursPolicy` to `Kernel.notification.QuietHoursPolicy`.
+> `ReminderQuietHoursPolicy` to `Sydowwe.Framework.Contracts.notification.QuietHoursPolicy`.
 
 **Scanner integration (`ReminderScanJobHandler`, after recipient resolution):**
 
@@ -323,7 +323,7 @@ migration `RemindersDispatchPolicy` in both portals.
   so a *mixed* window (some quiet, some not) dispatches to all. Correct for the dominant single-recipient case; a documented v1 simplification.
 - **Drop semantics not implemented:** v1 is defer-only (`SkipReason.QuietHours` stays reserved for a future drop policy).
 - **Time zone:** the repo models **no per-user/employee time zone** — only the single deployment zone (`Application:Timezone`, the one `WorkHourCalculatorService` uses). Quiet-hours windows are
-  interpreted in it (`Kernel.notification.QuietHoursPolicy.IsWithin`, fed `Helper.GetTimezone`); the handler falls back to UTC if the config is missing/invalid. If a per-user time zone is ever added,
+  interpreted in it (`Sydowwe.Framework.Contracts.notification.QuietHoursPolicy.IsWithin`, fed `Helper.GetTimezone`); the handler falls back to UTC if the config is missing/invalid. If a per-user time zone is ever added,
   revisit.
 
 **Reconciliation with the Notification module's `NotificationPreference` (orchestration rule 8) — the boundary:**
@@ -359,7 +359,7 @@ Opt-in aggregation **on top of** the scanner. **Strictly additive:** a definitio
 instead: the key's due definitions are aggregated so **each recipient gets one `NotificationType.ReminderDigest` notification** across every definition sharing the key they're a recipient of — while
 the handler **still writes one per-occurrence `ReminderDispatch` row per definition** (the audit trail is never collapsed; phase-05 snooze/dismiss stays per occurrence).
 
-**The new `ReminderDigest` notification type** was added to `Kernel.notification.NotificationType` with a renderer case in `Core.Notifications/application/NotificationTextRenderer` (the module's
+**The new `ReminderDigest` notification type** was added to `Sydowwe.Framework.Contracts.notification.NotificationType` with a renderer case in `Core.Notifications/application/NotificationTextRenderer` (the module's
 documented "add a notification type"
 playbook — mirrors how the existing `UpcomingHrEvents` digest works: aggregation in the caller, rendering in Notifications). The aggregate `NotifyAsync` carries a **count-by-`Kind`** payload (mirrors
 `NotifyUpcomingHrEventsJobHandler`;
@@ -412,7 +412,7 @@ as flagged in 02a). Filtering is shared between each JSON endpoint and its `Expo
 
 - **CSV only, no XLSX.** The 05a prompt says "mirror Attendance's export (CSV/XLSX)" *and* references EmployeeModule's
   `SimpleCsv`. Attendance's XLSX is Syncfusion (a licensed dependency) on a payroll-accountant handoff; these dashboard exports are an ops/audit dump, so a **dependency-free CSV** (UTF-8 BOM,
-  RFC-4180, ISO-8601 instants, ids only — no PII) keeps this domain-free infra module's reference graph to just Kernel + Framework. The
+  RFC-4180, ISO-8601 instants, ids only — no PII) keeps this domain-free infra module's reference graph to just `Sydowwe.Framework.Contracts` + Framework. The
   `ReminderExportFormat` enum + `ReminderExportFormatParser` keep the Attendance-style `?format=` endpoint shape so an XLSX variant can slot in later; an unsupported format ⇒ 400. Impl:
   `application/service/ReminderExportService`
   (`IReminderExportService` in `domain/serviceContract/`, `ISingletonService`).
@@ -489,7 +489,7 @@ Tests: `…/integration/reminders/ReminderScanJobHandlerTests.cs` (snooze defers
 ## Ledger retention (follow-up 01 — `application/job/PurgeExpiredReminderLedgersJobHandler.cs`)
 
 Both ledgers are append-only, so without a purge they grow for the life of the deployment — GDPR Art. 5 (1)(e) / §13 zák. 18/2018 (audit L1). The module dogfoods its own substrate: a **second**
-recurring job (`Reminders.PurgeExpiredDispatchLog`) alongside the scan, registered through the same Kernel
+recurring job (`Reminders.PurgeExpiredDispatchLog`) alongside the scan, registered through the same `Sydowwe.Framework.Contracts`
 `IScheduler` contract, monthly at `0 45 3 1 * ?`. Still no Quartz reference.
 
 **The ordering is the point.** Every FK into these tables is `Restrict` (history is never cascade-erased with its definition), so a naive delete aborts the whole batch. Three passes, each excluding
@@ -519,12 +519,12 @@ ledgers are
 
 ## Per-subject erasure (follow-up 03 — audit L2, closed 2026-07-20)
 
-`application/service/ReminderSubjectDataEraser.cs` implements the Kernel fan-out
-`MojaDigitalnaFirma.Kernel/gdpr/ISubjectDataEraser.cs`, which `EmployeeErasureService` composes as
+`application/service/ReminderSubjectDataEraser.cs` implements the Contracts fan-out
+`Sydowwe.Framework.Contracts/gdpr/ISubjectDataEraser.cs`, which `EmployeeErasureService` composes as
 `IEnumerable<ISubjectDataEraser>` — the write-side twin of the `IEmployeePersonalDataProvider`
 composition, so `EmployeeModule` still references nothing here. `SubjectErasureRequest` carries **both**
 `EmployeeId` and `UserId` (this module keys everything by `UserId`; the bridge is resolved once at the call site). Unlike follow-up 02's provider, this one lives **in the module** — the contract is a
-Kernel type, so no domain reference is needed. Mutates the ambient `DbContext` and never commits; exceptions are allowed to escape (a silently skipped erasure is an Art. 17 hole, and the caller rolls
+`Sydowwe.Framework.Contracts` type, so no domain reference is needed. Mutates the ambient `DbContext` and never commits; exceptions are allowed to escape (a silently skipped erasure is an Art. 17 hole, and the caller rolls
 back).
 
 | Table                                          | Action                                                                                                                                                                                          |
@@ -543,7 +543,7 @@ owner-supplied; tightening it belongs to
 
 ## GDPR cataloguing (follow-up 02 — audit L3, closed 2026-07-20)
 
-Reminder data is now visible to both GDPR surfaces, and **neither addition lives in this module** — its reference set is still Kernel + Framework only.
+Reminder data is now visible to both GDPR surfaces, and **neither addition lives in this module** — its reference set is still `Sydowwe.Framework.Contracts` + Framework only.
 
 - **RoPA (Art. 30):** `ProcessingActivity` `reminder-dispatch` / `ZSC-12`, seeded by the GDPR module's
   `DevProcessingActivitySeeder`. RoPA is dev-seed-only + admin CRUD in vanilla, so that row is the default template a customer's DPO edits. Legitimate interest, `DataSubjectCategory.Employee`, no
@@ -581,7 +581,7 @@ Reminder data is now visible to both GDPR surfaces, and **neither addition lives
       `prompts/reminders/frontend-prompts/05-dashboard-and-queries.md`.
 - Dispatch policy: `Core.Reminders/domain/entity/ReminderKindPreference.cs` + `…/application/endpoint/preference/` +
   `…/application/dto/preference/`; migration `RemindersDispatchPolicy` in both portals. Quiet hours moved out — entity `Core.Notifications/domain/entity/NotificationQuietHours.cs`, math
-  `Kernel/notification/QuietHoursPolicy.cs`, seam `Kernel/notification/IQuietHoursReader.cs` (impl `Core.Notifications/infrastructure/QuietHoursReader.cs`, fallback
+  `Sydowwe.Framework.Contracts/notification/QuietHoursPolicy.cs`, seam `Sydowwe.Framework.Contracts/notification/IQuietHoursReader.cs` (impl `Core.Notifications/infrastructure/QuietHoursReader.cs`, fallback
   `Core.Reminders/infrastructure/NoQuietHoursReader.cs`), migration `NotificationQuietHours` in both portals. Tests: `…/unit/notification/QuietHoursPolicyTests.cs` +
   `…/integration/reminders/ReminderPreferenceEndpointTests.cs`
   (kind opt-outs) + `AdminPortal.Tests/…/notification/NotificationQuietHoursEndpointTests.cs` (the window).
@@ -601,10 +601,10 @@ Reminder data is now visible to both GDPR surfaces, and **neither addition lives
 - Scan handler: `Core.Reminders/application/job/ReminderScanJobHandler.cs` (`reminders.scan`) +
   `…/integration/reminders/ReminderScanJobHandlerTests.cs`.
 - Next-occurrence helper: `Core.Reminders/domain/service/ReminderOccurrenceCalculator.cs` (shared with phase 03).
-- Cron evaluator: `MojaDigitalnaFirma.Kernel/scheduling/ICronEvaluator.cs` + `Core.Scheduler/infrastructure/CronEvaluator.cs`.
+- Cron evaluator: `Sydowwe.Framework.Contracts/scheduling/ICronEvaluator.cs` + `Core.Scheduler/infrastructure/CronEvaluator.cs`.
 - Registry/endpoint tests: `MojaDigitalnaFirma.HBCleaning.Tests/integration/reminders/ReminderRegistryServiceTests.cs`
     + `ReminderCommandEndpointTests.cs` (+ `infrastructure/FakeReminderStrategies.cs`).
-- Contract source: `MojaDigitalnaFirma.Kernel/reminders/`.
+- Contract source: `Sydowwe.Framework.Contracts/reminders/`.
 - Persistence: `Core.Reminders/domain/entity/` + `…/infrastructure/persistence/configuration/`.
 - Guard test: `MojaDigitalnaFirma.HBCleaning.Tests/unit/reminders/ReminderContractGuardTests.cs`.
 - Read DTOs: `Core.Reminders/application/dto/reminderDefinition/` + `…/reminderDispatch/`.

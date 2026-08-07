@@ -2,8 +2,8 @@ using AdhdTimeOrganizer.Scheduler.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Scheduler.application.job;
 
@@ -34,7 +34,7 @@ namespace AdhdTimeOrganizer.Scheduler.application.job;
 // Background-safe (no authenticated user).
 //
 // TODO (reminders follow-up 01, out of scope): per-user erasure. Purging on age does not reach a run
-// log row on demand when a user is anonymized. That needs a Kernel erasure contract so EmployeeModule
+// log row on demand when a user is anonymized. That needs a Sydowwe.Framework.Contracts erasure contract so EmployeeModule
 // never references this module — a separate task.
 public class PurgeExpiredRunLogsJobHandler(
     DbContext dbContext,

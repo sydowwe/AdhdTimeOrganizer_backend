@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.Notifications.application.dto;
 using FastEndpoints;
 using FluentValidation;
-using MojaDigitalnaFirma.Kernel.notification;
+using Sydowwe.Framework.Contracts.notification;
 
 namespace AdhdTimeOrganizer.Notifications.application.validator;
 

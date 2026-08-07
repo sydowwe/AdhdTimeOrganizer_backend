@@ -1,4 +1,4 @@
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Reminders.infrastructure.scheduling;
 
@@ -29,7 +29,7 @@ public sealed class ReminderScanOptions
 
     /// <summary>
     /// The Quartz-level misfire policy for a missed scan window (process down, etc.). Default
-    /// <see cref="Kernel.scheduling.MisfirePolicy.FireAndProceed"/>: on recovery, fire one scan now to catch up, then resume —
+    /// <see cref="MisfirePolicy.FireAndProceed"/>: on recovery, fire one scan now to catch up, then resume —
     /// the scan is idempotent + DB-deduped, so a single catch-up fire sweeps everything that came due. This is
     /// distinct from the <i>per-occurrence</i> catch-up the scan handler owns (it collapses older missed
     /// instants of one reminder to skip rows and sends only the most recent).

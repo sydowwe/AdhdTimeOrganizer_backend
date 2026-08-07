@@ -9,9 +9,9 @@ channel iOS users get outside an installed PWA). Triggered by any module — bac
 ## Dependency seams
 
 - **Consumes:** `UserManager<User>` for recipient resolution. No inbound module deps.
-- **Exposes:** `INotificationService.NotifyAsync(...)` via the **Kernel contract**
-  (`MojaDigitalnaFirma.Kernel.notification`). Any module or Quartz job calls it; the impl implements `IScopedService` so it's auto-registered, and it's safe to call with no authenticated user.
-- **Cross-module contracts (in Kernel):** `INotificationService`, `NotificationType`,
+- **Exposes:** `INotificationService.NotifyAsync(...)` via the **`Sydowwe.Framework.Contracts` contract**
+  (`Sydowwe.Framework.Contracts.notification`). Any module or Quartz job calls it; the impl implements `IScopedService` so it's auto-registered, and it's safe to call with no authenticated user.
+- **Cross-module contracts (in `Sydowwe.Framework.Contracts`):** `INotificationService`, `NotificationType`,
   `NotificationChannel`, `NotificationRecipients`, `INotificationPayloadEnricher`, and — since the quiet-hours consolidation — `IQuietHoursReader` + `QuietHoursWindow` + `QuietHoursPolicy`
   (this module owns the table; Reminders reads it through the seam).
 
@@ -22,11 +22,11 @@ channel iOS users get outside an installed PWA). Triggered by any module — bac
 - **Payloads must carry ids, never person names — and this is no longer a convention, it is the type system.** A notification row belongs to its **recipient** (HR, the manager), so GDPR erasure of the
   person *named inside it* never touches it — a stored
   `employeeName` would be frozen PII surviving anonymization forever (audit 2026-07, L1). Persist `employeeId`; the display name is resolved per read by
-  `INotificationPayloadEnricher` (Kernel), so an anonymized employee degrades on its own with no backfill or scrubber. Enrichment is **best-effort** — a caller with no ambient
+  `INotificationPayloadEnricher` (`Sydowwe.Framework.Contracts`), so an anonymized employee degrades on its own with no backfill or scrubber. Enrichment is **best-effort** — a caller with no ambient
   `HttpContext` (background job) gets the renderer's name-less fallback rather than an exception.
     - You **cannot** pass an anonymous object any more. `NotifyAsync` takes
       `INotificationPayload`, and there is one record per `NotificationType` in
-      `Kernel/notification/payload/` — the rule itself is stated once, in
+      `Sydowwe.Framework.Contracts/notification/payload/` — the rule itself is stated once, in
       `INotificationPayload`'s XML doc, and every payload property in all three modules points at it instead of paraphrasing. Adding a type means adding its record.
     - `PayloadPiiContractGuardTests` reflects over every payload record and **fails the build** on a person-data property name (SK + EN). A typed record only helps if nobody can add `EmployeeName` to
       it tomorrow; that test is what stops them.
@@ -55,7 +55,7 @@ channel iOS users get outside an installed PWA). Triggered by any module — bac
   deferred notification is visible in-app right away, so don't "fix" the read path to hide it.
     - **One window per user, deployment-wide, and this module owns it.** Reminders used to have its own
       `ReminderQuietHours` table; it was migrated into `notification_quiet_hours` and now reads it through
-      `Kernel.notification.IQuietHoursReader`. Editing is at `GET|PUT|DELETE /notification-quiet-hours`
+      `Sydowwe.Framework.Contracts.notification.IQuietHoursReader`. Editing is at `GET|PUT|DELETE /notification-quiet-hours`
       (owner-scoped, no user id anywhere in the route) — **not** under `/reminder-preference` any more.
     - Minutes-from-local-midnight in `Application:Timezone` (the repo models **no** per-user zone).
       `Start > End` = overnight; `Start == End` is rejected — clear the window with `DELETE` instead.
@@ -74,8 +74,8 @@ channel iOS users get outside an installed PWA). Triggered by any module — bac
   don't treat `notification` as a durable ledger — if a caller needs a permanent trail of the event, it must write one itself via `IAuditService.LogAsync`. Windows are owner policy (consts on the
   handler), not statutory. Preferences are exempt.
 - **A GDPR erasure also reaches this module, on demand.**
-  `application/service/NotificationSubjectDataEraser.cs` implements the Kernel fan-out
-  `MojaDigitalnaFirma.Kernel/gdpr/ISubjectDataEraser.cs`, which `EmployeeErasureService` composes as `IEnumerable<ISubjectDataEraser>` (no cross-module reference either way). It **deletes** all four
+  `application/service/NotificationSubjectDataEraser.cs` implements the Contracts fan-out
+  `Sydowwe.Framework.Contracts/gdpr/ISubjectDataEraser.cs`, which `EmployeeErasureService` composes as `IEnumerable<ISubjectDataEraser>` (no cross-module reference either way). It **deletes** all four
   of the subject's own tables — `Notification`, `NotificationPreference`, `PushSubscription`,
   `NotificationQuietHours` — because none is an append-only ledger. Different axis from the purge above: that one deletes by **age**, this one by **subject**. Nothing else would collect these rows:
   deactivating a user never deletes the `CoreUser` row, so no cascade fires. **Recipient-side only** (`WHERE UserId = <erased user>`) — a notification *about* the erased employee in someone else's
@@ -88,8 +88,8 @@ channel iOS users get outside an installed PWA). Triggered by any module — bac
 
 ## Extension playbook
 
-- **Add a notification type:** 1) add a member to `NotificationType` (Kernel);
-    2) add its payload record in `Kernel/notification/payload/NotificationPayloads.cs`, tagged
+- **Add a notification type:** 1) add a member to `NotificationType` (`Sydowwe.Framework.Contracts`);
+    2) add its payload record in `Sydowwe.Framework.Contracts/notification/payload/NotificationPayloads.cs`, tagged
        `[NotificationPayload(NotificationType.YourType)]` — **ids and non-person scalars only**
        (the guard test enforces it, and `EveryNotificationType_HasExactlyOnePayloadRecord` will fail until the record exists);
     3) add a `case` in `NotificationTextRenderer.Render` deserializing that record — give it a **name-less fallback branch**, since enrichment can be absent;

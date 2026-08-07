@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.Reminders.domain.@enum;
-using MojaDigitalnaFirma.Kernel.reminders;
 using Sydowwe.Framework.application.dto.request.@interface;
+using Sydowwe.Framework.Contracts.reminders;
 
 namespace AdhdTimeOrganizer.Reminders.application.dto.dashboard;
 

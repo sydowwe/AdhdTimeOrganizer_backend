@@ -2,16 +2,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MojaDigitalnaFirma.Core.application.job;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.scheduling;
 using Quartz;
-using IScheduler = MojaDigitalnaFirma.Kernel.scheduling.IScheduler;
+using Sydowwe.Framework.Contracts.scheduling;
+using IScheduler = Sydowwe.Framework.Contracts.scheduling.IScheduler;
 
 namespace MojaDigitalnaFirma.Core.infrastructure.scheduling;
 
 /// <summary>
 /// Startup reconciliation seam for the vanilla Core module's recurring jobs (Scheduler phase 05). On boot
-/// it (re-)registers each owned job with the Scheduler via the <see cref="Kernel.scheduling.IScheduler"/> contract — the
-/// owning module pushes its schedule; Scheduler reconciles. <see cref="Kernel.scheduling.IScheduler.RegisterRecurringJobAsync"/>
+/// it (re-)registers each owned job with the Scheduler via the <see cref="IScheduler"/> contract — the
+/// owning module pushes its schedule; Scheduler reconciles. <see cref="IScheduler.RegisterRecurringJobAsync"/>
 /// is an idempotent upsert by <c>JobKey</c>, so re-running on every boot converges the registry + Quartz
 /// triggers with no duplicates (and is <i>required</i>, since the RAM job store drops all triggers on restart).
 /// <para>

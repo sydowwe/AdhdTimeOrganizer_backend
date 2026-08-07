@@ -1,14 +1,14 @@
 using AdhdTimeOrganizer.domain.model.entity.user;
 using Microsoft.EntityFrameworkCore;
-using MojaDigitalnaFirma.Kernel.user;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
 
 /// <summary>
-/// Host-side implementation of the two seams seeding code uses to find users: the Kernel's
+/// Host-side implementation of the two seams seeding code uses to find users: <c>Sydowwe.Framework.Contracts</c>'s
 /// <see cref="ISeedUserIdProvider"/> (module dev seeders) and the framework's
 /// <see cref="ISeedUserProvider"/> (the per-user seeder managers). Neither can query
 /// <see cref="User"/> itself — they key everything by a plain UserId and do not reference this

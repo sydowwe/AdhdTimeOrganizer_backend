@@ -1,4 +1,4 @@
-using MojaDigitalnaFirma.Kernel.notification;
+using Sydowwe.Framework.Contracts.notification;
 
 namespace AdhdTimeOrganizer.Reminders.application.dto.preference;
 

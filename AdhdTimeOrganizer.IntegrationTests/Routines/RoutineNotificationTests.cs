@@ -6,9 +6,9 @@ using AdhdTimeOrganizer.Notifications.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.notification;
 using Moq;
 using Quartz;
+using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Testing;
 using Xunit;
 

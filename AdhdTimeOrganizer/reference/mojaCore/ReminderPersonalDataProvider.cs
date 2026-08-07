@@ -3,9 +3,11 @@ using MojaDigitalnaFirma.Core.EmployeeModule.Contracts.domain.serviceContract;
 using MojaDigitalnaFirma.Core.EmployeeModule.domain.model.entity.employee;
 using MojaDigitalnaFirma.Core.Reminders.domain.entity;
 using MojaDigitalnaFirma.Core.Reminders.domain.@enum;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.reminders;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.reminders;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.reminders;
 
 namespace MojaDigitalnaFirma.Core.infrastructure.service;
 

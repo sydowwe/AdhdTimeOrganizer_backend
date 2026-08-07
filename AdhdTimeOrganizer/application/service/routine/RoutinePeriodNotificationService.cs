@@ -2,15 +2,15 @@ using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.@enum;
 using AdhdTimeOrganizer.domain.service;
 using AdhdTimeOrganizer.domain.serviceContract;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.notification.payload;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
 
 namespace AdhdTimeOrganizer.application.service.routine;
 
 /// <summary>
-/// The portal's routine-domain notification producer. Maps <c>RoutineTimePeriod</c> events onto the Kernel
-/// notification contract; nothing else in the portal names a routine <c>NotificationType</c> or payload.
+/// The portal's routine-domain notification producer. Maps <c>RoutineTimePeriod</c> events onto the
+/// <c>Sydowwe.Framework.Contracts</c> notification contract; nothing else in the portal names a routine <c>NotificationType</c> or payload.
 /// <para>
 /// Recipient is always the period's own <c>UserId</c> — a routine belongs to exactly one person, so there is
 /// no resolver and no fan-out. The user's channel choices are applied downstream by the Notifications module,

@@ -76,7 +76,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
-        <ProjectReference Include="..\MojaDigitalnaFirma.Kernel\MojaDigitalnaFirma.Kernel.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>
         <ProjectReference Include="..\AdhdTimeOrganizer.Notifications\AdhdTimeOrganizer.Notifications.csproj"/>
         <ProjectReference Include="..\AdhdTimeOrganizer.Reminders\AdhdTimeOrganizer.Reminders.csproj"/>
         <ProjectReference Include="..\AdhdTimeOrganizer.Scheduler\AdhdTimeOrganizer.Scheduler.csproj"/>

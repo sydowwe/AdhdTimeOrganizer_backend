@@ -2,7 +2,7 @@ namespace AdhdTimeOrganizer.Reminders.domain.@enum;
 
 /// <summary>
 /// The outcome recorded on an append-only <c>ReminderDispatch</c> row — what actually happened when the
-/// scanner (phase 03) acted on one occurrence. Internal stored state, NOT part of the Kernel contract.
+/// scanner (phase 03) acted on one occurrence. Internal stored state, NOT part of the <c>Sydowwe.Framework.Contracts</c> surface.
 /// </summary>
 public enum DispatchOutcome
 {

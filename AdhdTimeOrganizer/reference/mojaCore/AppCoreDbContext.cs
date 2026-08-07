@@ -26,8 +26,8 @@ using MojaDigitalnaFirma.Core.Reminders.domain.entity;
 using MojaDigitalnaFirma.Core.Scheduler.domain.entity;
 using MojaDigitalnaFirma.Core.Vehicles.domain.entity;
 using MojaDigitalnaFirma.Core.Zmluvy.domain.entity;
-using MojaDigitalnaFirma.Kernel.partneri;
-using MojaDigitalnaFirma.Kernel.user;
+using Sydowwe.Framework.Contracts.partneri;
+using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Framework.domain.extServiceContract.user;
 using Sydowwe.Framework.infrastructure;
 

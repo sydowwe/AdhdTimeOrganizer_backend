@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.Reminders.domain.entity;
 using Microsoft.EntityFrameworkCore;
-using MojaDigitalnaFirma.Kernel.reminders;
+using Sydowwe.Framework.Contracts.reminders;
 
 namespace AdhdTimeOrganizer.Reminders.application.endpoint.dashboard;
 

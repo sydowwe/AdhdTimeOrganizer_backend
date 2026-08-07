@@ -1,7 +1,7 @@
 using System.Text.Json;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.notification.payload;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Notifications.application;
@@ -11,7 +11,7 @@ namespace AdhdTimeOrganizer.Notifications.application;
 /// recipient, replace with an implementation that takes the user's culture and resolves
 /// strings from resource files.
 /// <para>
-/// Each branch deserializes the Kernel payload record its <see cref="NotificationType"/> declares, so the
+/// Each branch deserializes the <c>Sydowwe.Framework.Contracts</c> payload record its <see cref="NotificationType"/> declares, so the
 /// producer's shape and the text that reads it are coupled at compile time. One rule holds everywhere:
 /// <b>every branch keeps a degraded fallback.</b> A payload can be empty, malformed, or written by an older
 /// shape, and it must still render rather than throw.

@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.Notifications.domain.entity;
 using Microsoft.EntityFrameworkCore;
-using MojaDigitalnaFirma.Kernel.notification;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
 
 namespace AdhdTimeOrganizer.Notifications.infrastructure;
 

@@ -2,9 +2,9 @@ using AdhdTimeOrganizer.Notifications.application.dto;
 using AdhdTimeOrganizer.Notifications.domain.entity;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
-using MojaDigitalnaFirma.Kernel.notification;
 using Npgsql;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Notifications.application.endpoint.quietHours;

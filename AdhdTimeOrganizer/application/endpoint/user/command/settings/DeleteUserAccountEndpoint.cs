@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity.user;
 using Microsoft.AspNetCore.Identity;
-using MojaDigitalnaFirma.Kernel.gdpr;
 using Sydowwe.Framework.application.endpoint.user.command.settings;
+using Sydowwe.Framework.Contracts.gdpr;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.settings;
 
@@ -18,7 +18,7 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.settings;
 /// only a retention problem — it leaves its definition scanning forever for a user who no longer exists.
 /// </para>
 /// <para>
-/// So this fans out over the Kernel's <see cref="ISubjectDataEraser"/> seam, which is what both modules
+/// So this fans out over <c>Sydowwe.Framework.Contracts</c>'s <see cref="ISubjectDataEraser"/> seam, which is what both modules
 /// ship their erasers for. The fan-out keeps the direction right — the portal never references a module's
 /// erasure logic, and a deployment that drops a module resolves a shorter enumerable with no change here.
 /// Each eraser knows its own shape: Notifications deletes outright, Reminders pseudonymizes its

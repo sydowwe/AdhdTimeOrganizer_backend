@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using MojaDigitalnaFirma.Core.Notifications.domain.entity;
-using MojaDigitalnaFirma.Kernel.user;
+using Sydowwe.Framework.Contracts.user;
 
 namespace MojaDigitalnaFirma.Core.infrastructure.persistence.configuration;
 

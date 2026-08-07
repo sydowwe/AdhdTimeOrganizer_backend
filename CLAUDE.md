@@ -16,16 +16,28 @@ their docs are versioned in that repo, not this one.
 # Solution Layout
 
 - `AdhdTimeOrganizer` — the portal (entities, endpoints, `AppDbContext`, migrations).
-- `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding two projects:
+- `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding three projects:
   - `framework/Sydowwe.Framework` — the shared framework, used by **the portal and the modules
     alike**. Base entities, base endpoints, builder extensions, DbContext helpers, seeders, auth
     services.
+  - `framework/Sydowwe.Framework.Contracts` — the cross-module contract layer: the interfaces, enums
+    and records through which the modules talk to each other and to a host without referencing it
+    (`IScheduler`, `IScheduledJobHandler`, `INotificationService`, `IQuietHoursReader`,
+    `IReminderRegistry`, `ISubjectDataEraser`, the payload types). **Contract types only** — no
+    services, no EF, no package references. Implementations live in the modules or the portal. It
+    references `Sydowwe.Framework`; the modules and the portal reference it.
   - `framework/Sydowwe.Framework.Testing` — the shared test infrastructure.
 - `AdhdTimeOrganizer.Notifications` / `.Reminders` / `.Scheduler` — opt-in module projects built on
-  the `Sydowwe.Framework` primitives.
+  the `Sydowwe.Framework` primitives, wired to each other only through `Sydowwe.Framework.Contracts`.
 - `AdhdTimeOrganizer.IntegrationTests`.
-- `MojaDigitalnaFirma.Kernel` and `AdhdTimeOrganizer/reference/mojaCore/` are reference/foreign
-  code — don't extend them.
+- `AdhdTimeOrganizer/reference/mojaCore/` is reference/foreign code — don't extend it.
+
+⚠ This layer used to be a portal-level project called **`MojaDigitalnaFirma.Kernel`**, and older docs
+and comments still call it "the Kernel". Same 42 contract types, same folder names; only the root
+namespace changed (`MojaDigitalnaFirma.Kernel.<seam>` → `Sydowwe.Framework.Contracts.<seam>`). It moved
+so the modules — which depend on nothing else portal-side — could follow it into the submodule later.
+`docs/architecture.md` and `docs/modules.md` still describe a `MojaDigitalnaFirma.Kernel` product base;
+that is the *other* solution's layering and is deliberately unchanged.
 
 ⚠ **`framework/` is a submodule, so editing it is a two-repo operation.** A change there is committed
 and pushed in the `Sydowwe.Framework` repo *first*; the parent then records the new commit sha as a
@@ -36,8 +48,10 @@ is invisible to the parent's diff and will not travel with a parent push.
 Clone with `git clone --recurse-submodules`. An existing checkout that predates the split needs
 `git submodule update --init` or the solution will not restore — `framework/` is simply empty.
 
-Namespaces did **not** change with the move: the code is still `Sydowwe.Framework.*`, and only the
-on-disk paths gained the `framework/` prefix.
+Namespaces did **not** change when `Sydowwe.Framework` / `.Testing` moved: that code is still
+`Sydowwe.Framework.*`, and only the on-disk paths gained the `framework/` prefix. The later
+`Sydowwe.Framework.Contracts` move is the one exception — it was renamed out of `MojaDigitalnaFirma.*`
+on the way in (see above).
 
 **Which copy to use: there is one copy.** The portal's parallel set of primitives was deleted in the
 framework reconciliation — reach for `Sydowwe.Framework.*` from portal code too. What still lives in
@@ -204,7 +218,7 @@ the DI scan registers it and the matching manager picks it up. No manual registr
   `SeedAssembly…Async` (reseed one module) and `TruncateAllTablesAsync`.
 - **Finding users:** never query users from a seeder or manager in Framework — use `ISeedUserProvider`
   (`GetAllUserIdsAsync` / `GetRootAdminUserIdAsync` / `GetSeedUserIdsAsync`). The portal implements it in
-  `infrastructure/persistence/seeder/SeedUserIdProvider.cs`, alongside the Kernel's `ISeedUserIdProvider`.
+  `infrastructure/persistence/seeder/SeedUserIdProvider.cs`, alongside Contracts' `ISeedUserIdProvider`.
 - Entry point is `Program.SeedDatabase` — four ordered passes, **all still commented out**, so nothing
   seeds on startup today.
 

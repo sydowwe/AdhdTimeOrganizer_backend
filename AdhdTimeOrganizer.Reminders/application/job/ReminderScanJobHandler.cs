@@ -8,11 +8,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MojaDigitalnaFirma.Kernel.notification;
-using MojaDigitalnaFirma.Kernel.notification.payload;
-using MojaDigitalnaFirma.Kernel.reminders;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
+using Sydowwe.Framework.Contracts.reminders;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Reminders.application.job;
@@ -22,7 +22,7 @@ namespace AdhdTimeOrganizer.Reminders.application.job;
 /// <see cref="IScheduledJobHandler"/> (key <see cref="HandlerKey"/>); the Scheduler module registers it as the
 /// single recurring scan job in phase 03b (this module never owns a Quartz <c>IJob</c> or calls
 /// <c>AddQuartz</c>). On each fire it finds due occurrences, dedupes them against the append-only
-/// <see cref="ReminderDispatch"/> log, resolves recipients + text through the owner's Kernel strategies,
+/// <see cref="ReminderDispatch"/> log, resolves recipients + text through the owner's <c>Sydowwe.Framework.Contracts</c> strategies,
 /// dispatches through the Notification module (<see cref="INotificationService.NotifyAsync"/>), appends a
 /// dispatch row, and advances <see cref="ReminderDefinition.NextOccurrenceAt"/> via the shared
 /// <see cref="ReminderOccurrenceCalculator"/> (so register/resume and the scan agree by construction).
@@ -42,7 +42,7 @@ namespace AdhdTimeOrganizer.Reminders.application.job;
 /// catch-up Reminders owns.
 /// </para>
 /// <para>
-/// <b>No domain imports:</b> recipients and text come exclusively through the Kernel strategy abstractions the
+/// <b>No domain imports:</b> recipients and text come exclusively through the <c>Sydowwe.Framework.Contracts</c> strategy abstractions the
 /// owners registered — the scanner knows nothing domain-specific. Background-safe (no authenticated user): the
 /// definitions are plain-table entities and the Notification contract is safe to call with no principal.
 /// </para>
@@ -55,7 +55,7 @@ namespace AdhdTimeOrganizer.Reminders.application.job;
 /// <br/>
 /// The quiet-hours window itself is <b>not this module's</b>: notifications follow-up 05 consolidated it into
 /// the Notifications module (one window per user, deployment-wide, also honoured by the notification
-/// dispatcher), and the scan reads it through the Kernel <see cref="IQuietHoursReader"/> seam. The scan-side
+/// dispatcher), and the scan reads it through the <c>Sydowwe.Framework.Contracts</c> <see cref="IQuietHoursReader"/> seam. The scan-side
 /// deferral mechanism is unchanged — <c>NextOccurrenceAt</c> is left untouched and re-evaluated next scan, so
 /// no deferred-delivery state is needed here.
 /// </para>

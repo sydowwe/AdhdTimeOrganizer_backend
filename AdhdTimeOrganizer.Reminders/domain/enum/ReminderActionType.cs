@@ -2,7 +2,7 @@ namespace AdhdTimeOrganizer.Reminders.domain.@enum;
 
 /// <summary>
 /// The kind of per-recipient action recorded on an append-only <c>ReminderOccurrenceAction</c> row
-/// (phase 05b). Internal stored state, NOT part of the Kernel contract.
+/// (phase 05b). Internal stored state, NOT part of the <c>Sydowwe.Framework.Contracts</c> surface.
 /// </summary>
 public enum ReminderActionType
 {

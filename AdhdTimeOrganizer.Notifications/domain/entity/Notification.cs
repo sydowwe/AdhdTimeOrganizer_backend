@@ -1,4 +1,5 @@
-using MojaDigitalnaFirma.Kernel.notification;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.entity.@base;
 
@@ -24,7 +25,7 @@ public class Notification : BaseTableEntity
     /// JSON payload (jsonb). Title/body are rendered from Type + this at read/send time.
     /// <para>
     /// Bound by the payload PII contract — <b>the rule and the reasoning live on
-    /// <see cref="MojaDigitalnaFirma.Kernel.notification.payload.INotificationPayload"/></b>, stated once for
+    /// <see cref="INotificationPayload"/></b>, stated once for
     /// all three modules that persist a payload. Enforced structurally: what lands here is always the
     /// serialization of a typed payload record, and a guard test rejects person-data fields on those records.
     /// </para>

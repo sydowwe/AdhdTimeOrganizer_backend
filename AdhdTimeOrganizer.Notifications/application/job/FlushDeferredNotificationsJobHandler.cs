@@ -2,8 +2,8 @@ using AdhdTimeOrganizer.Notifications.domain.entity;
 using AdhdTimeOrganizer.Notifications.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Notifications.application.job;
 

@@ -2,9 +2,9 @@ using AdhdTimeOrganizer.Scheduler.domain.entity;
 using AdhdTimeOrganizer.Scheduler.domain.@enum;
 using AdhdTimeOrganizer.Scheduler.domain.serviceContract;
 using Microsoft.EntityFrameworkCore;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Quartz;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.result;
 
 namespace AdhdTimeOrganizer.Scheduler.infrastructure;

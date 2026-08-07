@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MojaDigitalnaFirma.Kernel.scheduling;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Reminders.infrastructure.scheduling;
 
@@ -16,7 +16,7 @@ namespace AdhdTimeOrganizer.Reminders.infrastructure.scheduling;
 /// per-reminder timing lives in the DB (<c>NextOccurrenceAt</c>) and the scan sweeps for what is due.
 /// <para>
 /// <b>Reminders owns no Quartz.</b> It never calls <c>AddQuartz</c>, owns no Quartz <c>IJob</c>, and references
-/// no Quartz type — it registers its scan as a job key + handler key through the Kernel contract. All Quartz
+/// no Quartz type — it registers its scan as a job key + handler key through the <c>Sydowwe.Framework.Contracts</c> contract. All Quartz
 /// infrastructure, the misfire→instruction mapping and the run log live in the Scheduler module.
 /// </para>
 /// <para>

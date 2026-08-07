@@ -5,7 +5,7 @@ namespace AdhdTimeOrganizer.Reminders.application.export;
 /// <c>AttendanceExportFormatParser</c> shape, but this module emits <b>CSV only</b>: Attendance's XLSX path is
 /// Syncfusion (a licensed dependency) on a payroll-accountant handoff; the reminders dashboard exports are an
 /// ops/audit dump, so a dependency-free CSV (mirroring EmployeeModule's <c>SimpleCsv</c>) keeps this domain-free
-/// infra module's reference graph to just Kernel + Framework. Defaults to CSV when the value is omitted.
+/// infra module's reference graph to just Sydowwe.Framework.Contracts + Framework. Defaults to CSV when the value is omitted.
 /// </summary>
 public static class ReminderExportFormatParser
 {

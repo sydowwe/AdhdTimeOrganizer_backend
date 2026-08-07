@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Notifications.domain.entity;
+using Sydowwe.Framework.Contracts.notification;
 
 namespace AdhdTimeOrganizer.Notifications.infrastructure;
 
@@ -6,7 +7,7 @@ namespace AdhdTimeOrganizer.Notifications.infrastructure;
 /// The module-internal seam the flush job (<c>FlushDeferredNotificationsJobHandler</c>) uses to deliver the
 /// background channels of notifications that were withheld during a recipient's quiet hours.
 /// <para>
-/// Deliberately <b>not</b> in the Kernel: unlike <see cref="MojaDigitalnaFirma.Kernel.notification.INotificationService"/>
+/// Deliberately <b>not</b> in <c>Sydowwe.Framework.Contracts</c>: unlike <see cref="INotificationService"/>
 /// this is not a capability other modules may call — re-delivering a stored notification is an internal detail
 /// of how Notifications honours quiet hours. It exists as an interface only so the job (which owns the query,
 /// the batching and the column clear) can reuse <c>NotificationService</c>'s channel machinery — the render →

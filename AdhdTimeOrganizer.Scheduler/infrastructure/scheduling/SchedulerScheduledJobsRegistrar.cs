@@ -3,9 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Quartz;
-using IScheduler = MojaDigitalnaFirma.Kernel.scheduling.IScheduler;
+using Sydowwe.Framework.Contracts.scheduling;
+using IScheduler = Sydowwe.Framework.Contracts.scheduling.IScheduler;
 
 namespace AdhdTimeOrganizer.Scheduler.infrastructure.scheduling;
 

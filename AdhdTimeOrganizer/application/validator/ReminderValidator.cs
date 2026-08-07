@@ -35,7 +35,7 @@ public class ReminderValidator : Validator<ReminderRequest>
             .When(x => x.LeadOffsetsMinutes is not null)
             .WithMessage("Lead offsets must be unique.");
 
-        // A recurring reminder's offset is folded into the recurrence anchor, because the Kernel's recurring
+        // A recurring reminder's offset is folded into the recurrence anchor, because Sydowwe.Framework.Contracts's recurring
         // schedule has no lead-offset concept. One offset is expressible; a second one would be dropped
         // silently, so it is refused instead. See ReminderRegistrationService.BuildSchedule.
         RuleFor(x => x.LeadOffsetsMinutes)

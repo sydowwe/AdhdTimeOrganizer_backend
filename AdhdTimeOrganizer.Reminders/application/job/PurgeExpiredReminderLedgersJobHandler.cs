@@ -3,8 +3,8 @@ using AdhdTimeOrganizer.Reminders.domain.@enum;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MojaDigitalnaFirma.Kernel.scheduling;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.scheduling;
 
 namespace AdhdTimeOrganizer.Reminders.application.job;
 
@@ -16,7 +16,7 @@ namespace AdhdTimeOrganizer.Reminders.application.job;
 // (RetentionOptions.DefaultRetentionYears), configurable via ReminderRetentionOptions.
 //
 // The module dogfoods its own substrate: this is a second handler on the Scheduler substrate alongside
-// the scan, registered through the Kernel IScheduler contract — Reminders still references no Quartz.
+// the scan, registered through the Sydowwe.Framework.Contracts IScheduler contract — Reminders still references no Quartz.
 //
 // ── Delete ordering is load-bearing ────────────────────────────────────────────────────────────────
 // Every FK into these tables is DeleteBehavior.Restrict (the ledger invariant: history is never
@@ -55,7 +55,7 @@ namespace AdhdTimeOrganizer.Reminders.application.job;
 //
 // Per-user erasure (reminders audit L2) is a DIFFERENT axis and lives elsewhere: this purge deletes by
 // AGE, while an Art. 17 erasure must reach one subject's rows ON DEMAND. See
-// application/service/ReminderSubjectDataEraser.cs, reached through the Kernel ISubjectDataEraser
+// application/service/ReminderSubjectDataEraser.cs, reached through the Sydowwe.Framework.Contracts ISubjectDataEraser
 // fan-out so EmployeeModule never references this module.
 public class PurgeExpiredReminderLedgersJobHandler(
     DbContext dbContext,
