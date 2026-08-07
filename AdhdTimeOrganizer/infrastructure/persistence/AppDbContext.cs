@@ -12,15 +12,15 @@ using AdhdTimeOrganizer.domain.model.entity.timer;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.user;
-using AdhdTimeOrganizer.Notifications.domain.entity;
-using AdhdTimeOrganizer.Reminders.domain.entity;
-using AdhdTimeOrganizer.Scheduler.domain.entity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.extServiceContract.user;
 using Sydowwe.Framework.infrastructure;
 using Sydowwe.Framework.infrastructure.persistence.configuration;
+using Sydowwe.Notifications.domain.entity;
+using Sydowwe.Reminders.domain.entity;
+using Sydowwe.Scheduler.domain.entity;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence;
 

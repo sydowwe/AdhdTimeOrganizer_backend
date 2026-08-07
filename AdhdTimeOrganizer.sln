@@ -8,13 +8,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Framework", "framew
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Framework.Testing", "framework\Sydowwe.Framework.Testing\Sydowwe.Framework.Testing.csproj", "{8B295DA7-E1AE-4694-A774-D493937CA7C5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Notifications", "AdhdTimeOrganizer.Notifications\AdhdTimeOrganizer.Notifications.csproj", "{8BBA7A35-FF8F-474F-A076-AB3D9787DF9F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Notifications", "framework\Sydowwe.Notifications\Sydowwe.Notifications.csproj", "{8BBA7A35-FF8F-474F-A076-AB3D9787DF9F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Reminders", "AdhdTimeOrganizer.Reminders\AdhdTimeOrganizer.Reminders.csproj", "{C813B300-DC97-4011-BF69-AE933DD233C5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Reminders", "framework\Sydowwe.Reminders\Sydowwe.Reminders.csproj", "{C813B300-DC97-4011-BF69-AE933DD233C5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Scheduler", "AdhdTimeOrganizer.Scheduler\AdhdTimeOrganizer.Scheduler.csproj", "{95759481-5A5D-442B-B0E3-591CCB1B1128}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Scheduler", "framework\Sydowwe.Scheduler\Sydowwe.Scheduler.csproj", "{95759481-5A5D-442B-B0E3-591CCB1B1128}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Framework.Contracts", "framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj", "{85619205-F7AA-44B5-9512-8EB6F7F64FB3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sydowwe.Scheduler.Xlsx", "framework\Sydowwe.Scheduler.Xlsx\Sydowwe.Scheduler.Xlsx.csproj", "{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,6 +28,18 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Debug|x64.Build.0 = Debug|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Debug|x86.Build.0 = Debug|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Release|x64.ActiveCfg = Release|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Release|x64.Build.0 = Release|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Release|x86.ActiveCfg = Release|Any CPU
+		{3F1A9C64-2D8B-4E57-9A03-7C6E5B41D2A8}.Release|x86.Build.0 = Release|Any CPU
 		{427285EE-0B51-4ABD-8D9B-46BF9E654A94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{427285EE-0B51-4ABD-8D9B-46BF9E654A94}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{427285EE-0B51-4ABD-8D9B-46BF9E654A94}.Debug|x64.ActiveCfg = Debug|Any CPU

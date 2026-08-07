@@ -2,7 +2,6 @@ using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
-using AdhdTimeOrganizer.Notifications.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -10,6 +9,7 @@ using Moq;
 using Quartz;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Testing;
+using Sydowwe.Notifications.domain.entity;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Routines;

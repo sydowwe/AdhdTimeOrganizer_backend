@@ -1,17 +1,18 @@
 using System.Reflection;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.Notifications.application;
-using AdhdTimeOrganizer.Notifications.domain.entity;
-using AdhdTimeOrganizer.Notifications.infrastructure;
-using AdhdTimeOrganizer.Notifications.infrastructure.email;
-using AdhdTimeOrganizer.Reminders.application.job;
-using AdhdTimeOrganizer.Reminders.domain.entity;
-using AdhdTimeOrganizer.Reminders.infrastructure.scheduling;
-using AdhdTimeOrganizer.Scheduler.application.job;
-using AdhdTimeOrganizer.Scheduler.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Notifications.application;
+using Sydowwe.Notifications.domain.entity;
+using Sydowwe.Notifications.infrastructure;
+using Sydowwe.Notifications.infrastructure.email;
+using Sydowwe.Reminders.application.job;
+using Sydowwe.Reminders.domain.entity;
+using Sydowwe.Reminders.infrastructure.scheduling;
+using Sydowwe.Scheduler.application.job;
+using Sydowwe.Scheduler.domain.entity;
+using Sydowwe.Scheduler.Xlsx;
 using FrameworkDi = Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.config.dependencyInjection;
@@ -85,6 +86,12 @@ public static class ModuleServiceExtensions
         // The only INotificationPayloadEnricher in the solution, and it carries no lifetime marker (it is
         // meant as the host-supplied default). Swap for a real enricher if payloads ever need overlays.
         services.AddScoped<INotificationPayloadEnricher, NoOpNotificationPayloadEnricher>();
+
+        // Scheduler dashboard XLSX export. Registered by name, not by marker scan: Sydowwe.Scheduler.Xlsx is
+        // deliberately absent from ModuleAssemblies (adding it there to pick up a marker would put it in the
+        // path of the double-registration trap documented above). Without this call the dashboard still
+        // exports CSV and XLSX requests throw — see IXlsxTableRenderer.
+        services.AddSchedulerXlsxExport();
 
         AddModuleOptions(services, configuration);
 

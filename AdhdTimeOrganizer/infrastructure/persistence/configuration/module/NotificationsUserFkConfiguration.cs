@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.Notifications.domain.entity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Notifications.domain.entity;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.module;
 

@@ -4,10 +4,11 @@ Each feature module documents itself in its own `docs/` folder. **Before working
 read its `docs/summary.md`** — it orients you and points to the navigation index in
 `docs/domain-map.md` so you open only the files you need.
 
-Modules with docs today: `AdhdTimeOrganizer.Notifications`, `AdhdTimeOrganizer.Reminders`,
-`AdhdTimeOrganizer.Scheduler`, plus `framework/Sydowwe.Framework` and
-`framework/Sydowwe.Framework.Testing` — the last two live inside the `framework/` submodule, so
-their docs are versioned in that repo, not this one.
+Modules with docs today: `framework/Sydowwe.Notifications`, `framework/Sydowwe.Reminders`,
+`framework/Sydowwe.Scheduler`, `framework/Sydowwe.Framework` and
+`framework/Sydowwe.Framework.Testing` — **all of them live inside the `framework/` submodule**, so
+their docs are versioned in that repo, not this one. Editing a module doc is a two-repo operation,
+same as editing module code.
 
 > `docs/modules.md`, `docs/extendingVanillaForCustomers.md` and `docs/testing.md` at the repo root
 > were copied from the MojaDigitalnaFirma solution and describe modules/types that do **not** exist
@@ -16,7 +17,7 @@ their docs are versioned in that repo, not this one.
 # Solution Layout
 
 - `AdhdTimeOrganizer` — the portal (entities, endpoints, `AppDbContext`, migrations).
-- `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding three projects:
+- `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding seven projects:
   - `framework/Sydowwe.Framework` — the shared framework, used by **the portal and the modules
     alike**. Base entities, base endpoints, builder extensions, DbContext helpers, seeders, auth
     services.
@@ -27,15 +28,29 @@ their docs are versioned in that repo, not this one.
     services, no EF, no package references. Implementations live in the modules or the portal. It
     references `Sydowwe.Framework`; the modules and the portal reference it.
   - `framework/Sydowwe.Framework.Testing` — the shared test infrastructure.
-- `AdhdTimeOrganizer.Notifications` / `.Reminders` / `.Scheduler` — opt-in module projects built on
-  the `Sydowwe.Framework` primitives, wired to each other only through `Sydowwe.Framework.Contracts`.
-- `AdhdTimeOrganizer.IntegrationTests`.
+  - `framework/Sydowwe.Notifications` / `Sydowwe.Reminders` / `Sydowwe.Scheduler` — opt-in module
+    projects built on the `Sydowwe.Framework` primitives, wired to each other only through
+    `Sydowwe.Framework.Contracts`. They reference **only** those two — no portal coupling at all,
+    which is what let them move in here. Note they are `Sydowwe.<Module>`, *not*
+    `Sydowwe.Framework.<Module>`: they are optional modules, not framework core.
+  - `framework/Sydowwe.Scheduler.Xlsx` — opt-in XLSX export for the scheduler dashboard, and **the only
+    project in the submodule carrying a licensed dependency** (Syncfusion.XlsIO.Net.Core). It is split out
+    precisely so `Sydowwe.Scheduler` itself needs no Syncfusion licence: the core writes CSV with no
+    dependency and delegates XLSX through `IXlsxTableRenderer`. A host opts in by referencing this project
+    and calling `services.AddSchedulerXlsxExport()` — the portal does both. Registered **by name**, not via
+    a lifetime marker, and deliberately **not** in `ModuleAssemblies` (see Composition Root). With no
+    renderer registered, an XLSX request throws `NotSupportedException` rather than silently returning CSV
+    bytes under an `.xlsx` content type.
+- `AdhdTimeOrganizer.IntegrationTests` — stays in the parent. It pins *this host's* composition
+  (that the modules are wired correctly into *this* portal), which is a property of the parent,
+  not of the modules.
 - `AdhdTimeOrganizer/reference/mojaCore/` is reference/foreign code — don't extend it.
 
 ⚠ This layer used to be a portal-level project called **`MojaDigitalnaFirma.Kernel`**, and older docs
 and comments still call it "the Kernel". Same 42 contract types, same folder names; only the root
 namespace changed (`MojaDigitalnaFirma.Kernel.<seam>` → `Sydowwe.Framework.Contracts.<seam>`). It moved
-so the modules — which depend on nothing else portal-side — could follow it into the submodule later.
+so the modules — which depend on nothing else portal-side — could follow it into the submodule, which
+they since have (as `Sydowwe.Notifications` / `.Reminders` / `.Scheduler`).
 `docs/architecture.md` and `docs/modules.md` still describe a `MojaDigitalnaFirma.Kernel` product base;
 that is the *other* solution's layering and is deliberately unchanged.
 
@@ -47,6 +62,15 @@ is invisible to the parent's diff and will not travel with a parent push.
 
 Clone with `git clone --recurse-submodules`. An existing checkout that predates the split needs
 `git submodule update --init` or the solution will not restore — `framework/` is simply empty.
+
+⚠ **Module entities live in the submodule; their migrations live here.** `AppDbContext` owns every
+module table, so a change to a module entity is a submodule commit *and* a migration commit in the
+parent — in that order. This split is inherent to the design (modules are host-agnostic; the host
+owns its schema), not a bug. Note also that a CLR namespace rename does **not** change table or
+column names (those come from `BaseEntityConfigure`, derived from the *class* name), so the module
+move required no migration — but the next `dotnet ef migrations add` will regenerate
+`AppDbContextModelSnapshot.cs` with the new `Sydowwe.*` type names, producing a large but
+semantically empty diff. Expect it; don't try to hand-edit the snapshots.
 
 Namespaces did **not** change when `Sydowwe.Framework` / `.Testing` moved: that code is still
 `Sydowwe.Framework.*`, and only the on-disk paths gained the `framework/` prefix. The later
@@ -230,17 +254,17 @@ retention purge or they grow forever — GDPR Art. 5(1)(e) / §13 zák. 18/2018.
 Bind the **policy** from `framework/Sydowwe.Framework/infrastructure/persistence/retention/RetentionOptions.cs`
 (`Enabled`, `RetentionYears`, `KeepLastN` + `CutoffUtc()` / `CutoffOffset()`): subclass it per module
 with a `SectionName` and `services.Configure<>` it — see
-`AdhdTimeOrganizer.Scheduler/application/job/SchedulerRetentionOptions.cs` and
-`AdhdTimeOrganizer.Reminders/application/job/ReminderRetentionOptions.cs`. Same shape everywhere;
+`framework/Sydowwe.Scheduler/application/job/SchedulerRetentionOptions.cs` and
+`framework/Sydowwe.Reminders/application/job/ReminderRetentionOptions.cs`. Same shape everywhere;
 values may differ.
 
 Write the **query** as plain LINQ in the module's own purge handler — there is deliberately no
 shared delete helper, because the FK guards that differ per ledger are the hard part and can't be
 shared. Existing examples to copy:
-`AdhdTimeOrganizer.Scheduler/application/job/PurgeExpiredRunLogsJobHandler.cs` (one pass),
-`AdhdTimeOrganizer.Reminders/application/job/PurgeExpiredReminderLedgersJobHandler.cs` (three
+`framework/Sydowwe.Scheduler/application/job/PurgeExpiredRunLogsJobHandler.cs` (one pass),
+`framework/Sydowwe.Reminders/application/job/PurgeExpiredReminderLedgersJobHandler.cs` (three
 ordered passes, two self-FKs), and
-`AdhdTimeOrganizer.Notifications/application/job/PurgeExpiredNotificationHistoryJobHandler.cs`. The
+`framework/Sydowwe.Notifications/application/job/PurgeExpiredNotificationHistoryJobHandler.cs`. The
 shape is: age gate → keep-last-N floor (`Count(newer => …) >= keepLastN`) → FK guards → one
 `ExecuteDeleteAsync`.
 

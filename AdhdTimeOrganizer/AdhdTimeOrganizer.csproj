@@ -77,8 +77,12 @@
     <ItemGroup>
         <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
         <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>
-        <ProjectReference Include="..\AdhdTimeOrganizer.Notifications\AdhdTimeOrganizer.Notifications.csproj"/>
-        <ProjectReference Include="..\AdhdTimeOrganizer.Reminders\AdhdTimeOrganizer.Reminders.csproj"/>
-        <ProjectReference Include="..\AdhdTimeOrganizer.Scheduler\AdhdTimeOrganizer.Scheduler.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Notifications\Sydowwe.Notifications.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Reminders\Sydowwe.Reminders.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Scheduler\Sydowwe.Scheduler.csproj"/>
+        <!-- Opt-in XLSX export for the scheduler dashboard. Brings the licensed Syncfusion dependency,
+             which Sydowwe.Scheduler itself deliberately does not carry. Drop this reference (and the
+             AddSchedulerXlsxExport() call) to fall back to the dependency-free CSV export. -->
+        <ProjectReference Include="..\framework\Sydowwe.Scheduler.Xlsx\Sydowwe.Scheduler.Xlsx.csproj"/>
     </ItemGroup>
 </Project>

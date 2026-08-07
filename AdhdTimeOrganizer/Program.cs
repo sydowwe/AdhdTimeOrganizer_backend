@@ -5,20 +5,11 @@ using AdhdTimeOrganizer.application.endpoint.@base;
 using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.config.swagger;
-using AdhdTimeOrganizer.infrastructure.extService;
 using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
 using AdhdTimeOrganizer.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.settings;
-using AdhdTimeOrganizer.Notifications.domain.entity;
-using AdhdTimeOrganizer.Notifications.infrastructure.realtime;
-using AdhdTimeOrganizer.Notifications.infrastructure.scheduling;
-using AdhdTimeOrganizer.Reminders.domain.entity;
-using AdhdTimeOrganizer.Reminders.infrastructure.scheduling;
-using AdhdTimeOrganizer.Scheduler.domain.entity;
-using AdhdTimeOrganizer.Scheduler.infrastructure;
-using AdhdTimeOrganizer.Scheduler.infrastructure.scheduling;
 using DotNetEnv;
 using FastEndpoints;
 using FastEndpoints.Swagger;
@@ -40,6 +31,14 @@ using Sydowwe.Framework.infrastructure.extService.user.auth;
 using Sydowwe.Framework.infrastructure.persistence;
 using Sydowwe.Framework.infrastructure.security;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
+using Sydowwe.Notifications.domain.entity;
+using Sydowwe.Notifications.infrastructure.realtime;
+using Sydowwe.Notifications.infrastructure.scheduling;
+using Sydowwe.Reminders.domain.entity;
+using Sydowwe.Reminders.infrastructure.scheduling;
+using Sydowwe.Scheduler.domain.entity;
+using Sydowwe.Scheduler.infrastructure;
+using Sydowwe.Scheduler.infrastructure.scheduling;
 
 try
 {
