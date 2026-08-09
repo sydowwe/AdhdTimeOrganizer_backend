@@ -1,18 +1,19 @@
 using AdhdTimeOrganizer.domain.model.entity.timer;
-using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
-using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class PomodoroTimerPresetSeeder(
     AppDbContext dbContext,
-    ILogger<PomodoroTimerPresetSeeder> logger) : IScopedService, IPerUserDefaultSeeder
+    ILogger<PomodoroTimerPresetSeeder> logger)
+    : BasePerUserDefaultSeeder<PomodoroTimerPreset>(dbContext, logger), IScopedService
 {
-    public string SeederName => "PomodoroTimerPreset";
-    public int Order => 11;
+    public override string SeederName => "PomodoroTimerPreset";
+    public override int Order => 11;
+    protected override string EntityLabel => "pomodoro timer presets";
 
-    private static List<PomodoroTimerPreset> Defaults(long userId) =>
+    protected override List<PomodoroTimerPreset> Defaults(long userId) =>
     [
         new()
         {
@@ -64,55 +65,21 @@ public class PomodoroTimerPresetSeeder(
         }
     ];
 
-    public async Task SetupDefaults(long userId, CancellationToken ct = default)
+    /// <summary>
+    /// No unique index on this table, so nothing here can fail on a constraint — Name is the identity
+    /// of a preset all the same, and matching on it keeps setup and reset idempotent.
+    /// </summary>
+    protected override bool Collides(PomodoroTimerPreset a, PomodoroTimerPreset b) => a.Name == b.Name;
+
+    protected override void Apply(PomodoroTimerPreset target, PomodoroTimerPreset @default)
     {
-        var defaults = Defaults(userId);
-
-        var existingCount = await dbContext.PomodoroTimerPresets
-            .Where(ptp => ptp.UserId == userId)
-            .CountAsync(ct);
-
-        if (defaults.Count <= existingCount)
-        {
-            logger.LogDebug("Pomodoro timer presets for user {UserId} already exist, skipping.", userId);
-            return;
-        }
-
-        await dbContext.PomodoroTimerPresets.AddRangeAsync(defaults, ct);
-
-        await dbContext.SaveChangesAsync(ct);
-
-        logger.LogInformation("Seeded pomodoro timer presets for user {UserId}", userId);
-    }
-
-    public async Task<bool> ResetDefaults(long userId, CancellationToken ct = default)
-    {
-        var defaults = Defaults(userId);
-
-        var existing = await dbContext.PomodoroTimerPresets
-            .Where(ptp => ptp.UserId == userId)
-            .OrderBy(ptp => ptp.Id)
-            .Take(defaults.Count)
-            .ToListAsync(ct);
-
-        if (defaults.Count != existing.Count)
-            return false;
-
-        for (var i = 0; i < defaults.Count; i++)
-        {
-            existing[i].Name = defaults[i].Name;
-            existing[i].FocusDuration = defaults[i].FocusDuration;
-            existing[i].ShortBreakDuration = defaults[i].ShortBreakDuration;
-            existing[i].LongBreakDuration = defaults[i].LongBreakDuration;
-            existing[i].FocusPeriodInCycleCount = defaults[i].FocusPeriodInCycleCount;
-            existing[i].NumberOfCycles = defaults[i].NumberOfCycles;
-            existing[i].FocusActivityId = defaults[i].FocusActivityId;
-            existing[i].RestActivityId = defaults[i].RestActivityId;
-        }
-
-        dbContext.PomodoroTimerPresets.UpdateRange(existing);
-        await dbContext.SaveChangesAsync(ct);
-
-        return true;
+        target.Name = @default.Name;
+        target.FocusDuration = @default.FocusDuration;
+        target.ShortBreakDuration = @default.ShortBreakDuration;
+        target.LongBreakDuration = @default.LongBreakDuration;
+        target.FocusPeriodInCycleCount = @default.FocusPeriodInCycleCount;
+        target.NumberOfCycles = @default.NumberOfCycles;
+        target.FocusActivityId = @default.FocusActivityId;
+        target.RestActivityId = @default.RestActivityId;
     }
 }

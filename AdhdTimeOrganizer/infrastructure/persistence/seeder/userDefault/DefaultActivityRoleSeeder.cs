@@ -1,67 +1,34 @@
 using AdhdTimeOrganizer.domain.model.entity.activity;
-using AdhdTimeOrganizer.domain.model.@enum;
-using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
-using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class DefaultActivityRoleSeeder(
     AppDbContext dbContext,
-    ILogger<DefaultActivityRoleSeeder> logger) : IScopedService, IPerUserDefaultSeeder
+    ILogger<DefaultActivityRoleSeeder> logger)
+    : BasePerUserDefaultSeeder<ActivityRole>(dbContext, logger), IScopedService
 {
-    public string SeederName => "DefaultActivityRole";
-    public int Order => 4;
+    public override string SeederName => "DefaultActivityRole";
+    public override int Order => 4;
+    protected override string EntityLabel => "default activity roles";
 
-    private static List<ActivityRole> Defaults(long userId) =>
+    protected override List<ActivityRole> Defaults(long userId) =>
     [
         new() { UserId = userId, Name = "Planner task", Text = "Quickly created activities in task planner", Color = ColorPalette.Blue, Icon = "fas fa-calendar-days" },
         new() { UserId = userId, Name = "To-do list task", Text = "Quickly created activities in to-do list", Color = ColorPalette.Sky, Icon = "fas fa-list-check" },
         new() { UserId = userId, Name = "Routine task", Text = "Quickly created activities in routine to-do list", Color = ColorPalette.Teal, Icon = "fas fa-recycle" }
     ];
 
-    public async Task SetupDefaults(long userId, CancellationToken ct = default)
+    /// <summary>Unique index: (user_id, name) — not Text, which is a description here.</summary>
+    protected override bool Collides(ActivityRole a, ActivityRole b) => a.Name == b.Name;
+
+    protected override void Apply(ActivityRole target, ActivityRole @default)
     {
-        var defaults = Defaults(userId);
-
-        var existingCount = await dbContext.ActivityRoles
-            .Where(ar => ar.UserId == userId)
-            .CountAsync(ct);
-
-        if (defaults.Count <= existingCount)
-        {
-            logger.LogDebug("Default activity roles for user {UserId} already exist, skipping.", userId);
-            return;
-        }
-
-        await dbContext.ActivityRoles.AddRangeAsync(defaults, ct);
-
-        await dbContext.SaveChangesAsync(ct);
-
-        logger.LogInformation("Seeded default activity roles for user {UserId}", userId);
-    }
-
-    public async Task<bool> ResetDefaults(long userId, CancellationToken ct = default)
-    {
-        var defaults = Defaults(userId);
-
-        var existing = await dbContext.ActivityRoles.Where(ar => ar.UserId == userId).OrderBy(ar => ar.Id).Take(defaults.Count).ToListAsync(ct);
-
-        if (defaults.Count != existing.Count)
-            return false;
-
-        for (var i = 0; i < defaults.Count; i++)
-        {
-            existing[i].Name = defaults[i].Name;
-            existing[i].Text = defaults[i].Text;
-            existing[i].Color = defaults[i].Color;
-            existing[i].Icon = defaults[i].Icon;
-        }
-
-        dbContext.ActivityRoles.UpdateRange(existing);
-        await dbContext.SaveChangesAsync(ct);
-
-        return true;
+        target.Name = @default.Name;
+        target.Text = @default.Text;
+        target.Color = @default.Color;
+        target.Icon = @default.Icon;
     }
 }

@@ -40,15 +40,20 @@ public class CalendarSeeder(
     /// <param name="ct">Cancellation token</param>
     private async Task SeedYearForUser(int year, string countryCode, long userId, CancellationToken ct = default)
     {
-        var existingCount = await dbContext.Calendars
-            .Where(c => c.Date.Year == year && c.UserId == userId)
-            .CountAsync(ct);
-
-        if (existingCount > 0)
-        {
-            logger.LogDebug("Calendar entries for year {Year} and user {UserId} already exist, skipping.", year, userId);
-            return;
-        }
+        // Per missing date, not "the year has any rows at all": the unique index is (user_id, date),
+        // so a year the user has partially deleted has to be filled in rather than skipped whole or
+        // re-inserted whole.
+        //
+        // IgnoreQueryFilters for the same reason as BasePerUserDefaultSeeder: this reads the rows of
+        // whichever user we were told to seed, which is not necessarily the one signed in, and the
+        // host scopes IEntityWithUser reads to the ambient user. Filtered, it would read back no
+        // dates for that user and re-insert the whole year onto (user_id, date).
+        var existingDates = (await dbContext.Calendars
+                .IgnoreQueryFilters()
+                .Where(c => c.Date.Year == year && c.UserId == userId)
+                .Select(c => c.Date)
+                .ToListAsync(ct))
+            .ToHashSet();
 
         var holidays = GetHolidays(year, countryCode);
         var calendars = new List<Calendar>();
@@ -58,6 +63,9 @@ public class CalendarSeeder(
 
         for (var date = startDate; date <= endDate; date = date.AddDays(1))
         {
+            if (existingDates.Contains(date))
+                continue;
+
             var dayOfWeek = date.DayOfWeek;
             var dayType = DayType.Workday;
             string? holidayName = null;
@@ -81,6 +89,12 @@ public class CalendarSeeder(
             };
 
             calendars.Add(calendar);
+        }
+
+        if (calendars.Count == 0)
+        {
+            logger.LogDebug("Calendar entries for year {Year} and user {UserId} already exist, skipping.", year, userId);
+            return;
         }
 
         await dbContext.Calendars.AddRangeAsync(calendars, ct);

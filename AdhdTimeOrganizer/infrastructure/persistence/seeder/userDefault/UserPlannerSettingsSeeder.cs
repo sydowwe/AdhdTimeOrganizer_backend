@@ -1,18 +1,20 @@
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
-using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class UserPlannerSettingsSeeder(
     AppDbContext dbContext,
-    ILogger<UserPlannerSettingsSeeder> logger) : IScopedService, IPerUserDefaultSeeder
+    ILogger<UserPlannerSettingsSeeder> logger)
+    : BasePerUserDefaultSeeder<UserPlannerSettings>(dbContext, logger), IScopedService
 {
-    public string SeederName => "UserPlannerSettings";
-    public int Order => 5;
+    public override string SeederName => "UserPlannerSettings";
+    public override int Order => 5;
+    protected override string EntityLabel => "planner settings";
 
-    private static UserPlannerSettings Default(long userId) =>
+    protected override List<UserPlannerSettings> Defaults(long userId) =>
+    [
         new()
         {
             UserId = userId,
@@ -21,39 +23,21 @@ public class UserPlannerSettingsSeeder(
             DetailsPanelExpandedByDefault = true,
             ArrowKeyNavEnabled = true,
             PredefinedSkipReasons = []
-        };
-
-    public async Task SetupDefaults(long userId, CancellationToken ct = default)
-    {
-        var exists = await dbContext.UserPlannerSettings.AnyAsync(s => s.UserId == userId, ct);
-        if (exists)
-        {
-            logger.LogDebug("Planner settings for user {UserId} already exist, skipping.", userId);
-            return;
         }
+    ];
 
-        await dbContext.UserPlannerSettings.AddAsync(Default(userId), ct);
-        await dbContext.SaveChangesAsync(ct);
+    /// <summary>
+    /// One row per user, so the user id alone is the key — and the query already scopes to it. Any
+    /// existing row therefore *is* this default's row: nothing else to compare.
+    /// </summary>
+    protected override bool Collides(UserPlannerSettings a, UserPlannerSettings b) => true;
 
-        logger.LogInformation("Seeded planner settings for user {UserId}", userId);
-    }
-
-    public async Task<bool> ResetDefaults(long userId, CancellationToken ct = default)
+    protected override void Apply(UserPlannerSettings target, UserPlannerSettings @default)
     {
-        var existing = await dbContext.UserPlannerSettings.FirstOrDefaultAsync(s => s.UserId == userId, ct);
-        if (existing == null)
-            return false;
-
-        var defaults = Default(userId);
-        existing.RemindersEnabled = defaults.RemindersEnabled;
-        existing.ReminderMinutesBefore = defaults.ReminderMinutesBefore;
-        existing.DetailsPanelExpandedByDefault = defaults.DetailsPanelExpandedByDefault;
-        existing.ArrowKeyNavEnabled = defaults.ArrowKeyNavEnabled;
-        existing.PredefinedSkipReasons = defaults.PredefinedSkipReasons;
-
-        dbContext.UserPlannerSettings.Update(existing);
-        await dbContext.SaveChangesAsync(ct);
-
-        return true;
+        target.RemindersEnabled = @default.RemindersEnabled;
+        target.ReminderMinutesBefore = @default.ReminderMinutesBefore;
+        target.DetailsPanelExpandedByDefault = @default.DetailsPanelExpandedByDefault;
+        target.ArrowKeyNavEnabled = @default.ArrowKeyNavEnabled;
+        target.PredefinedSkipReasons = @default.PredefinedSkipReasons;
     }
 }

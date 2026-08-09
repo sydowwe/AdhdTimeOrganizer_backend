@@ -1,20 +1,20 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.domain.model.@enum;
-using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
-using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class TaskPrioritySeeder(
     AppDbContext dbContext,
-    ILogger<TaskPrioritySeeder> logger) : IScopedService, IPerUserDefaultSeeder
+    ILogger<TaskPrioritySeeder> logger)
+    : BasePerUserDefaultSeeder<TaskPriority>(dbContext, logger), IScopedService
 {
-    public string SeederName => "TaskPriority";
-    public int Order => 1;
+    public override string SeederName => "TaskPriority";
+    public override int Order => 1;
+    protected override string EntityLabel => "task priorities";
 
-    private static List<TaskPriority> Defaults(long userId) =>
+    protected override List<TaskPriority> Defaults(long userId) =>
     [
         new() { UserId = userId, Text = "Today", Color = ColorPalette.Red, Priority = 1 },
         new() { UserId = userId, Text = "This week", Color = ColorPalette.Yellow, Priority = 2 },
@@ -22,50 +22,13 @@ public class TaskPrioritySeeder(
         new() { UserId = userId, Text = "This year", Color = ColorPalette.Emerald, Priority = 4 }
     ];
 
-    public async Task SetupDefaults(long userId, CancellationToken ct = default)
+    /// <summary>Unique index: (user_id, priority) — not Text, which is free to repeat.</summary>
+    protected override bool Collides(TaskPriority a, TaskPriority b) => a.Priority == b.Priority;
+
+    protected override void Apply(TaskPriority target, TaskPriority @default)
     {
-        var defaults = Defaults(userId);
-
-        var existingCount = await dbContext.TaskPriorities
-            .Where(tu => tu.UserId == userId)
-            .CountAsync(ct);
-
-        if (defaults.Count <= existingCount)
-        {
-            logger.LogDebug("Task urgencies for user {UserId} already exist, skipping.", userId);
-            return;
-        }
-
-        await dbContext.TaskPriorities.AddRangeAsync(defaults, ct);
-
-        await dbContext.SaveChangesAsync(ct);
-
-        logger.LogInformation("Seeded task urgencies for user {UserId}", userId);
-    }
-
-    public async Task<bool> ResetDefaults(long userId, CancellationToken ct = default)
-    {
-        var defaults = Defaults(userId);
-
-        var existing = await dbContext.TaskPriorities
-            .Where(tu => tu.UserId == userId)
-            .OrderBy(tu => tu.Id)
-            .Take(defaults.Count)
-            .ToListAsync(ct);
-
-        if (defaults.Count != existing.Count)
-            return false;
-
-        for (var i = 0; i < defaults.Count; i++)
-        {
-            existing[i].Text = defaults[i].Text;
-            existing[i].Color = defaults[i].Color;
-            existing[i].Priority = defaults[i].Priority;
-        }
-
-        dbContext.TaskPriorities.UpdateRange(existing);
-        await dbContext.SaveChangesAsync(ct);
-
-        return true;
+        target.Text = @default.Text;
+        target.Color = @default.Color;
+        target.Priority = @default.Priority;
     }
 }

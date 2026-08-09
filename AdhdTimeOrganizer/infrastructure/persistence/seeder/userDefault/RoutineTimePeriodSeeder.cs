@@ -1,20 +1,20 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.domain.model.@enum;
-using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
-using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder.userDefault;
 
 public class RoutineTimePeriodSeeder(
     AppDbContext dbContext,
-    ILogger<RoutineTimePeriodSeeder> logger) : IScopedService, IPerUserDefaultSeeder
+    ILogger<RoutineTimePeriodSeeder> logger)
+    : BasePerUserDefaultSeeder<RoutineTimePeriod>(dbContext, logger), IScopedService
 {
-    public string SeederName => "RoutineTimePeriod";
-    public int Order => 3;
+    public override string SeederName => "RoutineTimePeriod";
+    public override int Order => 3;
+    protected override string EntityLabel => "routine time periods";
 
-    private static List<RoutineTimePeriod> Defaults(long userId) =>
+    protected override List<RoutineTimePeriod> Defaults(long userId) =>
     [
         new() { UserId = userId, Text = "Daily", Color = ColorPalette.Lime, LengthInDays = 1, StreakThreshold = 100, StreakGraceDays = 0, ResetAnchorDay = 0 },
         new() { UserId = userId, Text = "Weekly", Color = ColorPalette.Violet, LengthInDays = 7, StreakThreshold = 90, StreakGraceDays = 0, ResetAnchorDay = 1 },
@@ -22,53 +22,20 @@ public class RoutineTimePeriodSeeder(
         new() { UserId = userId, Text = "Yearly", Color = ColorPalette.Sky, LengthInDays = 365, StreakThreshold = 80, StreakGraceDays = 10, ResetAnchorDay = 1 }
     ];
 
-    public async Task SetupDefaults(long userId, CancellationToken ct = default)
+    /// <summary>
+    /// Two unique indexes here: (user_id, text) and (user_id, length_in_days). Either one is enough
+    /// to reject a row, so both have to gate seeding.
+    /// </summary>
+    protected override bool Collides(RoutineTimePeriod a, RoutineTimePeriod b) =>
+        a.Text == b.Text || a.LengthInDays == b.LengthInDays;
+
+    protected override void Apply(RoutineTimePeriod target, RoutineTimePeriod @default)
     {
-        var defaults = Defaults(userId);
-
-        var existingCount = await dbContext.RoutineTimePeriods
-            .Where(rtp => rtp.UserId == userId)
-            .CountAsync(ct);
-
-        if (defaults.Count <= existingCount)
-        {
-            logger.LogDebug("Routine time periods for user {UserId} already exist, skipping.", userId);
-            return;
-        }
-
-        await dbContext.RoutineTimePeriods.AddRangeAsync(defaults, ct);
-
-        await dbContext.SaveChangesAsync(ct);
-
-        logger.LogInformation("Seeded routine time periods for user {UserId}", userId);
-    }
-
-    public async Task<bool> ResetDefaults(long userId, CancellationToken ct = default)
-    {
-        var defaults = Defaults(userId);
-
-        var existing = await dbContext.RoutineTimePeriods
-            .Where(rtp => rtp.UserId == userId)
-            .OrderBy(rtp => rtp.Id)
-            .Take(defaults.Count)
-            .ToListAsync(ct);
-
-        if (defaults.Count != existing.Count)
-            return false;
-
-        for (var i = 0; i < defaults.Count; i++)
-        {
-            existing[i].Text = defaults[i].Text;
-            existing[i].Color = defaults[i].Color;
-            existing[i].LengthInDays = defaults[i].LengthInDays;
-            existing[i].ResetAnchorDay = defaults[i].ResetAnchorDay;
-            existing[i].StreakThreshold = defaults[i].StreakThreshold;
-            existing[i].StreakGraceDays = defaults[i].StreakGraceDays;
-        }
-
-        dbContext.RoutineTimePeriods.UpdateRange(existing);
-        await dbContext.SaveChangesAsync(ct);
-
-        return true;
+        target.Text = @default.Text;
+        target.Color = @default.Color;
+        target.LengthInDays = @default.LengthInDays;
+        target.ResetAnchorDay = @default.ResetAnchorDay;
+        target.StreakThreshold = @default.StreakThreshold;
+        target.StreakGraceDays = @default.StreakGraceDays;
     }
 }
