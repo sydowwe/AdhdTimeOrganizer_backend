@@ -6,4 +6,4 @@ using Sydowwe.Framework.application.endpoint.@base.read;
 namespace AdhdTimeOrganizer.application.endpoint.activity.lookup.weatherDependency.query;
 
 public class GetAllActivityWeatherDependencyEndpoint(AppDbContext dbContext)
-    : BaseGetAllEndpoint<ActivityWeatherDependency, LookupResponse<ActivityWeatherDependency>>(dbContext);
+    : BaseGetAllLookupEndpoint<ActivityWeatherDependency>(dbContext);

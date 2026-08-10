@@ -6,4 +6,4 @@ using Sydowwe.Framework.application.endpoint.@base.command;
 namespace AdhdTimeOrganizer.application.endpoint.activity.lookup.experienceType.command;
 
 public class CreateActivityExperienceTypeEndpoint(AppDbContext dbContext)
-    : BaseCreateEndpoint<ActivityExperienceType, LookupRequest<ActivityExperienceType>>(dbContext);
+    : BaseCreateLookupEndpoint<ActivityExperienceType>(dbContext);

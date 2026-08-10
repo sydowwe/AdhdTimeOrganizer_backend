@@ -6,4 +6,4 @@ using Sydowwe.Framework.application.endpoint.@base.read;
 namespace AdhdTimeOrganizer.application.endpoint.activity.lookup.locationType.query;
 
 public class GetAllActivityLocationTypeEndpoint(AppDbContext dbContext)
-    : BaseGetAllEndpoint<ActivityLocationType, LookupResponse<ActivityLocationType>>(dbContext);
+    : BaseGetAllLookupEndpoint<ActivityLocationType>(dbContext);

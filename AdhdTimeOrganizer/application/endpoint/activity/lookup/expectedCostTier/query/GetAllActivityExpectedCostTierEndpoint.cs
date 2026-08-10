@@ -6,4 +6,4 @@ using Sydowwe.Framework.application.endpoint.@base.read;
 namespace AdhdTimeOrganizer.application.endpoint.activity.lookup.expectedCostTier.query;
 
 public class GetAllActivityExpectedCostTierEndpoint(AppDbContext dbContext)
-    : BaseGetAllEndpoint<ActivityExpectedCostTier, LookupResponse<ActivityExpectedCostTier>>(dbContext);
+    : BaseGetAllLookupEndpoint<ActivityExpectedCostTier>(dbContext);
