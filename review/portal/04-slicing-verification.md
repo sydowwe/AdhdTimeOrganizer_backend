@@ -17,6 +17,14 @@
 > - **`AdhdTimeOrganizer.Timers` is not happening.** Timers folds into Core.
 > - The integration suite is green: **198 passed, 6 skipped, 0 failed.**
 >
+> **Correction (2026-08-11):** the `Reminders → Planning` edge recorded below is **bidirectional**,
+> which this document and `slicePrompts/06-reminders.md` both missed. Reminders → Planning:
+> `Reminder.PlannerTaskId` FK + cascade, `ReminderRegistrationService` reading
+> `PlannerTasks.Include(t => t.Calendar)` and `UserPlannerSettings`, and two endpoint existence
+> checks. Planning → Reminders: six planner-task endpoints inject `IReminderRegistrationService`.
+> Consequence: **`AdhdTimeOrganizer.Reminders` is not happening** — reminders fold into Planning,
+> `06-reminders.md` is deleted, and the "five slices" count below is four.
+>
 > **Correction (2026-08-10, after the History extraction):** the `History → TodoLists + Routines`
 > edge recorded below **no longer exists**. It was not honoured, it was deleted: the four membership
 > filters now go through `IActivityMembershipSource` in
@@ -192,8 +200,8 @@ AdhdTimeOrganizer.Core
         ├── AdhdTimeOrganizer.Tracking          ingest + mappings + dashboards   ⚠ needs §4 first
         ├── AdhdTimeOrganizer.TodoLists         lists · items · steps · priorities
         │      └── AdhdTimeOrganizer.Routines   periods · routine items · completions · 2 jobs
-        ├── AdhdTimeOrganizer.Planning ────────► TodoLists   (PlannerTask.TodolistItemId)
-        └── AdhdTimeOrganizer.Reminders ───────► Planning    (task-linked reminders)
+        └── AdhdTimeOrganizer.Planning ────────► TodoLists   (PlannerTask.TodolistItemId)
+               + reminders (folded in 2026-08-11 — the edge is bidirectional, see below)
         │
 AdhdTimeOrganizer  (host)
    Program.cs · AppDbContext · migrations · DI · Serilog

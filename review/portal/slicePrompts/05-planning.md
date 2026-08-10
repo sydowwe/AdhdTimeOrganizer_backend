@@ -1,11 +1,34 @@
-# Extract `AdhdTimeOrganizer.Planning`
+# Extract `AdhdTimeOrganizer.Planning` (planner **and reminders**)
 
 `Core`, `TodoLists`, `Routines` and `History` must already exist and be committed. Planning
 depends on **TodoLists** (`PlannerTask.TodolistItemId`) and on **History** (the suggestions
 endpoint reads `ActivityHistory`) — extracting it before either produces a slice→host
 reference that will not compile.
 
-This is the largest slice, ~44 endpoints.
+This is the largest slice, ~49 endpoints (44 planner + 5 reminder).
+
+> **⚠ Reminders is part of this slice. There is no `AdhdTimeOrganizer.Reminders`.**
+> `06-reminders.md` was deleted on 2026-08-11; this section replaces it. The reason is that the
+> portal's `Reminder` ↔ `PlannerTask` coupling is **bidirectional**, which the old prompt missed:
+> - **Reminders → Planning** — `Reminder.PlannerTaskId` FK + navigation with a cascade;
+>   `ReminderRegistrationService` reads `PlannerTasks.Include(t => t.Calendar)` for
+>   `Calendar.Date` + `StartTime` + `Status`, and `UserPlannerSettings.{RemindersEnabled,
+>   ReminderMinutesBefore}`; `Create`/`UpdateReminderEndpoint` existence-check `PlannerTasks`.
+> - **Planning → Reminders** — six planner-task endpoints (`Delete`, `BatchDelete`, `Update`,
+>   `PatchSpan`, `PatchStatus`, `ApplyTemplate`) inject `IReminderRegistrationService`, plus the
+>   host-side `TodoListItemIsDoneChangedEventHandler`.
+>
+> Two separate projects would therefore need **two** seams in Core — an id-only sync interface and
+> a planner-task-instant source — and the second one abstracts "read this task's start time" for a
+> single consumer while inheriting the seam's silent-misregistration failure mode, which for a
+> notification path means reminders quietly stop syncing. The coupling is not accidental:
+> `Reminder.RemindAt` is documented as a *cache* of the task's instant, recomputed on every sync.
+> One slice, no seam. Folding it in also means the `IReminderRegistrationService` interface can
+> move into the slice next to its implementation instead of staying in `domain/serviceContract/`.
+>
+> Reminders is **not** going into Core, for the record: `Reminder` carries a hard FK to
+> `PlannerTask` (which Core cannot reference) and pulls `Sydowwe.Framework.Contracts.reminders` +
+> notification payloads onto the hub project every slice consumes.
 
 ---
 
@@ -17,10 +40,11 @@ This is the largest slice, ~44 endpoints.
 - `framework/` is a **git submodule**. Do not touch it. Parent repo only.
 - `git mv` so history survives. Change only the root namespace prefix. **Do not rename types.**
 - **Never reference the host from a slice.** Planning → TodoLists + History + Core +
-  `Sydowwe.Framework`. Host → Planning.
+  `Sydowwe.Framework` + `Sydowwe.Framework.Contracts` (the reminder half needs
+  `IReminderRegistry` / `IQuietHoursReader`). Host → Planning.
 - Slice services take a plain **`DbContext`**, never `AppDbContext`. The alias is registered.
 - Confirm the baseline first: `dotnet test AdhdTimeOrganizer.IntegrationTests` =
-  **219 passed, 6 skipped, 0 failed**. Match it at the end.
+  **228 passed, 6 skipped, 0 failed**. Match it at the end.
 
 ## Registering with the host — four places, none break the build
 
@@ -61,6 +85,27 @@ entities `IEntityWithUser` with their FKs and cascades intact.
   into the 400–499 band during the Core commit.
 - **DTOs and validators** for the above.
 
+### …and the reminder half
+
+- **Endpoints** — all five: `application/endpoint/reminder/command/{Create,Update,Delete}` and
+  `query/{GetById,GetByDate}`.
+- **Entity** — `domain/model/entity/reminder/Reminder.cs` +
+  `infrastructure/persistence/configuration/reminder/ReminderConfiguration.cs`.
+- **Service** — `application/service/reminder/ReminderRegistrationService.cs` **and its interface**
+  `domain/serviceContract/IReminderRegistrationService.cs`. The interface only lived in a separate
+  folder to keep the host's planner endpoints off the implementation; both sides are now inside
+  this slice, so put them together.
+- **DTOs and validator** — `dto/request/reminder/ReminderRequest.cs`,
+  `dto/response/reminder/{ReminderResponse,ReminderOnDateResponse}.cs`,
+  `validator/ReminderValidator.cs`.
+- No reminder seeder exists. If you add one it goes in **Planning's 400–499 band** — the old
+  500–599 Reminders band is retired.
+- **Stays host-side:** `application/eventHandler/TodoListItemIsDoneChangedEventHandler.cs`, which
+  resolves `IReminderRegistrationService` from a scope. Same rule as the other event handlers —
+  host → slice is fine.
+- **Do not touch** `AdhdTimeOrganizer/reference/mojaCore/ReminderPersonalDataProvider.cs`; that
+  folder is foreign reference code.
+
 ---
 
 ## Slice-specific gotchas
@@ -99,16 +144,52 @@ event with a direct call.
 *materialized views* and their interceptor/installer/job stay host-side; only this endpoint's
 read moves with you.
 
+### Reminder-specific (carried over from the deleted `06-reminders.md`)
+
+**⚠ There are two unrelated "Reminders" in this solution. Do not conflate them.**
+- `framework/Sydowwe.Reminders` is an **opt-in framework module inside the git submodule**, with
+  its own `ReminderDefinition` entity, ledgers, retention job and registrar. **Do not touch it, do
+  not move anything into it, and do not merge the two.**
+- The portal's `Reminder` entity and `ReminderRegistrationService` are what you are moving.
+
+Namespace collisions are likely (`Sydowwe.Reminders.*` vs `AdhdTimeOrganizer.Planning.*` pulling
+in both). Fully qualify or alias rather than renaming any type.
+
+**`ReminderRegistrationService` talks to the framework module only through
+`Sydowwe.Framework.Contracts`** (`IReminderRegistry`, `NotificationType`, the payload records).
+Those contract interfaces are the seam — keep going through them; never reference
+`Sydowwe.Reminders` directly.
+
+**`IQuietHoursReader` must keep resolving to Notifications' `QuietHoursReader`.** The Reminders
+*module* ships a `NoQuietHoursReader` for hosts without Notifications, deliberately carrying no
+lifetime marker so it is never auto-registered — an auto-registered no-op silently disables quiet
+hours everywhere. If this project's assembly ends up in a marker scan that picks it up, quiet
+hours break with no error. Verify after wiring.
+
+**`AdhdTimeOrganizer.IntegrationTests/Modules/ModuleWiringTests.cs` pins the composition root** —
+double registration, a missing `ModuleAssemblies` entry, the `IQuietHoursReader` resolution. Run
+it specifically, not just the whole suite. `Reminders/ReminderRegistrationTests.cs` and
+`Reminders/ReminderSeedHelper.cs` will need their `using` lines updated; they stay in the parent
+test project.
+
+**Keep the `Reminder` → `PlannerTask` cascade.** It is the reason the FK is real rather than the
+module's string `SubjectType`/`SubjectId` pair — no planner-task delete path can leave an orphaned
+reminder row. The module-side `ReminderDefinition` is *not* reached by that cascade, which is why
+the delete endpoints read reminder ids **before** deleting the task and cancel through the
+registry afterwards. Both halves are now in your slice; do not "simplify" either away.
+
 ---
 
 ## Done when
 
 - `dotnet build AdhdTimeOrganizer.sln` clean
-- `dotnet test` = **219 passed, 6 skipped, 0 failed**
+- `dotnet test` = **228 passed, 6 skipped, 0 failed**, with `ModuleWiringTests` and
+  `Reminders/ReminderRegistrationTests` green
 - `dotnet ef migrations add PlanningSlice` produces an **empty** `Up`/`Down`
-- one planner-task endpoint and one calendar endpoint manually smoke-tested (a missing
-  FastEndpoints registration is a 404, not a build error)
+- one planner-task endpoint, one calendar endpoint and one reminder endpoint manually smoke-tested
+  (a missing FastEndpoints registration is a 404, not a build error)
 - toggling a planner task's done state still fans out to its linked to-do item — proves the
   event wiring survived
+- `IQuietHoursReader` still resolves to Notifications' `QuietHoursReader`, not the no-op
 - `docs/summary.md` + `docs/domain-map.md` written in the new project
 - one commit

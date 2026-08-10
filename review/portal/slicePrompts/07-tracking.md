@@ -1,8 +1,8 @@
 # Extract `AdhdTimeOrganizer.Tracking`
 
 **Last slice, and the only one with a prerequisite refactor.** All other slices — `Core`,
-`TodoLists`, `Routines`, `History`, `Planning`, `Reminders` — must already exist and be
-committed.
+`TodoLists`, `Routines`, `History`, `Planning` — must already exist and be committed. (There is
+no `Reminders` slice; it folded into `Planning` on 2026-08-11. See `00-README.md`.)
 
 This is **two commits, not one.** Phase 1 builds a seam; phase 2 moves the files. Do not start
 phase 2 until phase 1 is committed and green.

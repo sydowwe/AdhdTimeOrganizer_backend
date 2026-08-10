@@ -15,8 +15,8 @@ new seeder can slot between two existing ones without a renumbering pass.
 | 100–199 | TodoLists | lists · items · steps · `TaskPriority` |
 | 200–299 | Routines | routine periods · routine items · period completions |
 | 300–399 | History | `ActivityHistory` |
-| 400–499 | Planning | planner tasks · templates · `TaskImportance` · `Calendar` · `UserPlannerSettings` |
-| 500–599 | Reminders | *(no seeders yet)* |
+| 400–499 | Planning | planner tasks · templates · `TaskImportance` · `Calendar` · `UserPlannerSettings` · **reminders** |
+| 500–599 | *(retired)* | Was Reminders. Reminders folded into Planning on 2026-08-11 — the `Reminder` ↔ `PlannerTask` coupling is bidirectional. A reminder seeder, if one ever appears, belongs in 400–499. |
 | 600–699 | Tracking | web-extension / desktop / android entries and their pattern mappings |
 | 900–999 | host + opt-in module fixtures | reserved; see the caveat below |
 

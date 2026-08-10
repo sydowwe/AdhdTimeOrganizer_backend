@@ -30,7 +30,9 @@ tables it was copied with have been deleted.
   `Sydowwe.Framework.Contracts` — never the host**, which is why everything in it takes a plain
   `DbContext` rather than `AppDbContext`. Read `AdhdTimeOrganizer.Core/docs/summary.md` before
   working in it, and `.../seeder/SeederOrderBands.md` before adding a seeder **anywhere** in the
-  solution. Six more slices follow it; the plan is `review/portal/slicePrompts/00-README.md`.
+  solution. Five more slices follow it — TodoLists, Routines and History have landed; **Planning**
+  (which now includes reminders — there is no `AdhdTimeOrganizer.Reminders`) and **Tracking**
+  remain. The plan is `review/portal/slicePrompts/00-README.md`.
 - `AdhdTimeOrganizer.TodoLists` — **the second slice.** Lists, items, steps, categories and the
   per-user `TaskPriority` lookup, plus the shared to-do primitives the Routines slice builds on
   (`BaseTodoListItem`, `TodoListStep`, `BaseTodoListConfigure`, `TodoListExtensions`,

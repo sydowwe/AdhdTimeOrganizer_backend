@@ -10,11 +10,20 @@ them out of order produces a slice→host reference, which does not compile.
 |---|---|---|---|
 | ~~1~~ | ~~`01-core.md`~~ | — | ✅ **DONE.** `AdhdTimeOrganizer.Core` exists: 220 files, Timers folded in, seeder `Order` banded. |
 | ~~2~~ | ~~`02-todolists.md`~~ | Core | ✅ **DONE.** `AdhdTimeOrganizer.TodoLists` exists: 90 files, `TaskPriority` pulled out of the Planning folder, `TodoListSettings` moved in, one FK constraint name pinned. |
-| 3 | `03-routines.md` | TodoLists | Highest correctness payoff. |
+| ~~3~~ | ~~`03-routines.md`~~ | TodoLists | ✅ **DONE.** `AdhdTimeOrganizer.Routines` exists: routine lists, time periods, completions, the reset service, two Quartz jobs, two seeders. `RoutineTodoListActivityMembershipSource` moved with the entity. |
 | ~~4~~ | ~~`04-history.md`~~ | ~~TodoLists, Routines~~ → **Core only** | ✅ **DONE.** `AdhdTimeOrganizer.History` exists: 39 files. Its two outbound edges were *removed* rather than honoured — see below — so it landed before Routines. |
-| 5 | `05-planning.md` | TodoLists, History | |
-| 6 | `06-reminders.md` | Planning | Smallest slice, but blocked until Planning lands. |
-| 7 | `07-tracking.md` | Planning, TodoLists, Routines | Has a **seam to build first** — read the prompt. |
+| 5 | `05-planning.md` | TodoLists, History | **Includes reminders** — see below. Largest slice, ~49 endpoints. |
+| 6 | `07-tracking.md` | Planning, TodoLists, Routines | Has a **seam to build first** — read the prompt. |
+
+> **`06-reminders.md` was deleted on 2026-08-11 — reminders fold into Planning.** The prompt
+> claimed `Reminders → Planning` was a one-way edge; it is bidirectional. `Reminder` carries an FK
+> and cascade to `PlannerTask` and its service derives `RemindAt` from `Calendar.Date` +
+> `StartTime` + `Status` (plus two `UserPlannerSettings` fields), while six planner-task endpoints
+> inject `IReminderRegistrationService`. Separating them needs **two** Core seams, one of which
+> abstracts "read this task's start time" for a single consumer and inherits the seam's silent
+> failure mode on a notification path. `Reminder.RemindAt` is documented as a cache of the task's
+> instant — the coupling is the design. `07-tracking.md` keeps its filename; only its position in
+> this table moved.
 
 > **⚠ The ordering above is weaker than it looks — try to delete an edge before obeying it.**
 > History was supposed to wait for Routines because its grid filtered on to-do and routine
