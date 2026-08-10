@@ -1,5 +1,22 @@
 # Vertical slicing — verification pass
 
+> **⚠ This is an evidence record, not instructions.** The executable plan is
+> `slicePrompts/` — one self-contained prompt per slice, in `slicePrompts/00-README.md` order.
+> This file exists so the *proof* behind those prompts survives: the greps that established
+> each seam, and what was measured rather than assumed. Where the two disagree, the prompts win.
+>
+> **Corrections since this was written (2026-08-10):**
+> - **§3 is done.** The inverse collections were removed. The ⛔ in its heading is historical.
+> - **Two dependency edges are missing from this document** and were found later:
+>   `Planning → History` (`GetSuggestionsRepeatingPlannerTaskEndpoint` reads `ActivityHistory`)
+>   and `History → TodoLists + Routines`
+>   (`GetFilteredTableActivityHistoryEndpoint.cs:91-106` filters via `Any(...)` subqueries).
+>   The graph below and its "two slice→slice edges" claim are therefore understated, and the
+>   **Sequencing** section at the bottom is wrong — History must fall between Routines and
+>   Planning. Use `slicePrompts/00-README.md` for ordering.
+> - **`AdhdTimeOrganizer.Timers` is not happening.** Timers folds into Core.
+> - The integration suite is green: **198 passed, 6 skipped, 0 failed.**
+
 Read-only. Answers the four questions blocking the slice map, and corrects two claims I made
 before checking.
 
@@ -44,9 +61,10 @@ What *is* bidirectional is the **completion fan-out**, and it already runs throu
 `RoutineTodoListIsDoneChangedEvent`) rather than direct references. Put the event records in `Core`
 and the cycle is broken by construction — the mechanism you'd need is already in place.
 
-## 3. ⛔ The blocking issue: `User` and `Activity` hold inverse collections into every slice
+## 3. ✅ *(resolved 2026-08-10)* `User` and `Activity` held inverse collections into every slice
 
-This is the real obstacle, and I missed it in the sketch.
+This was the real obstacle, and I missed it in the sketch. **It has since been fixed** — see the
+Sequencing note below for what landed. Kept here for the measurement.
 
 `Core`'s two hub entities carry collection navigations pointing at **every** slice:
 
@@ -177,6 +195,19 @@ AdhdTimeOrganizer  (host)
 Acyclic. Two slice→slice edges (`Planning→TodoLists`, `Reminders→Planning`), both verified one-way,
 both real FKs that keep their cascade and their global query filter.
 
+> **⚠ Understated — two more edges were found later (2026-08-10), and neither is an FK:**
+> - **`Planning → History`** — `GetSuggestionsRepeatingPlannerTaskEndpoint` reads
+>   `ActivityHistory`.
+> - **`History → TodoLists + Routines`** — `GetFilteredTableActivityHistoryEndpoint.cs:91-106`
+>   filters on `dbContext.TodoListItems` / `dbContext.RoutineTodoLists` through `Any(...)`
+>   subqueries. These are the subqueries §3's correction note introduced, so this edge is a
+>   *consequence* of the inverse-collection fix, not something it missed.
+>
+> Still acyclic, but the ordering is forced:
+> **TodoLists → Routines → History → Planning → Reminders → Tracking.**
+> Also note `Tracking → History` (the heartbeat writes `ActivityHistory`), on top of the §4
+> writes.
+
 ### Endpoint counts (verified)
 
 | Slice | Endpoints |
@@ -192,6 +223,9 @@ both real FKs that keep their cascade and their global query filter.
 | User/auth (→ host) | 34 |
 
 ## Sequencing
+
+> **⚠ Superseded.** Only item 1 below is still accurate. The rest predates the two edges above
+> and the decision to fold Timers into Core. **Use `slicePrompts/00-README.md`.**
 
 1. ~~**Kill the inverse collections** (§3).~~ **DONE 2026-08-10** — 22 collections removed from
    `User` / `Activity` / `ActivityRole` / `ActivityCategory`, ~18 configuration call sites switched to
