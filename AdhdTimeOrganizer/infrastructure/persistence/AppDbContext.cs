@@ -9,13 +9,14 @@ using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.entity.reminder;
 using AdhdTimeOrganizer.domain.model.entity.suggestion;
 using AdhdTimeOrganizer.Core.domain.model.entity.timer;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.user;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.configuration.todoList;
 using AdhdTimeOrganizer.History.infrastructure.persistence.configuration.activityHistory;
+using AdhdTimeOrganizer.Routines.infrastructure.persistence.configuration.todoList;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -150,6 +151,8 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         // in the host's configuration/activityHistory/ folder — Desktop, WebExtension, AndroidSessionData
         // — belong to Tracking, not History, and are covered by the host call below.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ActivityHistoryConfiguration).Assembly);
+        // AdhdTimeOrganizer.Routines (RoutineTodoList, RoutineTimePeriod, RoutinePeriodCompletion).
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(RoutineTimePeriodConfiguration).Assembly);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlannerTaskConfiguration).Assembly);
     }
 

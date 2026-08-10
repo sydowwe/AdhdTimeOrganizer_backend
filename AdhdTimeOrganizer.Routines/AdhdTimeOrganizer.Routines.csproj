@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>14</LangVersion>
+        <RootNamespace>AdhdTimeOrganizer.Routines</RootNamespace>
+    </PropertyGroup>
+
+    <!-- Same shape as AdhdTimeOrganizer.Core / .TodoLists: a plain library (Microsoft.NET.Sdk) that holds
+         endpoints, so it needs the ASP.NET Core surface, and the Web SDK's implicit usings are not
+         in scope here and are re-declared below. -->
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Microsoft.AspNetCore.Builder"/>
+        <Using Include="Microsoft.AspNetCore.Http"/>
+        <Using Include="Microsoft.Extensions.Configuration"/>
+        <Using Include="Microsoft.Extensions.DependencyInjection"/>
+        <Using Include="Microsoft.Extensions.Hosting"/>
+        <Using Include="Microsoft.Extensions.Logging"/>
+        <!-- Every endpoint, job and seeder here takes a plain DbContext (the host aliases it to
+             AppDbContext in DI), so Microsoft.EntityFrameworkCore is named by almost every file in
+             the project. Global rather than 40-odd identical using lines. -->
+        <Using Include="Microsoft.EntityFrameworkCore"/>
+    </ItemGroup>
+
+    <!-- The two Quartz jobs (RoutineTodoListResetJob, RoutinePeriodNudgeJob) need IJob /
+         IJobExecutionContext / DisallowConcurrentExecution from Quartz core. Registration itself
+         (AddJob/AddTrigger) stays host-side in the single AddQuartz call — this is only the
+         package the job classes compile against. Version pinned to match the host and
+         Sydowwe.Scheduler so the solution carries one Quartz version. -->
+    <ItemGroup>
+        <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.1"/>
+    </ItemGroup>
+
+    <!-- Deliberately no reference to AdhdTimeOrganizer (the host), and only Core + TodoLists among the
+         slices: Routines references TodoLists for the shared to-do bases (BaseTodoListItem,
+         TodoListStep, BaseTodoListConfigure, TodoListExtensions, the toggle/step/reorder endpoint
+         bases) and TodoListSettings, but nothing points back. -->
+    <ItemGroup>
+        <ProjectReference Include="..\AdhdTimeOrganizer.Core\AdhdTimeOrganizer.Core.csproj"/>
+        <ProjectReference Include="..\AdhdTimeOrganizer.TodoLists\AdhdTimeOrganizer.TodoLists.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,16 @@
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+
+namespace AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+
+public class RoutineTodoList : BaseTodoListItem
+{
+    public required long TimePeriodId { get; set; }
+    public RoutineTimePeriod RoutineTimePeriod { get; set; } = null!;
+    public DateOnly? LastResetDate { get; set; }
+    public int Streak { get; set; }
+    public int BestStreak { get; set; }
+    public DateTime LastCompletedAt { get; set; }
+
+    public List<DayOfWeek> SuggestedDays { get; set; } = [];
+    public int? SuggestedDayOfMonth { get; set; }
+}

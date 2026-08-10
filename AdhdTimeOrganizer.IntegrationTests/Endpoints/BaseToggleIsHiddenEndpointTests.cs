@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;

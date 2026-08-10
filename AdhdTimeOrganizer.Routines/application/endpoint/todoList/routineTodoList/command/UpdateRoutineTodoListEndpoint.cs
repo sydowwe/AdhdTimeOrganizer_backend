@@ -1,0 +1,34 @@
+using AdhdTimeOrganizer.Routines.application.dto.request.todoList;
+using AdhdTimeOrganizer.Routines.application.validator;
+using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using Sydowwe.Framework.application.endpoint.@base.command;
+
+namespace AdhdTimeOrganizer.Routines.application.endpoint.todoList.routineTodoList.command;
+
+public class UpdateRoutineTodoListEndpoint(DbContext dbContext)
+    : BaseUpdateEndpoint<RoutineTodoList, UpdateRoutineTodoListRequest>(dbContext)
+{
+    public override void Configure()
+    {
+        base.Configure();
+        Validator<UpdateRoutineTodoListValidator>();
+    }
+
+    protected override Task<bool> AfterMapping(RoutineTodoList entity, UpdateRoutineTodoListRequest req, CancellationToken ct = default)
+    {
+        if (req.Steps is not null)
+            entity.Steps = req.Steps.Select(s => new TodoListStep
+            {
+                Name = s.Name,
+                Order = s.Order,
+                Note = s.Note,
+                IsDone = s.Id.HasValue && entity.Steps.FirstOrDefault(e => e.Id == s.Id.Value)?.IsDone == true
+            }).ToList();
+
+        if (req is { TotalCount: not null, DoneCount: null })
+            entity.DoneCount = 0;
+
+        return Task.FromResult(true);
+    }
+}

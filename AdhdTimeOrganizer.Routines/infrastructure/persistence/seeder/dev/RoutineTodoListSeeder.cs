@@ -1,0 +1,286 @@
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.domain.valueObject;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
+
+namespace AdhdTimeOrganizer.Routines.infrastructure.persistence.seeder.dev;
+
+public class RoutineTodoListSeeder(
+    DbContext dbContext,
+    IOptions<TodoListSettings> settings,
+    ILogger<RoutineTodoListSeeder> logger) : IScopedService, IPerUserDevSeeder
+{
+    public string SeederName => "RoutineTodoList";
+    public int Order => 200;
+
+    public async Task TruncateTable()
+    {
+        await dbContext.TruncateTableCascadeAsync<RoutineTodoList>();
+    }
+
+
+    public async Task SeedForUser(long userId)
+    {
+        // Note: TruncateTable already removed existing data for this user
+
+        // Get activities and routine time periods for this user
+        var activities = await dbContext.Set<Activity>()
+            .Where(a => a.UserId == userId)
+            .ToListAsync();
+
+        var timePeriods = await dbContext.Set<RoutineTimePeriod>()
+            .Where(rtp => rtp.UserId == userId)
+            .OrderBy(rtp => rtp.LengthInDays)
+            .ToListAsync();
+
+        if (!activities.Any())
+        {
+            logger.LogWarning("No activities found for user {UserId}. Skipping routine todo list seeding.", userId);
+            return;
+        }
+
+        if (!timePeriods.Any())
+        {
+            logger.LogWarning("No routine time periods found for user {UserId}. Skipping routine todo list seeding.", userId);
+            return;
+        }
+
+        // Get time periods by text (from UserDefaultsService)
+        var dailyPeriod = timePeriods.FirstOrDefault(tp => tp.Text == "Daily");
+        var weeklyPeriod = timePeriods.FirstOrDefault(tp => tp.Text == "Weekly");
+        var monthlyPeriod = timePeriods.FirstOrDefault(tp => tp.Text == "Monthly");
+
+        // Get specific activities for realistic routine todos
+        var exerciseActivity = activities.FirstOrDefault(a => a.Name == "Morning Exercise");
+        var meditationActivity = activities.FirstOrDefault(a => a.Name == "Meditation");
+        var journalingActivity = activities.FirstOrDefault(a => a.Name == "Journaling");
+        var mealPrepActivity = activities.FirstOrDefault(a => a.Name == "Meal Preparation");
+        var laundryActivity = activities.FirstOrDefault(a => a.Name == "Laundry");
+        var houseCleaningActivity = activities.FirstOrDefault(a => a.Name == "House Cleaning");
+        var groceryActivity = activities.FirstOrDefault(a => a.Name == "Grocery Shopping");
+        var videoCallParentsActivity = activities.FirstOrDefault(a => a.Name == "Video Call Parents");
+        var readBookActivity = activities.FirstOrDefault(a => a.Name == "Read Technical Book");
+
+        var routineTodoLists = new List<RoutineTodoList>();
+
+        // Get initial display order for each time period (simulate GetNextDisplayOrder logic)
+        var lastOrderDaily = await dbContext.Set<RoutineTodoList>()
+            .Where(rtl => rtl.UserId == userId && rtl.TimePeriodId == (dailyPeriod != null ? dailyPeriod.Id : 0))
+            .MinAsync(rtl => (int?)rtl.DisplayOrder) ?? 0;
+        var nextOrderDaily = lastOrderDaily != 0 ? lastOrderDaily - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
+
+        var lastOrderWeekly = await dbContext.Set<RoutineTodoList>()
+            .Where(rtl => rtl.UserId == userId && rtl.TimePeriodId == (weeklyPeriod != null ? weeklyPeriod.Id : 0))
+            .MinAsync(rtl => (int?)rtl.DisplayOrder) ?? 0;
+        var nextOrderWeekly = lastOrderWeekly != 0 ? lastOrderWeekly - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
+
+        var lastOrderMonthly = await dbContext.Set<RoutineTodoList>()
+            .Where(rtl => rtl.UserId == userId && rtl.TimePeriodId == (monthlyPeriod != null ? monthlyPeriod.Id : 0))
+            .MinAsync(rtl => (int?)rtl.DisplayOrder) ?? 0;
+        var nextOrderMonthly = lastOrderMonthly != 0 ? lastOrderMonthly - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var now = DateTime.UtcNow;
+
+        // Daily routines
+        if (dailyPeriod != null && exerciseActivity != null)
+        {
+            routineTodoLists.Add(new RoutineTodoList
+            {
+                ActivityId = exerciseActivity.Id,
+                TimePeriodId = dailyPeriod.Id,
+                IsDone = true,
+                DisplayOrder = nextOrderDaily,
+                UserId = userId,
+                SuggestedTime = new IntTime(7, 0),
+                LastResetDate = today,
+                Streak = 12,
+                BestStreak = 21,
+                LastCompletedAt = now,
+                Steps =
+                [
+                    new TodoListStep { Name = "10 min warm-up", Order = 1, IsDone = true },
+                    new TodoListStep { Name = "20 min cardio", Order = 2, IsDone = true },
+                    new TodoListStep { Name = "Stretching", Order = 3, IsDone = true }
+                ]
+            });
+            nextOrderDaily -= settings.Value.DisplayOrderGap;
+        }
+
+        if (dailyPeriod != null && meditationActivity != null)
+        {
+            routineTodoLists.Add(new RoutineTodoList
+            {
+                ActivityId = meditationActivity.Id,
+                TimePeriodId = dailyPeriod.Id,
+                IsDone = false,
+                DisplayOrder = nextOrderDaily,
+                UserId = userId,
+                SuggestedTime = new IntTime(7, 30),
+                LastResetDate = today,
+                Streak = 5,
+                BestStreak = 14,
+                LastCompletedAt = now.AddDays(-1)
+            });
+            nextOrderDaily -= settings.Value.DisplayOrderGap;
+        }
+
+        if (dailyPeriod != null && journalingActivity != null)
+        {
+            routineTodoLists.Add(new RoutineTodoList
+            {
+                ActivityId = journalingActivity.Id,
+                TimePeriodId = dailyPeriod.Id,
+                IsDone = false,
+                DisplayOrder = nextOrderDaily,
+                UserId = userId,
+                Note = "3 things I'm grateful for",
+                LastResetDate = today,
+                Streak = 3,
+                BestStreak = 9,
+                LastCompletedAt = now.AddDays(-1)
+            });
+            nextOrderDaily -= settings.Value.DisplayOrderGap;
+        }
+
+        if (dailyPeriod != null && mealPrepActivity != null)
+        {
+            routineTodoLists.Add(new RoutineTodoList
+            {
+                ActivityId = mealPrepActivity.Id,
+                TimePeriodId = dailyPeriod.Id,
+                IsDone = true,
+                DoneCount = 3,
+                TotalCount = 3,
+                DisplayOrder = nextOrderDaily,
+                UserId = userId,
+                LastResetDate = today,
+                Streak = 8,
+                BestStreak = 15,
+                LastCompletedAt = now,
+                Steps =
+                [
+                    new TodoListStep { Name = "Breakfast", Order = 1, IsDone = true },
+                    new TodoListStep { Name = "Lunch", Order = 2, IsDone = true },
+                    new TodoListStep { Name = "Dinner", Order = 3, IsDone = true }
+                ]
+            });
+            nextOrderDaily -= settings.Value.DisplayOrderGap;
+        }
+
+        // Weekly routines
+        if (weeklyPeriod != null && laundryActivity != null)
+        {
+            routineTodoLists.Add(new RoutineTodoList
+            {
+                ActivityId = laundryActivity.Id,
+                TimePeriodId = weeklyPeriod.Id,
+                IsDone = false,
+                DoneCount = 0,
+                TotalCount = 2,
+                DisplayOrder = nextOrderWeekly,
+                UserId = userId,
+                LastResetDate = today.AddDays(-(int)today.DayOfWeek),
+                Streak = 4,
+                BestStreak = 10,
+                LastCompletedAt = now.AddDays(-7)
+            });
+            nextOrderWeekly -= settings.Value.DisplayOrderGap;
+        }
+
+        if (weeklyPeriod != null && houseCleaningActivity != null)
+        {
+            routineTodoLists.Add(new RoutineTodoList
+            {
+                ActivityId = houseCleaningActivity.Id,
+                TimePeriodId = weeklyPeriod.Id,
+                IsDone = false,
+                DoneCount = 1,
+                TotalCount = 4,
+                DisplayOrder = nextOrderWeekly,
+                UserId = userId,
+                SuggestedTime = new IntTime(11, 0),
+                LastResetDate = today.AddDays(-(int)today.DayOfWeek),
+                Streak = 6,
+                BestStreak = 12,
+                LastCompletedAt = now.AddDays(-7),
+                Steps =
+                [
+                    new TodoListStep { Name = "Living room", Order = 1, IsDone = true },
+                    new TodoListStep { Name = "Kitchen", Order = 2, IsDone = false },
+                    new TodoListStep { Name = "Bathroom", Order = 3, IsDone = false },
+                    new TodoListStep { Name = "Bedroom", Order = 4, IsDone = false }
+                ]
+            });
+            nextOrderWeekly -= settings.Value.DisplayOrderGap;
+        }
+
+        if (weeklyPeriod != null && groceryActivity != null)
+        {
+            routineTodoLists.Add(new RoutineTodoList
+            {
+                ActivityId = groceryActivity.Id,
+                TimePeriodId = weeklyPeriod.Id,
+                IsDone = true,
+                DisplayOrder = nextOrderWeekly,
+                UserId = userId,
+                Note = "Check pantry before going",
+                LastResetDate = today.AddDays(-(int)today.DayOfWeek),
+                Streak = 7,
+                BestStreak = 18,
+                LastCompletedAt = now
+            });
+            nextOrderWeekly -= settings.Value.DisplayOrderGap;
+        }
+
+        if (weeklyPeriod != null && videoCallParentsActivity != null)
+        {
+            routineTodoLists.Add(new RoutineTodoList
+            {
+                ActivityId = videoCallParentsActivity.Id,
+                TimePeriodId = weeklyPeriod.Id,
+                IsDone = false,
+                DisplayOrder = nextOrderWeekly,
+                UserId = userId,
+                LastResetDate = today.AddDays(-(int)today.DayOfWeek),
+                Streak = 2,
+                BestStreak = 8,
+                LastCompletedAt = now.AddDays(-7)
+            });
+            nextOrderWeekly -= settings.Value.DisplayOrderGap;
+        }
+
+        // Monthly routines
+        if (monthlyPeriod != null && readBookActivity != null)
+        {
+            routineTodoLists.Add(new RoutineTodoList
+            {
+                ActivityId = readBookActivity.Id,
+                TimePeriodId = monthlyPeriod.Id,
+                IsDone = false,
+                DoneCount = 1,
+                TotalCount = 4,
+                DisplayOrder = nextOrderMonthly,
+                UserId = userId,
+                SuggestedTime = new IntTime(20, 0),
+                Note = "At least 30 pages per session",
+                LastResetDate = new DateOnly(today.Year, today.Month, 1),
+                Streak = 3,
+                BestStreak = 7,
+                LastCompletedAt = now.AddDays(-5)
+            });
+            nextOrderMonthly -= settings.Value.DisplayOrderGap;
+        }
+
+        await dbContext.Set<RoutineTodoList>().AddRangeAsync(routineTodoLists);
+        await dbContext.SaveChangesAsync();
+
+        logger.LogInformation("Seeded {Count} routine todo lists for user {UserId}", routineTodoLists.Count, userId);
+    }
+}

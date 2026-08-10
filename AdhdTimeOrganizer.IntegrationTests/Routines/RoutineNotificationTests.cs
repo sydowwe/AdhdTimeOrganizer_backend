@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.infrastructure.jobs;
+using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Routines.infrastructure.jobs;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
