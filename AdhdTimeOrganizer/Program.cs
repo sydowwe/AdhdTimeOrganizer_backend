@@ -88,8 +88,12 @@ try
     // SuggestionPatternRefreshInterceptor REFRESHes them on save - seeding included.
     await EnsureSuggestionPatternViews(app.Services, logger);
 
-    // Database seeding
-    await SeedDatabase(app.Services, true /*builder.Environment.IsDevelopment()*/, logger);
+    // Database seeding. Off unless Seeding:RunOnStartup says otherwise — switch it on (appsettings,
+    // appsettings.Development.json, or Seeding__RunOnStartup=true) for the boot after a migration, then
+    // switch it back. IncludeDevFixtures adds passes 2-4 on top (two of them truncate); see SeedDatabase.
+    var seeding = builder.Configuration.GetSection("Seeding");
+    if (seeding.GetValue<bool>("RunOnStartup"))
+        await SeedDatabase(app.Services, seeding.GetValue<bool>("IncludeDevFixtures"), logger);
 
 
     logger.LogInformation("Backend started.");
@@ -393,7 +397,13 @@ static async Task EnsureSuggestionPatternViews(IServiceProvider services, ILogge
     await SuggestionPatternViewInstaller.EnsureViewsCreatedAsync(db, logger);
 }
 
-static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, ILogger<AdhdTimeOrganizer.Program> logger)
+/// <summary>
+/// Runs the four seeding passes. Only reached when <c>Seeding:RunOnStartup</c> is set — every host boot,
+/// tests included, would otherwise reseed (and, for the dev passes, truncate) behind your back.
+/// <paramref name="includeDevFixtures"/> comes from <c>Seeding:IncludeDevFixtures</c> and gates the three
+/// passes that are fixtures rather than production data.
+/// </summary>
+static async Task SeedDatabase(IServiceProvider services, bool includeDevFixtures, ILogger<AdhdTimeOrganizer.Program> logger)
 {
     try
     {
@@ -402,9 +412,9 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
 
         logger.LogInformation("Starting database seeding...");
 
-        // Four passes, in this order — later passes need what earlier ones create. Every call is
-        // commented out on purpose: seeding is run deliberately, not on every boot. The dev passes
-        // truncate, so never uncomment them outside the `isDevelopment` guard.
+        // Four passes, in this order — later passes need what earlier ones create. Seeding is run
+        // deliberately, not on every boot, which is what Seeding:RunOnStartup at the call site is for.
+        // The dev passes truncate, so never take them outside the `includeDevFixtures` guard.
 
         // 1. App-wide production data: roles, then the root admin (whose own per-user defaults
         //    DefaultUsersSeeder creates as part of creating the account). Upserts, never truncates,
@@ -416,7 +426,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         //    changed after those accounts were created. `overrideData: true` rewrites the users'
         //    existing default rows in place, keeping their ids.
         var perUserDefaults = scopedServices.GetRequiredService<IPerUserDefaultSeederManager>();
-        if (isDevelopment)
+        if (includeDevFixtures)
         {
             await perUserDefaults.SeedAllForAllUsersAsync(true);
         }
@@ -425,7 +435,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         //    fixtures there have the highest Order values and used to run last when both kinds shared
         //    a single ordered list.
         var perUserDev = scopedServices.GetRequiredService<IPerUserDevSeederManager>();
-        if (isDevelopment)
+        if (includeDevFixtures)
         {
             await perUserDev.SeedAllForRootAdminAsync(true);
         }
@@ -433,7 +443,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         // 4. App-wide dev fixtures — the module ones (notifications, reminders), which pick their own
         //    owners through ISeedUserProvider rather than being handed a single user.
         var appWideDev = scopedServices.GetRequiredService<IAppWideDevSeederManager>();
-        if (isDevelopment)
+        if (includeDevFixtures)
         {
             await appWideDev.SeedAllAsync(true);
         }
