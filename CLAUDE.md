@@ -86,9 +86,9 @@ on the way in (see above).
 framework reconciliation — reach for `Sydowwe.Framework.*` from portal code too. What still lives in
 the portal is only what names a portal-specific type: the two `BaseEntityWithUser` / `BaseLookupWithUser`
 closing shims, `IsManyWithOneUser` / `IsOneWithOneUser`, and a handful of entity-specific config
-helpers. The old `EndpointHelper` / `DateTimeExtensions` name collisions are gone — the portal copies
-are now `PortalEndpointHelper` and `TimeOnlyExtensions`. The portal/framework reconciliation is
-finished; there is no outstanding duplicate to merge.
+helpers. The old `EndpointHelper` / `DateTimeExtensions` name collisions are gone — the portal copy
+is now `TimeOnlyExtensions`. The portal/framework reconciliation is finished; there is no outstanding
+duplicate to merge.
 
 # Composition Root (module wiring)
 
@@ -187,7 +187,11 @@ Sydowwe.Framework.infrastructure.persistence.configuration.extensions`.
     high-sensitivity strings. Stores a versioned token in a `text` column; randomized, so the column
     **cannot** be filtered/sorted/uniqued — use only for fields read by row id. Key comes from the
     `FIELD_ENCRYPTION_KEY` env var (base64, 32 bytes; in `.env`, never the repo). See
-    `framework/Sydowwe.Framework/infrastructure/persistence/encryption/`. Currently unused by any entity here.
+    `framework/Sydowwe.Framework/infrastructure/persistence/encryption/`. In use on
+    `User.GoogleCalendarRefreshToken` via the nullable-property variant `EncryptedColumnNullable`
+    (plain `EncryptedColumn` binds `Expression<Func<TEntity, string>>`, which a `string?` property
+    can't satisfy). `FIELD_ENCRYPTION_KEY` is a hard boot requirement wherever it's configured — the
+    encryptor is constructed inside `OnModelCreating` and throws if the var is unset.
 
   ⚠ **Table-name gotcha in `BaseEntityConfigure`:** it derives the table name with
   `.Replace("Read", "")` on the *whole* class name, not a suffix strip. No entity in this solution
@@ -470,12 +474,8 @@ Role names live in one place — `UserRoleEnum` (User · Admin · Root) with the
 `UserRoles.UserOrHigher` / `UserRoles.AdminOrHigher` in
 `framework/Sydowwe.Framework/domain/helper/EndpointExtensions.cs`. The bases default to
 `IEndpoint.GetUserRole()` (`= UserRoles.UserOrHigher`); `IEndpoint.GetAdminRole()` is the
-admin-or-higher counterpart. `AdhdTimeOrganizer/application/helper/PortalEndpointHelper.cs`
-re-exports the same two arrays as `GetUserOrHigherRoles()` / `GetAdminOrHigherRoles()` and adds
-`HttpContext.GetVerifiedUser()` closed over the portal `User` — it is a convenience wrapper, not a
-second source of truth. It is named `Portal…` so it no longer collides with Framework's own
-`EndpointHelper` (`framework/Sydowwe.Framework/domain/helper/`, the result-error → HTTP status map), which is a
-completely different helper. Never hard-code role strings.
+admin-or-higher counterpart. There is no portal-side `PortalEndpointHelper` wrapper around these —
+call `IEndpoint.GetUserRole()` / `GetAdminRole()` directly. Never hard-code role strings.
 
 **User scoping — the role gate is not what keeps other users' rows out, and neither are the base
 endpoints.** Since there is now one shared set of bases, `ApplyUserScoping` on

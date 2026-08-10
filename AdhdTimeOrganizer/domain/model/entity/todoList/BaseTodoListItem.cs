@@ -12,4 +12,17 @@ public abstract class BaseTodoListItem : BaseEntityWithIsDone, IEntityWithDoneAn
     public string? Note { get; set; }
     public IntTime? SuggestedTime { get; set; }
     public ICollection<TodoListStep> Steps { get; set; } = [];
+
+    /// <summary>
+    /// Snaps IsDone, DoneCount (when step-counted) and every step's IsDone together, so the three
+    /// representations of "done" can't drift apart the way they did when callers set them separately.
+    /// </summary>
+    public void SetDone(bool isDone)
+    {
+        IsDone = isDone;
+        if (TotalCount.HasValue)
+            DoneCount = isDone ? TotalCount : 0;
+        foreach (var step in Steps)
+            step.IsDone = isDone;
+    }
 }

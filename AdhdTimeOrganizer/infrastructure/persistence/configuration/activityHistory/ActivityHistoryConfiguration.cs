@@ -22,5 +22,10 @@ public class ActivityHistoryConfiguration : IEntityTypeConfiguration<ActivityHis
             .HasConversion(new IntTimeConverter()).IsRequired();
 
         builder.HasIndex(a => new { a.UserId, a.ActivityId, a.StartTimestamp }).IsUnique();
+
+        // The unique index above cannot serve a user + date-range scan: ActivityId sits between the
+        // two columns such a scan filters on, so Postgres can only use the UserId prefix and then
+        // filters the rest. History dashboards and mv_activity_history_pattern both read that shape.
+        builder.HasIndex(a => new { a.UserId, a.StartTimestamp });
     }
 }

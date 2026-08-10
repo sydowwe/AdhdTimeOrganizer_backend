@@ -46,6 +46,8 @@ public class Reminder : BaseEntityWithUser
     /// </summary>
     public required DateTime RemindAt { get; set; }
 
+    private List<int> _leadOffsetsMinutes = [0];
+
     /// <summary>
     /// Occurrences relative to <see cref="RemindAt"/>, in minutes. Must be <c>&lt;= 0</c> and unique —
     /// <c>[-10, 0]</c> means "ten minutes before, and again at the time". The registry rejects a positive
@@ -54,8 +56,23 @@ public class Reminder : BaseEntityWithUser
     /// A <b>recurring</b> reminder carries exactly one offset: <c>Sydowwe.Framework.Contracts</c>'s recurring schedule has no
     /// lead-offset concept, so the single offset is folded into the recurrence anchor at registration.
     /// </para>
+    /// <para>
+    /// <c>ReminderValidator</c> is what gives the user a friendly error; this setter throws instead, as a
+    /// backstop for write paths that skip the DTO validator (a seeder, a script, a future endpoint).
+    /// </para>
     /// </summary>
-    public List<int> LeadOffsetsMinutes { get; set; } = [0];
+    public List<int> LeadOffsetsMinutes
+    {
+        get => _leadOffsetsMinutes;
+        set
+        {
+            if (value.Any(o => o > 0))
+                throw new ArgumentException("Lead offsets must be 0 or negative.", nameof(LeadOffsetsMinutes));
+            if (value.Distinct().Count() != value.Count)
+                throw new ArgumentException("Lead offsets must be unique.", nameof(LeadOffsetsMinutes));
+            _leadOffsetsMinutes = value;
+        }
+    }
 
     /// <summary><c>null</c> = fires once. Otherwise the cadence, anchored at <see cref="RemindAt"/>.</summary>
     public ReminderRecurrence? Recurrence { get; set; }

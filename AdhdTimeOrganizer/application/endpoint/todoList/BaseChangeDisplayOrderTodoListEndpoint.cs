@@ -46,6 +46,8 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
     /// </summary>
     public override async Task HandleAsync(ChangeDisplayOrderRequest req, CancellationToken ct)
     {
+        var userId = User.GetId();
+
         var itemToMove = await _dbSet
             .FirstOrDefaultAsync(x => x.Id == req.MovedItemId, ct);
 
@@ -60,7 +62,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
         await using (var tx = await dbContext.Database.BeginTransactionAsync(ct))
         {
             // Attempt to calculate new order. If conflict triggers, we'll rebalance and retry once.
-            var newOrderResult = await CalculateNewOrderAsync(req, ct);
+            var newOrderResult = await CalculateNewOrderAsync(req, userId, ct);
 
             if (newOrderResult.Failed)
             {
@@ -88,7 +90,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
     /// <summary>
     /// Calculates the new DisplayOrder value based on the surrounding items using arithmetic of precedingOrder and followingOrder.
     /// </summary>
-    private async Task<Result<long>> CalculateNewOrderAsync(ChangeDisplayOrderRequest req, CancellationToken ct)
+    private async Task<Result<long>> CalculateNewOrderAsync(ChangeDisplayOrderRequest req, long userId, CancellationToken ct)
     {
         var standardGap = _settings.DisplayOrderGap;
 
@@ -99,7 +101,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
             if (!req.FollowingItemId.HasValue)
                 return Result.Successful(standardGap);
 
-            var followingOrder = await _dbSet.GetDisplayOrderById(req.FollowingItemId.Value, ct);
+            var followingOrder = await _dbSet.GetDisplayOrderById(req.FollowingItemId.Value, userId, ct);
 
             return followingOrder.HasValue
                 ? Result.Successful(ArithmeticNewOrderNumber(followingOrder.Value - standardGap, followingOrder.Value))
@@ -108,7 +110,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
 
         if (!req.FollowingItemId.HasValue)
         {
-            var precedingOrder = await _dbSet.GetDisplayOrderById(req.PrecedingItemId.Value, ct);
+            var precedingOrder = await _dbSet.GetDisplayOrderById(req.PrecedingItemId.Value, userId, ct);
 
             return precedingOrder.HasValue
                 ? Result.Successful(ArithmeticNewOrderNumber(precedingOrder.Value, precedingOrder.Value + standardGap))
@@ -116,11 +118,11 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
         }
 
         // Case 3: Move between two existing items
-        var preOrder = await _dbSet.GetDisplayOrderById(req.PrecedingItemId.Value, ct);
+        var preOrder = await _dbSet.GetDisplayOrderById(req.PrecedingItemId.Value, userId, ct);
         if (!preOrder.HasValue)
             return Result<long>.Error(ResultErrorType.NotFound, "The specified 'PrecedingItemId' was not found.");
 
-        var folOrder = await _dbSet.GetDisplayOrderById(req.FollowingItemId.Value, ct);
+        var folOrder = await _dbSet.GetDisplayOrderById(req.FollowingItemId.Value, userId, ct);
         if (!folOrder.HasValue)
             return Result<long>.Error(ResultErrorType.NotFound, "The specified 'FollowingItemId' was not found.");
 
@@ -129,8 +131,8 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
         // If no gap (midpoint equals one of the endpoints) -> signal conflict and request rebalance
         if (newOrder == preOrder.Value || newOrder == folOrder.Value)
         {
-            await RebalanceDisplayOrdersAsync(req.FollowingItemId.Value, ct);
-            var newOrderResult = await CalculateNewOrderAsync(req, ct);
+            await RebalanceDisplayOrdersAsync(req.FollowingItemId.Value, userId, ct);
+            var newOrderResult = await CalculateNewOrderAsync(req, userId, ct);
             return newOrderResult;
         }
 
@@ -140,11 +142,9 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(AppDbConte
     protected abstract Expression<Func<TEntity, long>> GroupFilterExpression { get; }
 
 
-    private async Task RebalanceDisplayOrdersAsync(long followingId, CancellationToken ct)
+    private async Task RebalanceDisplayOrdersAsync(long followingId, long userId, CancellationToken ct)
     {
-        var userId = User.GetId();
-
-        var groupId = await _dbSet.GetGroupIdById(followingId, GroupFilterExpression, ct);
+        var groupId = await _dbSet.GetGroupIdById(followingId, userId, GroupFilterExpression, ct);
         if (groupId is null)
             return;
 

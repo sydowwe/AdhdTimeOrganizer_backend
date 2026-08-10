@@ -13,7 +13,7 @@ public static class TodoListEntityConfigurationExtensions
         {
             t.HasCheckConstraint($"CK_{entityName}_DoneCount_Min", "done_count IS NULL OR done_count >= 0");
             t.HasCheckConstraint($"CK_{entityName}_TotalCount_Range", "total_count IS NULL OR total_count >= 2 AND total_count <= 99");
-            t.HasCheckConstraint($"CK_{entityName}_DoneCount_LessOrEqual_TotalCount", "done_count <= total_count");
+            t.HasCheckConstraint($"CK_{entityName}_DoneCount_LessOrEqual_TotalCount", "done_count IS NULL OR total_count IS NULL OR done_count <= total_count");
         });
 
         builder.Property(e => e.DisplayOrder).IsRequired();

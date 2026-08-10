@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -14,6 +14,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
         {
             migrationBuilder.EnsureSchema(
                 name: "public");
+
+            migrationBuilder.EnsureSchema(
+                name: "audit");
 
             migrationBuilder.CreateTable(
                 name: "AspNetRoles",
@@ -34,6 +37,26 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_asp_net_roles", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "business_audit_log",
+                schema: "audit",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    event_type = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    payload = table.Column<string>(type: "jsonb", nullable: true),
+                    entity_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    entity_id = table.Column<long>(type: "bigint", nullable: true),
+                    user_id = table.Column<long>(type: "bigint", nullable: true),
+                    correlation_id = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_business_audit_log", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -158,11 +181,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
-                    timezone = table.Column<string>(type: "text", nullable: false),
                     google_o_auth_user_id = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
-                    google_calendar_refresh_token = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    google_calendar_refresh_token = table.Column<string>(type: "text", nullable: true),
                     has_extension_access = table.Column<bool>(type: "boolean", nullable: false),
-                    last_login_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     first_day_of_week = table.Column<int>(type: "integer", nullable: false, defaultValue: 1),
                     email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
@@ -182,6 +203,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     is_active = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
                     theme = table.Column<string>(type: "text", nullable: false),
                     locale = table.Column<string>(type: "text", nullable: false),
+                    timezone = table.Column<string>(type: "text", nullable: false),
                     ask_before_delete = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
                 },
                 constraints: table =>
@@ -581,7 +603,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     process_name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     product_name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     window_title = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
-                    executable_path = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: false),
+                    executable_path = table.Column<string>(type: "text", nullable: false),
                     is_fullscreen = table.Column<bool>(type: "boolean", nullable: false),
                     active_seconds = table.Column<int>(type: "integer", nullable: false),
                     background_seconds = table.Column<int>(type: "integer", nullable: false),
@@ -695,21 +717,21 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    user_id = table.Column<long>(type: "bigint", nullable: false),
                     token_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     stay_logged_in = table.Column<bool>(type: "boolean", nullable: false),
-                    is_extension_client = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     auth_method = table.Column<int>(type: "integer", nullable: false),
+                    is_extension_client = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    user_agent = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    ip_address = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
                     is_revoked = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     replaced_by_token_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     revoked_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     revoked_by_ip = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
-                    user_agent = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    ip_address = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    user_id = table.Column<long>(type: "bigint", nullable: false)
+                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
@@ -742,6 +764,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     last_reset_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     streak_grace_until = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     history_depth = table.Column<int>(type: "integer", nullable: false),
+                    reminder_lead_days = table.Column<int>(type: "integer", nullable: true),
+                    ending_soon_notified_for = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    grace_notified_for = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
@@ -753,6 +778,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.CheckConstraint("ck_routine_time_period_best_streak_non_negative", "\"best_streak\" >= 0");
                     table.CheckConstraint("ck_routine_time_period_history_depth_range", "\"history_depth\" >= 1 AND \"history_depth\" <= 100");
                     table.CheckConstraint("ck_routine_time_period_length_in_days_range", "\"length_in_days\" >= 1 AND \"length_in_days\" <= 365");
+                    table.CheckConstraint("ck_routine_time_period_reminder_lead_days_range", "\"reminder_lead_days\" IS NULL OR (\"reminder_lead_days\" >= 1 AND \"reminder_lead_days\" < \"length_in_days\")");
                     table.CheckConstraint("ck_routine_time_period_reset_anchor_day_range", "(\"length_in_days\" <= 7 OR \"length_in_days\" % 7 = 0 AND \"reset_anchor_day\" BETWEEN 1 AND 7) OR (\"length_in_days\" > 7 AND \"length_in_days\" % 7 <> 0 AND \"reset_anchor_day\" BETWEEN 1 AND 30)");
                     table.CheckConstraint("ck_routine_time_period_streak_grace_days_range", "\"streak_grace_days\" >= 0 AND \"streak_grace_days\" <= \"length_in_days\" - 1");
                     table.CheckConstraint("ck_routine_time_period_streak_non_negative", "\"streak\" >= 0");
@@ -1525,7 +1551,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 {
                     table.PrimaryKey("pk_routine_todo_list", x => x.id);
                     table.CheckConstraint("CK_RoutineTodoList_BestStreak_NonNegative", "\"best_streak\" >= 0");
-                    table.CheckConstraint("CK_RoutineTodoList_DoneCount_LessOrEqual_TotalCount", "done_count <= total_count");
+                    table.CheckConstraint("CK_RoutineTodoList_DoneCount_LessOrEqual_TotalCount", "done_count IS NULL OR total_count IS NULL OR done_count <= total_count");
                     table.CheckConstraint("CK_RoutineTodoList_DoneCount_Min", "done_count IS NULL OR done_count >= 0");
                     table.CheckConstraint("CK_RoutineTodoList_Streak_NonNegative", "\"streak\" >= 0");
                     table.CheckConstraint("CK_RoutineTodoList_SuggestedDayOfMonth_Range", "\"suggested_day_of_month\" IS NULL OR (\"suggested_day_of_month\" BETWEEN 1 AND 31)");
@@ -1779,7 +1805,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_todo_list_item", x => x.id);
-                    table.CheckConstraint("CK_TodoListItem_DoneCount_LessOrEqual_TotalCount", "done_count <= total_count");
+                    table.CheckConstraint("CK_TodoListItem_DoneCount_LessOrEqual_TotalCount", "done_count IS NULL OR total_count IS NULL OR done_count <= total_count");
                     table.CheckConstraint("CK_TodoListItem_DoneCount_Min", "done_count IS NULL OR done_count >= 0");
                     table.CheckConstraint("CK_TodoListItem_TotalCount_Range", "total_count IS NULL OR total_count >= 2 AND total_count <= 99");
                     table.ForeignKey(
@@ -1879,6 +1905,43 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "reminder",
+                schema: "public",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    title = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    note = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    remind_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    lead_offsets_minutes = table.Column<string>(type: "jsonb", nullable: false),
+                    recurrence = table.Column<string>(type: "text", nullable: true),
+                    planner_task_id = table.Column<long>(type: "bigint", nullable: true),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    user_id = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_reminder", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_reminder_planner_task_planner_task_id",
+                        column: x => x.planner_task_id,
+                        principalSchema: "public",
+                        principalTable: "planner_task",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "fk_reminder_user_user_id",
+                        column: x => x.user_id,
+                        principalSchema: "public",
+                        principalTable: "user",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "ix_activity_category_id",
                 schema: "public",
@@ -1890,6 +1953,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public",
                 table: "activity",
                 column: "role_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_activity_user_id",
+                schema: "public",
+                table: "activity",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_user_id_category_id",
@@ -1949,6 +2018,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 column: "experience_type_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_activity_category_user_id",
+                schema: "public",
+                table: "activity_category",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_activity_category_user_id_name",
                 schema: "public",
                 table: "activity_category",
@@ -1956,11 +2031,23 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "ix_activity_expected_cost_tier_user_id",
+                schema: "public",
+                table: "activity_expected_cost_tier",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_activity_expected_cost_tier_user_id_text",
                 schema: "public",
                 table: "activity_expected_cost_tier",
                 columns: new[] { "user_id", "text" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_activity_experience_type_user_id",
+                schema: "public",
+                table: "activity_experience_type",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_experience_type_user_id_text",
@@ -1976,11 +2063,29 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 column: "activity_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_activity_history_user_id",
+                schema: "public",
+                table: "activity_history",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_activity_history_user_id_activity_id_start_timestamp",
                 schema: "public",
                 table: "activity_history",
                 columns: new[] { "user_id", "activity_id", "start_timestamp" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_activity_history_user_id_start_timestamp",
+                schema: "public",
+                table: "activity_history",
+                columns: new[] { "user_id", "start_timestamp" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_activity_location_type_user_id",
+                schema: "public",
+                table: "activity_location_type",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_location_type_user_id_text",
@@ -1997,6 +2102,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "ix_activity_role_user_id",
+                schema: "public",
+                table: "activity_role",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_activity_role_user_id_name",
                 schema: "public",
                 table: "activity_role",
@@ -2004,11 +2115,23 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "ix_activity_weather_dependency_user_id",
+                schema: "public",
+                table: "activity_weather_dependency",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_activity_weather_dependency_user_id_text",
                 schema: "public",
                 table: "activity_weather_dependency",
                 columns: new[] { "user_id", "text" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_android_session_data_user_id",
+                schema: "public",
+                table: "android_session_data",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_android_session_data_user_id_device_id_package_name_session",
@@ -2037,10 +2160,47 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "ix_business_audit_log_correlation_id",
+                schema: "audit",
+                table: "business_audit_log",
+                column: "correlation_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_business_audit_log_entity_name_entity_id",
+                schema: "audit",
+                table: "business_audit_log",
+                columns: new[] { "entity_name", "entity_id" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_business_audit_log_event_type",
+                schema: "audit",
+                table: "business_audit_log",
+                column: "event_type");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_business_audit_log_timestamp",
+                schema: "audit",
+                table: "business_audit_log",
+                column: "timestamp",
+                descending: new bool[0]);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_business_audit_log_user_id",
+                schema: "audit",
+                table: "business_audit_log",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_calendar_day_type",
                 schema: "public",
                 table: "calendar",
                 column: "day_type");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_calendar_user_id",
+                schema: "public",
+                table: "calendar",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_calendar_user_id_date",
@@ -2048,6 +2208,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 table: "calendar",
                 columns: new[] { "user_id", "date" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_desktop_activity_entry_user_id",
+                schema: "public",
+                table: "desktop_activity_entry",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_desktop_activity_entry_user_id_window_start",
@@ -2133,6 +2299,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 column: "todolist_item_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_planner_task_user_id",
+                schema: "public",
+                table: "planner_task",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_planner_task_user_id_calendar_id_start_time",
                 schema: "public",
                 table: "planner_task",
@@ -2186,6 +2358,24 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public",
                 table: "refresh_token",
                 columns: new[] { "user_id", "is_revoked" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_reminder_planner_task_id",
+                schema: "public",
+                table: "reminder",
+                column: "planner_task_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_reminder_user_id",
+                schema: "public",
+                table: "reminder",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_reminder_user_id_remind_at",
+                schema: "public",
+                table: "reminder",
+                columns: new[] { "user_id", "remind_at" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_definition_owner_module_subject_type_subject_id_ki",
@@ -2287,6 +2477,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 column: "recurrence_type");
 
             migrationBuilder.CreateIndex(
+                name: "ix_repeating_planner_task_user_id",
+                schema: "public",
+                table: "repeating_planner_task",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_repeating_planner_task_user_id_is_active",
                 schema: "public",
                 table: "repeating_planner_task",
@@ -2324,6 +2520,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public",
                 table: "routine_todo_list",
                 column: "time_period_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_routine_todo_list_user_id",
+                schema: "public",
+                table: "routine_todo_list",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_todo_list_user_id_time_period_id",
@@ -2383,6 +2585,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public",
                 table: "task_planner_day_template",
                 column: "suggested_for_day_type");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_task_planner_day_template_user_id",
+                schema: "public",
+                table: "task_planner_day_template",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_task_planner_day_template_user_id_name",
@@ -2446,11 +2654,23 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 column: "category_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_todo_list_user_id",
+                schema: "public",
+                table: "todo_list",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_todo_list_user_id_name",
                 schema: "public",
                 table: "todo_list",
                 columns: new[] { "user_id", "name" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_todo_list_category_user_id",
+                schema: "public",
+                table: "todo_list_category",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_category_user_id_name",
@@ -2476,6 +2696,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public",
                 table: "todo_list_item",
                 column: "todo_list_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_todo_list_item_user_id",
+                schema: "public",
+                table: "todo_list_item",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_item_user_id_activity_id_todo_list_id",
@@ -2510,6 +2736,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 column: "role_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_tracker_android_mapping_by_pattern_user_id",
+                schema: "public",
+                table: "tracker_android_mapping_by_pattern",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_tracker_android_mapping_by_pattern_user_id_package_name_app",
                 schema: "public",
                 table: "tracker_android_mapping_by_pattern",
@@ -2535,6 +2767,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public",
                 table: "tracker_desktop_mapping_by_pattern",
                 column: "role_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_tracker_desktop_mapping_by_pattern_user_id",
+                schema: "public",
+                table: "tracker_desktop_mapping_by_pattern",
+                column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_desktop_mapping_by_pattern_user_id_process_name_pro",
@@ -2595,6 +2833,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 column: "role_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_web_extension_activity_entry_user_id",
+                schema: "public",
+                table: "web_extension_activity_entry",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_web_extension_activity_entry_user_id_window_start",
                 schema: "public",
                 table: "web_extension_activity_entry",
@@ -2632,6 +2876,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public");
 
             migrationBuilder.DropTable(
+                name: "business_audit_log",
+                schema: "audit");
+
+            migrationBuilder.DropTable(
                 name: "desktop_activity_entry",
                 schema: "public");
 
@@ -2652,10 +2900,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public");
 
             migrationBuilder.DropTable(
-                name: "planner_task",
-                schema: "public");
-
-            migrationBuilder.DropTable(
                 name: "pomodoro_timer_preset",
                 schema: "public");
 
@@ -2665,6 +2909,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "refresh_token",
+                schema: "public");
+
+            migrationBuilder.DropTable(
+                name: "reminder",
                 schema: "public");
 
             migrationBuilder.DropTable(
@@ -2760,11 +3008,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public");
 
             migrationBuilder.DropTable(
-                name: "calendar",
-                schema: "public");
-
-            migrationBuilder.DropTable(
-                name: "todo_list_item",
+                name: "planner_task",
                 schema: "public");
 
             migrationBuilder.DropTable(
@@ -2780,15 +3024,27 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 schema: "public");
 
             migrationBuilder.DropTable(
-                name: "task_importance",
-                schema: "public");
-
-            migrationBuilder.DropTable(
                 name: "task_planner_day_template",
                 schema: "public");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles",
+                schema: "public");
+
+            migrationBuilder.DropTable(
+                name: "calendar",
+                schema: "public");
+
+            migrationBuilder.DropTable(
+                name: "task_importance",
+                schema: "public");
+
+            migrationBuilder.DropTable(
+                name: "todo_list_item",
+                schema: "public");
+
+            migrationBuilder.DropTable(
+                name: "reminder_definition",
                 schema: "public");
 
             migrationBuilder.DropTable(
@@ -2801,10 +3057,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "todo_list",
-                schema: "public");
-
-            migrationBuilder.DropTable(
-                name: "reminder_definition",
                 schema: "public");
 
             migrationBuilder.DropTable(

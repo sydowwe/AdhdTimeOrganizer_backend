@@ -101,6 +101,10 @@ DB-enforced unless stated otherwise.
   authoritative and the value is rewritten on every sync.
 - The suggestion pattern views must exist before any save touching `PlannerTask` / `ActivityHistory` /
   `Calendar`; nothing in the schema expresses that.
+- `User.GoogleCalendarRefreshToken` is at-rest encrypted (AES-256-GCM via `EncryptedColumnNullable`,
+  `FIELD_ENCRYPTION_KEY`); non-filterable/non-sortable as a result, but it's read only by user id, so
+  that costs nothing. `GoogleOAuthUserId` stays plaintext (lower-sensitivity). Both carry
+  `[AuditIgnore]`. Existing rows stay plaintext until their next write — no backfill pass has run.
 
 ## Business rules / domain logic
 
@@ -146,6 +150,12 @@ values are the `RecurrenceType` enum's ints (0 = DayOfWeek, 1 = DayOfMonth).
   `RoutinePeriodCompletion` row is written, and the summary notification is sent **after** the commit.
 - `CheckGrace` zeroes the streak once `StreakGraceUntil` has passed; it is meant to be called before
   any reset evaluation.
+- Only the list-based `RoutineResetService.TryReset` overload (used by `RoutineTodoListResetJob`,
+  `GetAllGroupedRoutineTodoListEndpoint`, `RoutineToggleIsDoneTodoListEndpoint`) may advance
+  `period.LastResetAt` / evaluate the streak / write a `RoutinePeriodCompletion` row. The single-item
+  overload used by `ToggleStepIsDoneRoutineTodoListEndpoint` only un-ticks the touched item for a
+  fresh-looking UI — it never advances the period, so a step toggle can no longer consume a due reset
+  cycle.
 - The 09:00 sweep (`RoutinePeriodNudgeJob`) sends two things: the lead-time nudge
   (`ReminderLeadDays` before the reset, only while something is still unfinished, ceiling days-left)
   and the grace-expiry warning (1 day before `StreakGraceUntil`). Both are marked idempotently
@@ -156,9 +166,12 @@ values are the `RecurrenceType` enum's ints (0 = DayOfWeek, 1 = DayOfMonth).
 
 **Completion fan-out** — ticking one thing updates its counterparts, via FastEndpoints events:
 - Planner task done/undone → the matching `RoutineTodoList` (same activity+user) and the linked
-  `TodoListItem` are synced, and `DoneCount` is snapped to `TotalCount` / 0 for step-counted items.
-- To-do item or routine item done/undone → **today's** planner tasks for that activity/item flip
-  between `Completed` and `NotStarted`.
+  `TodoListItem` are synced: `DoneCount` is snapped to `TotalCount` / 0 for step-counted items, and
+  every `Steps[].IsDone` is snapped to match.
+- To-do item done/undone → **today's** planner tasks linked to that item flip between `Completed` and
+  `NotStarted` via `PlannerTask.ApplyStatus` (clearing actual start/end times for `NotStarted`, same as
+  a direct `PatchPlannerTaskStatusEndpoint` call), their reminders are synced, and any task already
+  `Cancelled` that day is left untouched rather than overwritten.
 
 **Reminders** (`ReminderRegistrationService`) — the portal owns user intent (title, when, what it is
 attached to); the Reminders module owns status, next occurrence and dispatch history. One registry
@@ -173,6 +186,10 @@ the unique keys above make re-posting idempotent. Attribution to an Activity/Rol
 through `Tracker*MappingByPattern` rules (`PatternMatchType` per field, `IsIgnored` to drop noise),
 and the dashboards (pie / stacked bars / timeline / summary cards) read raw entries plus mappings.
 `ActivityHistory` is the *manual* record of time spent and is separate from tracking ingest.
+`DesktopActivityEntry` and `WebExtensionActivityEntry` rows are hard-deleted after **3 years** by the
+daily `PurgeExpiredActivityTrackingEntriesJob` (`ActivityTrackingRetentionOptions`, no keep-last-N
+floor) — there is no equivalent purge for `ActivityHistory`, which is user-authored data rather than
+raw ingest.
 
 **Account data** — `GET /user/data-export` returns a JSON dump of the user's own rows, throttled to
 one request per minute via `IDistributedCache`. Account deletion fans out over `ISubjectDataEraser`
@@ -262,11 +279,11 @@ something the base classes do not.
 | ReminderRegistrationService | Service | The only class that knows the Reminders module's key/schedule/payload shape | `application/service/reminder/ReminderRegistrationService.cs` |
 | UserDefaultsService | Service | `IUserDefaultsService` — runs per-user default seeders at sign-up | `application/service/UserDefaultsService.cs` |
 | TaskPlannerHelper | Helper | `WithIncludes()` for planner reads; `TasksOverlap` | `application/helper/TaskPlannerHelper.cs` |
-| PortalEndpointHelper | Helper | Role arrays + `GetVerifiedUser()` closed over the portal `User` | `application/helper/PortalEndpointHelper.cs` |
 | RoutineTodoListResetJob | Quartz job | 02:00 daily period reset + completion history + summary notification | `infrastructure/jobs/RoutineTodoListResetJob.cs` |
 | RoutinePeriodNudgeJob | Quartz job | 09:00 daily lead-time nudge + grace-expiry warning sweep | `infrastructure/jobs/RoutinePeriodNudgeJob.cs` |
 | AppDbContext | DbContext | Portal + module DbSets, identity mapping, the `WebExtensionActivityEntry` combined filter | `infrastructure/persistence/AppDbContext.cs` |
-| SuggestionPatternRefreshInterceptor | Interceptor | REFRESHes the pattern views after saves touching planner/history/calendar | `infrastructure/persistence/interceptors/SuggestionPatternRefreshInterceptor.cs` |
+| SuggestionPatternRefreshInterceptor | Interceptor | Marks the matching pattern view dirty after saves touching planner/history/calendar (does not refresh itself) | `infrastructure/persistence/interceptors/SuggestionPatternRefreshInterceptor.cs` |
+| SuggestionPatternRefreshJob | Quartz job | Drains the dirty-view queue every 10s and REFRESHes the pattern views off the request thread | `infrastructure/jobs/SuggestionPatternRefreshJob.cs` |
 | SuggestionPatternViewInstaller | Installer | Creates missing pattern views at boot from embedded SQL | `infrastructure/persistence/SuggestionPatternViewInstaller.cs` |
 | SeedUserIdProvider | Service | `ISeedUserProvider` — how Framework seeders find users | `infrastructure/persistence/seeder/SeedUserIdProvider.cs` |
 | PerUserDefaultMatcher | Helper | Shared matching for per-user default seeders | `infrastructure/persistence/seeder/userDefault/PerUserDefaultMatcher.cs` |
@@ -278,6 +295,9 @@ something the base classes do not.
 | RemoveToEntitySchemaProcessor | Swagger | Strips `ToEntity` from schemas (cyclic EF nav graphs) | `config/swagger/RemoveToEntitySchemaProcessor.cs` |
 
 **Events** (`application/event/` → `application/eventHandler/`): `PlannerTaskIsDoneChangedEvent`,
-`TodoListItemIsDoneChangedEvent`, `RoutineTodoListIsDoneChangedEvent`, `ActivityAddedToHistoryEvent`,
-`ActivityCreatedIsOnTodoListEvent` (plus two declared-but-unhandled: `ActivityAddedToTodoListEvent`,
-`ActivityAddedToRoutineTodoListEvent`).
+`TodoListItemIsDoneChangedEvent`, `RoutineTodoListIsDoneChangedEvent` (plus two
+declared-but-unhandled: `ActivityAddedToTodoListEvent`, `ActivityAddedToRoutineTodoListEvent`).
+`ActivityAddedToHistoryEvent` and `ActivityCreatedIsOnTodoListEvent` were removed as dead code — no
+publisher ever existed for either; `ActivityHistory` rows are written directly by
+`DesktopActivityHeartbeatEndpoint`, and `Activity` carries no `IsOnTodoList`/`TaskPriorityId` data to
+drive the latter.

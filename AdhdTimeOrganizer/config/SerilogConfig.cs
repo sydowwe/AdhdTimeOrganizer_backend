@@ -43,6 +43,10 @@ public static class SerilogConfig
                 { "response_status", new SinglePropertyColumnWriter("ResponseStatus", PropertyWriteMethod.Raw, NpgsqlDbType.Integer) },
                 { "response_time_ms", new SinglePropertyColumnWriter("ResponseTimeMs", PropertyWriteMethod.Raw, NpgsqlDbType.Double) }
 
+                // Dedicated typed columns for these are disabled below, but the "properties" writer
+                // above still serializes all of them (UserAgent/ClientIP/AuthenticationMethod/UserId/
+                // UserRole) into the JSONB blob regardless — commenting these out does NOT exclude
+                // the data from the sink, only the convenience column.
                 // { "user_agent", new SinglePropertyColumnWriter("UserAgent", PropertyWriteMethod.Raw, NpgsqlDbType.Varchar) },
                 // { "client_ip", new SinglePropertyColumnWriter("ClientIp", PropertyWriteMethod.Raw, NpgsqlDbType.Inet) },
 
@@ -51,23 +55,26 @@ public static class SerilogConfig
                 // { "role", new SinglePropertyColumnWriter("UserRole", PropertyWriteMethod.Raw, NpgsqlDbType.Varchar) }
             };
 
-            if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Production")
+            if (context.HostingEnvironment.IsProduction())
                 config.WriteTo.PostgreSQL(
-                    databaseConnectionString,
-                    "warning_logs",
-                    columnOptions,
-                    LogEventLevel.Information,
-                    null,
-                    null,
-                    30,
-                    int.MaxValue,
-                    null,
-                    false,
-                    "command",
-                    true,
-                    true,
-                    e => Log.Error(e.Message),
-                    configuration
+                    connectionString: databaseConnectionString,
+                    tableName: "app_logs",
+                    columnOptions: columnOptions,
+                    restrictedToMinimumLevel: LogEventLevel.Information,
+                    period: null,
+                    formatProvider: null,
+                    batchSizeLimit: 30,
+                    queueLimit: int.MaxValue,
+                    levelSwitch: null,
+                    useCopy: false,
+                    schemaName: "command",
+                    needAutoCreateTable: true,
+                    needAutoCreateSchema: true,
+                    failureCallback: e => Log.Error(e.Message),
+                    appConfiguration: configuration,
+                    // no PiiRedactor wiring exists on this pipeline (CLAUDE.md), so bound how long
+                    // whatever properties land in the JSONB column persist
+                    retentionTime: TimeSpan.FromDays(90)
                 );
         });
     }

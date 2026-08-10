@@ -9,7 +9,7 @@ public static class RoutineResetService
     // Everything else (10d, 20d, 45d…)                       → anchor = day of month (1–30)
     private static bool IsWeeklyAligned(RoutineTimePeriod period) => period.LengthInDays <= 7 || period.LengthInDays % 7 == 0;
 
-    public static DateTime ComputeNextReset(RoutineTimePeriod period)
+    public static DateTime ComputeNextReset(RoutineTimePeriod period, DateTime now)
     {
         var lastReset = period.LastResetAt ?? period.CreatedTimestamp;
         var earliest = DateTime.SpecifyKind(lastReset.AddDays(period.LengthInDays).Date, DateTimeKind.Utc);
@@ -28,12 +28,15 @@ public static class RoutineResetService
         }
         else
         {
-            var targetDay = period.ResetAnchorDay; // 1–28
+            // Clamped below via Math.Min against DateTime.DaysInMonth, so any 1–31 value is safe;
+            // months shorter than the anchor land on their own last day.
+            var targetDay = period.ResetAnchorDay;
             int year, month;
 
             if (period.LengthInDays == 30)
             {
-                // Calendar-month aligned: next reset is targetDay of the next calendar month
+                // Calendar-month aligned: next reset is targetDay of the next calendar month,
+                // advanced further if the routine went dormant for more than one cycle.
                 month = lastReset.Month + 1;
                 year = lastReset.Year;
                 if (month > 12)
@@ -41,20 +44,9 @@ public static class RoutineResetService
                     month = 1;
                     year++;
                 }
-            }
-            else if (period.LengthInDays == 365)
-            {
-                // Calendar-year aligned: next reset is targetDay of the same month next year
-                month = lastReset.Month;
-                year = lastReset.Year + 1;
-            }
-            else
-            {
-                // Day-of-month anchor: find next occurrence of that day on or after earliest
-                year = earliest.Year;
-                month = earliest.Month;
 
-                if (earliest.Day > targetDay)
+                var candidate = MonthlyCandidate(year, month, targetDay);
+                while (candidate < now)
                 {
                     month++;
                     if (month > 12)
@@ -62,12 +54,50 @@ public static class RoutineResetService
                         month = 1;
                         year++;
                     }
+                    candidate = MonthlyCandidate(year, month, targetDay);
+                }
+                return candidate;
+            }
+
+            if (period.LengthInDays == 365)
+            {
+                // Calendar-year aligned: next reset is targetDay of the same month next year,
+                // advanced further if the routine went dormant for more than one cycle.
+                month = lastReset.Month;
+                year = lastReset.Year + 1;
+
+                var candidate = MonthlyCandidate(year, month, targetDay);
+                while (candidate < now)
+                {
+                    year++;
+                    candidate = MonthlyCandidate(year, month, targetDay);
+                }
+                return candidate;
+            }
+
+            // Day-of-month anchor: find next occurrence of that day on or after earliest
+            year = earliest.Year;
+            month = earliest.Month;
+
+            if (earliest.Day > targetDay)
+            {
+                month++;
+                if (month > 12)
+                {
+                    month = 1;
+                    year++;
                 }
             }
 
-            var day = Math.Min(targetDay, DateTime.DaysInMonth(year, month));
-            return new DateTime(year, month, day, 2, 0, 0, DateTimeKind.Utc);
+            return MonthlyCandidate(year, month, targetDay);
         }
+    }
+
+    // Canonical reset instant is midnight UTC, matching the weekly-aligned path above.
+    private static DateTime MonthlyCandidate(int year, int month, int targetDay)
+    {
+        var day = Math.Min(targetDay, DateTime.DaysInMonth(year, month));
+        return new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Utc);
     }
 
     /// <summary>How many days before <see cref="RoutineTimePeriod.StreakGraceUntil"/> the grace warning fires.</summary>
@@ -91,7 +121,7 @@ public static class RoutineResetService
         if (period.ReminderLeadDays is not { } leadDays)
             return null;
 
-        var nextReset = ComputeNextReset(period);
+        var nextReset = ComputeNextReset(period, now);
         if (period.EndingSoonNotifiedFor == nextReset)
             return null;
 
@@ -129,23 +159,24 @@ public static class RoutineResetService
     }
 
     /// <summary>
-    /// Resets a single item if the period has elapsed. Does not evaluate period streak.
+    /// Resets a single item's own checklist state if the period has elapsed, so a stale item looks fresh the
+    /// moment it's touched. Deliberately does <b>not</b> advance <see cref="RoutineTimePeriod.LastResetAt"/> or
+    /// evaluate the streak — <see cref="ComputeNextReset"/> will keep reporting the same due reset until the
+    /// list-based overload runs (background job or the grouped read), which is the only place the streak
+    /// transition and <see cref="RoutinePeriodCompletion"/> row are produced. Advancing it here would let this
+    /// single-item path silently consume the reset cycle with no streak evaluation.
     /// Use when only one item is in context (e.g. step toggle). Returns true if a reset occurred.
     /// </summary>
     public static bool TryReset(RoutineTimePeriod period, RoutineTodoList item, DateTime now)
     {
-        var nextReset = ComputeNextReset(period);
+        var nextReset = ComputeNextReset(period, now);
         if (now < nextReset)
             return false;
 
         var today = DateOnly.FromDateTime(now);
-        item.IsDone = false;
-        item.DoneCount = 0;
+        item.SetDone(false);
         item.LastResetDate = today;
-        foreach (var step in item.Steps)
-            step.IsDone = false;
 
-        period.LastResetAt = nextReset;
         return true;
     }
 
@@ -162,7 +193,7 @@ public static class RoutineResetService
     /// </summary>
     public static RoutinePeriodReset? TryReset(RoutineTimePeriod period, IList<RoutineTodoList> items, DateTime now)
     {
-        var nextReset = ComputeNextReset(period);
+        var nextReset = ComputeNextReset(period, now);
         if (now < nextReset)
             return null;
 
@@ -197,11 +228,8 @@ public static class RoutineResetService
         var today = DateOnly.FromDateTime(now);
         foreach (var item in items)
         {
-            item.IsDone = false;
-            item.DoneCount = 0;
+            item.SetDone(false);
             item.LastResetDate = today;
-            foreach (var step in item.Steps)
-                step.IsDone = false;
         }
 
         var periodEnd = DateOnly.FromDateTime(nextReset);

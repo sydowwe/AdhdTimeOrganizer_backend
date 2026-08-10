@@ -14,9 +14,13 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.user;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.extServiceContract.user;
 using Sydowwe.Framework.infrastructure;
+using Sydowwe.Framework.infrastructure.persistence;
 using Sydowwe.Framework.infrastructure.persistence.configuration;
 using Sydowwe.Notifications.domain.entity;
 using Sydowwe.Reminders.domain.entity;
@@ -139,8 +143,13 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         base.OnModelCreating(modelBuilder);
 
         // WebExtensionActivityEntry needs both the partition date filter and the user filter, so it
-        // is excluded from the automatic one above and gets the combined filter here.
-        if (loggedUserService != null)
+        // is excluded from the automatic one above and gets the combined filter here. The user half
+        // must respect UserScopingOptions.Enabled the same way ApplyUserQueryFilters does for every
+        // other IEntityWithUser, or this entity stays filtered when a deployment turns scoping off.
+        var appServices = options.FindExtension<CoreOptionsExtension>()?.ApplicationServiceProvider;
+        var scopingEnabled = appServices?.GetService<IOptions<UserScopingOptions>>()?.Value?.Enabled ?? false;
+
+        if (scopingEnabled && loggedUserService != null)
             modelBuilder.Entity<WebExtensionActivityEntry>()
                 .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate &&
                                      (!loggedUserService.IsAuthenticated || x.UserId == loggedUserService.GetUserId));
@@ -152,10 +161,4 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     }
 
     partial void OnAppModelCreatingPartial(ModelBuilder modelBuilder);
-
-    // In your DbContext configuration
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        optionsBuilder.LogTo(Console.WriteLine, LogLevel.Information);
-    }
 }

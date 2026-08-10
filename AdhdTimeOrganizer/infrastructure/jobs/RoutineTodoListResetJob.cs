@@ -20,17 +20,19 @@ public class RoutineTodoListResetJob(IServiceScopeFactory scopeFactory, ILogger<
 
         var periods = await dbContext.Set<RoutineTimePeriod>()
             .Include(tp => tp.RoutineTodoListColl)
+            .ThenInclude(t => t.Steps)
             .ToListAsync(context.CancellationToken);
 
         var now = DateTime.UtcNow;
         var totalReset = 0;
+        var graceChanged = false;
         var completionRecords = new List<RoutinePeriodCompletion>();
         var reset = new List<(RoutineTimePeriod Period, RoutineResetService.RoutinePeriodReset Result)>();
 
         foreach (var period in periods)
         {
             var items = period.RoutineTodoListColl.ToList();
-            RoutineResetService.CheckGrace(period, now);
+            graceChanged |= RoutineResetService.CheckGrace(period, now);
             var result = RoutineResetService.TryReset(period, items, now);
             if (result is { } r)
             {
@@ -40,7 +42,7 @@ public class RoutineTodoListResetJob(IServiceScopeFactory scopeFactory, ILogger<
             }
         }
 
-        if (reset.Count == 0)
+        if (reset.Count == 0 && !graceChanged)
         {
             logger.LogInformation("No items to reset");
             return;

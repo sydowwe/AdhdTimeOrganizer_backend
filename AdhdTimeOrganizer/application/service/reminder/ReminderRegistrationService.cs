@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.reminder;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using AdhdTimeOrganizer.domain.model.@enum;
@@ -49,29 +50,44 @@ public class ReminderRegistrationService(
 
     public async Task SyncAsync(Reminder reminder, CancellationToken ct = default)
     {
+        PlannerTask? task = null;
         if (reminder.PlannerTaskId is { } plannerTaskId)
         {
-            var task = await dbContext.PlannerTasks
+            task = await dbContext.PlannerTasks
+                .AsNoTracking()
                 .Include(t => t.Calendar)
                 .FirstOrDefaultAsync(t => t.Id == plannerTaskId, ct);
+        }
 
-            // The FK makes this unreachable in practice; treating it as "nothing to schedule" is still the
-            // only safe reading — a reminder pointing at no task has no instant to derive.
-            if (task is null)
-            {
-                await CancelAsync(reminder.Id, ct);
-                return;
-            }
+        await SyncCoreAsync(reminder, task, null, ct);
+    }
 
+    /// <summary>
+    /// Shared core of <see cref="SyncAsync"/>, taking an already-loaded task so batch callers
+    /// (<see cref="SyncForPlannerTasksAsync"/>) can load every attached task and user timezone once instead
+    /// of once per reminder.
+    /// </summary>
+    /// <param name="timezone">
+    /// The reminder owner's time zone when the caller has already loaded it in bulk; <c>null</c> makes this
+    /// method fetch it itself. Passing it is what keeps <see cref="SyncForPlannerTasksAsync"/> from issuing
+    /// one user lookup per reminder.
+    /// </param>
+    private async Task SyncCoreAsync(Reminder reminder, PlannerTask? task, TimeZoneInfo? timezone, CancellationToken ct)
+    {
+        if (reminder.PlannerTaskId is not null)
+        {
+            // The FK makes `task is null` unreachable in practice; treating it as "nothing to schedule" is
+            // still the only safe reading — a reminder pointing at no task has no instant to derive.
             // Decision: finishing a task retires its nudge. A reminder for something already done or called
             // off is pure noise, and the user cancelled it implicitly by acting on the task.
-            if (task.Status is PlannerTaskStatus.Completed or PlannerTaskStatus.Cancelled)
+            if (task is null || task.Status is PlannerTaskStatus.Completed or PlannerTaskStatus.Cancelled)
             {
                 await CancelAsync(reminder.Id, ct);
                 return;
             }
 
-            var derived = await ComposeTaskInstantAsync(task.Calendar.Date, task.StartTime, reminder.UserId, ct);
+            timezone ??= await ResolveTimezoneAsync(reminder.UserId, ct);
+            var derived = ComposeTaskInstant(task.Calendar.Date, task.StartTime, reminder.UserId, timezone);
             if (reminder.RemindAt != derived)
             {
                 // RemindAt is a cache of the task's instant so the day view can query one column; the task
@@ -117,7 +133,30 @@ public class ReminderRegistrationService(
         reminder.LeadOffsetsMinutes = [-settings.ReminderMinutesBefore];
     }
 
-    public async Task CancelAsync(long reminderId, CancellationToken ct = default) => await registry.CancelAsync(KeyFor(reminderId), ct);
+    /// <summary>
+    /// Every call site today sources <paramref name="reminderId"/> from a user-scoped query or a prior
+    /// <c>AuthorizeAsync</c> check (see <c>DeleteReminderEndpoint</c>, <c>DeletePlannerTaskEndpoint</c>); this
+    /// service is not itself the ownership boundary, so a future call site must not forward a client-supplied
+    /// id straight in.
+    /// <para>
+    /// Callers use this only <b>after</b> the owning portal row has already committed, so a registry failure
+    /// here must not throw back into a request that has nothing left to roll back — it is logged loudly
+    /// instead, leaving a strandable <c>ReminderDefinition</c> that has to be found and cancelled by hand.
+    /// </para>
+    /// </summary>
+    public async Task CancelAsync(long reminderId, CancellationToken ct = default)
+    {
+        try
+        {
+            await registry.CancelAsync(KeyFor(reminderId), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex,
+                "Failed to cancel reminder registration for reminder {ReminderId} after its portal row was already deleted; the module's ReminderDefinition is now orphaned and must be cancelled manually",
+                reminderId);
+        }
+    }
 
     public async Task CancelManyAsync(IReadOnlyCollection<long> reminderIds, CancellationToken ct = default)
     {
@@ -134,8 +173,29 @@ public class ReminderRegistrationService(
             .Where(r => r.PlannerTaskId != null && plannerTaskIds.Contains(r.PlannerTaskId.Value))
             .ToListAsync(ct);
 
+        if (reminders.Count == 0)
+            return;
+
+        var tasks = await dbContext.PlannerTasks
+            .AsNoTracking()
+            .Include(t => t.Calendar)
+            .Where(t => plannerTaskIds.Contains(t.Id))
+            .ToDictionaryAsync(t => t.Id, ct);
+
+        // One lookup for the whole batch. Without it SyncCoreAsync fetches the owner's zone per reminder,
+        // which is the N+1 the batch loading above exists to avoid.
+        var userIds = reminders.Select(r => r.UserId).Distinct().ToList();
+        var timezones = await dbContext.Set<User>()
+            .AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Timezone })
+            .ToDictionaryAsync(u => u.Id, u => u.Timezone ?? TimeZoneInfo.Utc, ct);
+
         foreach (var reminder in reminders)
-            await SyncAsync(reminder, ct);
+        {
+            tasks.TryGetValue(reminder.PlannerTaskId!.Value, out var task);
+            await SyncCoreAsync(reminder, task, timezones.GetValueOrDefault(reminder.UserId, TimeZoneInfo.Utc), ct);
+        }
     }
 
     public async Task<IReadOnlyList<long>> GetReminderIdsForPlannerTasksAsync(IReadOnlyCollection<long> plannerTaskIds, CancellationToken ct = default)
@@ -202,14 +262,8 @@ public class ReminderRegistrationService(
     /// a user travels.
     /// </para>
     /// </summary>
-    private async Task<DateTime> ComposeTaskInstantAsync(DateOnly date, TimeOnly startTime, long userId, CancellationToken ct)
+    private DateTime ComposeTaskInstant(DateOnly date, TimeOnly startTime, long userId, TimeZoneInfo timezone)
     {
-        var timezone = await dbContext.Set<User>()
-            .AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => u.Timezone)
-            .FirstOrDefaultAsync(ct) ?? TimeZoneInfo.Utc;
-
         var local = DateTime.SpecifyKind(date.ToDateTime(startTime), DateTimeKind.Unspecified);
 
         // Spring-forward: the wall-clock time the task claims does not exist that day. Push it to the first
@@ -222,9 +276,23 @@ public class ReminderRegistrationService(
                 "Planner task reminder for user {UserId} falls in a DST gap; shifted to {Shifted:HH:mm} local", userId, shifted);
             local = shifted;
         }
+        // Fall-back: the wall-clock time occurs twice that day. ConvertTimeToUtc silently resolves it to the
+        // earlier (standard-time) occurrence; log so an hour-off nudge has a trail, same as the DST-gap case.
+        else if (timezone.IsAmbiguousTime(local))
+        {
+            logger.LogInformation(
+                "Planner task reminder for user {UserId} falls in an ambiguous DST fall-back hour; resolving to the earlier occurrence", userId);
+        }
 
         return TimeZoneInfo.ConvertTimeToUtc(local, timezone);
     }
+
+    private async Task<TimeZoneInfo> ResolveTimezoneAsync(long userId, CancellationToken ct) =>
+        await dbContext.Set<User>()
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.Timezone)
+            .FirstOrDefaultAsync(ct) ?? TimeZoneInfo.Utc;
 
     /// <summary>
     /// Reminder instants are absolute. A value off the wire may arrive with an unspecified kind, so pin it to

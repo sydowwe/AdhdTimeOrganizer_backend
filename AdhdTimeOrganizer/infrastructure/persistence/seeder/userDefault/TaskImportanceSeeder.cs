@@ -22,7 +22,7 @@ public class TaskImportanceSeeder(
             Text = "Critical",
             Color = ColorPalette.Red,
             Icon = "fas fa-exclamation-triangle",
-            Importance = 999
+            Importance = TaskImportance.CriticalMarkerValue
         },
         new()
         {
@@ -30,7 +30,7 @@ public class TaskImportanceSeeder(
             Text = "Optional",
             Color = ColorPalette.Zinc,
             Icon = "fas fa-question-circle",
-            Importance = 666
+            Importance = TaskImportance.OptionalMarkerValue
         }
     ];
 

@@ -46,26 +46,44 @@ public class RoutinePeriodNudgeJob(
         var nudged = 0;
         var graceWarned = 0;
 
+        // Sequential on purpose. Fanning the notify calls out with Task.WhenAll would run them against
+        // this scope's single AppDbContext concurrently — INotificationService writes notification rows
+        // through the same scoped context — which throws rather than going faster. Doing it safely means
+        // a scope (and DbContext) per period plus moving the marker writes off these tracked entities,
+        // which is not worth it for a once-a-day sweep. See PERF-8 in review/portal/02-findings.md.
         foreach (var period in periods)
         {
-            if (RoutineResetService.EvaluateEndingSoon(period, now) is { } nudge)
+            try
             {
-                var items = period.RoutineTodoListColl;
-                var remaining = items.Count(i => !i.IsDone);
-
-                // Marked only when something actually went out — see IRoutinePeriodNotificationService.
-                if (await notifier.NotifyEndingSoonAsync(period, nudge, remaining, items.Count, ct))
+                if (RoutineResetService.EvaluateEndingSoon(period, now) is { } nudge)
                 {
-                    period.EndingSoonNotifiedFor = nudge.NextReset;
-                    nudged++;
+                    var items = period.RoutineTodoListColl;
+                    var remaining = items.Count(i => !i.IsDone);
+
+                    // Marked only when something actually went out — see IRoutinePeriodNotificationService.
+                    if (await notifier.NotifyEndingSoonAsync(period, nudge, remaining, items.Count, ct))
+                    {
+                        period.EndingSoonNotifiedFor = nudge.NextReset;
+                        nudged++;
+                    }
+                }
+
+                if (RoutineResetService.ShouldWarnGraceExpiring(period, now))
+                {
+                    await notifier.NotifyGraceExpiringAsync(period, ct);
+                    period.GraceNotifiedFor = period.StreakGraceUntil;
+                    graceWarned++;
                 }
             }
-
-            if (RoutineResetService.ShouldWarnGraceExpiring(period, now))
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                await notifier.NotifyGraceExpiringAsync(period, ct);
-                period.GraceNotifiedFor = period.StreakGraceUntil;
-                graceWarned++;
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // One period's failure must not lose the "notified for" markers already set for
+                // earlier periods in this sweep, nor skip the periods still to come.
+                logger.LogError(ex, "Routine nudge sweep failed for period {PeriodId}", period.Id);
             }
         }
 

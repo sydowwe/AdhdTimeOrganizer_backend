@@ -23,8 +23,17 @@ public class DesktopActivityEntryConfiguration : IEntityTypeConfiguration<Deskto
 
         builder.Property(x => x.ProductName).HasMaxLength(255);
         builder.Property(x => x.ProcessName).HasMaxLength(255);
+        // WindowTitle stays plaintext deliberately — FetchTableDistinctDesktopEntry does a SQL-side
+        // GROUP BY on it plus an Exact/Contains/Wildcard/Regex filter and a sort, none of which
+        // survive randomized encryption. A hash column would recover grouping and Exact only, not
+        // the other three match modes. See SEC-4 in review/portal/02-findings.md.
         builder.Property(x => x.WindowTitle).HasMaxLength(1024);
-        builder.Property(x => x.ExecutablePath).HasMaxLength(2048);
+
+        // ExecutablePath is write-only: set at ingest, never filtered, grouped, indexed or projected.
+        // Full filesystem paths are high-sensitivity PII (usernames, project and document names), so
+        // it is encrypted at rest (GDPR Art. 32). Nothing reads it by value, so randomized
+        // encryption costs nothing here.
+        builder.EncryptedColumn(x => x.ExecutablePath);
 
         builder.IsManyWithOneUser();
 

@@ -4,7 +4,6 @@ namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 public abstract class BasePlannerTask : BaseEntityWithActivity
 {
-    // public bool IsNextDay { get; set; } = false;
     public required TimeOnly StartTime { get; set; }
     public required TimeOnly EndTime { get; set; }
     public required bool IsBackground { get; set; }
@@ -14,7 +13,7 @@ public abstract class BasePlannerTask : BaseEntityWithActivity
     public string? Notes { get; set; }
 
     public long? ImportanceId { get; set; }
-    public TaskImportance? Importance { get; set; } = null!;
+    public TaskImportance? Importance { get; set; }
 
-    public bool IsOptional => Importance?.Importance == 666;
+    public bool IsOptional => Importance?.Importance == TaskImportance.OptionalMarkerValue;
 }

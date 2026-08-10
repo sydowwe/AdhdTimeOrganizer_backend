@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.infrastructure.extService.googleCalendar;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 
@@ -25,6 +26,15 @@ public class ConnectGoogleCalendarEndpoint(
         if (user is null)
         {
             await Send.UnauthorizedAsync(ct);
+            return;
+        }
+
+        var hasStateCookie = HttpContext.Request.Cookies.TryGetValue(GoogleCalendarService.StateCookieName, out var expectedState);
+        HttpContext.Response.Cookies.Delete(GoogleCalendarService.StateCookieName, new CookieOptions { Path = "/user/google-calendar" });
+        if (!hasStateCookie || string.IsNullOrEmpty(expectedState) || expectedState != req.State)
+        {
+            AddError("The OAuth state is missing or does not match. Please restart the Google Calendar connection flow.");
+            await Send.ErrorsAsync(400, ct);
             return;
         }
 

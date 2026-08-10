@@ -113,7 +113,6 @@ public class WebExtensionDataSeeder(
             records.Add(new WebExtensionActivityEntry
             {
                 UserId = userId,
-                RecordDate = DateOnly.FromDateTime(windowStart),
                 WindowStart = windowStart,
                 Domain = activities[primaryIndex].Domain,
                 Url = activities[primaryIndex].Url,
@@ -135,7 +134,6 @@ public class WebExtensionDataSeeder(
                 records.Add(new WebExtensionActivityEntry
                 {
                     UserId = userId,
-                    RecordDate = DateOnly.FromDateTime(windowStart),
                     WindowStart = windowStart,
                     Domain = activities[secondIndex].Domain,
                     Url = activities[secondIndex].Url,
@@ -158,7 +156,6 @@ public class WebExtensionDataSeeder(
                 records.Add(new WebExtensionActivityEntry
                 {
                     UserId = userId,
-                    RecordDate = DateOnly.FromDateTime(windowStart),
                     WindowStart = windowStart,
                     Domain = bg.Domain,
                     Url = bg.Url,

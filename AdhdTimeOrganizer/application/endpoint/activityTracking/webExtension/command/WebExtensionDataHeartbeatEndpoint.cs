@@ -61,7 +61,6 @@ public class WebExtensionDataHeartbeatEndpoint(AppDbContext dbContext) : Endpoin
                 var record = new WebExtensionActivityEntry
                 {
                     UserId = userId,
-                    RecordDate = DateOnly.FromDateTime(req.WindowStart),
                     WindowStart = req.WindowStart,
                     Domain = activity.Domain,
                     Url = activity.Url,

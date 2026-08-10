@@ -17,6 +17,10 @@ public class UserDefaultsService(
             await seederManager.SeedAllForUserAsync(userId, false, ct);
             return Result.Successful();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception e)
         {
             logger.LogError(e, "Failed to create defaults for new user {UserId}", userId);

@@ -44,10 +44,10 @@ public class RoutineResetServiceTests
     [Fact]
     public void ComputeNextReset_NoAnchor_ReturnsEarliestDate()
     {
-        var period = MakePeriod(7, 0,
-            lastResetAt: new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var lastReset = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var period = MakePeriod(7, 0, lastResetAt: lastReset);
 
-        var next = RoutineResetService.ComputeNextReset(period);
+        var next = RoutineResetService.ComputeNextReset(period, lastReset);
 
         next.Date.Should().Be(new DateTime(2024, 1, 8));
     }
@@ -58,7 +58,7 @@ public class RoutineResetServiceTests
         var period = MakePeriod(7, 0);
         // CreatedTimestamp = 2024-01-01 (set in MakePeriod when lastResetAt is null)
 
-        var next = RoutineResetService.ComputeNextReset(period);
+        var next = RoutineResetService.ComputeNextReset(period, new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
 
         next.Date.Should().Be(new DateTime(2024, 1, 8));
     }
@@ -68,10 +68,10 @@ public class RoutineResetServiceTests
     {
         // Last reset Tuesday 2024-01-02, anchor=1 (Monday)
         // Earliest = 2024-01-09 (Tuesday) → snap forward to Monday 2024-01-15
-        var period = MakePeriod(7, 1,
-            lastResetAt: new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc));
+        var lastReset = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+        var period = MakePeriod(7, 1, lastResetAt: lastReset);
 
-        var next = RoutineResetService.ComputeNextReset(period);
+        var next = RoutineResetService.ComputeNextReset(period, lastReset);
 
         next.DayOfWeek.Should().Be(DayOfWeek.Monday);
         next.Should().BeOnOrAfter(new DateTime(2024, 1, 9, 0, 0, 0, DateTimeKind.Utc));
@@ -81,10 +81,10 @@ public class RoutineResetServiceTests
     public void ComputeNextReset_SundayAnchor_MappedCorrectly()
     {
         // anchor=7 maps to DayOfWeek.Sunday
-        var period = MakePeriod(7, 7,
-            lastResetAt: new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)); // Monday
+        var lastReset = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc); // Monday
+        var period = MakePeriod(7, 7, lastResetAt: lastReset);
 
-        var next = RoutineResetService.ComputeNextReset(period);
+        var next = RoutineResetService.ComputeNextReset(period, lastReset);
 
         next.DayOfWeek.Should().Be(DayOfWeek.Sunday);
     }
@@ -94,10 +94,10 @@ public class RoutineResetServiceTests
     {
         // 14 days is weekly aligned (14 % 7 == 0), anchor=5 (Friday)
         // Last Mon 2024-01-01, earliest = 2024-01-15 (Mon) → snap to Fri 2024-01-19
-        var period = MakePeriod(14, 5,
-            lastResetAt: new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var lastReset = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var period = MakePeriod(14, 5, lastResetAt: lastReset);
 
-        var next = RoutineResetService.ComputeNextReset(period);
+        var next = RoutineResetService.ComputeNextReset(period, lastReset);
 
         next.DayOfWeek.Should().Be(DayOfWeek.Friday);
         next.Should().BeOnOrAfter(new DateTime(2024, 1, 15, 0, 0, 0, DateTimeKind.Utc));
@@ -107,10 +107,10 @@ public class RoutineResetServiceTests
     public void ComputeNextReset_MonthlyPeriod_SnapsToTargetDayOfNextMonth()
     {
         // LengthInDays=30, anchor=15, last reset 2024-01-20 → next 2024-02-15
-        var period = MakePeriod(30, 15,
-            lastResetAt: new DateTime(2024, 1, 20, 0, 0, 0, DateTimeKind.Utc));
+        var lastReset = new DateTime(2024, 1, 20, 0, 0, 0, DateTimeKind.Utc);
+        var period = MakePeriod(30, 15, lastResetAt: lastReset);
 
-        var next = RoutineResetService.ComputeNextReset(period);
+        var next = RoutineResetService.ComputeNextReset(period, lastReset);
 
         next.Year.Should().Be(2024);
         next.Month.Should().Be(2);
@@ -121,10 +121,10 @@ public class RoutineResetServiceTests
     public void ComputeNextReset_YearlyPeriod_SnapsToSameDayNextYear()
     {
         // LengthInDays=365, anchor=10, last reset 2024-03-01 → next 2025-03-10
-        var period = MakePeriod(365, 10,
-            lastResetAt: new DateTime(2024, 3, 1, 0, 0, 0, DateTimeKind.Utc));
+        var lastReset = new DateTime(2024, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+        var period = MakePeriod(365, 10, lastResetAt: lastReset);
 
-        var next = RoutineResetService.ComputeNextReset(period);
+        var next = RoutineResetService.ComputeNextReset(period, lastReset);
 
         next.Year.Should().Be(2025);
         next.Month.Should().Be(3);
@@ -135,10 +135,10 @@ public class RoutineResetServiceTests
     public void ComputeNextReset_NonWeeklyNonMonthly_UsesNextOccurrenceOfDayInMonth()
     {
         // LengthInDays=10, anchor=20, last reset 2024-01-05 → earliest 2024-01-15 (day<20) → 2024-01-20
-        var period = MakePeriod(10, 20,
-            lastResetAt: new DateTime(2024, 1, 5, 0, 0, 0, DateTimeKind.Utc));
+        var lastReset = new DateTime(2024, 1, 5, 0, 0, 0, DateTimeKind.Utc);
+        var period = MakePeriod(10, 20, lastResetAt: lastReset);
 
-        var next = RoutineResetService.ComputeNextReset(period);
+        var next = RoutineResetService.ComputeNextReset(period, lastReset);
 
         next.Day.Should().Be(20);
         next.Month.Should().Be(1);
@@ -204,6 +204,9 @@ public class RoutineResetServiceTests
     {
         var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-8));
         var item = MakeItem(true);
+        // DoneCount is step-counted: SetDone only rewrites it when TotalCount is set, so a
+        // DoneCount without a TotalCount is not a state the app can produce.
+        item.TotalCount = 3;
         item.DoneCount = 3;
 
         var result = RoutineResetService.TryReset(period, item, DateTime.UtcNow);
@@ -335,7 +338,11 @@ public class RoutineResetServiceTests
             MakeItem(true),
             MakeItem(true)
         };
+        // Both items need a TotalCount for DoneCount to be meaningful — see SetDone.
+        items[0].TotalCount = 5;
         items[0].DoneCount = 5;
+        items[1].TotalCount = 2;
+        items[1].DoneCount = 2;
 
         RoutineResetService.TryReset(period, items, DateTime.UtcNow);
 
@@ -424,7 +431,7 @@ public class RoutineResetServiceTests
         var now = new DateTime(2024, 1, 6, 12, 0, 0, DateTimeKind.Utc);
         var period = MakePeriod(7, lastResetAt: new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         period.ReminderLeadDays = 3;
-        period.EndingSoonNotifiedFor = RoutineResetService.ComputeNextReset(period);
+        period.EndingSoonNotifiedFor = RoutineResetService.ComputeNextReset(period, now);
 
         RoutineResetService.EvaluateEndingSoon(period, now).Should().BeNull();
     }

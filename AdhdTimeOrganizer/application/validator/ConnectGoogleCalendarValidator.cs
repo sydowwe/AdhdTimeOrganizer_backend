@@ -9,5 +9,6 @@ public class ConnectGoogleCalendarValidator : Validator<ConnectGoogleCalendarReq
     public ConnectGoogleCalendarValidator()
     {
         RuleFor(x => x.Code).NotEmpty().MaximumLength(512);
+        RuleFor(x => x.State).NotEmpty().MaximumLength(128);
     }
 }

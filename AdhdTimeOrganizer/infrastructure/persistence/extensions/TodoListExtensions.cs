@@ -24,24 +24,26 @@ public static class TodoListExtensions
         return await dbSet.GetNextDisplayOrder(settings, userId, e => e.TimePeriodId == timePeriodId, ct);
     }
 
-    public static async Task<long> GetNextDisplayOrder(this DbSet<TodoListItem> dbSet, TodoListSettings settings, long userId, long timePeriodId, CancellationToken ct = default)
+    public static async Task<long> GetNextDisplayOrder(this DbSet<TodoListItem> dbSet, TodoListSettings settings, long userId, long taskPriorityId, CancellationToken ct = default)
     {
-        return await dbSet.GetNextDisplayOrder(settings, userId, e => e.TaskPriorityId == timePeriodId, ct);
+        return await dbSet.GetNextDisplayOrder(settings, userId, e => e.TaskPriorityId == taskPriorityId, ct);
     }
 
-
-    public static async Task<long?> GetDisplayOrderById<TEntity>(this DbSet<TEntity> dbSet, long id, CancellationToken ct = default) where TEntity : BaseTodoListItem
+    // userId is defense-in-depth alongside AppDbContext's global IEntityWithUser query filter, which
+    // is what actually scopes this lookup under normal reads — explicit here so the filter isn't the
+    // only thing standing between this method and a cross-user lookup under IgnoreQueryFilters().
+    public static async Task<long?> GetDisplayOrderById<TEntity>(this DbSet<TEntity> dbSet, long id, long userId, CancellationToken ct = default) where TEntity : BaseTodoListItem
     {
-        return await dbSet.Where(e => e.Id == id)
+        return await dbSet.Where(e => e.Id == id && e.UserId == userId)
             .Select(e => (long?)e.DisplayOrder)
             .FirstOrDefaultAsync(ct);
     }
 
-    public static async Task<long?> GetGroupIdById<TEntity>(this DbSet<TEntity> dbSet, long id, Expression<Func<TEntity, long>> groupId, CancellationToken ct = default)
+    public static async Task<long?> GetGroupIdById<TEntity>(this DbSet<TEntity> dbSet, long id, long userId, Expression<Func<TEntity, long>> groupId, CancellationToken ct = default)
         where TEntity : BaseTodoListItem
     {
         return await dbSet
-            .Where(e => e.Id == id)
+            .Where(e => e.Id == id && e.UserId == userId)
             .Select(groupId)
             .FirstOrDefaultAsync(ct);
     }

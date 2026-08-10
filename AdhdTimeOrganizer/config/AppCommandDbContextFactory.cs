@@ -13,7 +13,8 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
     {
         Env.Load();
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString)
+        optionsBuilder.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString,
+                b => b.MigrationsAssembly(typeof(Program).Assembly.FullName))
             .UseSnakeCaseNamingConvention()
             .ReplaceService<IMigrationsSqlGenerator, PartitionedNpgsqlMigrationsSqlGenerator>();
 

@@ -73,6 +73,10 @@ public class RoutinePeriodNotificationService(
         {
             await notificationService.NotifyAsync(NotificationRecipients.User(period.UserId), payload, ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Routine notification {Payload} failed for period {PeriodId}", typeof(TPayload).Name, period.Id);

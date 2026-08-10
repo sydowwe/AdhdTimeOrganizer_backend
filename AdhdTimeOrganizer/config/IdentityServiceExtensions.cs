@@ -35,7 +35,8 @@ public static class IdentityServiceExtensions
                     ValidAudience = Helper.GetEnvVar("JWT_AUDIENCE"),
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = keyProvider.GetSigningKey(),
-                    ValidAlgorithms = [keyProvider.SecurityAlgorithm]
+                    ValidAlgorithms = [keyProvider.SecurityAlgorithm],
+                    ClockSkew = TimeSpan.FromSeconds(30)
                 };
                 options.Events = new JwtBearerEvents
                 {
@@ -108,7 +109,7 @@ public static class IdentityServiceExtensions
 
         services.AddIdentityCore<User>(options =>
             {
-                options.Password.RequiredLength = 8;
+                options.Password.RequiredLength = 10;
                 options.Password.RequiredUniqueChars = 4;
                 options.Password.RequireNonAlphanumeric = true;
                 options.Password.RequireDigit = true;
@@ -121,6 +122,12 @@ public static class IdentityServiceExtensions
 
                 options.ClaimsIdentity.UserNameClaimType = ClaimTypes.NameIdentifier;
                 options.ClaimsIdentity.EmailClaimType = ClaimTypes.Email;
+
+                // Explicit, not just the ASP.NET Core Identity defaults — pinned here so the
+                // brute-force-lockout policy is visible rather than implicit.
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+                options.Lockout.AllowedForNewUsers = true;
             }).AddRoles<UserRole>()
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders()

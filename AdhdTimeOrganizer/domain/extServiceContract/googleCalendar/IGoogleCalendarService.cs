@@ -4,7 +4,8 @@ namespace AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
 
 public interface IGoogleCalendarService
 {
-    string GetAuthUrl();
+    string GenerateState();
+    string GetAuthUrl(string state);
     Task<string?> ExchangeCodeForRefreshToken(string code);
     CalendarService GetCalendarService(string refreshToken);
 }

@@ -73,8 +73,8 @@ public class PlannerTaskSeeder(
         var watchMovie = activities.FirstOrDefault(a => a.Name == "Watch Movie/Series");
 
         // Get importance levels
-        var criticalImportance = importances.FirstOrDefault(i => i.Importance == 999);
-        var optionalImportance = importances.FirstOrDefault(i => i.Importance == 666);
+        var criticalImportance = importances.FirstOrDefault(i => i.Importance == TaskImportance.CriticalMarkerValue);
+        var optionalImportance = importances.FirstOrDefault(i => i.Importance == TaskImportance.OptionalMarkerValue);
         if (criticalImportance == null || optionalImportance == null)
             throw new InvalidOperationException("Critical importance levels are missing in the database.");
 

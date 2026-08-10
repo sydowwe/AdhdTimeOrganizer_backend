@@ -67,8 +67,8 @@ public class TemplatePlannerTaskSeeder(
         var watchMovie = activities.FirstOrDefault(a => a.Name == "Watch Movie/Series");
 
         // Get importance levels
-        var criticalImportance = importances.FirstOrDefault(i => i.Importance == 999) ?? throw new InvalidOperationException("Critical importance level missing.");
-        var optionalImportance = importances.FirstOrDefault(i => i.Importance == 666) ?? throw new InvalidOperationException("Optional importance level missing.");
+        var criticalImportance = importances.FirstOrDefault(i => i.Importance == TaskImportance.CriticalMarkerValue) ?? throw new InvalidOperationException("Critical importance level missing.");
+        var optionalImportance = importances.FirstOrDefault(i => i.Importance == TaskImportance.OptionalMarkerValue) ?? throw new InvalidOperationException("Optional importance level missing.");
 
         var templateTasks = new List<TemplatePlannerTask>();
 

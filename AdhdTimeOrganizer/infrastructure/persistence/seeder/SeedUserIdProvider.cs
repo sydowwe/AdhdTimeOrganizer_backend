@@ -2,7 +2,6 @@ using AdhdTimeOrganizer.domain.model.entity.user;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.Contracts.user;
-using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.seeder;
@@ -37,7 +36,9 @@ public class SeedUserIdProvider(AppDbContext dbContext) : ISeedUserIdProvider, I
 
     public async Task<long?> GetRootAdminUserIdAsync(CancellationToken ct = default)
     {
-        var rootAdminEmail = Helper.GetEnvVar("ROOT_ADMIN_EMAIL");
+        var rootAdminEmail = Environment.GetEnvironmentVariable("ROOT_ADMIN_EMAIL");
+        if (string.IsNullOrEmpty(rootAdminEmail))
+            return null;
 
         // Matched on UserName, not Email, because that is the column DefaultUsersSeeder writes and
         // looks the admin up by.

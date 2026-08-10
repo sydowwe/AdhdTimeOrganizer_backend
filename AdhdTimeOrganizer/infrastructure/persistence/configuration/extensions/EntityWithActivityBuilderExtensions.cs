@@ -7,23 +7,26 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 
 public static class EntityWithActivityBuilderExtensions
 {
-    public static void IsManyWithOneActivity<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<Activity, IEnumerable<TEntity>?>>? navigationProperty = null,
-        DeleteBehavior deleteBehavior = DeleteBehavior.Cascade, bool isRequired = true) where TEntity : BaseEntityWithActivity
+    extension<TEntity>(EntityTypeBuilder<TEntity> builder) where TEntity : BaseEntityWithActivity
     {
-        builder.HasOne(p => p.Activity)
-            .WithMany(navigationProperty)
-            .HasForeignKey(p => p.ActivityId)
-            .IsRequired(isRequired)
-            .OnDelete(deleteBehavior);
-    }
+        public ReferenceCollectionBuilder<Activity, TEntity> IsManyWithOneActivity(Expression<Func<Activity, IEnumerable<TEntity>?>>? navigationProperty = null,
+            DeleteBehavior deleteBehavior = DeleteBehavior.Cascade)
+        {
+            return builder.HasOne(p => p.Activity)
+                .WithMany(navigationProperty)
+                .HasForeignKey(p => p.ActivityId)
+                .IsRequired()
+                .OnDelete(deleteBehavior);
+        }
 
-    public static void IsOneWithOneActivity<TEntity>(this EntityTypeBuilder<TEntity> builder, Expression<Func<Activity, TEntity?>>? navigationProperty = null,
-        DeleteBehavior deleteBehavior = DeleteBehavior.Cascade, bool isRequired = true) where TEntity : BaseEntityWithActivity
-    {
-        builder.HasOne(p => p.Activity)
-            .WithOne(navigationProperty)
-            .HasForeignKey<TEntity>(p => p.ActivityId)
-            .IsRequired(isRequired)
-            .OnDelete(deleteBehavior);
+        public ReferenceReferenceBuilder<TEntity, Activity> IsOneWithOneActivity(Expression<Func<Activity, TEntity?>>? navigationProperty = null,
+            DeleteBehavior deleteBehavior = DeleteBehavior.Cascade)
+        {
+            return builder.HasOne(p => p.Activity)
+                .WithOne(navigationProperty)
+                .HasForeignKey<TEntity>(p => p.ActivityId)
+                .IsRequired()
+                .OnDelete(deleteBehavior);
+        }
     }
 }

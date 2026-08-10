@@ -56,7 +56,6 @@ public class DesktopActivityHeartbeatEndpoint(AppDbContext dbContext) : Endpoint
             var record = new DesktopActivityEntry
             {
                 UserId = userId,
-                RecordDate = DateOnly.FromDateTime(req.WindowStart),
                 WindowStart = req.WindowStart,
                 ProcessName = entry.ProcessName,
                 ProductName = entry.ProductName,

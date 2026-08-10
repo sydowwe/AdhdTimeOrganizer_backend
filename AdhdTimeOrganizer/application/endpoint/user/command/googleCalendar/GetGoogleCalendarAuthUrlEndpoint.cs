@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
+using AdhdTimeOrganizer.infrastructure.extService.googleCalendar;
 using FastEndpoints;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.googleCalendar;
@@ -16,7 +17,18 @@ public class GetGoogleCalendarAuthUrlEndpoint(IGoogleCalendarService googleCalen
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var url = googleCalendarService.GetAuthUrl();
+        var state = googleCalendarService.GenerateState();
+        HttpContext.Response.Cookies.Append(GoogleCalendarService.StateCookieName, state, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/user/google-calendar",
+            Expires = DateTimeOffset.UtcNow.AddMinutes(10),
+            IsEssential = true
+        });
+
+        var url = googleCalendarService.GetAuthUrl(state);
         await Send.OkAsync(new GoogleCalendarAuthUrlResponse(url), ct);
     }
 }

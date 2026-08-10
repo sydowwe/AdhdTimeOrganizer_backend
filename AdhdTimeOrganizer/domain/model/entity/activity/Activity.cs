@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
 using AdhdTimeOrganizer.domain.model.entity.user;
+using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.entityInterface;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activity;
@@ -8,6 +9,8 @@ namespace AdhdTimeOrganizer.domain.model.entity.activity;
 public class Activity : BaseEntityWithUser, IBaseNameTextEntity
 {
     public required string Name { get; set; }
+
+    [AuditIgnore]
     public string? Text { get; set; }
     public bool IsUnavoidable { get; set; }
 
@@ -28,12 +31,17 @@ public class Activity : BaseEntityWithUser, IBaseNameTextEntity
     public ActivityBacklogProfile? BacklogProfile { get; set; }
     public ActivityProjectProfile? ProjectProfile { get; set; }
     public ActivityBucketListProfile? BucketListProfile { get; set; }
-    public virtual ICollection<MemoryAnchor> MemoryAnchors { get; set; } = new List<MemoryAnchor>();
+    public virtual ICollection<MemoryAnchor> MemoryAnchors { get; set; } = [];
 
     public Activity Clone()
     {
         var cloned = (Activity)MemberwiseClone();
         cloned.Id = 0; // Reset ID for new entity
+        // Reset navigation references — MemberwiseClone shares them with the source entity.
+        cloned.BacklogProfile = null;
+        cloned.ProjectProfile = null;
+        cloned.BucketListProfile = null;
+        cloned.MemoryAnchors = [];
         return cloned;
     }
 }

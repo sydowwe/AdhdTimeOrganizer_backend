@@ -53,40 +53,55 @@ public class SyncCalendarToGoogleEndpoint(
             return;
         }
 
-        var calendarService = googleCalendarService.GetCalendarService(user.GoogleCalendarRefreshToken);
+        using var calendarService = googleCalendarService.GetCalendarService(user.GoogleCalendarRefreshToken);
         var tzOffset = user.Timezone.GetUtcOffset(DateTime.UtcNow);
         var syncedCount = 0;
 
-        foreach (var task in calendar.Tasks)
+        try
         {
-            var startDto = new DateTimeOffset(
-                calendar.Date.Year, calendar.Date.Month, calendar.Date.Day,
-                task.StartTime.Hour, task.StartTime.Minute, 0, tzOffset);
-
-            var endDto = new DateTimeOffset(
-                calendar.Date.Year, calendar.Date.Month, calendar.Date.Day,
-                task.EndTime.Hour, task.EndTime.Minute, 0, tzOffset);
-
-            var googleEvent = new Event
+            foreach (var task in calendar.Tasks)
             {
-                Summary = task.Activity.Name,
-                Description = task.Notes,
-                Location = task.Location,
-                Start = new EventDateTime { DateTimeDateTimeOffset = startDto, TimeZone = user.Timezone.Id },
-                End = new EventDateTime { DateTimeDateTimeOffset = endDto, TimeZone = user.Timezone.Id }
-            };
+                var startDto = new DateTimeOffset(
+                    calendar.Date.Year, calendar.Date.Month, calendar.Date.Day,
+                    task.StartTime.Hour, task.StartTime.Minute, 0, tzOffset);
 
-            if (task.GoogleEventId is null)
-            {
-                var created = await calendarService.Events.Insert(googleEvent, "primary").ExecuteAsync(ct);
-                task.GoogleEventId = created.Id;
+                var endDto = new DateTimeOffset(
+                    calendar.Date.Year, calendar.Date.Month, calendar.Date.Day,
+                    task.EndTime.Hour, task.EndTime.Minute, 0, tzOffset);
+
+                var googleEvent = new Event
+                {
+                    Summary = task.Activity.Name,
+                    Description = task.Notes,
+                    Location = task.Location,
+                    Start = new EventDateTime { DateTimeDateTimeOffset = startDto, TimeZone = user.Timezone.Id },
+                    End = new EventDateTime { DateTimeDateTimeOffset = endDto, TimeZone = user.Timezone.Id }
+                };
+
+                if (task.GoogleEventId is null)
+                {
+                    var created = await calendarService.Events.Insert(googleEvent, "primary").ExecuteAsync(ct);
+                    task.GoogleEventId = created.Id;
+                }
+                else
+                {
+                    await calendarService.Events.Update(googleEvent, "primary", task.GoogleEventId).ExecuteAsync(ct);
+                }
+
+                syncedCount++;
             }
-            else
-            {
-                await calendarService.Events.Update(googleEvent, "primary", task.GoogleEventId).ExecuteAsync(ct);
-            }
-
-            syncedCount++;
+        }
+        catch (Google.GoogleApiException e) when (e.HttpStatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            AddError("Google Calendar access was revoked or expired. Please reconnect it via /user/google-calendar/connect.");
+            await Send.ErrorsAsync(409, ct);
+            return;
+        }
+        catch (Google.GoogleApiException)
+        {
+            AddError("Google Calendar sync failed. Please try again later.");
+            await Send.ErrorsAsync(502, ct);
+            return;
         }
 
         await dbContext.SaveChangesAsync(ct);

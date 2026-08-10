@@ -33,16 +33,28 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbCo
         {
             if (overrideData)
             {
-                existingAdmin.Email = adminUser.Email;
-                existingAdmin.Locale = adminUser.Locale;
-                existingAdmin.Timezone = adminUser.Timezone;
-                existingAdmin.EmailConfirmed = true;
+                try
+                {
+                    existingAdmin.Email = adminUser.Email;
+                    existingAdmin.Locale = adminUser.Locale;
+                    existingAdmin.Timezone = adminUser.Timezone;
+                    existingAdmin.EmailConfirmed = true;
+                    existingAdmin.HasExtensionAccess = adminUser.HasExtensionAccess;
 
-                await userManager.UpdateAsync(existingAdmin);
+                    var updateResult = await userManager.UpdateAsync(existingAdmin);
+                    if (!updateResult.Succeeded)
+                        logger.LogError("Failed to update root admin user during override.");
 
-                // If you also need to reset the password during override:
-                var token = await userManager.GeneratePasswordResetTokenAsync(existingAdmin);
-                await userManager.ResetPasswordAsync(existingAdmin, token, Helper.GetEnvVar("ROOT_ADMIN_PASSWORD"));
+                    var token = await userManager.GeneratePasswordResetTokenAsync(existingAdmin);
+                    var resetResult = await userManager.ResetPasswordAsync(existingAdmin, token, Helper.GetEnvVar("ROOT_ADMIN_PASSWORD"));
+                    if (!resetResult.Succeeded)
+                        logger.LogError("Failed to reset root admin password during override.");
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(new EventId(1000), e, "Failed to override root admin user");
+                }
+
                 return;
             }
 
@@ -54,16 +66,19 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbCo
         {
             var result = await userManager.CreateAsync(adminUser, Helper.GetEnvVar("ROOT_ADMIN_PASSWORD"));
             if (!result.Succeeded)
-                logger.LogError(result.ToString());
+            {
+                logger.LogError("Failed to create root admin user.");
+                return;
+            }
 
-            result = await userManager.AddToRoleAsync(adminUser, "Root");
+            result = await userManager.AddToRoleAsync(adminUser, nameof(UserRoleEnum.Root));
             if (!result.Succeeded)
-                logger.LogError(result.ToString());
+                logger.LogError("Failed to assign Root role to root admin user.");
 
             // Use the handler directly instead of FastEndpoints command execution
             var defaultsRes = await userDefaultsService.CreateDefaultsAsync(adminUser.Id);
             if (defaultsRes.Failed)
-                logger.LogError(defaultsRes.ErrorMessage);
+                logger.LogError("Failed to create defaults for root admin user.");
         }
         catch (Exception e)
         {

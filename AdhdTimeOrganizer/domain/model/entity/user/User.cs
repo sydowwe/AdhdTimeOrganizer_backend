@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations.Schema;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
+using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.entityInterface;
 
@@ -10,19 +10,16 @@ namespace AdhdTimeOrganizer.domain.model.entity.user;
 // BaseUser); it is kept so the app's own BaseEntityConfigure/EnumColumn helpers still apply to this table.
 public sealed class User : BaseUser, IBaseTableEntity
 {
+    [AuditIgnore]
     public string? GoogleOAuthUserId { get; set; }
+
+    [AuditIgnore]
     public string? GoogleCalendarRefreshToken { get; set; }
     public bool HasExtensionAccess { get; set; } = false;
     public int FirstDayOfWeek { get; set; } = 1;
 
 
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
-
-    [NotMapped]
-    public override string? PhoneNumber { get; set; }
-
-    [NotMapped]
-    public override bool PhoneNumberConfirmed { get; set; }
 
     // Navigation properties.
     //

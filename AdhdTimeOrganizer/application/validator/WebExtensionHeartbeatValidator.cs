@@ -12,6 +12,15 @@ public class WebExtensionHeartbeatValidator : Validator<WebExtensionHeartbeatReq
             .NotEmpty();
 
         RuleFor(x => x.WindowMinutes).Equal(1);
+
+        // WindowStart must sit exactly on a minute boundary. The timeline endpoint treats each row as
+        // covering [WindowStart, WindowStart + 1min) and joins adjacent windows by equality, so an
+        // off-boundary value corrupts the rendered timeline silently instead of failing. See the
+        // invariant documented on WebExtensionActivityEntry.WindowStart.
+        RuleFor(x => x.WindowStart)
+            .NotEmpty()
+            .Must(x => x.Ticks % TimeSpan.TicksPerMinute == 0)
+            .WithMessage("WindowStart must be aligned to a whole minute (zero seconds and sub-second component).");
         RuleFor(x => x.Activities).NotNull();
 
         RuleForEach(x => x.Activities).ChildRules(a =>

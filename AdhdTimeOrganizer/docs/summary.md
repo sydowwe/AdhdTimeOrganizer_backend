@@ -42,11 +42,15 @@ submodule and are consumed through `Sydowwe.Framework.Contracts`.
   inert when `IsAuthenticated` is false). The flip side: a background *insert* of a
   `BaseEntityWithUser` gets `UserId == 0` and dies on the FK — set `UserId` explicitly in jobs and
   event handlers.
-- **Saving `PlannerTask`, `ActivityHistory` or `Calendar` triggers a `REFRESH MATERIALIZED VIEW
-  CONCURRENTLY`** in `SuggestionPatternRefreshInterceptor`, synchronously, inside the same request.
-  It is per-save, not per-row, and it fails with 42P01 if the view is missing (hence
-  `SuggestionPatternViewInstaller` at boot and the fixture's `OnSchemaCreatedAsync` in tests). Don't
-  add a fourth pattern view without adding both the SQL script and the refresh branch.
+- **Saving `PlannerTask`, `ActivityHistory` or `Calendar` marks the matching pattern view dirty.**
+  `SuggestionPatternRefreshInterceptor` no longer runs `REFRESH MATERIALIZED VIEW CONCURRENTLY`
+  itself — it queues the view name in the singleton `ISuggestionPatternRefreshQueue`, and
+  `SuggestionPatternRefreshJob` (Quartz, every 10s, `[DisallowConcurrentExecution]`) drains the queue
+  and does the actual refresh off the request thread, coalescing several saves in the same window into
+  one refresh per view. A refresh failure (42P01 if the view is missing — hence
+  `SuggestionPatternViewInstaller` at boot and the fixture's `OnSchemaCreatedAsync` in tests) is logged
+  by the job and no longer surfaces to the request that triggered it. Don't add a fourth pattern view
+  without adding the SQL script, a `SuggestionPatternView` enum member, and the job's `ViewNames` entry.
 - **Reminder times are derived, not authored.** For a reminder attached to a planner task,
   `Reminder.RemindAt` is recomputed by `ReminderRegistrationService.SyncAsync` from
   `Calendar.Date + PlannerTask.StartTime` **in the user's own time zone**. Anything that moves a task

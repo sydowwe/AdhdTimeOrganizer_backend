@@ -96,7 +96,7 @@ public class GetAllGroupedRoutineTodoListEndpoint(
             {
                 RoutineTimePeriod = RoutineTimePeriodResponse.Projection(new[] { tp }.AsQueryable()).Single() with
                 {
-                    NextResetAt = RoutineResetService.ComputeNextReset(tp),
+                    NextResetAt = RoutineResetService.ComputeNextReset(tp, now),
                     CompletionHistory = completionsByPeriod.GetValueOrDefault(tp.Id, [])
                 },
                 Items = tp.RoutineTodoListColl

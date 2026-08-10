@@ -44,15 +44,10 @@ public class PatchPlannerTaskStatusEndpoint(AppDbContext dbContext, IReminderReg
                 return;
             }
 
-            entity.Status = request.Status;
+            entity.ApplyStatus(request.Status);
 
             switch (request.Status)
             {
-                case PlannerTaskStatus.Cancelled:
-                case PlannerTaskStatus.NotStarted:
-                    entity.ActualStartTime = null;
-                    entity.ActualEndTime = null;
-                    break;
                 case PlannerTaskStatus.InProgress:
                     if (request.ActualStartTime != null)
                         entity.ActualStartTime = request.ActualStartTime.ToTimeOnly();

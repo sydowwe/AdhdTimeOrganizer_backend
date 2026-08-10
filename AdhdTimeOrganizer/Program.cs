@@ -8,6 +8,7 @@ using AdhdTimeOrganizer.config.swagger;
 using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
+using AdhdTimeOrganizer.infrastructure.persistence.retention;
 using AdhdTimeOrganizer.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.settings;
 using DotNetEnv;
@@ -44,6 +45,8 @@ try
 {
     // Load environment variables
     Env.Load();
+
+    EnsureFieldEncryptionKey();
 
     // Set default culture
     var defaultCulture = new CultureInfo("sk-SK");
@@ -86,7 +89,7 @@ try
     await EnsureSuggestionPatternViews(app.Services, logger);
 
     // Database seeding
-    await SeedDatabase(app.Services, false /*builder.Environment.IsDevelopment()*/, logger);
+    await SeedDatabase(app.Services, true /*builder.Environment.IsDevelopment()*/, logger);
 
 
     logger.LogInformation("Backend started.");
@@ -105,12 +108,62 @@ finally
 
 return;
 
+/// <summary>
+/// Fails the boot immediately, and legibly, when <c>FIELD_ENCRYPTION_KEY</c> is missing or malformed.
+/// <para>
+/// <b>Why this exists.</b> <c>User.GoogleCalendarRefreshToken</c> and
+/// <c>DesktopActivityEntry.ExecutablePath</c> use <c>EncryptedColumn</c>, which resolves
+/// <c>AesGcmFieldEncryptor.Shared</c> during <c>OnModelCreating</c>. Without this guard a missing key
+/// surfaces as an <c>EnvironmentVariableMissingException</c> wrapped in a model-building failure at the
+/// first DbContext use — long after startup "succeeded", and reading as an EF problem rather than a
+/// deployment one. Checking here turns that into one clear line at boot.
+/// </para>
+/// <para>
+/// <b>Deployment note.</b> The Docker image copies no <c>.env</c>, so in a container this must be
+/// supplied by the runtime (<c>-e</c>, compose <c>environment:</c>, or an orchestrator secret). It is
+/// deliberately not baked into the Dockerfile — that would commit a live encryption key to the repo.
+/// Generate one with:
+/// <c>[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))</c>
+/// </para>
+/// <para>
+/// ⚠ Rotating the key makes every existing <c>enc:v1:</c> token undecryptable. The <c>v1</c> prefix
+/// leaves room for a staged rotation, but no rotation tooling exists yet.
+/// </para>
+/// </summary>
+static void EnsureFieldEncryptionKey()
+{
+    const string keyName = "FIELD_ENCRYPTION_KEY";
+    const string howTo =
+        "Set it to a base64-encoded 32-byte value. In development it belongs in AdhdTimeOrganizer/.env; " +
+        "in a container it must come from the runtime environment, since no .env is copied into the image.";
+
+    var value = Environment.GetEnvironmentVariable(keyName);
+    if (string.IsNullOrWhiteSpace(value))
+        throw new InvalidOperationException(
+            $"{keyName} is not set, and encrypted entity columns cannot be configured without it. {howTo}");
+
+    byte[] key;
+    try
+    {
+        key = Convert.FromBase64String(value);
+    }
+    catch (FormatException)
+    {
+        throw new InvalidOperationException($"{keyName} is not valid base64. {howTo}");
+    }
+
+    if (key.Length != 32)
+        throw new InvalidOperationException(
+            $"{keyName} must decode to 32 bytes for AES-256; got {key.Length}. {howTo}");
+}
+
 static void ConfigureServices(IConfiguration configuration, IServiceCollection services, bool isDevelopment)
 {
     // HTTP context accessor
     services.AddHttpContextAccessor();
 
     // Interceptors
+    services.AddSingleton<ISuggestionPatternRefreshQueue, SuggestionPatternRefreshQueue>();
     services.AddScoped<SuggestionPatternRefreshInterceptor>();
 
     // Per-user global query filters (BaseDbContext). Framework defaults this off; in this portal every
@@ -121,11 +174,14 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
 
     // Database configuration
     services.AddDbContext<AppDbContext>((sp, options) =>
+    {
         options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly(typeof(AdhdTimeOrganizer.Program).Assembly.FullName))
             .UseSnakeCaseNamingConvention()
             .ReplaceService<IMigrationsSqlGenerator, PartitionedNpgsqlMigrationsSqlGenerator>()
-            .AddInterceptors(sp.GetRequiredService<SuggestionPatternRefreshInterceptor>())
-            .LogTo(Console.WriteLine));
+            .AddInterceptors(sp.GetRequiredService<SuggestionPatternRefreshInterceptor>());
+        if (isDevelopment)
+            options.LogTo(Console.WriteLine);
+    });
 
     // Dependency injection
     services.AddDependencyInjection();
@@ -164,20 +220,34 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
                 // processor. See RemoveToEntitySchemaProcessor for the full explanation.
                 s.SchemaSettings.SchemaProcessors.Add(new RemoveToEntitySchemaProcessor());
 
-                // TEMP DIAGNOSTIC: FastEndpoints' own ValidationSchemaProcessor (added internally by
-                // SwaggerDocument()) still overflows the stack even with ToEntity stripped, so the recursion
-                // is inside its FluentValidation rule-tree walk, not the EF nav graph. Removing it here to
-                // confirm the crash goes away — if it does, the bug is upstream in FastEndpoints.Swagger 8.1.0
-                // and needs a real decision (upgrade/report/keep disabled), not a silent workaround.
-                var toRemove = s.SchemaSettings.SchemaProcessors
+                // Strip FastEndpoints' own ValidationSchemaProcessor (SwaggerDocument() adds it
+                // internally). It recurses without bound and kills the process with a StackOverflowException
+                // the first time /swagger/v1/swagger.json is requested — not an exception you can catch.
+                //
+                // Confirmed upstream bug, not a misconfiguration here. The captured trace is thousands of
+                // frames of ValidationSchemaProcessor.ApplyRulesToSchema calling itself via
+                // NJsonSchema.JsonSchema.get_ActualProperties. That method takes a HashSet<Type> cycle
+                // guard, but it guards on *Type* while the recursion runs over schema *nodes*, so a
+                // self-referential schema (this app has several) defeats it.
+                //
+                // Verified still broken on FastEndpoints.Swagger 8.2.0 (2026-08-10): upgraded, removed this
+                // block, requested the document, process died the same way. Reverted to 8.1.0 — the upgrade
+                // buys nothing here. Needs an upstream report; re-test this block on the next release.
+                //
+                // Cost of keeping it: dev Swagger loses FluentValidation-derived constraints (required,
+                // min/max, etc.) on request schemas. Routes, verbs and shapes are all still documented.
+                var validationProcessors = s.SchemaSettings.SchemaProcessors
                     .Where(p => p.GetType().Name == "ValidationSchemaProcessor")
                     .ToList();
-                foreach (var p in toRemove)
-                    s.SchemaSettings.SchemaProcessors.Remove(p);
+                foreach (var processor in validationProcessors)
+                    s.SchemaSettings.SchemaProcessors.Remove(processor);
             };
         });
 
     services.AddIdentityServices();
+
+    services.Configure<ActivityTrackingRetentionOptions>(
+        configuration.GetSection(ActivityTrackingRetentionOptions.SectionName));
 
     // Background services
     services.AddHostedService<RefreshTokenCleanupService>();
@@ -196,12 +266,6 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             .WithIdentity("routine-reset-trigger", "routine")
             .WithCronSchedule("0 0 2 * * ?")); // 2:00 AM daily
 
-        // TEMP: verify manually after applying the pending migrations, remove after checking logs.
-        q.AddTrigger(opts => opts
-            .ForJob("routine-reset", "routine")
-            .WithIdentity("routine-reset-verify-trigger", "routine")
-            .StartNow());
-
         q.AddJob<RoutinePeriodNudgeJob>(opts =>
             opts.WithIdentity("routine-nudge", "routine"));
 
@@ -210,6 +274,24 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             .ForJob("routine-nudge", "routine")
             .WithIdentity("routine-nudge-trigger", "routine")
             .WithCronSchedule("0 0 9 * * ?")); // 9:00 AM daily
+
+        q.AddJob<PurgeExpiredActivityTrackingEntriesJob>(opts =>
+            opts.WithIdentity("purge-activity-tracking", "retention"));
+
+        q.AddTrigger(opts => opts
+            .ForJob("purge-activity-tracking", "retention")
+            .WithIdentity("purge-activity-tracking-trigger", "retention")
+            .WithCronSchedule("0 30 3 * * ?")); // 3:30 AM daily
+
+        // Drains the dirty set SuggestionPatternRefreshInterceptor fills; see that class + this job's
+        // header comment for why the refresh moved off the request path.
+        q.AddJob<SuggestionPatternRefreshJob>(opts =>
+            opts.WithIdentity("suggestion-pattern-refresh", "suggestion-pattern"));
+
+        q.AddTrigger(opts => opts
+            .ForJob("suggestion-pattern-refresh", "suggestion-pattern")
+            .WithIdentity("suggestion-pattern-refresh-trigger", "suggestion-pattern")
+            .WithSimpleSchedule(s => s.WithIntervalInSeconds(10).RepeatForever()));
     });
     services.AddQuartzHostedService(SchedulerQuartzConfig.ConfigureSchedulerHostedService);
 
@@ -260,7 +342,9 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
         var extensionId = Helper.GetEnvVar("EXTENSION_ID"); // Chrome extension ID
         options.AddPolicy("AllowFrontend", corsBuilder =>
         {
-            var origins = new List<string> { "https://localhost:3000", "https://localhost:5173", pageUrl };
+            var origins = new List<string> { "https://localhost:3000", "https://localhost:5173" };
+            if (!string.IsNullOrEmpty(pageUrl))
+                origins.Add(pageUrl);
 
             // Add Chrome extension origin if configured
             if (!string.IsNullOrEmpty(extensionId))
@@ -369,8 +453,6 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
     app.Lifetime.ApplicationStopping.Register(() =>
     {
         logger.LogInformation("Application is stopping...");
-        Console.WriteLine("<< STOPPING called. Stack:");
-        Console.WriteLine(Environment.StackTrace);
     });
 
     // Must be first so real client IP is resolved before any logging
@@ -406,18 +488,10 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
             diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
             diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
 
-            if (httpContext.Request.Method != "GET" && httpContext.Request.ContentLength > 0)
-            {
-                httpContext.Request.EnableBuffering();
-                httpContext.Request.Body.Position = 0;
-                using var reader = new StreamReader(httpContext.Request.Body, leaveOpen: true);
-                var body = reader.ReadToEndAsync().Result;
-                httpContext.Request.Body.Position = 0;
-
-                if (body.Length > 1000)
-                    body = body.Substring(0, 1000) + "... (truncated)";
-                diagnosticContext.Set("RequestBody", body);
-            }
+            // Deliberately no request-body capture: login/register/change-password bodies carry
+            // plaintext passwords, and every other write body carries emails/names — the Postgres sink's
+            // PropertiesColumnWriter persists every diagnostic-context property into a queryable column
+            // with no redaction (PiiRedactor isn't wired into this pipeline).
         };
         options.GetLevel = (httpContext, elapsed, ex) =>
         {

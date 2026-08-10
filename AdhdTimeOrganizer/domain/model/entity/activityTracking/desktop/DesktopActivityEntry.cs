@@ -1,15 +1,31 @@
 using AdhdTimeOrganizer.domain.model.entity.user;
+using Sydowwe.Framework.domain.audit;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 
 public sealed class DesktopActivityEntry : BaseEntityWithUser
 {
-    public required DateOnly RecordDate { get; set; }
-    public required DateTime WindowStart { get; set; }
+    private DateTime _windowStart;
+
+    public DateOnly RecordDate { get; private set; }
+
+    public required DateTime WindowStart
+    {
+        get => _windowStart;
+        init
+        {
+            _windowStart = value;
+            RecordDate = DateOnly.FromDateTime(value);
+        }
+    }
 
     public required string ProcessName { get; set; }
     public required string ProductName { get; init; }
+
+    [AuditIgnore]
     public required string WindowTitle { get; set; }
+
+    [AuditIgnore]
     public required string ExecutablePath { get; set; }
 
     public required bool IsFullscreen { get; init; }

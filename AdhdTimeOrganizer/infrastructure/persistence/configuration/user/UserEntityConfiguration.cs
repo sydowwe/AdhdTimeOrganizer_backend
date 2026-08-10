@@ -13,7 +13,12 @@ public class UserEntityConfiguration : IEntityTypeConfiguration<User>
         builder.EnumColumn(u => u.Locale);
         builder.EnumColumn(u => u.Theme);
         builder.Property(u => u.GoogleOAuthUserId).HasMaxLength(50);
-        builder.Property(u => u.GoogleCalendarRefreshToken).HasMaxLength(500);
+        // Long-lived credential granting standing access to a third-party account, so it is encrypted
+        // at rest (AES-256-GCM). Randomized ciphertext => cannot be filtered/sorted/uniqued; both call
+        // sites (ConnectGoogleCalendarEndpoint, SyncCalendarToGoogleEndpoint) read it by user id only.
+        // Rows written before this switch stay plaintext and decrypt untouched (see AesGcmFieldEncryptor);
+        // they become encrypted on their next write.
+        builder.EncryptedColumnNullable(u => u.GoogleCalendarRefreshToken);
         builder.Property(u => u.Timezone).IsRequired()
             .HasConversion(
                 tz => tz.Id,
