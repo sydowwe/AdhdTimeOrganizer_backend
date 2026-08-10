@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.model.entity;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 

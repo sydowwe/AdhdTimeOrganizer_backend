@@ -1,0 +1,12 @@
+using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner.template;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using Sydowwe.Framework.application.endpoint.@base.read;
+
+namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.templatePlannerTask.query;
+
+public class GetByIdTemplatePlannerTaskEndpoint(DbContext dbContext)
+    : BaseGetByIdEndpoint<TemplatePlannerTask, TemplatePlannerTaskResponse>(dbContext)
+{
+    // Scoped by AppDbContext's global IEntityWithUser query filter, so a foreign row never projects.
+    protected override Task<bool> AuthorizeAsync(TemplatePlannerTaskResponse entity, CancellationToken ct) => Task.FromResult(true);
+}

@@ -1,8 +1,8 @@
 using AdhdTimeOrganizer.Core.application.@event;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
-using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 

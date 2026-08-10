@@ -1,0 +1,226 @@
+using AdhdTimeOrganizer.Planning.application.dto.@enum;
+using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.helper;
+using AdhdTimeOrganizer.Planning.application.validator;
+using AdhdTimeOrganizer.Planning.domain.model.entity;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.serviceContract;
+using FastEndpoints;
+using Humanizer;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.persistence;
+
+namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plannerTask.command;
+
+public class ApplyTemplatePlannerTaskEndpoint(DbContext dbContext, IReminderRegistrationService reminders)
+    : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
+{
+    public override void Configure()
+    {
+        const string entityName = nameof(Calendar);
+        Post($"/{entityName.Kebaberize()}/apply-planner-template");
+        Validator<ApplyTemplateToTaskPlannerValidator>();
+
+        Summary(s =>
+        {
+            s.Summary = $"Apply template to {entityName}";
+            s.Description = $"Applies a planner template to a {entityName}, creating tasks from the template";
+            s.Response<ApplyTemplatePlannerTaskResponse>(201, "Template applied successfully; new tasks created");
+            s.Response(400, "Bad request");
+            s.Response(404, "Calendar or template not found");
+        });
+    }
+
+    public override async Task HandleAsync(ApplyTemplateToTaskPlannerRequest req, CancellationToken ct)
+    {
+        try
+        {
+            var calendar = await dbContext.Set<Calendar>().Include(t => t.Tasks)
+                .FirstOrDefaultAsync(e => e.Id == req.CalendarId, ct);
+            if (calendar == null)
+            {
+                AddError("Calendar not found");
+                await Send.ErrorsAsync(404, ct);
+                return;
+            }
+
+            var template = await dbContext.Set<TaskPlannerDayTemplate>().FirstOrDefaultAsync(e => e.Id == req.TemplateId, ct);
+            if (template == null)
+            {
+                AddError("Template not found");
+                await Send.ErrorsAsync(404, ct);
+                return;
+            }
+
+            UpdateCalendar(template, calendar);
+            template.LastUsedAt = DateTime.UtcNow;
+            template.UsageCount++;
+
+            var newTasks = req.TasksFromTemplate.Select(t =>
+            {
+                var entity = t.ToEntity;
+                entity.UserId = User.GetId();
+                return entity;
+            }).ToList();
+            var existingTasks = calendar.Tasks.ToList();
+
+            switch (req.ConflictResolution)
+            {
+                case ApplyTemplateConflictResolutionEnum.Ignore:
+                    newTasks = newTasks.Where(nt => !existingTasks.Any(et =>
+                        et.TasksOverlap(nt.StartTime, nt.EndTime))).ToList();
+                    break;
+
+                case ApplyTemplateConflictResolutionEnum.Overwrite:
+                    var conflictingExisting = existingTasks.Where(et =>
+                        newTasks.Any(nt => et.TasksOverlap(nt.StartTime, nt.EndTime))).ToList();
+                    dbContext.Set<PlannerTask>().RemoveRange(conflictingExisting);
+                    break;
+
+                case ApplyTemplateConflictResolutionEnum.MergeIgnore:
+                    newTasks = MergeCarveNewTasksAroundExisting(newTasks, existingTasks);
+                    break;
+
+                case ApplyTemplateConflictResolutionEnum.MergeOverwrite:
+                    MergeCarveExistingTasksAroundNew(existingTasks, newTasks);
+                    break;
+            }
+
+            dbContext.Set<PlannerTask>().AddRange(newTasks);
+
+            // Every conflict resolution except Ignore removes existing tasks (MergeOverwrite removes and
+            // re-adds carved segments), and each removal cascades that task's reminders away. Reading the
+            // ChangeTracker instead of threading a list through the four branches keeps this correct even if
+            // a new resolution mode is added later — whatever it deletes is seen here.
+            var removedTaskIds = dbContext.ChangeTracker.Entries<PlannerTask>()
+                .Where(e => e.State == EntityState.Deleted)
+                .Select(e => e.Entity.Id)
+                .ToList();
+            var orphanedReminderIds = await reminders.GetReminderIdsForPlannerTasksAsync(removedTaskIds, ct);
+
+            await dbContext.SaveChangesAsync(ct);
+
+            await reminders.CancelManyAsync(orphanedReminderIds, ct);
+
+            var updatedTasks = await PlannerTaskResponse.Projection(dbContext.Set<PlannerTask>().Where(t => t.CalendarId == calendar.Id).WithIncludes().OrderBy(t => t.StartTime)).ToListAsync(ct);
+
+            var response = new ApplyTemplatePlannerTaskResponse
+            {
+                Calendar = CalendarResponse.Projection(new[] { calendar! }.AsQueryable()).Single(),
+                Tasks = updatedTasks
+            };
+
+            await Send.ResponseAsync(response, 201, ct);
+        }
+        catch (Exception ex)
+        {
+            var result = DbUtils.HandleException(ex, "Create");
+            AddError(result.ErrorMessage!);
+            await Send.ErrorsAsync(400, ct);
+        }
+    }
+
+    private static void UpdateCalendar(TaskPlannerDayTemplate template, Calendar calendar)
+    {
+        calendar.AppliedTemplateId = template.Id;
+        calendar.AppliedTemplateName = template.Name;
+        calendar.WakeUpTime = template.DefaultWakeUpTime ?? calendar.WakeUpTime;
+        calendar.BedTime = template.DefaultBedTime ?? calendar.BedTime;
+    }
+
+
+    /// <summary>
+    /// MergeIgnore: Carve new tasks around existing ones.
+    /// If an existing task is in the middle of a new task, split the new task.
+    /// If a new task overlaps with existing, shorten it to fit.
+    /// </summary>
+    private List<PlannerTask> MergeCarveNewTasksAroundExisting(List<PlannerTask> newTasks, List<PlannerTask> existingTasks)
+    {
+        var result = new List<PlannerTask>();
+
+        foreach (var segments in newTasks.Select(newTask => CarveTaskAroundBlockers(newTask, existingTasks)))
+            result.AddRange(segments);
+
+        return result;
+    }
+
+    /// <summary>
+    /// MergeOverwrite: Carve existing tasks around new ones.
+    /// If a new task is in the middle of an existing task, split the existing task.
+    /// If an existing task overlaps with new, shorten it to fit.
+    /// </summary>
+    private void MergeCarveExistingTasksAroundNew(List<PlannerTask> existingTasks, List<PlannerTask> newTasks)
+    {
+        var tasksToRemove = new List<PlannerTask>();
+        var tasksToAdd = new List<PlannerTask>();
+
+        foreach (var existingTask in existingTasks)
+        {
+            var overlappingNewTasks = newTasks.Where(nt =>
+                existingTask.TasksOverlap(nt.StartTime, nt.EndTime)).ToList();
+
+            if (overlappingNewTasks.Count == 0)
+                continue;
+
+            tasksToRemove.Add(existingTask);
+            var segments = CarveTaskAroundBlockers(existingTask, overlappingNewTasks);
+            tasksToAdd.AddRange(segments);
+        }
+
+        dbContext.Set<PlannerTask>().RemoveRange(tasksToRemove);
+        dbContext.Set<PlannerTask>().AddRange(tasksToAdd);
+    }
+
+    /// <summary>
+    /// Carves a task around blocking tasks, returning segments that don't overlap with blockers.
+    /// Handles splitting when a blocker is in the middle, and shortening when blockers overlap edges.
+    /// </summary>
+    private static List<PlannerTask> CarveTaskAroundBlockers(PlannerTask task, List<PlannerTask> blockers)
+    {
+        var overlappingBlockers = blockers
+            .Where(b => task.TasksOverlap(b.StartTime, b.EndTime))
+            .OrderBy(b => b.StartTime)
+            .ToList();
+
+        if (overlappingBlockers.Count == 0)
+            return [task];
+
+        var result = new List<PlannerTask>();
+        var currentStart = task.StartTime;
+
+        foreach (var blocker in overlappingBlockers)
+        {
+            if (currentStart < blocker.StartTime)
+            {
+                var segmentEnd = blocker.StartTime < task.EndTime ? blocker.StartTime : task.EndTime;
+                if (currentStart < segmentEnd)
+                    result.Add(CloneTaskWithNewTimes(task, currentStart, segmentEnd));
+            }
+
+            currentStart = blocker.EndTime > currentStart ? blocker.EndTime : currentStart;
+        }
+
+        if (currentStart < task.EndTime)
+            result.Add(CloneTaskWithNewTimes(task, currentStart, task.EndTime));
+
+        return result;
+    }
+
+    private static PlannerTask CloneTaskWithNewTimes(PlannerTask original, TimeOnly newStart, TimeOnly newEnd) =>
+        new()
+        {
+            StartTime = newStart,
+            EndTime = newEnd,
+            IsBackground = original.IsBackground,
+            Location = original.Location,
+            Notes = original.Notes,
+            ImportanceId = original.ImportanceId,
+            ActivityId = original.ActivityId,
+            CalendarId = original.CalendarId,
+            Status = original.Status,
+            SourceTemplateTaskId = original.SourceTemplateTaskId,
+            TodolistItemId = original.TodolistItemId,
+            UserId = original.UserId
+        };
+}

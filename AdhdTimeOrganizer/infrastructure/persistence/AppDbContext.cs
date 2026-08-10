@@ -2,20 +2,21 @@ using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
-using AdhdTimeOrganizer.domain.model.entity.reminder;
-using AdhdTimeOrganizer.domain.model.entity.suggestion;
 using AdhdTimeOrganizer.Core.domain.model.entity.timer;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.user;
-using AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.configuration.todoList;
 using AdhdTimeOrganizer.History.infrastructure.persistence.configuration.activityHistory;
+using AdhdTimeOrganizer.Planning.domain.model.entity;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.model.entity.reminder;
+using AdhdTimeOrganizer.Planning.domain.model.entity.suggestion;
+using AdhdTimeOrganizer.Planning.infrastructure.persistence.configuration.activityPlanning;
 using AdhdTimeOrganizer.Routines.infrastructure.persistence.configuration.todoList;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -153,7 +154,44 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ActivityHistoryConfiguration).Assembly);
         // AdhdTimeOrganizer.Routines (RoutineTodoList, RoutineTimePeriod, RoutinePeriodCompletion).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RoutineTimePeriodConfiguration).Assembly);
+        // AdhdTimeOrganizer.Planning (Calendar, the four planner-task types, TaskImportance,
+        // TaskPlannerDayTemplate, UserPlannerSettings, Reminder, and the three suggestion-pattern
+        // views). Reminders are part of this slice — there is no AdhdTimeOrganizer.Reminders.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlannerTaskConfiguration).Assembly);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        // Last, because it needs entity types from two slices that cannot see each other.
+        ConfigureCrossSliceRelationships(modelBuilder);
+    }
+
+    /// <summary>
+    /// Relationships whose two ends live in slice projects that do not reference one another. The host
+    /// is the only place both types are in scope, and it owns the schema anyway, so the FK is declared
+    /// here rather than forcing a project reference purely to name the principal.
+    /// </summary>
+    /// <remarks>
+    /// There is exactly one today: <c>PlannerTask.TodolistItemId</c> → <c>TodoListItem</c>. Planning
+    /// keeps the id column; the navigation property was deleted, because nothing read it — every call
+    /// site passes the bare id — and it was the only thing that would have forced a
+    /// Planning → TodoLists project reference. Configured with no navigation on either end, which is
+    /// what <c>HasOne&lt;T&gt;()</c> / <c>WithMany()</c> without lambdas means; column name, nullability
+    /// and <c>SetNull</c> are all unchanged, so this produces no migration.
+    /// </remarks>
+    private static void ConfigureCrossSliceRelationships(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PlannerTask>()
+            .HasOne<TodoListItem>()
+            .WithMany()
+            .HasForeignKey(p => p.TodolistItemId)
+            .OnDelete(DeleteBehavior.SetNull)
+            // Pinned, because the generated name depends on whether TodoListItem's ToTable has run yet
+            // when this FK is named. While every configuration lived in one assembly, "PlannerTask"
+            // sorted ahead of "ToDoListItem", so the name fell back to the entity-set name
+            // ("todo_list_items", plural). Applying the TodoLists slice assembly first flips that to the
+            // real table name and silently emits a constraint rename. Naming it here makes the FK
+            // independent of assembly order, which will keep shifting as further slices come out.
+            .HasConstraintName("fk_planner_task_todo_list_items_todolist_item_id");
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Contracts.notification;
@@ -63,6 +64,11 @@ public static class ModuleServiceExtensions
         // AdhdTimeOrganizer.Routines — same reasoning: RoutineTimePeriodSeeder / RoutineTodoListSeeder
         // and RoutineTodoListActivityMembershipSource carry lifetime markers.
         typeof(RoutineTimePeriod).Assembly,
+        // AdhdTimeOrganizer.Planning — same reasoning: CalendarSeeder, TaskImportanceSeeder,
+        // UserPlannerSettingsSeeder and the two dev template seeders carry lifetime markers, as does
+        // ReminderRegistrationService. Being in this list (and therefore out of the AppDomain sweep)
+        // is what keeps each of them registered exactly once.
+        typeof(PlannerTask).Assembly,
         typeof(Notification).Assembly,
         typeof(ReminderDefinition).Assembly,
         typeof(ScheduledJob).Assembly

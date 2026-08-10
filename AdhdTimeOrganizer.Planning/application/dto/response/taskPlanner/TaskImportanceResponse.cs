@@ -1,0 +1,22 @@
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using Sydowwe.Framework.application.dto.response;
+using Sydowwe.Framework.application.dto.response.@base;
+
+namespace AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+
+public record TaskImportanceResponse : TextColorIconResponse, IProjectionResponse<TaskImportanceResponse, TaskImportance>
+{
+    public required int Importance { get; init; }
+
+    public static IQueryable<TaskImportanceResponse> Projection(IQueryable<TaskImportance> query)
+    {
+        return query.Select(entity => new TaskImportanceResponse
+        {
+            Id = entity.Id,
+            Text = entity.Text,
+            Color = entity.Color,
+            Icon = entity.Icon,
+            Importance = entity.Importance
+        });
+    }
+}

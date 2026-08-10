@@ -1,8 +1,0 @@
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.infrastructure.persistence;
-using Sydowwe.Framework.application.endpoint.@base.command;
-
-namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.templatePlannerTask.command;
-
-public class BatchDeleteTemplatePlannerTaskEndpoint(AppDbContext dbContext)
-    : BaseBatchDeleteEndpoint<TemplatePlannerTask>(dbContext);

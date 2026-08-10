@@ -1,0 +1,27 @@
+using AdhdTimeOrganizer.Core.application.dto.response.activity;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+using Sydowwe.Framework.application.dto.dto;
+
+namespace AdhdTimeOrganizer.Planning.application.dto.response.suggestion;
+
+public record SuggestionResponse
+{
+    public long? RepeatingPlannerTaskId { get; init; }
+    public required ActivityResponse Activity { get; init; }
+    public TaskImportanceResponse? Importance { get; init; }
+    public required TimeDto StartTime { get; init; }
+    public required TimeDto EndTime { get; init; }
+    public bool IsBackground { get; init; }
+    public string? Location { get; init; }
+    public string? Notes { get; init; }
+    public required string Color { get; init; }
+    public required RecurrenceType RecurrenceType { get; init; }
+    public required IEnumerable<string> ScheduledDays { get; init; }
+    public required IEnumerable<int> ScheduledDates { get; init; }
+    public DateOnly? ActiveFromDate { get; init; }
+    public DateOnly? ActiveToDate { get; init; }
+    public required IEnumerable<string> ScheduledForDayTypes { get; init; }
+    public required SuggestionSourceType SourceType { get; init; }
+    public int? OccurrenceCount { get; init; }
+}

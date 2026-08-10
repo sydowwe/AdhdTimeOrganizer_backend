@@ -30,9 +30,8 @@ tables it was copied with have been deleted.
   `Sydowwe.Framework.Contracts` — never the host**, which is why everything in it takes a plain
   `DbContext` rather than `AppDbContext`. Read `AdhdTimeOrganizer.Core/docs/summary.md` before
   working in it, and `.../seeder/SeederOrderBands.md` before adding a seeder **anywhere** in the
-  solution. Five more slices follow it — TodoLists, Routines and History have landed; **Planning**
-  (which now includes reminders — there is no `AdhdTimeOrganizer.Reminders`) and **Tracking**
-  remain. The plan is `review/portal/slicePrompts/00-README.md`.
+  solution. Five more slices follow it — TodoLists, Routines, History and Planning have landed;
+  only **Tracking** remains. The plan is `review/portal/slicePrompts/00-README.md`.
 - `AdhdTimeOrganizer.TodoLists` — **the second slice.** Lists, items, steps, categories and the
   per-user `TaskPriority` lookup, plus the shared to-do primitives the Routines slice builds on
   (`BaseTodoListItem`, `TodoListStep`, `BaseTodoListConfigure`, `TodoListExtensions`,
@@ -62,6 +61,40 @@ tables it was copied with have been deleted.
   implementation is **silent** — no build error, no exception, the filter just stops narrowing. Every
   consumer needs a test asserting the rows, not merely the route
   (`HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam`).
+- `AdhdTimeOrganizer.Planning` — **the fourth slice, and it includes reminders** (there is no
+  `AdhdTimeOrganizer.Reminders`). Calendar, the four planner-task types, day templates,
+  `TaskImportance`, `UserPlannerSettings`, `Reminder` + `ReminderRegistrationService`, the three
+  suggestion-pattern read-models, ~49 endpoints, 12 validators, five seeders. **References Core and
+  the framework only — zero outbound slice edges**, because both of its predicted dependencies turned
+  out to be avoidable:
+  - `Planning → History` never existed. The suggestions endpoint reads `ActivityHistoryPattern` (the
+    entity over `mv_activity_history_pattern`), not the `ActivityHistory` entity. The materialized
+    view is the decoupling; the view SQL, installer, interceptor and refresh job stay host-side.
+  - `Planning → TodoLists` was **deleted**. `PlannerTask.TodolistItemId` keeps its FK and its
+    `SetNull`; the unused `PlannerTask.TodolistItem` navigation was removed and the relationship
+    moved to `AppDbContext.ConfigureCrossSliceRelationships`, where both types are visible. Empty
+    migration. Do not add the navigation back.
+
+  Google Calendar (it carries `Google.Apis.Auth`) and the dev `PlannerTaskSeeder` (it links to a
+  seeded `TodoListItem`) deliberately stayed host-side. Read
+  `AdhdTimeOrganizer.Planning/docs/summary.md` before working in it.
+
+  ⚠ Two things here fail **silently**. (1) Delete the host-side relationship declaration and the FK
+  vanishes from the model with no build error —
+  `PlanningRouteSmokeTests.PlannerTaskToTodoListItem_ForeignKey_SurvivesTheSliceSplit` is the guard.
+  (2) `ApplyHostConfigurations`'s host-side scan is anchored on `typeof(AppDbContext).Assembly`
+  **on purpose**: it used to be anchored on `PlannerTaskConfiguration`, which this extraction moved
+  out, silently turning the host's own scan into a second Planning scan and dropping six host
+  configurations from the model. Nothing failed to build; the next `migrations add` emitted ~500
+  lines of table renames and dropped partition keys. **Never anchor an assembly scan —
+  `ApplyConfigurationsFromAssembly`, `ModuleAssemblies`, FastEndpoints `o.Assemblies` — on a type
+  that can move slices.**
+
+  ⚠ **Three ways to avoid a slice→slice reference, all now in use.** Try each before accepting a
+  project reference or a sequencing constraint: a **materialized view** (Planning ← History), a
+  **navigation-free FK declared in the host** (Planning → TodoLists), and the
+  `IActivityMembershipSource` **seam** (History ← TodoLists / Routines). All three fail silently when
+  broken, so each needs a behavioural test rather than a route smoke test.
 - `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding seven projects:
   - `framework/Sydowwe.Framework` — the shared framework, used by **the portal and the modules
     alike**. Base entities, base endpoints, builder extensions, DbContext helpers, seeders, auth

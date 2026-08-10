@@ -96,5 +96,6 @@
         <ProjectReference Include="..\AdhdTimeOrganizer.TodoLists\AdhdTimeOrganizer.TodoLists.csproj" />
         <ProjectReference Include="..\AdhdTimeOrganizer.History\AdhdTimeOrganizer.History.csproj" />
         <ProjectReference Include="..\AdhdTimeOrganizer.Routines\AdhdTimeOrganizer.Routines.csproj" />
+        <ProjectReference Include="..\AdhdTimeOrganizer.Planning\AdhdTimeOrganizer.Planning.csproj" />
     </ItemGroup>
 </Project>

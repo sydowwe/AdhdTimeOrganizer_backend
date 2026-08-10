@@ -1,0 +1,18 @@
+using AdhdTimeOrganizer.Core.application.dto.response.activity;
+using Sydowwe.Framework.application.dto.dto;
+using Sydowwe.Framework.application.dto.response.@base;
+
+namespace AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+
+public record BasePlannerTaskResponse : IdResponse
+{
+    public required TimeDto StartTime { get; set; }
+    public required TimeDto EndTime { get; set; }
+    public required bool IsBackground { get; set; }
+
+    public string? Location { get; set; }
+    public string? Notes { get; set; }
+
+    public required ActivityResponse Activity { get; set; }
+    public required TaskImportanceResponse? Importance { get; init; }
+}

@@ -1,8 +1,8 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Framework.Testing.baseTests;

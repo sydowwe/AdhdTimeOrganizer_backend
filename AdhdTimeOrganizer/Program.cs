@@ -14,6 +14,7 @@ using AdhdTimeOrganizer.infrastructure.persistence.retention;
 using AdhdTimeOrganizer.infrastructure.security;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.infrastructure.jobs;
 using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
@@ -225,6 +226,11 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             typeof(ActivityHistory).Assembly,
             // AdhdTimeOrganizer.Routines — the routine to-do list and time period endpoints.
             typeof(RoutineTimePeriod).Assembly,
+            // AdhdTimeOrganizer.Planning — the 44 planner/calendar/template endpoints plus the five
+            // reminder ones (reminders are part of this slice). SyncCalendarToGoogleEndpoint is
+            // deliberately NOT here: the Google integration stayed host-side and is covered by
+            // typeof(Program).Assembly above.
+            typeof(PlannerTask).Assembly,
             typeof(Notification).Assembly,
             typeof(ReminderDefinition).Assembly,
             typeof(ScheduledJob).Assembly

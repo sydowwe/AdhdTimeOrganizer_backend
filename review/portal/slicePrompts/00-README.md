@@ -12,8 +12,35 @@ them out of order produces a slice→host reference, which does not compile.
 | ~~2~~ | ~~`02-todolists.md`~~ | Core | ✅ **DONE.** `AdhdTimeOrganizer.TodoLists` exists: 90 files, `TaskPriority` pulled out of the Planning folder, `TodoListSettings` moved in, one FK constraint name pinned. |
 | ~~3~~ | ~~`03-routines.md`~~ | TodoLists | ✅ **DONE.** `AdhdTimeOrganizer.Routines` exists: routine lists, time periods, completions, the reset service, two Quartz jobs, two seeders. `RoutineTodoListActivityMembershipSource` moved with the entity. |
 | ~~4~~ | ~~`04-history.md`~~ | ~~TodoLists, Routines~~ → **Core only** | ✅ **DONE.** `AdhdTimeOrganizer.History` exists: 39 files. Its two outbound edges were *removed* rather than honoured — see below — so it landed before Routines. |
-| 5 | `05-planning.md` | TodoLists, History | **Includes reminders** — see below. Largest slice, ~49 endpoints. |
+| ~~5~~ | ~~`05-planning.md`~~ | ~~TodoLists, History~~ → **Core only** | ✅ **DONE.** `AdhdTimeOrganizer.Planning` exists: 123 files, reminders folded in. **Both** of its predicted edges were deleted rather than honoured — see below. |
 | 6 | `07-tracking.md` | Planning, TodoLists, Routines | Has a **seam to build first** — read the prompt. |
+
+> **Planning landed with zero outbound slice edges. Neither predicted dependency was real.**
+> - **`Planning → History` never existed.** `GetSuggestionsRepeatingPlannerTaskEndpoint` reads
+>   `ActivityHistoryPattern` — the entity over the `mv_activity_history_pattern` materialized view —
+>   **not** the `ActivityHistory` entity. That type was always host-side and moved into Planning with
+>   its two siblings. The materialized view *is* the decoupling. `04-slicing-verification.md` and
+>   `05-planning.md` both recorded this edge; both were wrong.
+> - **`Planning → TodoLists` was deleted, not honoured.** `PlannerTask.TodolistItemId` keeps its FK
+>   and its `SetNull`; the unused `PlannerTask.TodolistItem` **navigation** was removed, and the
+>   relationship is declared in `AppDbContext.ConfigureCrossSliceRelationships` where both types are
+>   visible. Empty migration. This is the third pattern for killing a slice→slice edge, after the
+>   `IActivityMembershipSource` seam and the materialized view: **when the only thing forcing a
+>   reference is a navigation property nothing reads, move the relationship to the host.** The host
+>   owns the schema anyway.
+> - Same silent-failure cost as the seam: delete the host-side declaration and the FK vanishes from
+>   the model with no build error. `PlanningRouteSmokeTests.PlannerTaskToTodoListItem_ForeignKey_SurvivesTheSliceSplit`
+>   asserts the FK, its column, its delete behaviour, its pinned constraint name, and the absence of
+>   navigations.
+>
+> ⚠ **Trap this extraction hit, which the next one will hit too.** `ApplyHostConfigurations`'s final
+> `ApplyConfigurationsFromAssembly(typeof(PlannerTaskConfiguration).Assembly)` *was the host's own
+> scan* — anchored on a type that then moved into the slice, silently turning it into a second
+> Planning scan and dropping every remaining host configuration from the model. No build error; the
+> next `migrations add` emitted ~500 lines of table renames and dropped partition keys. It is now
+> anchored on `typeof(AppDbContext).Assembly`, which cannot move. **Before extracting Tracking,
+> check that no `ApplyConfigurationsFromAssembly`, `ModuleAssemblies` entry or FastEndpoints
+> `o.Assemblies` entry is anchored on a type you are about to move.**
 
 > **`06-reminders.md` was deleted on 2026-08-11 — reminders fold into Planning.** The prompt
 > claimed `Reminders → Planning` was a one-way edge; it is bidirectional. `Reminder` carries an FK
