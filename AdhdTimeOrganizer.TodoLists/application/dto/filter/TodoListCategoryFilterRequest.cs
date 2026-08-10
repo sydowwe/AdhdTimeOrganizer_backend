@@ -1,0 +1,9 @@
+using Sydowwe.Framework.application.dto.request.@interface;
+
+namespace AdhdTimeOrganizer.TodoLists.application.dto.filter;
+
+public record TodoListCategoryFilterRequest : IFilterRequest
+{
+    public string? Name { get; set; }
+    public bool HideEmpty { get; set; }
+}

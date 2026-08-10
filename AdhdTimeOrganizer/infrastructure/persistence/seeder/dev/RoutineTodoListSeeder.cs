@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
-using AdhdTimeOrganizer.infrastructure.settings;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Sydowwe.Framework.config.dependencyInjection;

@@ -17,7 +17,7 @@ compile.
   `Sydowwe.Framework`. Host → History.
 - Slice services take a plain **`DbContext`**, never `AppDbContext`. The alias is registered.
 - Confirm the baseline first: `dotnet test AdhdTimeOrganizer.IntegrationTests` =
-  **216 passed, 6 skipped, 0 failed**. Match it at the end.
+  **219 passed, 6 skipped, 0 failed**. Match it at the end.
 
 ## Registering with the host — four places, none break the build
 
@@ -99,7 +99,7 @@ entity it belongs to Planning, which has not been extracted yet, and it should s
 ## Done when
 
 - `dotnet build AdhdTimeOrganizer.sln` clean
-- `dotnet test` = **216 passed, 6 skipped, 0 failed**
+- `dotnet test` = **219 passed, 6 skipped, 0 failed**
 - `dotnet ef migrations add HistorySlice` produces an **empty** `Up`/`Down`
 - one history endpoint and one dashboard endpoint manually smoke-tested (a missing
   FastEndpoints registration is a 404, not a build error)

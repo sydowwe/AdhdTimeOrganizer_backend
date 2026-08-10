@@ -1,0 +1,167 @@
+using System.Linq.Expressions;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.extensions;
+using FastEndpoints;
+using Humanizer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Sydowwe.Framework.application.dto.request.@base;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.domain.result;
+using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
+using Sydowwe.Framework.infrastructure.persistence;
+
+namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList;
+
+public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext dbContext, IOptions<TodoListSettings> settings) : Endpoint<ChangeDisplayOrderRequest>
+    where TEntity : BaseTodoListItem
+{
+    private readonly DbSet<TEntity> _dbSet = dbContext.Set<TEntity>();
+    private readonly TodoListSettings _settings = settings.Value;
+
+
+    public override void Configure()
+    {
+        var entityName = typeof(TEntity).Name;
+
+        Patch($"/{entityName.Kebaberize()}/change-display-order");
+
+
+        Summary(s =>
+        {
+            s.Summary = $"Reorders a single {entityName} item within a list.";
+            s.Description = "This endpoint calculates a new 'DisplayOrder' for an item based on its preceding and following siblings.";
+            s.Responses[204] = "The item was successfully reordered.";
+            s.Responses[404] = "The item to move, or a sibling item, could not be found.";
+            s.Responses[409] = "A conflict occurred, requiring a full list re-index.";
+            s.Responses[400] = "A bad request or other validation error occurred.";
+            s.Responses[500] = "An error occurred during item update.";
+        });
+    }
+
+    /// <summary>
+    /// Handles the incoming reorder request.
+    /// </summary>
+    public override async Task HandleAsync(ChangeDisplayOrderRequest req, CancellationToken ct)
+    {
+        var userId = User.GetId();
+
+        var itemToMove = await _dbSet
+            .FirstOrDefaultAsync(x => x.Id == req.MovedItemId, ct);
+
+        if (itemToMove is null)
+        {
+            AddError("The item to be moved could not be found.");
+            await Send.ErrorsAsync(404, ct);
+            return;
+        }
+
+
+        await using (var tx = await dbContext.Database.BeginTransactionAsync(ct))
+        {
+            // Attempt to calculate new order. If conflict triggers, we'll rebalance and retry once.
+            var newOrderResult = await CalculateNewOrderAsync(req, userId, ct);
+
+            if (newOrderResult.Failed)
+            {
+                AddError(newOrderResult.ErrorMessage ?? "An error occurred during order calculation.");
+                await Send.ErrorsAsync(EndpointHelper.ToStatusCode(newOrderResult.ErrorType), ct);
+                return;
+            }
+
+            itemToMove.DisplayOrder = newOrderResult.Data;
+            var result = await dbContext.UpdateEntityAsync(itemToMove, ct);
+
+            if (result.Failed)
+            {
+                AddError(result.ErrorMessage ?? "An error occurred during update.");
+                await Send.ErrorsAsync(500, ct);
+                return;
+            }
+
+            await tx.CommitAsync(ct);
+        }
+
+        await Send.NoContentAsync(ct);
+    }
+
+    /// <summary>
+    /// Calculates the new DisplayOrder value based on the surrounding items using arithmetic of precedingOrder and followingOrder.
+    /// </summary>
+    private async Task<Result<long>> CalculateNewOrderAsync(ChangeDisplayOrderRequest req, long userId, CancellationToken ct)
+    {
+        var standardGap = _settings.DisplayOrderGap;
+
+        // Case 1: Move to the top of the list
+        if (!req.PrecedingItemId.HasValue)
+        {
+            // If the list is completely empty (no following), start with startOrder.
+            if (!req.FollowingItemId.HasValue)
+                return Result.Successful(standardGap);
+
+            var followingOrder = await _dbSet.GetDisplayOrderById(req.FollowingItemId.Value, userId, ct);
+
+            return followingOrder.HasValue
+                ? Result.Successful(ArithmeticNewOrderNumber(followingOrder.Value - standardGap, followingOrder.Value))
+                : Result<long>.Error(ResultErrorType.NotFound, "The specified 'FollowingItemId' was not found.");
+        }
+
+        if (!req.FollowingItemId.HasValue)
+        {
+            var precedingOrder = await _dbSet.GetDisplayOrderById(req.PrecedingItemId.Value, userId, ct);
+
+            return precedingOrder.HasValue
+                ? Result.Successful(ArithmeticNewOrderNumber(precedingOrder.Value, precedingOrder.Value + standardGap))
+                : Result<long>.Error(ResultErrorType.NotFound, "The specified 'PrecedingItemId' was not found.");
+        }
+
+        // Case 3: Move between two existing items
+        var preOrder = await _dbSet.GetDisplayOrderById(req.PrecedingItemId.Value, userId, ct);
+        if (!preOrder.HasValue)
+            return Result<long>.Error(ResultErrorType.NotFound, "The specified 'PrecedingItemId' was not found.");
+
+        var folOrder = await _dbSet.GetDisplayOrderById(req.FollowingItemId.Value, userId, ct);
+        if (!folOrder.HasValue)
+            return Result<long>.Error(ResultErrorType.NotFound, "The specified 'FollowingItemId' was not found.");
+
+        var newOrder = ArithmeticNewOrderNumber(preOrder.Value, folOrder.Value);
+
+        // If no gap (midpoint equals one of the endpoints) -> signal conflict and request rebalance
+        if (newOrder == preOrder.Value || newOrder == folOrder.Value)
+        {
+            await RebalanceDisplayOrdersAsync(req.FollowingItemId.Value, userId, ct);
+            var newOrderResult = await CalculateNewOrderAsync(req, userId, ct);
+            return newOrderResult;
+        }
+
+        return Result.Successful(newOrder);
+    }
+
+    protected abstract Expression<Func<TEntity, long>> GroupFilterExpression { get; }
+
+
+    private async Task RebalanceDisplayOrdersAsync(long followingId, long userId, CancellationToken ct)
+    {
+        var groupId = await _dbSet.GetGroupIdById(followingId, userId, GroupFilterExpression, ct);
+        if (groupId is null)
+            return;
+
+        var query = _dbSet.AsQueryable()
+            .Where(e => e.UserId == userId);
+
+        var items = await query.Where(e => GroupFilterExpression.Compile()(e) == groupId)
+            .OrderByDescending(e => e.DisplayOrder)
+            .ToListAsync(ct);
+
+        for (var i = 0; i < items.Count; i++)
+            items[i].DisplayOrder = _settings.DisplayOrderStart - (i + 1) * _settings.DisplayOrderGap;
+
+        dbContext.Set<TEntity>().UpdateRange(items);
+
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    private static long ArithmeticNewOrderNumber(long precedingOrder, long followingOrder) => precedingOrder + (followingOrder - precedingOrder) / 2;
+}

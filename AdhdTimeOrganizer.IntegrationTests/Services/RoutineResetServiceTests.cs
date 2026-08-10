@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.domain.service;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;
 using Xunit;
 

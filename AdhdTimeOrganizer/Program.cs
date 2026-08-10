@@ -11,9 +11,9 @@ using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
 using AdhdTimeOrganizer.infrastructure.persistence.retention;
-using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.security;
-using AdhdTimeOrganizer.infrastructure.settings;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using DotNetEnv;
 using FastEndpoints;
 using FastEndpoints.Swagger;
@@ -214,6 +214,8 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             // AdhdTimeOrganizer.Core carries the 78 activity endpoints and the 10 timer ones. A slice
             // missing from this list is not a build error — its routes simply never register and 404.
             typeof(Activity).Assembly,
+            // AdhdTimeOrganizer.TodoLists — lists, items, steps, categories and priorities.
+            typeof(TodoList).Assembly,
             typeof(Notification).Assembly,
             typeof(ReminderDefinition).Assembly,
             typeof(ScheduledJob).Assembly

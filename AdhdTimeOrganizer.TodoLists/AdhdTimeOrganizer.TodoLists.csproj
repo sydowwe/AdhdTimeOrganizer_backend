@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>14</LangVersion>
+        <RootNamespace>AdhdTimeOrganizer.TodoLists</RootNamespace>
+    </PropertyGroup>
+
+    <!-- Same shape as AdhdTimeOrganizer.Core: a plain library (Microsoft.NET.Sdk) that holds
+         endpoints, so it needs the ASP.NET Core surface, and the Web SDK's implicit usings are not
+         in scope here and are re-declared below. -->
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Microsoft.AspNetCore.Builder"/>
+        <Using Include="Microsoft.AspNetCore.Http"/>
+        <Using Include="Microsoft.Extensions.Configuration"/>
+        <Using Include="Microsoft.Extensions.DependencyInjection"/>
+        <Using Include="Microsoft.Extensions.Hosting"/>
+        <Using Include="Microsoft.Extensions.Logging"/>
+        <!-- Every endpoint and seeder here takes a plain DbContext (the host aliases it to
+             AppDbContext in DI), so Microsoft.EntityFrameworkCore is named by almost every file in
+             the project. Global rather than 40-odd identical using lines. -->
+        <Using Include="Microsoft.EntityFrameworkCore"/>
+    </ItemGroup>
+
+    <!-- Deliberately no reference to AdhdTimeOrganizer (the host), and none to any other slice:
+         TodoLists has zero outbound slice edges. Everything here takes a plain DbContext, which
+         ModuleServiceExtensions aliases to AppDbContext. Routines references *this* project next
+         for the shared to-do bases (BaseTodoListItem, TodoListStep, BaseTodoListConfigure,
+         TodoListExtensions, the toggle/step/reorder endpoint bases) - do not move those to Core. -->
+    <ItemGroup>
+        <ProjectReference Include="..\AdhdTimeOrganizer.Core\AdhdTimeOrganizer.Core.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>
+    </ItemGroup>
+
+</Project>

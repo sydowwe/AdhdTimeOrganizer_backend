@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.extensions;
-using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
+using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

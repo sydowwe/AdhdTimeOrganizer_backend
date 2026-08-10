@@ -1,7 +1,8 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.infrastructure.settings;
+using AdhdTimeOrganizer.TodoLists.application.endpoint.todoList;
+using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using Microsoft.Extensions.Options;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.command;

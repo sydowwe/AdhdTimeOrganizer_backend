@@ -1,0 +1,24 @@
+using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.extensions;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
+
+namespace AdhdTimeOrganizer.TodoLists.infrastructure.persistence.configuration.todoList;
+
+public class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
+{
+    public void Configure(EntityTypeBuilder<TodoList> builder)
+    {
+        builder.BaseNameTextEntityConfigure();
+        builder.IsManyWithOneUser();
+        builder.HasIndex(r => new { r.UserId, r.Name }).IsUnique();
+
+        builder.Property(r => r.Icon).HasMaxLength(255);
+
+        builder.HasMany(r => r.TodoListItemColl)
+            .WithOne(t => t.TodoList)
+            .HasForeignKey(t => t.TodoListId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

@@ -31,6 +31,16 @@ tables it was copied with have been deleted.
   `DbContext` rather than `AppDbContext`. Read `AdhdTimeOrganizer.Core/docs/summary.md` before
   working in it, and `.../seeder/SeederOrderBands.md` before adding a seeder **anywhere** in the
   solution. Six more slices follow it; the plan is `review/portal/slicePrompts/00-README.md`.
+- `AdhdTimeOrganizer.TodoLists` — **the second slice.** Lists, items, steps, categories and the
+  per-user `TaskPriority` lookup, plus the shared to-do primitives the Routines slice builds on
+  (`BaseTodoListItem`, `TodoListStep`, `BaseTodoListConfigure`, `TodoListExtensions`,
+  `TodoListSettings`, and the toggle/step/reorder endpoint bases — those stay **here**, not in Core).
+  References Core and the framework only; **zero outbound slice edges**, which is why it went first
+  among the feature slices. The routine entities and endpoints are still host-side and become
+  `AdhdTimeOrganizer.Routines` next. Read `AdhdTimeOrganizer.TodoLists/docs/summary.md` before
+  working in it — in particular the note on the **pinned FK constraint name** in
+  `PlannerTaskConfiguration`, which exists because EF derives that name from the order the
+  `ApplyConfigurationsFromAssembly` calls run in, and every new slice shifts that order.
 - `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding seven projects:
   - `framework/Sydowwe.Framework` — the shared framework, used by **the portal and the modules
     alike**. Base entities, base endpoints, builder extensions, DbContext helpers, seeders, auth

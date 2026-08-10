@@ -1,6 +1,5 @@
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
+﻿using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.extensions;
-using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;

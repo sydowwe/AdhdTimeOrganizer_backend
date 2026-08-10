@@ -1,3 +1,5 @@
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+
 namespace AdhdTimeOrganizer.domain.model.entity.todoList;
 
 public class RoutineTodoList : BaseTodoListItem

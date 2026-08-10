@@ -9,7 +9,7 @@ them out of order produces a slice→host reference, which does not compile.
 | # | Prompt | Depends on | Notes |
 |---|---|---|---|
 | ~~1~~ | ~~`01-core.md`~~ | — | ✅ **DONE.** `AdhdTimeOrganizer.Core` exists: 220 files, Timers folded in, seeder `Order` banded. |
-| 2 | `02-todolists.md` | Core | Zero outbound edges. The de-facto pilot. |
+| ~~2~~ | ~~`02-todolists.md`~~ | Core | ✅ **DONE.** `AdhdTimeOrganizer.TodoLists` exists: 90 files, `TaskPriority` pulled out of the Planning folder, `TodoListSettings` moved in, one FK constraint name pinned. |
 | 3 | `03-routines.md` | TodoLists | Highest correctness payoff. |
 | 4 | `04-history.md` | TodoLists, Routines | Filters into both. |
 | 5 | `05-planning.md` | TodoLists, History | |
@@ -18,8 +18,12 @@ them out of order produces a slice→host reference, which does not compile.
 
 ## Baseline
 
-`dotnet test` on `AdhdTimeOrganizer.IntegrationTests`: **216 passed, 6 skipped, 0 failed**
-(after the Core extraction). Any prompt that ends with a *lower* number has broken something.
+`dotnet test` on `AdhdTimeOrganizer.IntegrationTests`: **219 passed, 6 skipped, 0 failed**
+(after the TodoLists extraction). Any prompt that ends with a *lower* number has broken something.
+
+> Each slice adds its own route smoke test, so this number goes **up** per extraction. Core took it
+> from 214 to 216 (`CoreRouteSmokeTests`); TodoLists to 219 (`TodoListsRouteSmokeTests`, three
+> `[Theory]` cases). Update this line and the per-prompt figures when you land a slice.
 
 > The 198 recorded here originally was already stale when written — `ActivityProfileGridTests` (14)
 > and `PerUserDefaultMatcherTests` were added by commits `9f4bca7` / `b601637` / `064fada`, which
@@ -40,7 +44,17 @@ them out of order produces a slice→host reference, which does not compile.
 - Seeder `Order` values are banded per slice — see
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md`. Stay in your band.
 - `CoreRouteSmokeTests` is the template for the two registration traps (routes 404-ing, seeders
-  double-registering); extend it per slice rather than writing a new pattern.
+  double-registering); extend it per slice rather than writing a new pattern. Its seeder-duplication
+  test already asserts over *every* registered seeder, so a new slice only needs the route half —
+  `TodoListsRouteSmokeTests` is the example.
+- **A non-empty migration may be a constraint *rename*, not a schema change.** Adding a slice adds an
+  `ApplyConfigurationsFromAssembly` call, which changes the order entity configurations run in — and
+  EF derives a relationship's constraint name from whether the principal's `ToTable` has already run
+  when the FK is named. TodoLists hit this: the `PlannerTask` → `TodoListItem` FK flipped from
+  `fk_planner_task_todo_list_items_…` (entity-set name) to `fk_planner_task_todo_list_item_…` (table
+  name). The fix is `.HasConstraintName(...)` pinning the existing name at the relationship, which
+  also makes it immune to the next reordering. Expect one or two more of these; check the diff rather
+  than assuming a non-empty migration means you renamed a type.
 
 ## Evidence
 

@@ -1,0 +1,12 @@
+using Sydowwe.Framework.application.dto.request.@interface;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+
+namespace AdhdTimeOrganizer.TodoLists.application.dto.filter;
+
+public record TaskPriorityFilterRequest : IFilterRequest
+{
+    public string? Text { get; set; }
+    public string? Color { get; set; }
+    public int? MinPriority { get; set; }
+    public int? MaxPriority { get; set; }
+}

@@ -19,7 +19,7 @@ phase 2 until phase 1 is committed and green.
 - **Never reference the host from a slice.**
 - Slice services take a plain **`DbContext`**, never `AppDbContext`. The alias is registered.
 - Confirm the baseline first: `dotnet test AdhdTimeOrganizer.IntegrationTests` =
-  **216 passed, 6 skipped, 0 failed**. Match it after each phase.
+  **219 passed, 6 skipped, 0 failed**. Match it after each phase.
 
 ---
 
@@ -129,7 +129,7 @@ After phase 1, that should be Tracking's only remaining outbound slice edge besi
 ## Done when
 
 - `dotnet build AdhdTimeOrganizer.sln` clean
-- `dotnet test` = **216 passed, 6 skipped, 0 failed** (plus the phase-1 tests you added)
+- `dotnet test` = **219 passed, 6 skipped, 0 failed** (plus the phase-1 tests you added)
 - `dotnet ef migrations add TrackingSlice` produces an **empty** `Up`/`Down` — in particular
   **no partition DDL**
 - a desktop heartbeat and a web-extension ingest call both accepted from an extension-client

@@ -12,8 +12,9 @@ using AdhdTimeOrganizer.Core.domain.model.entity.timer;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.user;
-using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.user;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.configuration.todoList;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -140,6 +141,10 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         // typeof(...).Assembly that used to cover everything now covers only Core — the host's remaining
         // configurations would silently drop out of the model, taking their tables with them.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UserEntityConfiguration).Assembly);
+        // AdhdTimeOrganizer.TodoLists (TodoList, TodoListItem, TodoListCategory, TaskPriority) — one
+        // call per slice project, for the same reason. Drop it and those four tables vanish from the
+        // model while the routine tables that FK into them remain, which fails at model-build time.
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(TodoListConfiguration).Assembly);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlannerTaskConfiguration).Assembly);
     }
 

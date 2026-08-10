@@ -2,6 +2,7 @@ using System.Reflection;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Notifications.application;
@@ -50,6 +51,10 @@ public static class ModuleServiceExtensions
         // exactly once. Listing it here (and therefore excluding it from the AppDomain sweep) is what
         // guarantees that — every per-user default seeder in it would otherwise run twice.
         typeof(Activity).Assembly,
+        // AdhdTimeOrganizer.TodoLists — same reasoning as Core: TaskPrioritySeeder and TodoListSeeder
+        // carry lifetime markers, so being in this list (and out of the AppDomain sweep) is what keeps
+        // them registered exactly once.
+        typeof(TodoList).Assembly,
         typeof(Notification).Assembly,
         typeof(ReminderDefinition).Assembly,
         typeof(ScheduledJob).Assembly

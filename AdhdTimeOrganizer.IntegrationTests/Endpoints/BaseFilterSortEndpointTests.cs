@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Framework.Testing.baseTests;

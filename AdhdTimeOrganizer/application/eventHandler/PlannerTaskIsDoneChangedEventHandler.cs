@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.service;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 

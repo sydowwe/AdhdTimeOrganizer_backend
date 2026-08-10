@@ -20,7 +20,7 @@ This is the largest slice, ~44 endpoints.
   `Sydowwe.Framework`. Host → Planning.
 - Slice services take a plain **`DbContext`**, never `AppDbContext`. The alias is registered.
 - Confirm the baseline first: `dotnet test AdhdTimeOrganizer.IntegrationTests` =
-  **216 passed, 6 skipped, 0 failed**. Match it at the end.
+  **219 passed, 6 skipped, 0 failed**. Match it at the end.
 
 ## Registering with the host — four places, none break the build
 
@@ -104,7 +104,7 @@ read moves with you.
 ## Done when
 
 - `dotnet build AdhdTimeOrganizer.sln` clean
-- `dotnet test` = **216 passed, 6 skipped, 0 failed**
+- `dotnet test` = **219 passed, 6 skipped, 0 failed**
 - `dotnet ef migrations add PlanningSlice` produces an **empty** `Up`/`Down`
 - one planner-task endpoint and one calendar endpoint manually smoke-tested (a missing
   FastEndpoints registration is a 404, not a build error)

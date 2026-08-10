@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.application.endpoint.todoList.routineTodoList.command;

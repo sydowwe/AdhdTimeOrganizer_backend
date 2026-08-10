@@ -1,6 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.extensions;
-using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
@@ -39,7 +38,14 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
         builder.HasOne(p => p.TodolistItem)
             .WithMany()
             .HasForeignKey(p => p.TodolistItemId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.SetNull)
+            // Pinned, because the generated name depends on whether TodoListItem's ToTable has run yet
+            // when this FK is named. While every configuration lived in one assembly, "PlannerTask"
+            // sorted ahead of "ToDoListItem", so the name fell back to the entity-set name
+            // ("todo_list_items", plural). Applying the TodoLists slice assembly first flips that to the
+            // real table name and silently emits a constraint rename. Naming it here makes the FK
+            // independent of assembly order, which will keep shifting as further slices come out.
+            .HasConstraintName("fk_planner_task_todo_list_items_todolist_item_id");
 
         builder.HasIndex(p => new { p.UserId, p.CalendarId, p.StartTime });
         builder.HasIndex(p => p.Status);

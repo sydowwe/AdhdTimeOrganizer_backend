@@ -18,7 +18,7 @@ compile. That is the only reason this slice, the smallest at ~5 endpoints, comes
   + `Sydowwe.Framework.Contracts`. Host → Reminders.
 - Slice services take a plain **`DbContext`**, never `AppDbContext`. The alias is registered.
 - Confirm the baseline first: `dotnet test AdhdTimeOrganizer.IntegrationTests` =
-  **216 passed, 6 skipped, 0 failed**. Match it at the end.
+  **219 passed, 6 skipped, 0 failed**. Match it at the end.
 
 ## Registering with the host — four places, none break the build
 
@@ -87,7 +87,7 @@ assertions if anything about this slice's DI feels uncertain.
 ## Done when
 
 - `dotnet build AdhdTimeOrganizer.sln` clean
-- `dotnet test` = **216 passed, 6 skipped, 0 failed**, with `ModuleWiringTests` green
+- `dotnet test` = **219 passed, 6 skipped, 0 failed**, with `ModuleWiringTests` green
 - `dotnet ef migrations add RemindersSlice` produces an **empty** `Up`/`Down`
 - one reminder endpoint manually smoke-tested (a missing FastEndpoints registration is a 404,
   not a build error)
