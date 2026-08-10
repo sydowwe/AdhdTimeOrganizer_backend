@@ -16,6 +16,16 @@
 >   Planning. Use `slicePrompts/00-README.md` for ordering.
 > - **`AdhdTimeOrganizer.Timers` is not happening.** Timers folds into Core.
 > - The integration suite is green: **198 passed, 6 skipped, 0 failed.**
+>
+> **Correction (2026-08-10, after the History extraction):** the `History → TodoLists + Routines`
+> edge recorded below **no longer exists**. It was not honoured, it was deleted: the four membership
+> filters now go through `IActivityMembershipSource` in
+> `AdhdTimeOrganizer.Core/application/seam/`, which inverts the direction (the owning slice
+> implements, the consuming slice resolves by key, neither references the other). History therefore
+> references **Core only** and was extracted before Routines. The "Sequencing" section's premise —
+> that the edges below force an order — is weaker than it reads: check whether an edge can be
+> inverted before treating it as a constraint. `Tracking → Planning` is the one that genuinely
+> cannot, because it is a **write** (§4).
 
 Read-only. Answers the four questions blocking the slice map, and corrects two claims I made
 before checking.

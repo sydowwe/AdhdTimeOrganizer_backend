@@ -41,6 +41,25 @@ tables it was copied with have been deleted.
   working in it — in particular the note on the **pinned FK constraint name** in
   `PlannerTaskConfiguration`, which exists because EF derives that name from the order the
   `ApplyConfigurationsFromAssembly` calls run in, and every new slice shifts that order.
+- `AdhdTimeOrganizer.History` — **the third slice.** `ActivityHistory`, its 13 endpoints (CRUD, the
+  `gird` grid, and the six `HistoryDetail*` / `HistorySummary*` dashboards), DTOs, validator and dev
+  seeder. **References Core and the framework only — not TodoLists, not Routines.** That is the
+  point of it: the grid's to-do / routine membership filters were rewritten onto Core's
+  `IActivityMembershipSource` seam (below), which is what let History land *before* Routines despite
+  the plan sequencing it after. `CalendarActivityEndpoint` and the whole suggestion-pattern
+  machinery stayed host-side. Read `AdhdTimeOrganizer.History/docs/summary.md` before working in it.
+
+  ⚠ **`IActivityMembershipSource`** (`AdhdTimeOrganizer.Core/application/seam/`) is the pattern to
+  reuse whenever one slice needs to filter on another's rows: Core declares the interface and the
+  key constants, the **owning** slice implements it (`TodoListActivityMembershipSource` in
+  TodoLists; `RoutineTodoListActivityMembershipSource` still host-side until Routines exists — move
+  it with the entity), the **consuming** slice resolves `IEnumerable<IActivityMembershipSource>` and
+  matches on `Key`. Neither side references the other. Two rules: the returned `IQueryable<long>`
+  must stay **composable** (callers use it as a subquery, so `ToList()` turns one `EXISTS` into a
+  client-side filter), and because resolution is by *string key* a missing or misregistered
+  implementation is **silent** — no build error, no exception, the filter just stops narrowing. Every
+  consumer needs a test asserting the rows, not merely the route
+  (`HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam`).
 - `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding seven projects:
   - `framework/Sydowwe.Framework` — the shared framework, used by **the portal and the modules
     alike**. Base entities, base endpoints, builder extensions, DbContext helpers, seeders, auth

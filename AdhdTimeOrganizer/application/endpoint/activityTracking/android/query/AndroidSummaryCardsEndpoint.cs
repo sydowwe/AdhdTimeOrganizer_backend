@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.@enum;
+using AdhdTimeOrganizer.Core.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.android.dashboard;
 using AdhdTimeOrganizer.Core.application.validator;

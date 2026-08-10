@@ -13,6 +13,7 @@ using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
 using AdhdTimeOrganizer.infrastructure.persistence.retention;
 using AdhdTimeOrganizer.infrastructure.security;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using DotNetEnv;
 using FastEndpoints;
@@ -216,6 +217,10 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             typeof(Activity).Assembly,
             // AdhdTimeOrganizer.TodoLists — lists, items, steps, categories and priorities.
             typeof(TodoList).Assembly,
+            // AdhdTimeOrganizer.History — the history CRUD/grid plus the six dashboard endpoints.
+            // CalendarActivityEndpoint is deliberately NOT here: it reads the Calendar entity, so it
+            // stayed host-side and is covered by typeof(Program).Assembly above.
+            typeof(ActivityHistory).Assembly,
             typeof(Notification).Assembly,
             typeof(ReminderDefinition).Assembly,
             typeof(ScheduledJob).Assembly

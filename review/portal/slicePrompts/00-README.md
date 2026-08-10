@@ -11,19 +11,43 @@ them out of order produces a slice→host reference, which does not compile.
 | ~~1~~ | ~~`01-core.md`~~ | — | ✅ **DONE.** `AdhdTimeOrganizer.Core` exists: 220 files, Timers folded in, seeder `Order` banded. |
 | ~~2~~ | ~~`02-todolists.md`~~ | Core | ✅ **DONE.** `AdhdTimeOrganizer.TodoLists` exists: 90 files, `TaskPriority` pulled out of the Planning folder, `TodoListSettings` moved in, one FK constraint name pinned. |
 | 3 | `03-routines.md` | TodoLists | Highest correctness payoff. |
-| 4 | `04-history.md` | TodoLists, Routines | Filters into both. |
+| ~~4~~ | ~~`04-history.md`~~ | ~~TodoLists, Routines~~ → **Core only** | ✅ **DONE.** `AdhdTimeOrganizer.History` exists: 39 files. Its two outbound edges were *removed* rather than honoured — see below — so it landed before Routines. |
 | 5 | `05-planning.md` | TodoLists, History | |
 | 6 | `06-reminders.md` | Planning | Smallest slice, but blocked until Planning lands. |
 | 7 | `07-tracking.md` | Planning, TodoLists, Routines | Has a **seam to build first** — read the prompt. |
 
+> **⚠ The ordering above is weaker than it looks — try to delete an edge before obeying it.**
+> History was supposed to wait for Routines because its grid filtered on to-do and routine
+> membership. Instead the edge was inverted:
+> `AdhdTimeOrganizer.Core/application/seam/IActivityMembershipSource.cs` declares "which activities
+> are in your area?", the owning slice implements it, History resolves implementations by key from
+> DI. Neither side references the other, and History's only project reference is Core.
+>
+> Reach for the same trick on any remaining *"slice A filters on slice B's rows"* edge before
+> accepting a sequencing constraint. It does **not** apply to `Tracking → Planning`, which is a
+> **write** (§4 of `../04-slicing-verification.md`) — that one still needs the event seam.
+>
+> The cost of the seam is that a source is resolved by *string key*, so a missing or misregistered
+> implementation is silent: no build error, no exception, the filter merely stops narrowing. Every
+> consumer of the seam needs a behavioural test asserting the rows, not just a route smoke test —
+> `HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam` is the pattern.
+
 ## Baseline
 
-`dotnet test` on `AdhdTimeOrganizer.IntegrationTests`: **219 passed, 6 skipped, 0 failed**
-(after the TodoLists extraction). Any prompt that ends with a *lower* number has broken something.
+`dotnet test` on `AdhdTimeOrganizer.IntegrationTests`: **228 passed, 6 skipped, 0 failed**
+(after the History extraction). Any prompt that ends with a *lower* number has broken something.
 
 > Each slice adds its own route smoke test, so this number goes **up** per extraction. Core took it
 > from 214 to 216 (`CoreRouteSmokeTests`); TodoLists to 219 (`TodoListsRouteSmokeTests`, three
-> `[Theory]` cases). Update this line and the per-prompt figures when you land a slice.
+> `[Theory]` cases); History to 228 (`HistoryRouteSmokeTests` — six dashboard `[Theory]` cases, the
+> grid, `form-select-options`, and the membership-seam behaviour test). Update this line and the
+> per-prompt figures when you land a slice.
+>
+> ⚠ Two traps when writing a route smoke test, both hit during the History extraction: `GET
+> /{entity}/{id}` answers **404 for a missing row**, indistinguishable from a missing route, so never
+> assert `NotBe(NotFound)` on it; and a GET against a POST-only route answers 405, which passes
+> `NotBe(NotFound)` for the wrong reason. Assert `Be(OK)` on a route you can actually satisfy, or
+> POST with a real body.
 
 > The 198 recorded here originally was already stale when written — `ActivityProfileGridTests` (14)
 > and `PerUserDefaultMatcherTests` were added by commits `9f4bca7` / `b601637` / `064fada`, which

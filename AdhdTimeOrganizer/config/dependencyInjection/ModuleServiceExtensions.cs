@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Notifications.application;
@@ -55,6 +56,9 @@ public static class ModuleServiceExtensions
         // carry lifetime markers, so being in this list (and out of the AppDomain sweep) is what keeps
         // them registered exactly once.
         typeof(TodoList).Assembly,
+        // AdhdTimeOrganizer.History — same reasoning again: ActivityHistorySeeder carries a lifetime
+        // marker. Note History registers no IActivityMembershipSource of its own; it only consumes them.
+        typeof(ActivityHistory).Assembly,
         typeof(Notification).Assembly,
         typeof(ReminderDefinition).Assembly,
         typeof(ScheduledJob).Assembly

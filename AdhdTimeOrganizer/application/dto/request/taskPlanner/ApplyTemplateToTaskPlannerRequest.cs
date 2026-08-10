@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.application.dto.@enum;
+using AdhdTimeOrganizer.Core.application.dto.@enum;
 
 namespace AdhdTimeOrganizer.application.dto.request.taskPlanner;
 

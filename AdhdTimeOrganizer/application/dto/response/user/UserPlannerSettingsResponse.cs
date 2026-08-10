@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.application.dto.@enum;
+using AdhdTimeOrganizer.Core.application.dto.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 namespace AdhdTimeOrganizer.application.dto.response.user;

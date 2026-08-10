@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.@enum;
+using AdhdTimeOrganizer.Core.application.dto.@enum;
 using Sydowwe.Framework.application.dto.dto;
 
 namespace AdhdTimeOrganizer.application.dto.request.activityTracking;

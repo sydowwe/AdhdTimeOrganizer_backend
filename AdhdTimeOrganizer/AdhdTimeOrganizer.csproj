@@ -94,5 +94,6 @@
         <ProjectReference Include="..\framework\Sydowwe.Scheduler.Xlsx\Sydowwe.Scheduler.Xlsx.csproj" />
         <ProjectReference Include="..\AdhdTimeOrganizer.Core\AdhdTimeOrganizer.Core.csproj" />
         <ProjectReference Include="..\AdhdTimeOrganizer.TodoLists\AdhdTimeOrganizer.TodoLists.csproj" />
+        <ProjectReference Include="..\AdhdTimeOrganizer.History\AdhdTimeOrganizer.History.csproj" />
     </ItemGroup>
 </Project>

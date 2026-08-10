@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using AdhdTimeOrganizer.application.dto.@enum;
+using AdhdTimeOrganizer.Core.application.dto.@enum;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using Sydowwe.Framework.application.dto.request.@interface;
 

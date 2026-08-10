@@ -1026,6 +1026,72 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.ToTable("user", "public");
                 });
 
+            modelBuilder.Entity("AdhdTimeOrganizer.History.domain.model.entity.activityHistory.ActivityHistory", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("activity_id");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime>("EndTimestamp")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("end_timestamp");
+
+                    b.Property<int>("Length")
+                        .HasColumnType("integer")
+                        .HasColumnName("length");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime>("StartTimestamp")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("start_timestamp");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_history");
+
+                    b.HasIndex("ActivityId")
+                        .HasDatabaseName("ix_activity_history_activity_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_history_user_id");
+
+                    b.HasIndex("UserId", "StartTimestamp")
+                        .HasDatabaseName("ix_activity_history_user_id_start_timestamp");
+
+                    b.HasIndex("UserId", "ActivityId", "StartTimestamp")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_history_user_id_activity_id_start_timestamp");
+
+                    b.ToTable("activity_history", "public");
+                });
+
             modelBuilder.Entity("AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList.TaskPriority", b =>
                 {
                     b.Property<long>("Id")
@@ -1429,72 +1495,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasDatabaseName("ix_calendar_user_id_date");
 
                     b.ToTable("calendar", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityHistory.ActivityHistory", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ActivityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("activity_id");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime>("EndTimestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("end_timestamp");
-
-                    b.Property<int>("Length")
-                        .HasColumnType("integer")
-                        .HasColumnName("length");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime>("StartTimestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("start_timestamp");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_history");
-
-                    b.HasIndex("ActivityId")
-                        .HasDatabaseName("ix_activity_history_activity_id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_activity_history_user_id");
-
-                    b.HasIndex("UserId", "StartTimestamp")
-                        .HasDatabaseName("ix_activity_history_user_id_start_timestamp");
-
-                    b.HasIndex("UserId", "ActivityId", "StartTimestamp")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_history_user_id_activity_id_start_timestamp");
-
-                    b.ToTable("activity_history", "public");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.PlannerTask", b =>
@@ -4596,6 +4596,27 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("AdhdTimeOrganizer.History.domain.model.entity.activityHistory.ActivityHistory", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_activity_history_activity_activity_id");
+
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_activity_history_user_user_id");
+
+                    b.Navigation("Activity");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList.TaskPriority", b =>
                 {
                     b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
@@ -4721,27 +4742,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_calendar_user_user_id");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityHistory.ActivityHistory", b =>
-                {
-                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
-                        .WithMany()
-                        .HasForeignKey("ActivityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_activity_history_activity_activity_id");
-
-                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_activity_history_user_user_id");
-
-                    b.Navigation("Activity");
 
                     b.Navigation("User");
                 });

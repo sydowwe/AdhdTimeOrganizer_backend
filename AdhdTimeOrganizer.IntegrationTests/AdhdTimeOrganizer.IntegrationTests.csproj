@@ -9,13 +9,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0"/>
-        <PackageReference Include="xunit.v3" Version="3.2.2"/>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+        <PackageReference Include="xunit.v3" Version="3.2.2" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="Moq" Version="4.20.72"/>
+        <PackageReference Include="Moq" Version="4.20.72" />
     </ItemGroup>
 
     <ItemGroup>
@@ -23,14 +23,13 @@
              (how the test schema is built) skips them. Copied next to the test binaries so the fixture
              can apply them in OnSchemaCreatedAsync — without them SuggestionPatternRefreshInterceptor
              throws 42P01 on any save that touches PlannerTask / ActivityHistory / Calendar. -->
-        <Content Include="..\AdhdTimeOrganizer\infrastructure\persistence\sqlScripts\*.sql"
-                 Link="sqlScripts\%(Filename)%(Extension)"
-                 CopyToOutputDirectory="PreserveNewest"/>
+        <Content Include="..\AdhdTimeOrganizer\infrastructure\persistence\sqlScripts\*.sql" Link="sqlScripts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\AdhdTimeOrganizer\AdhdTimeOrganizer.csproj"/>
-        <ProjectReference Include="..\framework\Sydowwe.Framework.Testing\Sydowwe.Framework.Testing.csproj"/>
+        <ProjectReference Include="..\AdhdTimeOrganizer\AdhdTimeOrganizer.csproj" />
+        <ProjectReference Include="..\framework\Sydowwe.Framework.Testing\Sydowwe.Framework.Testing.csproj" />
+        <ProjectReference Include="..\AdhdTimeOrganizer.History\AdhdTimeOrganizer.History.csproj" />
     </ItemGroup>
 
 </Project>

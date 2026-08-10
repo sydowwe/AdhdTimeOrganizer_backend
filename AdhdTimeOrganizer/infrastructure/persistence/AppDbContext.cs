@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup;
-using AdhdTimeOrganizer.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
@@ -15,6 +15,7 @@ using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.user;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.configuration.todoList;
+using AdhdTimeOrganizer.History.infrastructure.persistence.configuration.activityHistory;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -145,6 +146,10 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         // call per slice project, for the same reason. Drop it and those four tables vanish from the
         // model while the routine tables that FK into them remain, which fails at model-build time.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TodoListConfiguration).Assembly);
+        // AdhdTimeOrganizer.History (ActivityHistory). The three tracking configurations that still sit
+        // in the host's configuration/activityHistory/ folder — Desktop, WebExtension, AndroidSessionData
+        // — belong to Tracking, not History, and are covered by the host call below.
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ActivityHistoryConfiguration).Assembly);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlannerTaskConfiguration).Assembly);
     }
 

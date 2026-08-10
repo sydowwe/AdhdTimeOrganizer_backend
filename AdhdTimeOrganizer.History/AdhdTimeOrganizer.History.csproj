@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>14</LangVersion>
+        <RootNamespace>AdhdTimeOrganizer.History</RootNamespace>
+    </PropertyGroup>
+
+    <!-- Same shape as AdhdTimeOrganizer.Core / .TodoLists: a plain library (Microsoft.NET.Sdk) that
+         holds endpoints, so it needs the ASP.NET Core surface, and the Web SDK's implicit usings are
+         not in scope here and are re-declared below. -->
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Microsoft.AspNetCore.Builder"/>
+        <Using Include="Microsoft.AspNetCore.Http"/>
+        <Using Include="Microsoft.Extensions.Configuration"/>
+        <Using Include="Microsoft.Extensions.DependencyInjection"/>
+        <Using Include="Microsoft.Extensions.Hosting"/>
+        <Using Include="Microsoft.Extensions.Logging"/>
+    </ItemGroup>
+
+    <!-- Core only - no reference to the host, and deliberately none to TodoLists or Routines.
+         The history grid does filter on to-do / routine membership, but it reaches them through
+         Core's IActivityMembershipSource seam rather than by naming their entities, so no edge is
+         created in either direction. Do not "simplify" that back into a direct dbContext.Set<
+         TodoListItem>() query - reintroducing the reference is what the seam exists to prevent, and
+         it re-imposes an extraction order on three slices that are otherwise independent. -->
+    <ItemGroup>
+        <ProjectReference Include="..\AdhdTimeOrganizer.Core\AdhdTimeOrganizer.Core.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>
+    </ItemGroup>
+
+</Project>
