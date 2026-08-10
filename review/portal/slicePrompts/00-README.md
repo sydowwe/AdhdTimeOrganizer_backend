@@ -8,7 +8,7 @@ them out of order produces a slice→host reference, which does not compile.
 
 | # | Prompt | Depends on | Notes |
 |---|---|---|---|
-| 1 | `01-core.md` | — | Must be first. Also folds in Timers and bands the seeder `Order` values. |
+| ~~1~~ | ~~`01-core.md`~~ | — | ✅ **DONE.** `AdhdTimeOrganizer.Core` exists: 220 files, Timers folded in, seeder `Order` banded. |
 | 2 | `02-todolists.md` | Core | Zero outbound edges. The de-facto pilot. |
 | 3 | `03-routines.md` | TodoLists | Highest correctness payoff. |
 | 4 | `04-history.md` | TodoLists, Routines | Filters into both. |
@@ -16,10 +16,31 @@ them out of order produces a slice→host reference, which does not compile.
 | 6 | `06-reminders.md` | Planning | Smallest slice, but blocked until Planning lands. |
 | 7 | `07-tracking.md` | Planning, TodoLists, Routines | Has a **seam to build first** — read the prompt. |
 
-## Baseline as of 2026-08-10
+## Baseline
 
-`dotnet test` on `AdhdTimeOrganizer.IntegrationTests`: **198 passed, 6 skipped, 0 failed.**
-Any prompt that ends with a different number has broken something.
+`dotnet test` on `AdhdTimeOrganizer.IntegrationTests`: **216 passed, 6 skipped, 0 failed**
+(after the Core extraction). Any prompt that ends with a *lower* number has broken something.
+
+> The 198 recorded here originally was already stale when written — `ActivityProfileGridTests` (14)
+> and `PerUserDefaultMatcherTests` were added by commits `9f4bca7` / `b601637` / `064fada`, which
+> land after that count. The pre-Core figure was **214 passed, 6 skipped, 0 failed**; the Core
+> extraction added the 2 tests in `Endpoints/CoreRouteSmokeTests.cs` and changed no existing test
+> beyond `using` lines.
+
+## What the Core extraction changed for the remaining prompts
+
+- Slice code takes a plain **`DbContext`**, never `AppDbContext` — that alias already exists in
+  `ModuleServiceExtensions`. No `dbContext.SomeDbSet`; use `dbContext.Set<T>()`.
+- Namespaces carry the project name: moved types are `AdhdTimeOrganizer.<Slice>.*`.
+- A new slice project is a plain `Microsoft.NET.Sdk` library and therefore does **not** get the Web
+  SDK's implicit usings. Copy the `<FrameworkReference>` + `<Using>` block from
+  `AdhdTimeOrganizer.Core.csproj` or ~50 files fail on `ILogger<>` alone.
+- `AppDbContext.ApplyHostConfigurations` now holds one `ApplyConfigurationsFromAssembly` call per
+  project. Add yours; do not replace the existing ones.
+- Seeder `Order` values are banded per slice — see
+  `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md`. Stay in your band.
+- `CoreRouteSmokeTests` is the template for the two registration traps (routes 404-ing, seeders
+  double-registering); extend it per slice rather than writing a new pattern.
 
 ## Evidence
 
@@ -40,7 +61,7 @@ Carried over from the deleted playbook so they aren't lost. None of them block a
 - **Per-slice test projects.** `AdhdTimeOrganizer.IntegrationTests` stays in the parent because
   it pins *host composition*, which is a property of the host. So the eventual breakup is a
   **split**, not a move: per-slice test projects plus a thin host-composition project. Every
-  prompt in this folder assumes the single parent test project and a 198/6/0 baseline; revisit
+  prompt in this folder assumes the single parent test project and a 216/6/0 baseline; revisit
   once the slices exist.
 - **`application/eventHandler/`'s final home.** The five handlers cross slices by nature. The
   event *records* live in Core; the prompts keep the handlers host-side throughout. Either leave

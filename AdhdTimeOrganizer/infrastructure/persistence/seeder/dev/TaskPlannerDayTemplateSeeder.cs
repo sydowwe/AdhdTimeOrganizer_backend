@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
@@ -11,7 +11,7 @@ public class TaskPlannerDayTemplateSeeder(
     ILogger<TaskPlannerDayTemplateSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "TaskPlannerDayTemplate";
-    public int Order => 11;
+    public int Order => 400;
 
     public async Task TruncateTable()
     {

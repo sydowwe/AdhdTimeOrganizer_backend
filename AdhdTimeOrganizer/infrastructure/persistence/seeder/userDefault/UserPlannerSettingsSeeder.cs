@@ -10,7 +10,7 @@ public class UserPlannerSettingsSeeder(
     : BasePerUserDefaultSeeder<UserPlannerSettings>(dbContext, logger), IScopedService
 {
     public override string SeederName => "UserPlannerSettings";
-    public override int Order => 5;
+    public override int Order => 420;
     protected override string EntityLabel => "planner settings";
 
     protected override List<UserPlannerSettings> Defaults(long userId) =>

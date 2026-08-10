@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using AdhdTimeOrganizer.application.service.reminder;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.reminder;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

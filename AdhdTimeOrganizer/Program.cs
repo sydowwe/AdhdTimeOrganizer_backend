@@ -3,12 +3,15 @@ using System.Net;
 using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.application.endpoint.@base;
 using AdhdTimeOrganizer.config;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.config.swagger;
 using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
 using AdhdTimeOrganizer.infrastructure.persistence.retention;
+using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.settings;
 using DotNetEnv;
@@ -208,6 +211,9 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
         o.Assemblies =
         [
             typeof(Program).Assembly,
+            // AdhdTimeOrganizer.Core carries the 78 activity endpoints and the 10 timer ones. A slice
+            // missing from this list is not a build error — its routes simply never register and 404.
+            typeof(Activity).Assembly,
             typeof(Notification).Assembly,
             typeof(ReminderDefinition).Assembly,
             typeof(ScheduledJob).Assembly

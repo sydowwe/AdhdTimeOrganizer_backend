@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.taskPlanner;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using FastEndpoints;
 using FluentValidation;
 

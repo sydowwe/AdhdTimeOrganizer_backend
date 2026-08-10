@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity.reminder;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using Sydowwe.Framework.application.dto.response;
 using Sydowwe.Framework.application.dto.response.@base;
 

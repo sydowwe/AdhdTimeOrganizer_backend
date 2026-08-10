@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Sydowwe.Framework.domain.entity.user;
+using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.security;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user;

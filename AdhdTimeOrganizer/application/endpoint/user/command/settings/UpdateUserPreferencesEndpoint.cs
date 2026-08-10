@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.user;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Microsoft.AspNetCore.Identity;
 using Sydowwe.Framework.application.endpoint.user.command.settings;
 

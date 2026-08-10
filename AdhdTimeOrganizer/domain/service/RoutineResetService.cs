@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 
 namespace AdhdTimeOrganizer.domain.service;
 

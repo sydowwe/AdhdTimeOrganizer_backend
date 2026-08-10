@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.domain.model.entity.@base;
-using AdhdTimeOrganizer.domain.model.entityInterface;
+using AdhdTimeOrganizer.Core.domain.model.entity.@base;
+using AdhdTimeOrganizer.Core.domain.model.entityInterface;
 using Sydowwe.Framework.domain.valueObject;
 
 namespace AdhdTimeOrganizer.domain.model.entity.todoList;

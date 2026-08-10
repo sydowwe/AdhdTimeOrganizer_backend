@@ -19,7 +19,7 @@ That makes it the de-facto pilot: if the extraction pattern is wrong, you find o
 - Slice services take a plain **`DbContext`**, never `AppDbContext`. The `DbContext` →
   `AppDbContext` alias is already registered in DI.
 - Confirm the baseline first: `dotnet test AdhdTimeOrganizer.IntegrationTests` =
-  **198 passed, 6 skipped, 0 failed**. Match it at the end.
+  **216 passed, 6 skipped, 0 failed**. Match it at the end.
 
 ## Registering with the host — four places, none break the build
 
@@ -101,7 +101,7 @@ state the app can produce.
 ## Done when
 
 - `dotnet build AdhdTimeOrganizer.sln` clean
-- `dotnet test` = **198 passed, 6 skipped, 0 failed**
+- `dotnet test` = **216 passed, 6 skipped, 0 failed**
 - `dotnet ef migrations add TodoListsSlice` produces an **empty** `Up`/`Down`
 - one to-do endpoint manually smoke-tested (a missing FastEndpoints registration is a 404, not
   a build error)

@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;

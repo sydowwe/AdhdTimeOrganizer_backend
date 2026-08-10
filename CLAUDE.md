@@ -20,7 +20,17 @@ tables it was copied with have been deleted.
 
 # Solution Layout
 
-- `AdhdTimeOrganizer` — the portal (entities, endpoints, `AppDbContext`, migrations).
+- `AdhdTimeOrganizer` — the portal (the remaining feature areas, endpoints, `AppDbContext`,
+  migrations, DI wiring, `Program.cs`).
+- `AdhdTimeOrganizer.Core` — **the first vertical slice project.** `User` and `Activity` plus
+  everything hanging directly off them (roles, categories, the four activity lookups, the three
+  activity profiles, memory anchors, timer presets), the base shims and the `IsManyWithOne*`
+  configuration helpers, the shared enums, the extendable/generic DTO bases, the cross-slice event
+  records, and the 78 activity + 10 timer endpoints. **It references only `Sydowwe.Framework` and
+  `Sydowwe.Framework.Contracts` — never the host**, which is why everything in it takes a plain
+  `DbContext` rather than `AppDbContext`. Read `AdhdTimeOrganizer.Core/docs/summary.md` before
+  working in it, and `.../seeder/SeederOrderBands.md` before adding a seeder **anywhere** in the
+  solution. Six more slices follow it; the plan is `review/portal/slicePrompts/00-README.md`.
 - `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding seven projects:
   - `framework/Sydowwe.Framework` — the shared framework, used by **the portal and the modules
     alike**. Base entities, base endpoints, builder extensions, DbContext helpers, seeders, auth

@@ -15,7 +15,7 @@ public class TodoListItemSeeder(
     ILogger<TodoListItemSeeder> logger) : IScopedService, IPerUserDevSeeder
 {
     public string SeederName => "TodoListItem";
-    public int Order => 10;
+    public int Order => 100;
 
     public async Task TruncateTable()
     {

@@ -11,7 +11,7 @@ public class TemplatePlannerTaskSeeder(
     ILogger<TemplatePlannerTaskSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "TemplatePlannerTask";
-    public int Order => 12;
+    public int Order => 410;
 
     public async Task TruncateTable()
     {

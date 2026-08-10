@@ -11,7 +11,7 @@ public class WebExtensionDataSeeder(
     ILogger<WebExtensionDataSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
     public string SeederName => "WebExtensionData";
-    public int Order => 12;
+    public int Order => 600;
 
     public async Task TruncateTable()
     {

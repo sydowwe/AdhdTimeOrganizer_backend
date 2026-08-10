@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;

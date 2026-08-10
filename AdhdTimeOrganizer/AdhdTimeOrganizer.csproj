@@ -8,22 +8,22 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="DotNetEnv" Version="3.1.1"/>
-        <PackageReference Include="EFCore.NamingConventions" Version="10.0.1"/>
-        <PackageReference Include="FastEndpoints" Version="8.1.0"/>
-        <PackageReference Include="FastEndpoints.Swagger" Version="8.1.0"/>
-        <PackageReference Include="Google.Apis.Auth" Version="1.73.0"/>
-        <PackageReference Include="Google.Apis.Calendar.v3" Version="1.73.0.4073"/>
-        <PackageReference Include="Humanizer.Core" Version="3.0.10"/>
-        <PackageReference Include="Humanizer.Core.sk" Version="3.0.10"/>
-        <PackageReference Include="Humanizer.Core.uk" Version="3.0.10"/>
-        <PackageReference Include="MailKit" Version="4.17.0"/>
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8"/>
-        <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.8"/>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8"/>
+        <PackageReference Include="DotNetEnv" Version="3.1.1" />
+        <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
+        <PackageReference Include="FastEndpoints" Version="8.1.0" />
+        <PackageReference Include="FastEndpoints.Swagger" Version="8.1.0" />
+        <PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
+        <PackageReference Include="Google.Apis.Calendar.v3" Version="1.73.0.4073" />
+        <PackageReference Include="Humanizer.Core" Version="3.0.10" />
+        <PackageReference Include="Humanizer.Core.sk" Version="3.0.10" />
+        <PackageReference Include="Humanizer.Core.uk" Version="3.0.10" />
+        <PackageReference Include="MailKit" Version="4.17.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8" />
+        <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.8" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
         <!-- Pinned above the 2.0.0 that Microsoft.AspNetCore.OpenApi drags in (GHSA-v5pm-xwqc-g5wc). -->
-        <PackageReference Include="Microsoft.OpenApi" Version="2.11.0"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8"/>
+        <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -32,41 +32,41 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="MimeKit" Version="4.17.0"/>
-        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2"/>
-        <PackageReference Include="QRCoder" Version="1.8.0"/>
-        <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.1"/>
-        <PackageReference Include="Scrutor" Version="7.0.0"/>
-        <PackageReference Include="Serilog" Version="4.3.1"/>
-        <PackageReference Include="Serilog.AspNetCore" Version="10.0.0"/>
-        <PackageReference Include="Serilog.Enrichers.CorrelationId" Version="3.0.1"/>
-        <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0"/>
-        <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0"/>
-        <PackageReference Include="Serilog.Sinks.Postgresql.Alternative" Version="4.2.0"/>
-        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0"/>
+        <PackageReference Include="MimeKit" Version="4.17.0" />
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+        <PackageReference Include="QRCoder" Version="1.8.0" />
+        <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.1" />
+        <PackageReference Include="Scrutor" Version="7.0.0" />
+        <PackageReference Include="Serilog" Version="4.3.1" />
+        <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+        <PackageReference Include="Serilog.Enrichers.CorrelationId" Version="3.0.1" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+        <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
+        <PackageReference Include="Serilog.Sinks.Postgresql.Alternative" Version="4.2.0" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
     </ItemGroup>
 
 
     <ItemGroup>
         <!-- Harvested composition-root wiring from MojaDigitalnaFirma.Core; see reference/mojaCore/README.md.
              Reference material only - it targets CoreUser and absent Moja modules, so it must not compile. -->
-        <Compile Remove="reference\**"/>
-        <None Include="reference\**"/>
+        <Compile Remove="reference\**" />
+        <None Include="reference\**" />
     </ItemGroup>
 
     <ItemGroup>
         <Folder Include="application\dto\request\base\" />
-        <Folder Include="application\endpoint\activityHistory\activityHistory\command\"/>
-        <Folder Include="application\endpoint\activityHistory\activityHistory\query\dashboard\"/>
-        <Folder Include="application\endpoint\activityTracking\desktop\"/>
-        <Folder Include="application\endpoint\activity\activity\query\"/>
-        <Folder Include="application\endpoint\activity\role\command\"/>
-        <Folder Include="application\preprocessor\"/>
-        <Folder Include="domain\"/>
+        <Folder Include="application\endpoint\activityHistory\activityHistory\command\" />
+        <Folder Include="application\endpoint\activityHistory\activityHistory\query\dashboard\" />
+        <Folder Include="application\endpoint\activityTracking\desktop\" />
+        <Folder Include="application\endpoint\activity\activity\query\" />
+        <Folder Include="application\endpoint\activity\role\command\" />
+        <Folder Include="application\preprocessor\" />
+        <Folder Include="domain\" />
         <Folder Include="domain\extension\" />
         <Folder Include="domain\model\dto\" />
         <Folder Include="infrastructure\persistence\converter\" />
-        <Folder Include="logs\"/>
+        <Folder Include="logs\" />
     </ItemGroup>
 
 
@@ -79,18 +79,19 @@
          reads them from the manifest. The integration tests apply the same files from disk via a
          Content link in their own csproj. -->
     <ItemGroup>
-        <EmbeddedResource Include="infrastructure\persistence\sqlScripts\*.sql"/>
+        <EmbeddedResource Include="infrastructure\persistence\sqlScripts\*.sql" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
-        <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>
-        <ProjectReference Include="..\framework\Sydowwe.Notifications\Sydowwe.Notifications.csproj"/>
-        <ProjectReference Include="..\framework\Sydowwe.Reminders\Sydowwe.Reminders.csproj"/>
-        <ProjectReference Include="..\framework\Sydowwe.Scheduler\Sydowwe.Scheduler.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj" />
+        <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj" />
+        <ProjectReference Include="..\framework\Sydowwe.Notifications\Sydowwe.Notifications.csproj" />
+        <ProjectReference Include="..\framework\Sydowwe.Reminders\Sydowwe.Reminders.csproj" />
+        <ProjectReference Include="..\framework\Sydowwe.Scheduler\Sydowwe.Scheduler.csproj" />
         <!-- Opt-in XLSX export for the scheduler dashboard. Brings the licensed Syncfusion dependency,
              which Sydowwe.Scheduler itself deliberately does not carry. Drop this reference (and the
              AddSchedulerXlsxExport() call) to fall back to the dependency-free CSV export. -->
-        <ProjectReference Include="..\framework\Sydowwe.Scheduler.Xlsx\Sydowwe.Scheduler.Xlsx.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Scheduler.Xlsx\Sydowwe.Scheduler.Xlsx.csproj" />
+        <ProjectReference Include="..\AdhdTimeOrganizer.Core\AdhdTimeOrganizer.Core.csproj" />
     </ItemGroup>
 </Project>

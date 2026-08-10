@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.application.endpoint.@base.read;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +14,7 @@ public class FormSelectOptionsActivityHistoryEndpoint(AppDbContext appDbContext)
 
     protected override IQueryable<Activity> GetBaseQuery(long userId)
     {
-        return AppDbContext.Set<ActivityHistory>()
+        return DbContext.Set<ActivityHistory>()
             .AsNoTracking()
             .FilteredByUser(userId)
             .Select(ah => ah.Activity)

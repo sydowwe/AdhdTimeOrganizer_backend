@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using Sydowwe.Framework.application.dto.request.@interface;
 using Sydowwe.Framework.domain.@enum;
 

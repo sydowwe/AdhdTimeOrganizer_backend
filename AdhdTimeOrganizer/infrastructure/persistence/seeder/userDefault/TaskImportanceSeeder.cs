@@ -11,7 +11,7 @@ public class TaskImportanceSeeder(
     : BasePerUserDefaultSeeder<TaskImportance>(dbContext, logger), IScopedService
 {
     public override string SeederName => "TaskImportance";
-    public override int Order => 2;
+    public override int Order => 400;
     protected override string EntityLabel => "task importances";
 
     protected override List<TaskImportance> Defaults(long userId) =>

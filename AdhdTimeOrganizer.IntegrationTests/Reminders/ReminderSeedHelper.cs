@@ -1,9 +1,9 @@
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.reminder;
-using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Testing;

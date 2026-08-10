@@ -1,8 +1,9 @@
 using AdhdTimeOrganizer.application.dto.request.taskPlanner;
-using AdhdTimeOrganizer.application.@event;
+using AdhdTimeOrganizer.Core.application.@event;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

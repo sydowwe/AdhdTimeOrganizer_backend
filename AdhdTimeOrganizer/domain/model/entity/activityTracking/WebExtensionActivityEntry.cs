@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Sydowwe.Framework.domain.audit;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activityTracking;

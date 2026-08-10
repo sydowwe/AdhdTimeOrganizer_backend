@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 

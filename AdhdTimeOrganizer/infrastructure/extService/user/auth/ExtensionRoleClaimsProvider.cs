@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;

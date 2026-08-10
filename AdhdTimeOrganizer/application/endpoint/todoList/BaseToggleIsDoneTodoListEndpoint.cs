@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.generic;
+using AdhdTimeOrganizer.Core.application.dto.request.generic;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

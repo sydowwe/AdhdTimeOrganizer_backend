@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.activity;
+using AdhdTimeOrganizer.Core.application.dto.request.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using Sydowwe.Framework.application.dto.request.@interface;
 using Sydowwe.Framework.domain.valueObject;

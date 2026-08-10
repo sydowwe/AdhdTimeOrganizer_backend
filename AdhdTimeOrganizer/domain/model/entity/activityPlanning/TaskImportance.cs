@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Sydowwe.Framework.domain.entityInterface;
 
 namespace AdhdTimeOrganizer.domain.model.entity.activityPlanning;

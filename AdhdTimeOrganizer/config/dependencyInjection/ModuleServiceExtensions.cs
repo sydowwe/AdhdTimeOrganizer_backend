@@ -1,5 +1,6 @@
 using System.Reflection;
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Contracts.notification;
@@ -43,6 +44,12 @@ public static class ModuleServiceExtensions
     /// </summary>
     internal static readonly Assembly[] ModuleAssemblies =
     [
+        // AdhdTimeOrganizer.Core — the first vertical-slice project. It is not a "module" in the
+        // Notifications/Reminders/Scheduler sense, but it is scanned the same way and for the same
+        // reason: its seeders and services carry the framework lifetime markers, so it must be scanned
+        // exactly once. Listing it here (and therefore excluding it from the AppDomain sweep) is what
+        // guarantees that — every per-user default seeder in it would otherwise run twice.
+        typeof(Activity).Assembly,
         typeof(Notification).Assembly,
         typeof(ReminderDefinition).Assembly,
         typeof(ScheduledJob).Assembly

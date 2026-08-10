@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard.pieChart;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

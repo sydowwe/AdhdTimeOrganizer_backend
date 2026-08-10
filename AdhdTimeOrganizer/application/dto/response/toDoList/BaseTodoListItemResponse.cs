@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.response.extendable;
+using AdhdTimeOrganizer.Core.application.dto.response.extendable;
 
 namespace AdhdTimeOrganizer.application.dto.response.todoList;
 

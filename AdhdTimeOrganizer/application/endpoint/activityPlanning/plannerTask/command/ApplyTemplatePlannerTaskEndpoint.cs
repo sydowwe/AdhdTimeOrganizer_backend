@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.application.helper;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;

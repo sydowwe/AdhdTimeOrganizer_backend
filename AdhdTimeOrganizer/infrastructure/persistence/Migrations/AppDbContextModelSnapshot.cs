@@ -23,6 +23,1009 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("CategoryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("category_id");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("IsUnavoidable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_unavoidable");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(true)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_id");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(1000)
+                        .IsUnicode(true)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity");
+
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("ix_activity_category_id");
+
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_activity_role_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_user_id");
+
+                    b.HasIndex("UserId", "CategoryId")
+                        .HasDatabaseName("ix_activity_user_id_category_id");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_user_id_name");
+
+                    b.HasIndex("UserId", "RoleId")
+                        .HasDatabaseName("ix_activity_user_id_role_id");
+
+                    b.ToTable("activity", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityCategory", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("icon");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(true)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(1000)
+                        .IsUnicode(true)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_category");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_category_user_id");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_category_user_id_name");
+
+                    b.ToTable("activity_category", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityRole", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("icon");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(true)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(1000)
+                        .IsUnicode(true)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_role");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_role_user_id");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_role_user_id_name");
+
+                    b.ToTable("activity_role", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityExpectedCostTier", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("text");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_expected_cost_tier");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_expected_cost_tier_user_id");
+
+                    b.HasIndex("UserId", "Text")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_expected_cost_tier_user_id_text");
+
+                    b.ToTable("activity_expected_cost_tier", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityExperienceType", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("text");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_experience_type");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_experience_type_user_id");
+
+                    b.HasIndex("UserId", "Text")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_experience_type_user_id_text");
+
+                    b.ToTable("activity_experience_type", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityLocationType", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("text");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_location_type");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_location_type_user_id");
+
+                    b.HasIndex("UserId", "Text")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_location_type_user_id_text");
+
+                    b.ToTable("activity_location_type", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityWeatherDependency", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("text");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_weather_dependency");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_activity_weather_dependency_user_id");
+
+                    b.HasIndex("UserId", "Text")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_weather_dependency_user_id_text");
+
+                    b.ToTable("activity_weather_dependency", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.memoryAnchor.MemoryAnchor", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("activity_id");
+
+                    b.Property<int>("AnchorMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("anchor_month");
+
+                    b.Property<int>("AnchorYear")
+                        .HasColumnType("integer")
+                        .HasColumnName("anchor_year");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("HighlightNote")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("highlight_note");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_memory_anchor");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_memory_anchor_user_id");
+
+                    b.HasIndex("ActivityId", "AnchorYear", "AnchorMonth")
+                        .HasDatabaseName("ix_memory_anchor_activity_id_anchor_year_anchor_month");
+
+                    b.ToTable("memory_anchor", "public", t =>
+                        {
+                            t.HasCheckConstraint("ck_memory_anchor_month", "anchor_month BETWEEN 1 AND 12");
+
+                            t.HasCheckConstraint("ck_memory_anchor_rating", "rating BETWEEN 1 AND 10");
+                        });
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.profile.ActivityBacklogProfile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("activity_id");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_minutes");
+
+                    b.Property<string>("EffortType")
+                        .HasColumnType("text")
+                        .HasColumnName("effort_type");
+
+                    b.Property<string>("EnergyLevel")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("energy_level");
+
+                    b.Property<long>("ExpectedCostTierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_cost_tier_id");
+
+                    b.Property<bool>("IsRepeatable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_repeatable");
+
+                    b.Property<long>("LocationTypeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("location_type_id");
+
+                    b.Property<int?>("MaxParticipants")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_participants");
+
+                    b.Property<int>("MinParticipants")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_participants");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("WeatherDependencyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("weather_dependency_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_backlog_profile");
+
+                    b.HasIndex("ActivityId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_backlog_profile_activity_id");
+
+                    b.HasIndex("ExpectedCostTierId")
+                        .HasDatabaseName("ix_activity_backlog_profile_expected_cost_tier_id");
+
+                    b.HasIndex("LocationTypeId")
+                        .HasDatabaseName("ix_activity_backlog_profile_location_type_id");
+
+                    b.HasIndex("WeatherDependencyId")
+                        .HasDatabaseName("ix_activity_backlog_profile_weather_dependency_id");
+
+                    b.ToTable("activity_backlog_profile", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.profile.ActivityBucketListProfile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("activity_id");
+
+                    b.Property<int>("ComfortZoneStep")
+                        .HasColumnType("integer")
+                        .HasColumnName("comfort_zone_step");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("ExperienceTypeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("experience_type_id");
+
+                    b.Property<decimal?>("FinancialGoal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("financial_goal");
+
+                    b.Property<string>("InspirationSource")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("inspiration_source");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("RequiresTravel")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_travel");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_bucket_list_profile");
+
+                    b.HasIndex("ActivityId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_bucket_list_profile_activity_id");
+
+                    b.HasIndex("ExperienceTypeId")
+                        .HasDatabaseName("ix_activity_bucket_list_profile_experience_type_id");
+
+                    b.ToTable("activity_bucket_list_profile", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.profile.ActivityProjectProfile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("activity_id");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("DifficultyLevel")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("difficulty_level");
+
+                    b.Property<decimal>("EstimatedHours")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)")
+                        .HasColumnName("estimated_hours");
+
+                    b.Property<bool>("IsMessy")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_messy");
+
+                    b.PrimitiveCollection<string>("MaterialsNeeded")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("materials_needed");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ProjectArea")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("project_area");
+
+                    b.Property<string>("ReadinessStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("readiness_status");
+
+                    b.PrimitiveCollection<string>("RequiredTools")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("required_tools");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_project_profile");
+
+                    b.HasIndex("ActivityId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_activity_project_profile_activity_id");
+
+                    b.ToTable("activity_project_profile", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.timer.PomodoroTimerPreset", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long?>("FocusActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("focus_activity_id");
+
+                    b.Property<int>("FocusDuration")
+                        .HasColumnType("integer")
+                        .HasColumnName("focus_duration");
+
+                    b.Property<int>("FocusPeriodInCycleCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("focus_period_in_cycle_count");
+
+                    b.Property<int>("LongBreakDuration")
+                        .HasColumnType("integer")
+                        .HasColumnName("long_break_duration");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("NumberOfCycles")
+                        .HasColumnType("integer")
+                        .HasColumnName("number_of_cycles");
+
+                    b.Property<long?>("RestActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rest_activity_id");
+
+                    b.Property<int>("ShortBreakDuration")
+                        .HasColumnType("integer")
+                        .HasColumnName("short_break_duration");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pomodoro_timer_preset");
+
+                    b.HasIndex("FocusActivityId")
+                        .HasDatabaseName("ix_pomodoro_timer_preset_focus_activity_id");
+
+                    b.HasIndex("RestActivityId")
+                        .HasDatabaseName("ix_pomodoro_timer_preset_rest_activity_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_pomodoro_timer_preset_user_id");
+
+                    b.ToTable("pomodoro_timer_preset", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.timer.TimerPreset", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("activity_id");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Duration")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_timer_preset");
+
+                    b.HasIndex("ActivityId")
+                        .HasDatabaseName("ix_timer_preset_activity_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_timer_preset_user_id");
+
+                    b.ToTable("timer_preset", "public");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.user.User", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_failed_count");
+
+                    b.Property<bool>("AskBeforeDelete")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("ask_before_delete");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("text")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_confirmed");
+
+                    b.Property<int>("FirstDayOfWeek")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("first_day_of_week");
+
+                    b.Property<string>("GoogleCalendarRefreshToken")
+                        .HasColumnType("text")
+                        .HasColumnName("google_calendar_refresh_token");
+
+                    b.Property<string>("GoogleOAuthUserId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("google_o_auth_user_id");
+
+                    b.Property<bool>("HasExtensionAccess")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_extension_access");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Locale")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("locale");
+
+                    b.Property<bool>("LockoutEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("lockout_enabled");
+
+                    b.Property<DateTimeOffset?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lockout_end");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("NormalizedEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_email");
+
+                    b.Property<string>("NormalizedUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_user_name");
+
+                    b.Property<string>("PasswordHash")
+                        .HasColumnType("text")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("SecurityStamp")
+                        .HasColumnType("text")
+                        .HasColumnName("security_stamp");
+
+                    b.Property<string>("Theme")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("theme");
+
+                    b.Property<string>("Timezone")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("timezone");
+
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("two_factor_enabled");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("user_name");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user");
+
+                    b.HasIndex("NormalizedEmail")
+                        .HasDatabaseName("EmailIndex");
+
+                    b.HasIndex("NormalizedUserName")
+                        .IsUnique()
+                        .HasDatabaseName("UserNameIndex");
+
+                    b.ToTable("user", "public");
+                });
+
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.Calendar", b =>
                 {
                     b.Property<long>("Id")
@@ -118,739 +1121,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasDatabaseName("ix_calendar_user_id_date");
 
                     b.ToTable("calendar", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.Activity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<long?>("CategoryId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("category_id");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<bool>("IsUnavoidable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_unavoidable");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .IsUnicode(true)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<long>("RoleId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("role_id");
-
-                    b.Property<string>("Text")
-                        .HasMaxLength(1000)
-                        .IsUnicode(true)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("text");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity");
-
-                    b.HasIndex("CategoryId")
-                        .HasDatabaseName("ix_activity_category_id");
-
-                    b.HasIndex("RoleId")
-                        .HasDatabaseName("ix_activity_role_id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_activity_user_id");
-
-                    b.HasIndex("UserId", "CategoryId")
-                        .HasDatabaseName("ix_activity_user_id_category_id");
-
-                    b.HasIndex("UserId", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_user_id_name");
-
-                    b.HasIndex("UserId", "RoleId")
-                        .HasDatabaseName("ix_activity_user_id_role_id");
-
-                    b.ToTable("activity", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.ActivityCategory", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Color")
-                        .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
-                        .HasColumnName("color");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Icon")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("icon");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .IsUnicode(true)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Text")
-                        .HasMaxLength(1000)
-                        .IsUnicode(true)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("text");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_category");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_activity_category_user_id");
-
-                    b.HasIndex("UserId", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_category_user_id_name");
-
-                    b.ToTable("activity_category", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.ActivityRole", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Color")
-                        .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
-                        .HasColumnName("color");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Icon")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("icon");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .IsUnicode(true)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Text")
-                        .HasMaxLength(1000)
-                        .IsUnicode(true)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("text");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_role");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_activity_role_user_id");
-
-                    b.HasIndex("UserId", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_role_user_id_name");
-
-                    b.ToTable("activity_role", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityExpectedCostTier", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("text");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_expected_cost_tier");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_activity_expected_cost_tier_user_id");
-
-                    b.HasIndex("UserId", "Text")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_expected_cost_tier_user_id_text");
-
-                    b.ToTable("activity_expected_cost_tier", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityExperienceType", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("text");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_experience_type");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_activity_experience_type_user_id");
-
-                    b.HasIndex("UserId", "Text")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_experience_type_user_id_text");
-
-                    b.ToTable("activity_experience_type", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityLocationType", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("text");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_location_type");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_activity_location_type_user_id");
-
-                    b.HasIndex("UserId", "Text")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_location_type_user_id_text");
-
-                    b.ToTable("activity_location_type", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityWeatherDependency", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("text");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_weather_dependency");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_activity_weather_dependency_user_id");
-
-                    b.HasIndex("UserId", "Text")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_weather_dependency_user_id_text");
-
-                    b.ToTable("activity_weather_dependency", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor.MemoryAnchor", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ActivityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("activity_id");
-
-                    b.Property<int>("AnchorMonth")
-                        .HasColumnType("integer")
-                        .HasColumnName("anchor_month");
-
-                    b.Property<int>("AnchorYear")
-                        .HasColumnType("integer")
-                        .HasColumnName("anchor_year");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("HighlightNote")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("highlight_note");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("integer")
-                        .HasColumnName("rating");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_memory_anchor");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_memory_anchor_user_id");
-
-                    b.HasIndex("ActivityId", "AnchorYear", "AnchorMonth")
-                        .HasDatabaseName("ix_memory_anchor_activity_id_anchor_year_anchor_month");
-
-                    b.ToTable("memory_anchor", "public", t =>
-                        {
-                            t.HasCheckConstraint("ck_memory_anchor_month", "anchor_month BETWEEN 1 AND 12");
-
-                            t.HasCheckConstraint("ck_memory_anchor_rating", "rating BETWEEN 1 AND 10");
-                        });
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.profile.ActivityBacklogProfile", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ActivityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("activity_id");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<int>("DurationMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("duration_minutes");
-
-                    b.Property<string>("EffortType")
-                        .HasColumnType("text")
-                        .HasColumnName("effort_type");
-
-                    b.Property<string>("EnergyLevel")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("energy_level");
-
-                    b.Property<long>("ExpectedCostTierId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("expected_cost_tier_id");
-
-                    b.Property<bool>("IsRepeatable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_repeatable");
-
-                    b.Property<long>("LocationTypeId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("location_type_id");
-
-                    b.Property<int?>("MaxParticipants")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_participants");
-
-                    b.Property<int>("MinParticipants")
-                        .HasColumnType("integer")
-                        .HasColumnName("min_participants");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<long>("WeatherDependencyId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("weather_dependency_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_backlog_profile");
-
-                    b.HasIndex("ActivityId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_backlog_profile_activity_id");
-
-                    b.HasIndex("ExpectedCostTierId")
-                        .HasDatabaseName("ix_activity_backlog_profile_expected_cost_tier_id");
-
-                    b.HasIndex("LocationTypeId")
-                        .HasDatabaseName("ix_activity_backlog_profile_location_type_id");
-
-                    b.HasIndex("WeatherDependencyId")
-                        .HasDatabaseName("ix_activity_backlog_profile_weather_dependency_id");
-
-                    b.ToTable("activity_backlog_profile", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.profile.ActivityBucketListProfile", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ActivityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("activity_id");
-
-                    b.Property<int>("ComfortZoneStep")
-                        .HasColumnType("integer")
-                        .HasColumnName("comfort_zone_step");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<long>("ExperienceTypeId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("experience_type_id");
-
-                    b.Property<decimal?>("FinancialGoal")
-                        .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("financial_goal");
-
-                    b.Property<string>("InspirationSource")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("inspiration_source");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<bool>("RequiresTravel")
-                        .HasColumnType("boolean")
-                        .HasColumnName("requires_travel");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_bucket_list_profile");
-
-                    b.HasIndex("ActivityId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_bucket_list_profile_activity_id");
-
-                    b.HasIndex("ExperienceTypeId")
-                        .HasDatabaseName("ix_activity_bucket_list_profile_experience_type_id");
-
-                    b.ToTable("activity_bucket_list_profile", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.profile.ActivityProjectProfile", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ActivityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("activity_id");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("DifficultyLevel")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("difficulty_level");
-
-                    b.Property<decimal>("EstimatedHours")
-                        .HasPrecision(6, 2)
-                        .HasColumnType("numeric(6,2)")
-                        .HasColumnName("estimated_hours");
-
-                    b.Property<bool>("IsMessy")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_messy");
-
-                    b.PrimitiveCollection<string>("MaterialsNeeded")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("materials_needed");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("ProjectArea")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("project_area");
-
-                    b.Property<string>("ReadinessStatus")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("readiness_status");
-
-                    b.PrimitiveCollection<string>("RequiredTools")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("required_tools");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_activity_project_profile");
-
-                    b.HasIndex("ActivityId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_activity_project_profile_activity_id");
-
-                    b.ToTable("activity_project_profile", "public");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityHistory.ActivityHistory", b =>
@@ -2175,142 +2445,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("TemplateId")
                         .HasDatabaseName("ix_template_suggestion_patterns_template_id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_template_suggestion_patterns_user_id");
 
                     b.ToTable((string)null);
 
                     b.ToView("mv_template_suggestion_pattern", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.timer.PomodoroTimerPreset", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("FocusActivityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("focus_activity_id");
-
-                    b.Property<int>("FocusDuration")
-                        .HasColumnType("integer")
-                        .HasColumnName("focus_duration");
-
-                    b.Property<int>("FocusPeriodInCycleCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("focus_period_in_cycle_count");
-
-                    b.Property<int>("LongBreakDuration")
-                        .HasColumnType("integer")
-                        .HasColumnName("long_break_duration");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("name");
-
-                    b.Property<int>("NumberOfCycles")
-                        .HasColumnType("integer")
-                        .HasColumnName("number_of_cycles");
-
-                    b.Property<long?>("RestActivityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("rest_activity_id");
-
-                    b.Property<int>("ShortBreakDuration")
-                        .HasColumnType("integer")
-                        .HasColumnName("short_break_duration");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pomodoro_timer_preset");
-
-                    b.HasIndex("FocusActivityId")
-                        .HasDatabaseName("ix_pomodoro_timer_preset_focus_activity_id");
-
-                    b.HasIndex("RestActivityId")
-                        .HasDatabaseName("ix_pomodoro_timer_preset_rest_activity_id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_pomodoro_timer_preset_user_id");
-
-                    b.ToTable("pomodoro_timer_preset", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.timer.TimerPreset", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<long?>("ActivityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("activity_id");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<int>("Duration")
-                        .HasColumnType("integer")
-                        .HasColumnName("duration");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_timer_preset");
-
-                    b.HasIndex("ActivityId")
-                        .HasDatabaseName("ix_timer_preset_activity_id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_timer_preset_user_id");
-
-                    b.ToTable("timer_preset", "public");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.todoList.RoutinePeriodCompletion", b =>
@@ -2915,145 +3055,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                             t.HasCheckConstraint("CK_TodoListItem_TotalCount_Range", "total_count IS NULL OR total_count >= 2 AND total_count <= 99");
                         });
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.user.User", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("AccessFailedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("access_failed_count");
-
-                    b.Property<bool>("AskBeforeDelete")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("ask_before_delete");
-
-                    b.Property<string>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("text")
-                        .HasColumnName("concurrency_stamp");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("email");
-
-                    b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean")
-                        .HasColumnName("email_confirmed");
-
-                    b.Property<int>("FirstDayOfWeek")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("first_day_of_week");
-
-                    b.Property<string>("GoogleCalendarRefreshToken")
-                        .HasColumnType("text")
-                        .HasColumnName("google_calendar_refresh_token");
-
-                    b.Property<string>("GoogleOAuthUserId")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("google_o_auth_user_id");
-
-                    b.Property<bool>("HasExtensionAccess")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_extension_access");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Locale")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("locale");
-
-                    b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("lockout_enabled");
-
-                    b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("lockout_end");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("NormalizedEmail")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("normalized_email");
-
-                    b.Property<string>("NormalizedUserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("normalized_user_name");
-
-                    b.Property<string>("PasswordHash")
-                        .HasColumnType("text")
-                        .HasColumnName("password_hash");
-
-                    b.Property<string>("SecurityStamp")
-                        .HasColumnType("text")
-                        .HasColumnName("security_stamp");
-
-                    b.Property<string>("Theme")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("theme");
-
-                    b.Property<string>("Timezone")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("timezone");
-
-                    b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("two_factor_enabled");
-
-                    b.Property<string>("UserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("user_name");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_user");
-
-                    b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("EmailIndex");
-
-                    b.HasIndex("NormalizedUserName")
-                        .IsUnique()
-                        .HasDatabaseName("UserNameIndex");
-
-                    b.ToTable("user", "public");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<long>", b =>
@@ -4353,34 +4354,22 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.ToTable("scheduled_job_run", "public");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.Calendar", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_calendar_user_user_id");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.Activity", b =>
-                {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.ActivityCategory", "Category")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityCategory", "Category")
                         .WithMany("Activities")
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_activity_activity_categories_category_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.ActivityRole", "Role")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityRole", "Role")
                         .WithMany("Activities")
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_activity_activity_roles_role_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany("ActivityList")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4394,9 +4383,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.ActivityCategory", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityCategory", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany("CategoryList")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4406,9 +4395,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.ActivityRole", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityRole", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany("RoleList")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4418,9 +4407,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityExpectedCostTier", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityExpectedCostTier", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4430,9 +4419,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityExperienceType", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityExperienceType", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4442,9 +4431,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityLocationType", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityLocationType", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4454,9 +4443,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityWeatherDependency", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityWeatherDependency", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4466,16 +4455,16 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor.MemoryAnchor", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.memoryAnchor.MemoryAnchor", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithMany("MemoryAnchors")
                         .HasForeignKey("ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_memory_anchor_activities_activity_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany("MemoryAnchors")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4487,30 +4476,30 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.profile.ActivityBacklogProfile", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.profile.ActivityBacklogProfile", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithOne("BacklogProfile")
-                        .HasForeignKey("AdhdTimeOrganizer.domain.model.entity.activity.profile.ActivityBacklogProfile", "ActivityId")
+                        .HasForeignKey("AdhdTimeOrganizer.Core.domain.model.entity.activity.profile.ActivityBacklogProfile", "ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_activity_backlog_profile_activities_activity_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityExpectedCostTier", "ExpectedCostTier")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityExpectedCostTier", "ExpectedCostTier")
                         .WithMany()
                         .HasForeignKey("ExpectedCostTierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_activity_backlog_profile_activity_expected_cost_tiers_expec");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityLocationType", "LocationType")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityLocationType", "LocationType")
                         .WithMany()
                         .HasForeignKey("LocationTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_activity_backlog_profile_activity_location_types_location_t");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityWeatherDependency", "WeatherDependency")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityWeatherDependency", "WeatherDependency")
                         .WithMany()
                         .HasForeignKey("WeatherDependencyId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -4526,16 +4515,16 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("WeatherDependency");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.profile.ActivityBucketListProfile", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.profile.ActivityBucketListProfile", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithOne("BucketListProfile")
-                        .HasForeignKey("AdhdTimeOrganizer.domain.model.entity.activity.profile.ActivityBucketListProfile", "ActivityId")
+                        .HasForeignKey("AdhdTimeOrganizer.Core.domain.model.entity.activity.profile.ActivityBucketListProfile", "ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_activity_bucket_list_profile_activities_activity_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.lookup.ActivityExperienceType", "ExperienceType")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup.ActivityExperienceType", "ExperienceType")
                         .WithMany()
                         .HasForeignKey("ExperienceTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -4547,11 +4536,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("ExperienceType");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.profile.ActivityProjectProfile", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.profile.ActivityProjectProfile", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithOne("ProjectProfile")
-                        .HasForeignKey("AdhdTimeOrganizer.domain.model.entity.activity.profile.ActivityProjectProfile", "ActivityId")
+                        .HasForeignKey("AdhdTimeOrganizer.Core.domain.model.entity.activity.profile.ActivityProjectProfile", "ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_activity_project_profile_activities_activity_id");
@@ -4559,16 +4548,76 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("Activity");
                 });
 
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.timer.PomodoroTimerPreset", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "FocusActivity")
+                        .WithMany()
+                        .HasForeignKey("FocusActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_pomodoro_timer_preset_activity_focus_activity_id");
+
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "RestActivity")
+                        .WithMany()
+                        .HasForeignKey("RestActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_pomodoro_timer_preset_activity_rest_activity_id");
+
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pomodoro_timer_preset_user_user_id");
+
+                    b.Navigation("FocusActivity");
+
+                    b.Navigation("RestActivity");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.timer.TimerPreset", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_timer_preset_activity_activity_id");
+
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_timer_preset_user_user_id");
+
+                    b.Navigation("Activity");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.Calendar", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_calendar_user_user_id");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityHistory.ActivityHistory", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithMany()
                         .HasForeignKey("ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_activity_history_activity_activity_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4582,7 +4631,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.PlannerTask", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithMany()
                         .HasForeignKey("ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4608,7 +4657,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_planner_task_todo_list_items_todolist_item_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4628,7 +4677,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.RepeatingPlannerTask", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithMany()
                         .HasForeignKey("ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4641,7 +4690,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_repeating_planner_task_task_importances_importance_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4657,7 +4706,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskImportance", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4669,7 +4718,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskPlannerDayTemplate", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4681,7 +4730,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TemplatePlannerTask", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithMany()
                         .HasForeignKey("ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4701,7 +4750,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_template_planner_task_task_planner_day_template_template_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4725,7 +4774,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_user_planner_settings_task_planner_day_templates_default_ap");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithOne()
                         .HasForeignKey("AdhdTimeOrganizer.domain.model.entity.activityPlanning.UserPlannerSettings", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4739,7 +4788,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityTracking.AndroidSessionData", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4751,7 +4800,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityTracking.WebExtensionActivityEntry", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4763,22 +4812,22 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityTracking.android.TrackerAndroidMappingByPattern", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithOne()
                         .HasForeignKey("AdhdTimeOrganizer.domain.model.entity.activityTracking.android.TrackerAndroidMappingByPattern", "ActivityId")
                         .HasConstraintName("fk_tracker_android_mapping_by_pattern_activities_activity_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.ActivityCategory", "Category")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityCategory", "Category")
                         .WithMany()
                         .HasForeignKey("CategoryId")
                         .HasConstraintName("fk_tracker_android_mapping_by_pattern_activity_categories_cate");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.ActivityRole", "Role")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityRole", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .HasConstraintName("fk_tracker_android_mapping_by_pattern_activity_roles_role_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4796,7 +4845,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop.DesktopActivityEntry", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4808,22 +4857,22 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop.TrackerDesktopMappingByPattern", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithOne()
                         .HasForeignKey("AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop.TrackerDesktopMappingByPattern", "ActivityId")
                         .HasConstraintName("fk_tracker_desktop_mapping_by_pattern_activities_activity_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.ActivityCategory", "Category")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityCategory", "Category")
                         .WithMany()
                         .HasForeignKey("CategoryId")
                         .HasConstraintName("fk_tracker_desktop_mapping_by_pattern_activity_categories_cate");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.ActivityRole", "Role")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityRole", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .HasConstraintName("fk_tracker_desktop_mapping_by_pattern_activity_roles_role_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4847,7 +4896,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_reminder_planner_task_planner_task_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4861,7 +4910,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.suggestion.ActivityHistoryPattern", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithMany()
                         .HasForeignKey("ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4873,7 +4922,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.suggestion.PlannerTaskPattern", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithMany()
                         .HasForeignKey("ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4899,61 +4948,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_template_suggestion_patterns_task_planner_day_templates_tem");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_template_suggestion_patterns_user_user_id");
 
                     b.Navigation("Template");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.timer.PomodoroTimerPreset", b =>
-                {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "FocusActivity")
-                        .WithMany()
-                        .HasForeignKey("FocusActivityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .HasConstraintName("fk_pomodoro_timer_preset_activity_focus_activity_id");
-
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "RestActivity")
-                        .WithMany()
-                        .HasForeignKey("RestActivityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .HasConstraintName("fk_pomodoro_timer_preset_activity_rest_activity_id");
-
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_pomodoro_timer_preset_user_user_id");
-
-                    b.Navigation("FocusActivity");
-
-                    b.Navigation("RestActivity");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.timer.TimerPreset", b =>
-                {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
-                        .WithMany()
-                        .HasForeignKey("ActivityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .HasConstraintName("fk_timer_preset_activity_activity_id");
-
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_timer_preset_user_user_id");
-
-                    b.Navigation("Activity");
 
                     b.Navigation("User");
                 });
@@ -4972,7 +4974,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.todoList.RoutineTimePeriod", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4984,7 +4986,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.todoList.RoutineTodoList", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithMany()
                         .HasForeignKey("ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -4998,7 +5000,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_routine_todo_list_routine_time_period_time_period_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5049,7 +5051,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.todoList.TaskPriority", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5067,7 +5069,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_todo_list_todo_list_category_category_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5081,7 +5083,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.todoList.TodoListCategory", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5093,7 +5095,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.todoList.TodoListItem", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.activity.Activity", "Activity")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
                         .WithMany()
                         .HasForeignKey("ActivityId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5113,7 +5115,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_todo_list_item_todo_list_todo_list_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", "User")
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5176,7 +5178,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<long>", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", null)
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5186,7 +5188,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<long>", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", null)
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5203,7 +5205,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_user__role_asp_net_roles_role_id");
 
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", null)
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5213,7 +5215,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<long>", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", null)
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5223,7 +5225,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("Sydowwe.Framework.domain.entity.user.RefreshToken", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", null)
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", null)
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5233,7 +5235,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("Sydowwe.Notifications.domain.entity.Notification", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", null)
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5243,7 +5245,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("Sydowwe.Notifications.domain.entity.NotificationPreference", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", null)
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5253,7 +5255,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("Sydowwe.Notifications.domain.entity.PushSubscription", b =>
                 {
-                    b.HasOne("AdhdTimeOrganizer.domain.model.entity.user.User", null)
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -5353,12 +5355,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("ScheduledJob");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.Calendar", b =>
-                {
-                    b.Navigation("Tasks");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.Activity", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", b =>
                 {
                     b.Navigation("BacklogProfile");
 
@@ -5369,14 +5366,32 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("ProjectProfile");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.ActivityCategory", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityCategory", b =>
                 {
                     b.Navigation("Activities");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activity.ActivityRole", b =>
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityRole", b =>
                 {
                     b.Navigation("Activities");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Core.domain.model.entity.user.User", b =>
+                {
+                    b.Navigation("ActivityList");
+
+                    b.Navigation("CategoryList");
+
+                    b.Navigation("MemoryAnchors");
+
+                    b.Navigation("RefreshTokens");
+
+                    b.Navigation("RoleList");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.Calendar", b =>
+                {
+                    b.Navigation("Tasks");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.activityPlanning.TaskPlannerDayTemplate", b =>
@@ -5404,19 +5419,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
             modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.todoList.TodoListCategory", b =>
                 {
                     b.Navigation("TodoListColl");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.domain.model.entity.user.User", b =>
-                {
-                    b.Navigation("ActivityList");
-
-                    b.Navigation("CategoryList");
-
-                    b.Navigation("MemoryAnchors");
-
-                    b.Navigation("RefreshTokens");
-
-                    b.Navigation("RoleList");
                 });
 
             modelBuilder.Entity("Sydowwe.Reminders.domain.entity.ReminderDefinition", b =>

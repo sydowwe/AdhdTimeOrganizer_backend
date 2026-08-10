@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.response.activity;
+using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using Sydowwe.Framework.application.dto.response;
 using Sydowwe.Framework.application.dto.response.@base;

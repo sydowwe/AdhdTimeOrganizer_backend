@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 
 namespace AdhdTimeOrganizer.domain.model.entity.suggestion;

@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.extendable;
+using AdhdTimeOrganizer.Core.application.dto.request.extendable;
 using Sydowwe.Framework.domain.valueObject;
 
 namespace AdhdTimeOrganizer.application.dto.request.todoList;

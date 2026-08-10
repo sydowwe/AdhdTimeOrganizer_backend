@@ -1,6 +1,6 @@
-using AdhdTimeOrganizer.application.@event;
+using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.domain.serviceContract;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;

@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.generic;
+using AdhdTimeOrganizer.Core.application.dto.request.generic;
 using FastEndpoints;
 using FluentValidation;
 

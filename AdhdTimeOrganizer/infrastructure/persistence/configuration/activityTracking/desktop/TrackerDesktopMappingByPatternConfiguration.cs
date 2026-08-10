@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence.configuration.extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

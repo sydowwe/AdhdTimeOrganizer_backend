@@ -2,7 +2,7 @@ using AdhdTimeOrganizer.application.dto.response.suggestion;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner.template;
 using AdhdTimeOrganizer.domain.model.entity;
 using AdhdTimeOrganizer.domain.model.entity.suggestion;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;

@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.application.dto.response.reminder;
 using AdhdTimeOrganizer.domain.model.entity.reminder;
-using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;

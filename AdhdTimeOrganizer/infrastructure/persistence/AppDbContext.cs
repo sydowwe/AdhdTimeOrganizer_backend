@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.activity;
-using AdhdTimeOrganizer.domain.model.entity.activity.lookup;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
@@ -8,10 +8,12 @@ using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.entity.reminder;
 using AdhdTimeOrganizer.domain.model.entity.suggestion;
-using AdhdTimeOrganizer.domain.model.entity.timer;
+using AdhdTimeOrganizer.Core.domain.model.entity.timer;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
-using AdhdTimeOrganizer.domain.model.entity.user;
-using AdhdTimeOrganizer.infrastructure.persistence.configuration.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.user;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.configuration.user;
+using AdhdTimeOrganizer.infrastructure.persistence.configuration.activityPlanning;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -133,7 +135,12 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ReminderDefinition).Assembly);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ScheduledJob).Assembly);
 
+        // AdhdTimeOrganizer.Core (User, Activity + its lookups/profiles/anchors, the timer presets) and
+        // then the host's own. Two calls, not one: UserEntityConfiguration moved to Core, so the single
+        // typeof(...).Assembly that used to cover everything now covers only Core — the host's remaining
+        // configurations would silently drop out of the model, taking their tables with them.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UserEntityConfiguration).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlannerTaskConfiguration).Assembly);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.activity;
+using AdhdTimeOrganizer.Core.application.dto.request.activity;
 
 namespace AdhdTimeOrganizer.application.dto.request.history;
 

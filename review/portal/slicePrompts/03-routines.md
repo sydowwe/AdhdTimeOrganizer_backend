@@ -19,7 +19,7 @@ any routine type. Routines references TodoLists; nothing points back.
   (+ `Sydowwe.Framework.Contracts` if it talks to a framework module). Host → Routines.
 - Slice services take a plain **`DbContext`**, never `AppDbContext`. The alias is registered.
 - Confirm the baseline first: `dotnet test AdhdTimeOrganizer.IntegrationTests` =
-  **198 passed, 6 skipped, 0 failed**. Match it at the end.
+  **216 passed, 6 skipped, 0 failed**. Match it at the end.
 
 ## Registering with the host — four places, none break the build
 
@@ -102,7 +102,7 @@ expected and is not a "slice → host" violation, because the test project refer
 ## Done when
 
 - `dotnet build AdhdTimeOrganizer.sln` clean
-- `dotnet test` = **198 passed, 6 skipped, 0 failed**
+- `dotnet test` = **216 passed, 6 skipped, 0 failed**
 - `dotnet ef migrations add RoutinesSlice` produces an **empty** `Up`/`Down`
 - one routine endpoint manually smoke-tested (a missing FastEndpoints registration is a 404,
   not a build error)

@@ -1,13 +1,15 @@
 using System.Text.RegularExpressions;
 using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.application.endpointGroups;
-using AdhdTimeOrganizer.application.@event;
+using AdhdTimeOrganizer.Core.application.@event;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.domain.service;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.security;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;

@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.response.activity;
+using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Sydowwe.Framework.application.dto.response;
 using Sydowwe.Framework.domain.valueObject;

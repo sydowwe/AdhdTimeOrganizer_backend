@@ -1,9 +1,10 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop;
 using AdhdTimeOrganizer.application.endpointGroups;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
 using Sydowwe.Framework.infrastructure.persistence;

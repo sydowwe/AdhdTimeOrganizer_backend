@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using Sydowwe.Framework.application.dto.response.@base;
 
 namespace AdhdTimeOrganizer.application.dto.response.reminder;

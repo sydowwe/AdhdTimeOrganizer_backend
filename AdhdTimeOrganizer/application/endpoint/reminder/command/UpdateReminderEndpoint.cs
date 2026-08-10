@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.reminder;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.reminder;
 using AdhdTimeOrganizer.domain.serviceContract;

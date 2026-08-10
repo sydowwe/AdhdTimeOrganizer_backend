@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.application.endpoint.@base.read;
-using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.application.endpoint.@base.read;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +14,7 @@ public class FormSelectOptionsPlannerTaskEndpoint(AppDbContext appDbContext)
 
     protected override IQueryable<Activity> GetBaseQuery(long userId)
     {
-        return AppDbContext.Set<PlannerTask>()
+        return DbContext.Set<PlannerTask>()
             .AsNoTracking()
             .FilteredByUser(userId)
             .Select(pt => pt.Activity)

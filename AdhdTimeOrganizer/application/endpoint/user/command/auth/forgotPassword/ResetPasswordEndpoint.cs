@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Microsoft.AspNetCore.Identity;
 using Sydowwe.Framework.application.endpoint.user.command.auth;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;

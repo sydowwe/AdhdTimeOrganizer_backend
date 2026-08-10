@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.application.dto.@enum;
 using AdhdTimeOrganizer.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.desktop.dashboard;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.summaryCards;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.infrastructure.persistence;

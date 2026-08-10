@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;

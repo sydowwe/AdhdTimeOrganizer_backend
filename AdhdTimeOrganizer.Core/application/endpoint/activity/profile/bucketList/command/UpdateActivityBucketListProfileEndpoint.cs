@@ -1,0 +1,57 @@
+using AdhdTimeOrganizer.Core.application.dto.request.activity.profile;
+using AdhdTimeOrganizer.Core.application.validator;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity.profile;
+using FastEndpoints;
+using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.persistence;
+
+namespace AdhdTimeOrganizer.Core.application.endpoint.activity.profile.bucketList.command;
+
+public class UpdateActivityBucketListProfileEndpoint(DbContext dbContext)
+    : Endpoint<ActivityBucketListProfileRequest>
+{
+    public override void Configure()
+    {
+        Put("/activity-bucket-list-profile/{id:long:required}");
+        Validator<UpdateActivityBucketListProfileValidator>();
+        Summary(s =>
+        {
+            s.Summary = "Update ActivityBucketListProfile";
+            s.Response(204, "Success");
+            s.Response(404, "Not found");
+            s.Response(400, "Bad request");
+        });
+    }
+
+    public override async Task HandleAsync(ActivityBucketListProfileRequest req, CancellationToken ct)
+    {
+        try
+        {
+            var id = Route<long>("id");
+            var userId = User.GetId();
+
+            var entity = await dbContext.Set<ActivityBucketListProfile>()
+                .Include(p => p.Activity)
+                .FirstOrDefaultAsync(p => p.Id == id, ct);
+
+            if (entity is null || entity.Activity.UserId != userId)
+            {
+                AddError("ActivityBucketListProfile not found.");
+                await Send.ErrorsAsync(404, ct);
+                return;
+            }
+
+            req.UpdateEntity(entity);
+            dbContext.Set<ActivityBucketListProfile>().Update(entity);
+            await dbContext.SaveChangesAsync(ct);
+            await Send.NoContentAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            var result = DbUtils.HandleException(ex, nameof(HandleAsync));
+            AddError(result.ErrorMessage!);
+            await Send.ErrorsAsync(400, ct);
+        }
+    }
+}

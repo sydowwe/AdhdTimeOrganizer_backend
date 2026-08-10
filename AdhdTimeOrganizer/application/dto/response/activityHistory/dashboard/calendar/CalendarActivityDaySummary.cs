@@ -1,5 +1,4 @@
-using AdhdTimeOrganizer.application.dto.dto;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using Sydowwe.Framework.application.dto.dto;
 
 namespace AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard.calendar;

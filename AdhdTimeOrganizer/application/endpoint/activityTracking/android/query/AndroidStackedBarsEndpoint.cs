@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.application.dto.response.activityTracking.android.dashboard;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.infrastructure.persistence;

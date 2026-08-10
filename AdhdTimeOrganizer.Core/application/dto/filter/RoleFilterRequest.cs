@@ -1,0 +1,11 @@
+using Sydowwe.Framework.application.dto.request.@interface;
+
+namespace AdhdTimeOrganizer.Core.application.dto.filter;
+
+public record RoleFilterRequest : IFilterRequest
+{
+    public string? Name { get; set; }
+    public string? Text { get; set; }
+    public string? Color { get; set; }
+    public string? Icon { get; set; }
+}

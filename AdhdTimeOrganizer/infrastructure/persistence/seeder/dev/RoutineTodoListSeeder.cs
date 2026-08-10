@@ -15,7 +15,7 @@ public class RoutineTodoListSeeder(
     ILogger<RoutineTodoListSeeder> logger) : IScopedService, IPerUserDevSeeder
 {
     public string SeederName => "RoutineTodoList";
-    public int Order => 11;
+    public int Order => 200;
 
     public async Task TruncateTable()
     {

@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
@@ -12,7 +12,7 @@ public class CalendarSeeder(
     ILogger<CalendarSeeder> logger) : IScopedService, IPerUserDefaultSeeder
 {
     public string SeederName => "Calendar";
-    public int Order => 5;
+    public int Order => 410;
 
     public async Task TruncateTable()
     {

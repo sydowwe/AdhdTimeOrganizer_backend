@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Sydowwe.Framework.application.dto.request.user;
 
 namespace AdhdTimeOrganizer.application.dto.request.user;

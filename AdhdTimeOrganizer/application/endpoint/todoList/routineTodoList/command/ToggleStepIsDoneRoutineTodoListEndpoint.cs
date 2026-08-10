@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.@event;
+using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.service;
 using AdhdTimeOrganizer.infrastructure.persistence;

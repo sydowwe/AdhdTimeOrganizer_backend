@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.user;
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.user.command.auth;

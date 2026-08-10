@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;

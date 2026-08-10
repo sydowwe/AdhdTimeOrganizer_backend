@@ -11,7 +11,7 @@ public class ActivityHistorySeeder(
     ILogger<ActivityHistorySeeder> logger) : IScopedService, IPerUserDevSeeder
 {
     public string SeederName => "ActivityHistory";
-    public int Order => 14;
+    public int Order => 300;
 
     public async Task TruncateTable()
     {

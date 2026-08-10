@@ -1,12 +1,11 @@
-using AdhdTimeOrganizer.application.dto.dto;
-using AdhdTimeOrganizer.application.dto.response.activity;
+using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.application.dto.response.suggestion;
 using AdhdTimeOrganizer.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.domain.model.entity;
-using AdhdTimeOrganizer.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.domain.model.entity.suggestion;
-using AdhdTimeOrganizer.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;

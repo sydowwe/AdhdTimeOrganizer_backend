@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.application.dto.response.activity;
-using AdhdTimeOrganizer.application.dto.response.extendable;
+using AdhdTimeOrganizer.Core.application.dto.response.activity;
+using AdhdTimeOrganizer.Core.application.dto.response.extendable;
 using AdhdTimeOrganizer.domain.model.entity.activityHistory;
 using Sydowwe.Framework.application.dto.response;
 using Sydowwe.Framework.domain.valueObject;

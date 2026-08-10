@@ -11,7 +11,7 @@ public class RoutineTimePeriodSeeder(
     : BasePerUserDefaultSeeder<RoutineTimePeriod>(dbContext, logger), IScopedService
 {
     public override string SeederName => "RoutineTimePeriod";
-    public override int Order => 3;
+    public override int Order => 200;
     protected override string EntityLabel => "routine time periods";
 
     protected override List<RoutineTimePeriod> Defaults(long userId) =>

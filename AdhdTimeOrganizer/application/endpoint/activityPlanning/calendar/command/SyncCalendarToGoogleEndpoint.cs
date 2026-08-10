@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
-using AdhdTimeOrganizer.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Google.Apis.Calendar.v3.Data;
