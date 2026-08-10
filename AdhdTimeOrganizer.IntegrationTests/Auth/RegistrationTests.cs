@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using AdhdTimeOrganizer.infrastructure.security;
 using Sydowwe.Framework.domain.@enum;
 using Xunit;
 
@@ -44,7 +45,7 @@ public class RegistrationTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
 
         var roleIds = await db.UserRoles.Where(ur => ur.UserId == user!.Id).Select(ur => ur.RoleId).ToListAsync();
         var roleNames = await db.Roles.Where(r => roleIds.Contains(r.Id)).Select(r => r.Name).ToListAsync();
-        roleNames.Should().Contain(nameof(UserRoleEnum.User));
+        roleNames.Should().Contain(PortalRoleCatalog.User);
     }
 
     [Fact]

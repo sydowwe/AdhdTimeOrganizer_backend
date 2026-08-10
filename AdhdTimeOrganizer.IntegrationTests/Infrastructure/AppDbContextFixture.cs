@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Sydowwe.Framework.domain.entity.user;
+using AdhdTimeOrganizer.infrastructure.security;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
@@ -101,8 +102,8 @@ public class AppDbContextFixture : PostgresContainerFixture<Program, AppDbContex
         var userRole = new UserRole
         {
             Id = 1,
-            Name = nameof(UserRoleEnum.User),
-            NormalizedName = nameof(UserRoleEnum.User).ToUpperInvariant(),
+            Name = PortalRoleCatalog.User,
+            NormalizedName = PortalRoleCatalog.User.ToUpperInvariant(),
             Description = "Standard user",
             IsDefault = true,
             RoleLevel = 1,

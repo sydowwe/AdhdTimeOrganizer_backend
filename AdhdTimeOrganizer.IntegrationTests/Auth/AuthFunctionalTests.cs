@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.application.dto.response.user;
+using AdhdTimeOrganizer.infrastructure.security;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
 using Sydowwe.Framework.domain.helper;
@@ -55,7 +56,7 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
             // Without a role the minted JWT authenticates but 403s on every endpoint, because the
             // global configurator in Program.cs puts Roles("User","Admin","Root") on anything that
             // doesn't set its own.
-            var roleId = await db.Roles.Where(r => r.Name == nameof(UserRoleEnum.User))
+            var roleId = await db.Roles.Where(r => r.Name == PortalRoleCatalog.User)
                 .Select(r => r.Id).FirstAsync();
             db.UserRoles.Add(new IdentityUserRole<long> { UserId = userId, RoleId = roleId });
             await db.SaveChangesAsync();

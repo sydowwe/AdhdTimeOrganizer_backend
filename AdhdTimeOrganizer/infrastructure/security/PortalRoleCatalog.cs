@@ -1,5 +1,4 @@
 using Sydowwe.Framework.domain.auth;
-using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.infrastructure.security;
 
@@ -17,11 +16,19 @@ namespace AdhdTimeOrganizer.infrastructure.security;
 /// </summary>
 public static class PortalRoleCatalog
 {
+    // The names are a persisted contract (they are the AspNetRoles rows), so they live here as
+    // constants rather than being retyped at each use site. They used to come from Framework's
+    // UserRoleEnum; that enum is gone because role names are deployment-specific, and this catalog
+    // is now the one place this deployment declares them.
+    public const string User = "User";
+    public const string Admin = "Admin";
+    public const string Root = "Root";
+
     public static IRoleCatalog Create() => new RoleCatalog(
     [
-        new RoleDefinition(nameof(UserRoleEnum.User), RoleTier.User, "Standard user", IsDefault: true),
-        new RoleDefinition(nameof(UserRoleEnum.Admin), RoleTier.Admin, "Administrator"),
+        new RoleDefinition(User, RoleTier.User, "Standard user", IsDefault: true),
+        new RoleDefinition(Admin, RoleTier.Admin, "Administrator"),
         // Seeded, never granted through the UI.
-        new RoleDefinition(nameof(UserRoleEnum.Root), RoleTier.Root, "Root administrator", IsAssignable: false)
+        new RoleDefinition(Root, RoleTier.Root, "Root administrator", IsAssignable: false)
     ]);
 }

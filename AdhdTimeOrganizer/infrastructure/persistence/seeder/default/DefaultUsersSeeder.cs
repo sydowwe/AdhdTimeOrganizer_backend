@@ -4,6 +4,7 @@ using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
+using AdhdTimeOrganizer.infrastructure.security;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.helper;
 
@@ -71,7 +72,7 @@ public class DefaultUsersSeeder(UserManager<User> userManager, AppDbContext dbCo
                 return;
             }
 
-            result = await userManager.AddToRoleAsync(adminUser, nameof(UserRoleEnum.Root));
+            result = await userManager.AddToRoleAsync(adminUser, PortalRoleCatalog.Root);
             if (!result.Succeeded)
                 logger.LogError("Failed to assign Root role to root admin user.");
 
