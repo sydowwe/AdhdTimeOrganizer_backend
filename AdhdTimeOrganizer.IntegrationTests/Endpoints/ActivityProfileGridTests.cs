@@ -147,7 +147,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdB) = await SeedBacklogProfileAsync(db, userIdB, "B's backlog activity");
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().PostAsJsonAsync("activity-backlog-profile/grid", GridBody(), JsonOpts);
+        var response = await factoryB.CreateClient().PostAsJsonAsync("api/activity-backlog-profile/grid", GridBody(), JsonOpts);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts);
@@ -163,7 +163,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdA) = await SeedBacklogProfileAsync(db, FakeLoggedUserService.TestUserId);
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().GetAsync($"activity-backlog-profile/{profileIdA}");
+        var response = await factoryB.CreateClient().GetAsync($"api/activity-backlog-profile/{profileIdA}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -189,10 +189,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             DurationMinutes = 999,
             IsRepeatable = true
         };
-        var updateResponse = await clientB.PutAsJsonAsync($"activity-backlog-profile/{profileIdA}", updatePayload, JsonOpts);
+        var updateResponse = await clientB.PutAsJsonAsync($"api/activity-backlog-profile/{profileIdA}", updatePayload, JsonOpts);
         updateResponse.IsSuccessStatusCode.Should().BeFalse();
 
-        var deleteResponse = await clientB.DeleteAsync($"activity-backlog-profile/{profileIdA}");
+        var deleteResponse = await clientB.DeleteAsync($"api/activity-backlog-profile/{profileIdA}");
         deleteResponse.IsSuccessStatusCode.Should().BeFalse();
 
         await using var assertDb = CreateDbContext();
@@ -210,7 +210,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdB) = await SeedBacklogProfileAsync(db, userIdB);
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().GetAsync("activity-backlog-profile/all-options");
+        var response = await factoryB.CreateClient().GetAsync("api/activity-backlog-profile/all-options");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOpts);
@@ -239,7 +239,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             IsRepeatable = false
         };
 
-        var response = await CreateClient().PostAsJsonAsync("activity-backlog-profile", payload, JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-backlog-profile", payload, JsonOpts);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest, "the create validator rejects a second profile of the same kind, not a raw 500 from the unique index");
     }
@@ -255,7 +255,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdB) = await SeedBucketListProfileAsync(db, userIdB, "B's bucket activity");
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().PostAsJsonAsync("activity-bucket-list-profile/grid", GridBody(), JsonOpts);
+        var response = await factoryB.CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile/grid", GridBody(), JsonOpts);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts);
@@ -271,7 +271,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdA) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId);
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().GetAsync($"activity-bucket-list-profile/{profileIdA}");
+        var response = await factoryB.CreateClient().GetAsync($"api/activity-bucket-list-profile/{profileIdA}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -294,10 +294,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             RequiresTravel = true,
             InspirationSource = "Hijacked"
         };
-        var updateResponse = await clientB.PutAsJsonAsync($"activity-bucket-list-profile/{profileIdA}", updatePayload, JsonOpts);
+        var updateResponse = await clientB.PutAsJsonAsync($"api/activity-bucket-list-profile/{profileIdA}", updatePayload, JsonOpts);
         updateResponse.IsSuccessStatusCode.Should().BeFalse();
 
-        var deleteResponse = await clientB.DeleteAsync($"activity-bucket-list-profile/{profileIdA}");
+        var deleteResponse = await clientB.DeleteAsync($"api/activity-bucket-list-profile/{profileIdA}");
         deleteResponse.IsSuccessStatusCode.Should().BeFalse();
 
         await using var assertDb = CreateDbContext();
@@ -322,7 +322,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             InspirationSource = "Another source"
         };
 
-        var response = await CreateClient().PostAsJsonAsync("activity-bucket-list-profile", payload, JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile", payload, JsonOpts);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -338,7 +338,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdB) = await SeedProjectProfileAsync(db, userIdB, "B's project activity");
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().PostAsJsonAsync("activity-project-profile/grid", GridBody(), JsonOpts);
+        var response = await factoryB.CreateClient().PostAsJsonAsync("api/activity-project-profile/grid", GridBody(), JsonOpts);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts);
@@ -354,7 +354,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdA) = await SeedProjectProfileAsync(db, FakeLoggedUserService.TestUserId);
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().GetAsync($"activity-project-profile/{profileIdA}");
+        var response = await factoryB.CreateClient().GetAsync($"api/activity-project-profile/{profileIdA}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -380,10 +380,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             RequiredTools = Array.Empty<string>(),
             ReadinessStatus = "ReadyToStart"
         };
-        var updateResponse = await clientB.PutAsJsonAsync($"activity-project-profile/{profileIdA}", updatePayload, JsonOpts);
+        var updateResponse = await clientB.PutAsJsonAsync($"api/activity-project-profile/{profileIdA}", updatePayload, JsonOpts);
         updateResponse.IsSuccessStatusCode.Should().BeFalse();
 
-        var deleteResponse = await clientB.DeleteAsync($"activity-project-profile/{profileIdA}");
+        var deleteResponse = await clientB.DeleteAsync($"api/activity-project-profile/{profileIdA}");
         deleteResponse.IsSuccessStatusCode.Should().BeFalse();
 
         await using var assertDb = CreateDbContext();
@@ -410,7 +410,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             ReadinessStatus = "Planning"
         };
 
-        var response = await CreateClient().PostAsJsonAsync("activity-project-profile", payload, JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-project-profile", payload, JsonOpts);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -439,7 +439,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
                 break;
         }
 
-        var deleteResponse = await CreateClient().DeleteAsync($"activity/{activityId}");
+        var deleteResponse = await CreateClient().DeleteAsync($"api/activity/{activityId}");
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using var assertDb = CreateDbContext();
