@@ -4,15 +4,19 @@ Each feature module documents itself in its own `docs/` folder. **Before working
 read its `docs/summary.md`** — it orients you and points to the navigation index in
 `docs/domain-map.md` so you open only the files you need.
 
-Modules with docs today: `framework/Sydowwe.Notifications`, `framework/Sydowwe.Reminders`,
-`framework/Sydowwe.Scheduler`, `framework/Sydowwe.Framework` and
-`framework/Sydowwe.Framework.Testing` — **all of them live inside the `framework/` submodule**, so
-their docs are versioned in that repo, not this one. Editing a module doc is a two-repo operation,
-same as editing module code.
+The portal documents itself in `AdhdTimeOrganizer/docs/` (README · summary · domain-map · testing) —
+that one is versioned here. The module docs — `framework/Sydowwe.Notifications`,
+`framework/Sydowwe.Reminders`, `framework/Sydowwe.Scheduler`, `framework/Sydowwe.Framework` and
+`framework/Sydowwe.Framework.Testing` — **all live inside the `framework/` submodule**, so they are
+versioned in that repo, not this one. Editing a module doc is a two-repo operation, same as editing
+module code.
 
-> `docs/modules.md`, `docs/extendingVanillaForCustomers.md` and `docs/testing.md` at the repo root
-> were copied from the MojaDigitalnaFirma solution and describe modules/types that do **not** exist
-> here. Don't trust them; the per-project `docs/summary.md` files are the accurate ones.
+`docs/modules.md` is the module registry and now describes **this** solution — the MojaDigitalnaFirma
+tables it was copied with have been deleted.
+
+> `docs/extendingVanillaForCustomers.md` and `docs/testing.md` at the repo root are still copies from
+> the MojaDigitalnaFirma solution and describe modules/types that do **not** exist here. Don't trust
+> them; the per-project `docs/summary.md` files are the accurate ones.
 
 # Solution Layout
 
@@ -51,8 +55,9 @@ and comments still call it "the Kernel". Same 42 contract types, same folder nam
 namespace changed (`MojaDigitalnaFirma.Kernel.<seam>` → `Sydowwe.Framework.Contracts.<seam>`). It moved
 so the modules — which depend on nothing else portal-side — could follow it into the submodule, which
 they since have (as `Sydowwe.Notifications` / `.Reminders` / `.Scheduler`).
-`docs/architecture.md` and `docs/modules.md` still describe a `MojaDigitalnaFirma.Kernel` product base;
-that is the *other* solution's layering and is deliberately unchanged.
+`docs/architecture.md` still describes a `MojaDigitalnaFirma.Kernel` product base; that is the *other*
+solution's layering and is deliberately unchanged. (`docs/modules.md` no longer does — it was rewritten
+for this solution.)
 
 ⚠ **`framework/` is a submodule, so editing it is a two-repo operation.** A change there is committed
 and pushed in the `Sydowwe.Framework` repo *first*; the parent then records the new commit sha as a
@@ -240,6 +245,26 @@ the DI scan registers it and the matching manager picks it up. No manual registr
   `IAppWideDevSeederManager`, `IPerUserDevSeederManager` (`SeedAllForRootAdminAsync`). Default managers
   let exceptions propagate; dev managers log and continue. Both dev managers also expose
   `SeedAssembly…Async` (reseed one module) and `TruncateAllTablesAsync`.
+- **Don't hand-write a per-user default seeder — subclass `BasePerUserDefaultSeeder<TEntity>`**
+  (`framework/Sydowwe.Framework/infrastructure/persistence/seeder/`). It supplies `SetupDefaults` /
+  `ResetDefaults`; you supply `Defaults(userId)`, `Collides(a, b)` — "would these two rows violate one of
+  this table's unique indexes?" — and `Apply(target, default)`. Every per-user default seeder in the portal
+  uses it except `CalendarSeeder`, whose key is a date range rather than a row set.
+  - **Both operations key off `Collides`, never off row counts.** Comparing `defaults.Count` to the user's
+    row count reads as a guard but isn't one: a user holding *some* defaults looks unseeded and gets the
+    whole set re-inserted (23505), and a positional reset rewrites a key column onto a row while a sibling
+    still holds the incoming value (23505 again). Both shipped here; `PerUserDefaultMatcher` +
+    `PerUserDefaultMatcherTests` (in the test project, no DB) are what keep them dead.
+  - **The key is rarely `Text`.** `TaskPriority` is `(user_id, priority)`, `TaskImportance` is
+    `(user_id, importance)`, `ActivityRole` is `(user_id, name)`, `RoutineTimePeriod` has *two* unique
+    indexes and needs both. Check the configuration before writing `Collides`.
+  - **Seeder reads use `IgnoreQueryFilters()`** — mandatory, and the reason `CalendarSeeder` does it by
+    hand. `UserScoping` is on in this portal, so an `IEntityWithUser` read is scoped to the *ambient* user;
+    a seeder told to seed a different user would read back zero rows and re-insert everything. The explicit
+    `UserId` predicate is the scoping.
+  - **Reset does not call `UpdateRange`.** The rows are tracked, so `SaveChanges` writes only what `Apply`
+    changed; marking them all `Modified` rewrites every column and bumps `ModifiedTimestamp` on rows that
+    already match.
 - **Finding users:** never query users from a seeder or manager in Framework — use `ISeedUserProvider`
   (`GetAllUserIdsAsync` / `GetRootAdminUserIdAsync` / `GetSeedUserIdsAsync`). The portal implements it in
   `infrastructure/persistence/seeder/SeedUserIdProvider.cs`, alongside Contracts' `ISeedUserIdProvider`.
@@ -559,7 +584,10 @@ Read `framework/Sydowwe.Framework.Testing/docs/testing.md` for the full guide (*
   materialized views), copied next to the test binaries by a `Content` item in the test csproj. They
   are hand-written SQL, not migration output, so `EnsureCreated` skips them — and without them
   `SuggestionPatternRefreshInterceptor` fails with 42P01 on any save touching `PlannerTask`,
-  `ActivityHistory` or `Calendar`. Add new scripts to that folder and they are picked up.
+  `ActivityHistory` or `Calendar`. Add new scripts to that folder and they are picked up. The running
+  app gets the same views from `SuggestionPatternViewInstaller` (called from `Program.cs` just before
+  `SeedDatabase`), which reads them as **embedded resources** and creates only the ones `to_regclass`
+  says are missing — the two paths read the same three files, so a new script is installed both places.
 - Test bases get HTTP clients via `CreateClient()` (Admin+User), `CreateAdminRoleClient()`,
   `CreateUserRoleClient()`, `CreateRootRoleClient()`, `CreateUnauthenticatedClient()`. For different
   test users, `CreateFactory(roles, userId)` — caller disposes. `CreateDbContext()` for

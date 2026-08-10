@@ -13,8 +13,8 @@ public class ActivityHistoryConfiguration : IEntityTypeConfiguration<ActivityHis
     {
         builder.BaseEntityConfigure();
 
-        builder.IsManyWithOneUser(u => u.ActivityHistoryList);
-        builder.IsManyWithOneActivity(a => a.ActivityHistoryList);
+        builder.IsManyWithOneUser();
+        builder.IsManyWithOneActivity();
 
         builder.Property(a => a.StartTimestamp).IsRequired();
         builder.Property(a => a.EndTimestamp).IsRequired();

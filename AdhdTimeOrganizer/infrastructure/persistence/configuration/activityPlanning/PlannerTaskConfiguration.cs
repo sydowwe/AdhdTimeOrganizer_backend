@@ -12,8 +12,8 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
     {
         builder.BaseEntityConfigure();
 
-        builder.IsManyWithOneUser(u => u.PlannerTaskList);
-        builder.IsManyWithOneActivity(a => a.PlannerTaskList);
+        builder.IsManyWithOneUser();
+        builder.IsManyWithOneActivity();
 
         builder.Property(p => p.StartTime).IsRequired();
         builder.Property(p => p.EndTime).IsRequired();

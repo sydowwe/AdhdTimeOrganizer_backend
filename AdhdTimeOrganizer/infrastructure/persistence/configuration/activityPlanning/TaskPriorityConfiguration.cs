@@ -12,11 +12,10 @@ public class TaskPriorityConfiguration : IEntityTypeConfiguration<TaskPriority>
         builder.BaseTextColorEntityConfigure();
         builder.Property(t => t.Priority).IsRequired();
 
-        // Configure the relationship
-        builder.HasMany(t => t.TodoListColl)
-            .WithOne(tl => tl.TaskPriority)
-            .HasForeignKey(tl => tl.TaskPriorityId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // The TaskPriority -> TodoListItem relationship is configured once, from the dependent side,
+        // in TodoListItemConfiguration (HasOne(r => r.TaskPriority).WithMany(t => t.TodoListColl),
+        // Restrict). It used to be declared here as well; two declarations of one relationship is
+        // redundant and invites the two copies drifting apart on delete behaviour.
 
         builder.HasIndex(t => new { t.UserId, t.Priority }).IsUnique();
 

@@ -12,7 +12,7 @@ public class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
     {
         builder.BaseEntityConfigure();
 
-        builder.IsManyWithOneUser(u => u.Reminders);
+        builder.IsManyWithOneUser();
 
         builder.Property(r => r.Title).IsRequired().HasMaxLength(200);
         builder.Property(r => r.Note).HasMaxLength(1000);

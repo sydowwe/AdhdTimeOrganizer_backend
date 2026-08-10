@@ -1,13 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using AdhdTimeOrganizer.domain.model.entity.activity;
 using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
-using AdhdTimeOrganizer.domain.model.entity.activityHistory;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
-using AdhdTimeOrganizer.domain.model.entity.reminder;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
 using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.entityInterface;
 
@@ -31,36 +24,29 @@ public sealed class User : BaseUser, IBaseTableEntity
     [NotMapped]
     public override bool PhoneNumberConfirmed { get; set; }
 
-    // Navigation properties
-    public ICollection<Calendar> Calendar { get; set; } = new List<Calendar>();
+    // Navigation properties.
+    //
+    // Only the activity-area collections live here. Every other user-owned entity (planner tasks,
+    // calendars, to-do lists, routines, reminders, history, tracking entries, tracker mappings,
+    // planner settings) configures its own user FK from the dependent side via the parameterless
+    // IsManyWithOneUser() / IsOneWithOneUser() — so User does NOT name those types.
+    //
+    // WHY: the inverse collections made User reference every feature area, which is a dependency
+    // cycle the moment those areas become their own projects. Nothing in application code traversed
+    // them; they existed only to hand the configuration helpers a navigation expression, and those
+    // helpers take it optionally. Deleting one changes no column, index or cascade — the FK is still
+    // configured, still required, still cascades. To query "this user's planner tasks", go through
+    // the DbSet (dbContext.PlannerTasks.Where(t => t.UserId == ...)), which the global query filter
+    // scopes for you anyway.
     public ICollection<Activity> ActivityList { get; set; } = new List<Activity>();
     public ICollection<ActivityCategory> CategoryList { get; set; } = new List<ActivityCategory>();
     public ICollection<ActivityRole> RoleList { get; set; } = new List<ActivityRole>();
-
-    public ICollection<ActivityHistory> ActivityHistoryList { get; set; } = new List<ActivityHistory>();
-    public ICollection<WebExtensionActivityEntry> WebExtensionActivityEntryList { get; set; } = new List<WebExtensionActivityEntry>();
-    public ICollection<DesktopActivityEntry> DesktopActivityEntryList { get; set; } = new List<DesktopActivityEntry>();
-    public ICollection<AndroidSessionData> AndroidSessionDataList { get; set; } = new List<AndroidSessionData>();
-
-    public ICollection<TodoListItem> TodoListItemColl { get; set; } = new List<TodoListItem>();
-    public ICollection<TodoList> TodoListColl { get; set; } = new List<TodoList>();
-    public ICollection<TodoListCategory> TodoListCategoryColl { get; set; } = new List<TodoListCategory>();
-    public ICollection<TaskPriority> TaskPriorityList { get; set; } = new List<TaskPriority>();
-    public ICollection<PlannerTask> PlannerTaskList { get; set; } = new List<PlannerTask>();
-    public ICollection<RoutineTodoList> RoutineTodoListColl { get; set; } = new List<RoutineTodoList>();
-
-    public ICollection<RoutineTimePeriod> RoutineTimePeriodList { get; set; } = new List<RoutineTimePeriod>();
+    public ICollection<MemoryAnchor> MemoryAnchors { get; set; } = new List<MemoryAnchor>();
 
     // Framework's RefreshToken (Sydowwe.Framework.domain.entity.user) carries no User navigation, so
-    // this collection is configured from the principal end in RefreshTokenConfiguration.
+    // this collection is configured from the principal end in RefreshTokenConfiguration. It is the
+    // only end of that relationship and therefore cannot be dropped.
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
-    public UserPlannerSettings? PlannerSettings { get; set; }
-
-
-    public ICollection<TrackerDesktopMappingByPattern> TrackerDesktopMappingByPatternList { get; set; } = new List<TrackerDesktopMappingByPattern>();
-    public ICollection<TrackerAndroidMappingByPattern> TrackerAndroidMappingByPatternList { get; set; } = new List<TrackerAndroidMappingByPattern>();
-    public ICollection<MemoryAnchor> MemoryAnchors { get; set; } = new List<MemoryAnchor>();
-    public ICollection<Reminder> Reminders { get; set; } = new List<Reminder>();
 
 
     public override string? Email

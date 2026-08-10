@@ -11,7 +11,7 @@ public class UserPlannerSettingsConfiguration : IEntityTypeConfiguration<UserPla
     public void Configure(EntityTypeBuilder<UserPlannerSettings> builder)
     {
         builder.BaseEntityConfigure();
-        builder.IsOneWithOneUser<UserPlannerSettings>(u => u.PlannerSettings);
+        builder.IsOneWithOneUser<UserPlannerSettings>();
 
         builder.Property(s => s.RemindersEnabled).IsRequired().HasDefaultValue(true);
         builder.Property(s => s.ReminderMinutesBefore).IsRequired().HasDefaultValue(10);

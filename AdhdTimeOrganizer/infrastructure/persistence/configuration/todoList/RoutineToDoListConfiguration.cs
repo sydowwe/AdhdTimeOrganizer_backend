@@ -41,8 +41,8 @@ public class RoutineTodoListConfiguration : IEntityTypeConfiguration<RoutineTodo
             "CK_RoutineTodoList_SuggestedDayOfMonth_Range",
             "\"suggested_day_of_month\" IS NULL OR (\"suggested_day_of_month\" BETWEEN 1 AND 31)"));
 
-        builder.IsManyWithOneUser(u => u.RoutineTodoListColl);
-        builder.IsManyWithOneActivity(a => a.RoutineTodoLists);
+        builder.IsManyWithOneUser();
+        builder.IsManyWithOneActivity();
 
         builder.HasOne(r => r.RoutineTimePeriod)
             .WithMany(t => t.RoutineTodoListColl)

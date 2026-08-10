@@ -26,7 +26,7 @@ public class DesktopActivityEntryConfiguration : IEntityTypeConfiguration<Deskto
         builder.Property(x => x.WindowTitle).HasMaxLength(1024);
         builder.Property(x => x.ExecutablePath).HasMaxLength(2048);
 
-        builder.IsManyWithOneUser(u => u.DesktopActivityEntryList);
+        builder.IsManyWithOneUser();
 
         builder.HasIndex(x => new { x.UserId, x.WindowStart, x.RecordDate, x.ProcessName, x.WindowTitle }).IsUnique();
         builder.HasIndex(x => new { x.UserId, x.WindowStart });

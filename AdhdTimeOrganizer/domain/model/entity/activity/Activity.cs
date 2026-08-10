@@ -1,10 +1,5 @@
 using AdhdTimeOrganizer.domain.model.entity.activity.memoryAnchor;
 using AdhdTimeOrganizer.domain.model.entity.activity.profile;
-using AdhdTimeOrganizer.domain.model.entity.activityHistory;
-using AdhdTimeOrganizer.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
-using AdhdTimeOrganizer.domain.model.entity.todoList;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using Sydowwe.Framework.domain.entityInterface;
 
@@ -22,15 +17,14 @@ public class Activity : BaseEntityWithUser, IBaseNameTextEntity
     public virtual ActivityCategory? Category { get; set; }
 
 
-    // Navigation properties
-    public virtual ICollection<TodoListItem> TodoListItems { get; set; } = [];
-    public virtual ICollection<RoutineTodoList> RoutineTodoLists { get; set; } = [];
-    public virtual ICollection<ActivityHistory> ActivityHistoryList { get; set; } = new List<ActivityHistory>();
-    public virtual ICollection<PlannerTask> PlannerTaskList { get; set; } = new List<PlannerTask>();
-
-    public TrackerDesktopMappingByPattern? TrackerDesktopMappingByPattern { get; set; }
-    public TrackerAndroidMappingByPattern? TrackerAndroidMappingByPattern { get; set; }
-
+    // Navigation properties — activity-area only.
+    //
+    // Activity deliberately does NOT name to-do items, routine items, history rows, planner tasks or
+    // tracker mappings. Each of those configures its own Activity FK from the dependent side via the
+    // parameterless IsManyWithOneActivity() / IsOneWithOneActivity(); the inverse collections here
+    // only fed those helpers a navigation expression and made the hub reference every feature area.
+    // Removing them changed no column, index or cascade. Query through the DbSet instead
+    // (dbContext.PlannerTasks.Where(t => t.ActivityId == ...)).
     public ActivityBacklogProfile? BacklogProfile { get; set; }
     public ActivityProjectProfile? ProjectProfile { get; set; }
     public ActivityBucketListProfile? BucketListProfile { get; set; }

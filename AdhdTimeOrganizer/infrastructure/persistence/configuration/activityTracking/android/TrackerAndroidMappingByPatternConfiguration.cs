@@ -14,16 +14,18 @@ public class TrackerAndroidMappingByPatternConfiguration : IEntityTypeConfigurat
         builder.Property(x => x.PackageName).HasMaxLength(255);
         builder.Property(x => x.AppLabel).HasMaxLength(255);
 
-        builder.HasOne(e => e.Activity).WithOne(a => a.TrackerAndroidMappingByPattern)
+        // All four relationships are configured from this (dependent) side with no inverse navigation:
+        // Activity, ActivityRole, ActivityCategory and User deliberately do not name tracking types.
+        builder.HasOne(e => e.Activity).WithOne()
             .HasForeignKey<TrackerAndroidMappingByPattern>(e => e.ActivityId);
 
-        builder.HasOne(e => e.Role).WithMany(e => e.TrackerAndroidMappingByPatternList)
+        builder.HasOne(e => e.Role).WithMany()
             .HasForeignKey(e => e.RoleId);
 
-        builder.HasOne(e => e.Category).WithMany(e => e.TrackerAndroidMappingByPatternList)
+        builder.HasOne(e => e.Category).WithMany()
             .HasForeignKey(e => e.CategoryId);
 
-        builder.IsManyWithOneUser(e => e.TrackerAndroidMappingByPatternList);
+        builder.IsManyWithOneUser();
 
         builder.HasIndex(e => new { e.UserId, e.PackageName, e.AppLabel })
             .IsUnique()

@@ -16,7 +16,7 @@ public class AndroidSessionDataConfiguration : IEntityTypeConfiguration<AndroidS
         builder.Property(x => x.AppLabel).HasMaxLength(255).IsRequired();
         builder.Property(x => x.DeviceId).HasMaxLength(100).IsRequired();
 
-        builder.IsManyWithOneUser(u => u.AndroidSessionDataList);
+        builder.IsManyWithOneUser();
 
         builder.HasIndex(x => new { x.UserId, x.DeviceId, x.PackageName, x.SessionStartUtc }).IsUnique();
         builder.HasIndex(x => new { x.UserId, x.SessionStartUtc });

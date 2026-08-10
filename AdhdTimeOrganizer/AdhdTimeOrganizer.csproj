@@ -74,6 +74,14 @@
          nothing to copy here. They used to be <Resource> items with CopyToOutputDirectory=Always, which
          the .NET SDK silently ignores (Resource is a WPF item type) - they never reached the output. -->
 
+    <!-- The hand-written suggestion-pattern materialized views. Embedded rather than copied to the
+         output so there is no working-directory assumption at startup; SuggestionPatternViewInstaller
+         reads them from the manifest. The integration tests apply the same files from disk via a
+         Content link in their own csproj. -->
+    <ItemGroup>
+        <EmbeddedResource Include="infrastructure\persistence\sqlScripts\*.sql"/>
+    </ItemGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
         <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>

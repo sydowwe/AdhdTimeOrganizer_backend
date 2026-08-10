@@ -80,8 +80,13 @@ try
     // Configure the HTTP request pipeline
     ConfigurePipeline(app, logger);
 
+    // The suggestion-pattern materialized views are hand-written SQL, so no migration creates them.
+    // They must exist before anything saves a Calendar / PlannerTask / ActivityHistory, because
+    // SuggestionPatternRefreshInterceptor REFRESHes them on save - seeding included.
+    await EnsureSuggestionPatternViews(app.Services, logger);
+
     // Database seeding
-    await SeedDatabase(app.Services, builder.Environment.IsDevelopment(), logger);
+    await SeedDatabase(app.Services, false /*builder.Environment.IsDevelopment()*/, logger);
 
 
     logger.LogInformation("Backend started.");
@@ -297,6 +302,13 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     });
 }
 
+static async Task EnsureSuggestionPatternViews(IServiceProvider services, ILogger<AdhdTimeOrganizer.Program> logger)
+{
+    using var scope = services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await SuggestionPatternViewInstaller.EnsureViewsCreatedAsync(db, logger);
+}
+
 static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, ILogger<AdhdTimeOrganizer.Program> logger)
 {
     try
@@ -314,7 +326,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         //    DefaultUsersSeeder creates as part of creating the account). Upserts, never truncates,
         //    so this one is safe to run in any environment.
         var appWideDefaults = scopedServices.GetRequiredService<IAppWideDefaultSeederManager>();
-        // await appWideDefaults.SeedAllAsync();
+        await appWideDefaults.SeedAllAsync();
 
         // 2. Replay per-user defaults across existing accounts — for when a default's definition
         //    changed after those accounts were created. `overrideData: true` rewrites the users'
@@ -322,7 +334,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         var perUserDefaults = scopedServices.GetRequiredService<IPerUserDefaultSeederManager>();
         if (isDevelopment)
         {
-            // await perUserDefaults.SeedAllForAllUsersAsync(true);
+            await perUserDefaults.SeedAllForAllUsersAsync(true);
         }
 
         // 3. Per-user dev fixtures, attached to the root admin. Runs before pass 4 because the module
@@ -331,7 +343,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         var perUserDev = scopedServices.GetRequiredService<IPerUserDevSeederManager>();
         if (isDevelopment)
         {
-            // await perUserDev.SeedAllForRootAdminAsync(true);
+            await perUserDev.SeedAllForRootAdminAsync(true);
         }
 
         // 4. App-wide dev fixtures — the module ones (notifications, reminders), which pick their own
@@ -339,7 +351,7 @@ static async Task SeedDatabase(IServiceProvider services, bool isDevelopment, IL
         var appWideDev = scopedServices.GetRequiredService<IAppWideDevSeederManager>();
         if (isDevelopment)
         {
-            // await appWideDev.SeedAllAsync(true);
+            await appWideDev.SeedAllAsync(true);
         }
 
         logger.LogInformation("Database seeding completed.");

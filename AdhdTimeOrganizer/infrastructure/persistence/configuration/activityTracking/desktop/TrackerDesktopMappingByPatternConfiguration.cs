@@ -15,16 +15,18 @@ public class TrackerDesktopMappingByPatternConfiguration : IEntityTypeConfigurat
         builder.Property(x => x.ProductName).HasMaxLength(200);
         builder.Property(x => x.WindowTitle).HasMaxLength(255);
 
-        builder.HasOne(e => e.Activity).WithOne(a => a.TrackerDesktopMappingByPattern)
+        // All four relationships are configured from this (dependent) side with no inverse navigation:
+        // Activity, ActivityRole, ActivityCategory and User deliberately do not name tracking types.
+        builder.HasOne(e => e.Activity).WithOne()
             .HasForeignKey<TrackerDesktopMappingByPattern>(e => e.ActivityId);
 
-        builder.HasOne(e => e.Role).WithMany(e => e.TrackerDesktopMappingByPatternList)
+        builder.HasOne(e => e.Role).WithMany()
             .HasForeignKey(e => e.RoleId);
 
-        builder.HasOne(e => e.Category).WithMany(e => e.TrackerDesktopMappingByPatternList)
+        builder.HasOne(e => e.Category).WithMany()
             .HasForeignKey(e => e.CategoryId);
 
-        builder.IsManyWithOneUser(e => e.TrackerDesktopMappingByPatternList);
+        builder.IsManyWithOneUser();
 
         // Unique pattern per user — same (ProcessName, ProductName, WindowTitle) combination cannot
         // appear twice. NULLs are treated as equal (NULLS NOT DISTINCT) so two NULL ProcessNames

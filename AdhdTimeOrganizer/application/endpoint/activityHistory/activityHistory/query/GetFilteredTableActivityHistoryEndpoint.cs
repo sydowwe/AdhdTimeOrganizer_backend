@@ -78,28 +78,32 @@ public class GetFilteredTableActivityHistoryEndpoint(AppDbContext dbContext)
             query = query.Where(ah => ah.ActivityId == filter.ActivityId.Value);
 
         if (filter.RoleId.HasValue)
-            query = query.Where(h => h.Activity.CategoryId == filter.RoleId);
+            query = query.Where(h => h.Activity.RoleId == filter.RoleId);
 
         if (filter.CategoryId.HasValue)
-            query = query.Where(h => h.Activity.RoleId == filter.CategoryId);
+            query = query.Where(h => h.Activity.CategoryId == filter.CategoryId);
 
 
+        // These filter on to-do / routine membership via subqueries rather than Activity's inverse
+        // collections, which were removed so Activity stops referencing the to-do and routine areas.
+        // EF translates both forms to the same EXISTS; the Include() calls that used to sit here were
+        // no-ops for filtering (Include never affects Where) and are gone with them.
         if (filter.IsFromTodoList.HasValue)
         {
-            query = query.Include(ah => ah.Activity).ThenInclude(a => a.TodoListItems);
-
-            query = query.Where(ah => ah.Activity.TodoListItems != null == filter.IsFromTodoList.Value);
+            query = query.Where(ah => dbContext.TodoListItems.Any(tli => tli.ActivityId == ah.ActivityId)
+                                      == filter.IsFromTodoList.Value);
             if (filter.TaskPriorityId.HasValue && filter.IsFromTodoList.Value)
-                query = query.Where(ah => ah.Activity.TodoListItems.Any(tli => tli.TaskPriorityId == filter.TaskPriorityId.Value));
+                query = query.Where(ah => dbContext.TodoListItems.Any(tli => tli.ActivityId == ah.ActivityId
+                                                                            && tli.TaskPriorityId == filter.TaskPriorityId.Value));
         }
 
         if (filter.IsFromRoutineTodoList.HasValue)
         {
-            query = query.Include(ah => ah.Activity).ThenInclude(a => a.RoutineTodoLists);
-
-            query = query.Where(h => h.Activity.RoutineTodoLists.Any() == filter.IsFromRoutineTodoList.Value);
+            query = query.Where(ah => dbContext.RoutineTodoLists.Any(rtd => rtd.ActivityId == ah.ActivityId)
+                                      == filter.IsFromRoutineTodoList.Value);
             if (filter.RoutineTimePeriodId.HasValue && filter.IsFromRoutineTodoList.Value)
-                query = query.Where(h => h.Activity.RoutineTodoLists.Any(rtd => rtd.TimePeriodId == filter.RoutineTimePeriodId.Value));
+                query = query.Where(ah => dbContext.RoutineTodoLists.Any(rtd => rtd.ActivityId == ah.ActivityId
+                                                                               && rtd.TimePeriodId == filter.RoutineTimePeriodId.Value));
         }
 
         if (filter.IsUnavoidable.HasValue)

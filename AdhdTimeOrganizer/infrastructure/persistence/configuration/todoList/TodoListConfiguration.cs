@@ -11,7 +11,7 @@ public class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
     public void Configure(EntityTypeBuilder<TodoList> builder)
     {
         builder.BaseNameTextEntityConfigure();
-        builder.IsManyWithOneUser(u => u.TodoListColl);
+        builder.IsManyWithOneUser();
         builder.HasIndex(r => new { r.UserId, r.Name }).IsUnique();
 
         builder.Property(r => r.Icon).HasMaxLength(255);

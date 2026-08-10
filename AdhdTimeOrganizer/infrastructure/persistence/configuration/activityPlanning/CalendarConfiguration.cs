@@ -11,7 +11,7 @@ public class CalendarConfiguration : IEntityTypeConfiguration<Calendar>
     public void Configure(EntityTypeBuilder<Calendar> builder)
     {
         builder.BaseEntityConfigure();
-        builder.IsManyWithOneUser(u => u.Calendar);
+        builder.IsManyWithOneUser();
         builder.EnumColumn(c => c.DayType);
 
         builder.Property(c => c.Date).IsRequired();

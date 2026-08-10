@@ -1,5 +1,3 @@
-using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.domain.model.entity.user;
 using Sydowwe.Framework.domain.entityInterface;
 
@@ -14,6 +12,7 @@ public class ActivityCategory : BaseEntityWithUser, IBaseNameTextColorIconEntity
 
     public virtual ICollection<Activity> Activities { get; set; } = new List<Activity>();
 
-    public virtual ICollection<TrackerDesktopMappingByPattern> TrackerDesktopMappingByPatternList { get; set; } = new List<TrackerDesktopMappingByPattern>();
-    public virtual ICollection<TrackerAndroidMappingByPattern> TrackerAndroidMappingByPatternList { get; set; } = new List<TrackerAndroidMappingByPattern>();
+    // The tracker-mapping inverse collections were removed so the activity area stops referencing the
+    // tracking area; Tracker{Desktop,Android}MappingByPatternConfiguration configures those FKs from
+    // the dependent side with a bare .WithMany(). No column or cascade changed.
 }

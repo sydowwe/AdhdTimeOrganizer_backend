@@ -24,7 +24,7 @@ public class WebExtensionActivityEntryConfiguration : IEntityTypeConfiguration<W
         builder.Property(x => x.Domain).HasMaxLength(255);
         builder.Property(x => x.Url).HasMaxLength(2048);
 
-        builder.IsManyWithOneUser(u => u.WebExtensionActivityEntryList);
+        builder.IsManyWithOneUser();
 
         builder.HasIndex(x => new { x.UserId, x.WindowStart, x.Domain, x.RecordDate }).IsUnique();
         builder.HasIndex(x => new { x.UserId, x.WindowStart });

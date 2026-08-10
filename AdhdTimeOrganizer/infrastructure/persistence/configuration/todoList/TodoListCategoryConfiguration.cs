@@ -11,7 +11,7 @@ public class TodoListCategoryConfiguration : IEntityTypeConfiguration<TodoListCa
     public void Configure(EntityTypeBuilder<TodoListCategory> builder)
     {
         builder.BaseNameTextColorIconEntityConfigure();
-        builder.IsManyWithOneUser(u => u.TodoListCategoryColl);
+        builder.IsManyWithOneUser();
         builder.HasIndex(r => new { r.UserId, r.Name }).IsUnique();
 
         builder.HasMany(c => c.TodoListColl)
