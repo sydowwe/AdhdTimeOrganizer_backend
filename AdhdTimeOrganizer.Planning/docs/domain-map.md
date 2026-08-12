@@ -71,6 +71,26 @@ names are decoupled from the view names** — every configuration pins its view 
 `PlannerSuggestionFromActivityHistory` is why this slice does **not** depend on History: it is a view
 over `activity_history`, not the `ActivityHistory` entity. The view is the seam.
 
+## Day-plan completion streak
+
+Derived, never stored — there is no entity, no column and no migration. The rules are one pure
+function; the query that feeds it is one grouped read.
+
+| Type | File |
+|---|---|
+| `PlannerStreakService` | `domain/service/PlannerStreakService.cs` — the rules (`Evaluate` one day, `Walk` the history) |
+| `IPlannerStreakReader` | `domain/serviceContract/IPlannerStreakReader.cs` |
+| `PlannerStreakReader` | `application/service/taskPlanner/PlannerStreakReader.cs` — the qualifying-task predicate + the day boundary |
+| `PlannerStreakResponse` | `application/dto/response/taskPlanner/PlannerStreakResponse.cs` |
+
+Delivered on `CalendarResponse.Streak`, filled in by `GetByDateCalendarEndpoint` **after** the
+projection (a streak is a walk across days; `Projection` runs per row). Every other calendar read
+leaves it null. See [`summary.md`](summary.md#day-plan-completion-streak) for the rules and why they
+are what they are.
+
+Guards: `Services.PlannerStreakServiceTests` (17 rule tests, no DB) and
+`Endpoints.PlannerStreakTests` (8 over HTTP, including the un-tick round-trip).
+
 ## Endpoints
 
 `application/endpoint/activityPlanning/` — `calendar/`, `plannerSettings/`, `plannerTask/`,

@@ -72,6 +72,55 @@ build if the host-side declaration is deleted, the FK just vanishes from the mod
 honest — it asserts the FK, its column, its `SetNull`, its constraint name, and the absence of
 navigations on both ends.
 
+## Day-plan completion streak
+
+The flame chip on the home page. It replaces a localStorage counter in the SPA that could only ever
+count days *this browser* had the app open, and whose un-tick path guessed at its own inverse.
+
+**Derived, never stored.** There is no entity, no column, no migration and no repair path — the
+streak is recomputed from `planner_task` rows on every read. This is the opposite of the Routines
+slice's `Streak` / `BestStreak` columns, and the difference is not taste: a routine period *wipes its
+items* on reset, so its counter has to be the record, while planner days keep every task row forever.
+Deriving it makes un-ticking an exact inverse (there is no increment to undo), makes editing a past
+day recompute across the gap it opens, and makes drift unrepresentable.
+
+The rules, all settled against the frontend's B1 ask rather than inherited from the client:
+
+| Question | Answer |
+|---|---|
+| What makes a day count? | Every **qualifying** task is `Completed`. Qualifying = not `IsBackground`, not `IsOptional`, not `Cancelled`. |
+| Does a skip break the day? | **No.** `Cancelled` leaves the denominator entirely — the app already presents skipping as a legitimate way to close a task. |
+| Does skipping everything earn a day? | **No.** Zero denominator ⇒ the day is *empty*, not complete. |
+| Does an unplanned day break the streak? | **No** — and it does not extend it either. The number means "days I completed". |
+| Does a background-only day count? | No — it is empty, exactly like an unplanned one. |
+| Optional tasks? | Excluded, same as background. **Not in the ask** — added because `BasePlannerTask.IsOptional` already existed. |
+| Grace days? | **None.** The three rules above are already lenient; grace on top would make the number unaccountable. If one is ever wanted it goes in `Walk`, not `Evaluate`. |
+| Day boundary? | The user's own `User.Timezone`. The response returns `Today` + `Timezone` so the client can stop computing dates. |
+| Retroactive edits? | Recomputed, including across the gap. Free, given the above. |
+
+Two rules exist for the client's sake rather than the domain's, and both are load-bearing:
+
+- **Today can never break the streak, only extend it.** An unfinished today is unfinished, not
+  failed. Without this the chip reads 0 every morning and climbs back by evening.
+- **`CurrentStreak` is the value to display, already zeroed when dead.** The client owns no
+  "is it still alive" decision — that judgement depends on the skip and empty-day rules, which live
+  here.
+
+⚠ **The streak's denominator is narrower than the progress ring's.** The ring counts every
+non-background task; the streak also drops optional and cancelled ones. A day can read 4/5 on the
+ring and still be complete. Clients must read `IsTodayComplete` rather than comparing counts.
+
+⚠ **It rides on `CalendarResponse.Streak` and is null on every calendar read except
+`GetByDateCalendarEndpoint`**, which fills it in after the projection — `Projection` runs per row and
+cannot walk days. Nothing breaks if that line is dropped; the field just goes null and the chip
+sticks at zero, which is why `PlannerStreakTests` asserts it is non-null on the plan response.
+
+⚠ **`PlannerStreakReader` owns the qualifying-task predicate, `PlannerStreakService` owns the rules.**
+Keep it that way — a second place deciding what a qualifying task is, is how the server and the
+client end up disagreeing about the same number. The read is deliberately **uncapped**: a lookback
+window would turn `BestStreak` into a rolling maximum, so a record the user really set could quietly
+shrink.
+
 ## Gotchas
 
 - **Slice code takes a plain `DbContext`**, never `AppDbContext`. There is no `dbContext.PlannerTasks`

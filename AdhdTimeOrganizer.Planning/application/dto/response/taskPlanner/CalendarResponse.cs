@@ -30,6 +30,18 @@ public record CalendarResponse : IdResponse, IProjectionResponse<CalendarRespons
     public required int TotalTasks { get; init; }
     public required int CompletedTasks { get; init; }
 
+    /// <summary>
+    /// The user's day-plan completion streak. A user-level fact, not a property of this day — it is carried
+    /// here only because the home page fetches this response on every mount and a dedicated route would be one
+    /// more request for a number that is needed every time.
+    /// <para>
+    /// <b>Null everywhere except <c>GetByDateCalendarEndpoint</c></b>, which fills it in after the projection.
+    /// <see cref="Projection"/> cannot produce it: a streak is a walk across days, and this projection runs
+    /// per-row. The grid and by-id reads leave it null rather than paying for a second query nothing displays.
+    /// </para>
+    /// </summary>
+    public PlannerStreakResponse? Streak { get; init; }
+
     public static IQueryable<CalendarResponse> Projection(IQueryable<Calendar> query)
     {
         return query.Select(c => new CalendarResponse
