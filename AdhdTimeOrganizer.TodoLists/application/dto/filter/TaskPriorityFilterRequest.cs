@@ -1,5 +1,4 @@
 using Sydowwe.Framework.application.dto.request.@interface;
-using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 
 namespace AdhdTimeOrganizer.TodoLists.application.dto.filter;
 

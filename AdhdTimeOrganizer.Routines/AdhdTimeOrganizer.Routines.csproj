@@ -28,14 +28,11 @@
         <Using Include="Microsoft.EntityFrameworkCore"/>
     </ItemGroup>
 
-    <!-- The two Quartz jobs (RoutineTodoListResetJob, RoutinePeriodNudgeJob) need IJob /
-         IJobExecutionContext / DisallowConcurrentExecution from Quartz core. Registration itself
-         (AddJob/AddTrigger) stays host-side in the single AddQuartz call — this is only the
-         package the job classes compile against. Version pinned to match the host and
-         Sydowwe.Scheduler so the solution carries one Quartz version. -->
-    <ItemGroup>
-        <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.1"/>
-    </ItemGroup>
+    <!-- No Quartz here, deliberately. The two scheduled jobs are keyed IScheduledJobHandler
+         implementations (RoutineTodoListResetJobHandler, RoutinePeriodNudgeJobHandler) whose schedules
+         RoutinesScheduledJobsRegistrar pushes through Sydowwe.Framework.Contracts' IScheduler.
+         Sydowwe.Scheduler is the only project in the solution that references Quartz — don't add the
+         package back to write an IJob. -->
 
     <!-- Deliberately no reference to AdhdTimeOrganizer (the host), and only Core + TodoLists among the
          slices: Routines references TodoLists for the shared to-do bases (BaseTodoListItem,

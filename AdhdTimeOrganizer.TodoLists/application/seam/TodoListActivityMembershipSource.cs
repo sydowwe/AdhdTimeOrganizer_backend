@@ -1,6 +1,5 @@
 using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
-using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.TodoLists.application.seam;

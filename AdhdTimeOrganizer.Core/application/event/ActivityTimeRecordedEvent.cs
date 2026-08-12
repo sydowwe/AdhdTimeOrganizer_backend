@@ -1,4 +1,4 @@
-using FastEndpoints;
+using AdhdTimeOrganizer.Core.application.seam;
 
 namespace AdhdTimeOrganizer.Core.application.@event;
 
@@ -28,7 +28,7 @@ namespace AdhdTimeOrganizer.Core.application.@event;
 /// One entry per activity the batch attributed time to, carrying that activity's <em>whole-day</em>
 /// total, not the batch delta — completion thresholds are cumulative.
 /// </param>
-public record ActivityTimeRecordedEvent(long UserId, DateOnly Day, IReadOnlyList<ActivityDayTotal> Totals) : IEvent;
+public record ActivityTimeRecordedEvent(long UserId, DateOnly Day, IReadOnlyList<ActivityDayTotal> Totals) : ISeamEvent;
 
 /// <param name="ActivityId">The activity a tracker mapping attributed the time to.</param>
 /// <param name="TotalSecondsOnDay">Seconds attributed to it across the whole of <c>Day</c>.</param>

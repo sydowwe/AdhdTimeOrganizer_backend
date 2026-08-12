@@ -1,12 +1,11 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using Microsoft.Extensions.Options;
-using Sydowwe.Framework.infrastructure.persistence.seeder;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.valueObject;
+using Sydowwe.Framework.infrastructure.persistence.seeder;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
-using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
-using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.TodoLists.infrastructure.persistence.seeder.dev;
 

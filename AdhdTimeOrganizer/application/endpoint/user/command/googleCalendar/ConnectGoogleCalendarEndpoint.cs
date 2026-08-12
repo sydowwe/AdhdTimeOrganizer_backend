@@ -1,8 +1,7 @@
 using AdhdTimeOrganizer.application.dto.request.user;
-using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
-using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
 using AdhdTimeOrganizer.infrastructure.extService.googleCalendar;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;

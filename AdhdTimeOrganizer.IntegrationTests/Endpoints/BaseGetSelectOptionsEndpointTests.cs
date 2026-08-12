@@ -14,6 +14,10 @@ public class GetSelectOptionsActivityCategoryEndpointTests(AppDbContextFixture f
 {
     protected override string EndpointUrl => "api/activity-category/all-options";
 
+    // ActivityCategory is user-owned data; the endpoint does not override AllowedRoles(), so plain
+    // Users can reach it.
+    protected override bool IsAdminOnly => false;
+
     protected override async Task<long> SeedEntityAsync(DbContext db)
     {
         var category = new ActivityCategory { Name = "Option A", Color = "#FF0000", UserId = FakeLoggedUserService.TestUserId };

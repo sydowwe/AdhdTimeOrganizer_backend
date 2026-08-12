@@ -20,14 +20,33 @@ Does **not** own:
   not before.
 - **The suggestion-pattern machinery** — `SuggestionPatternRefreshInterceptor`,
   `SuggestionPatternRefreshQueue`, `SuggestionPatternView`, `SuggestionPatternViewInstaller`,
-  `SuggestionPatternRefreshJob`, `ActivityHistoryPattern` + its configuration, and the three
+  `SuggestionPatternRefreshJob`, `PlannerSuggestionFromActivityHistory` + its configuration (both
+  since moved to Planning), and the three
   `sqlScripts/*.sql` materialized views. These span History + Planning + Calendar and are wired into
   `Program.cs`. The interceptor fires on any save touching `ActivityHistory`, so the host now
   references this slice — that is host → slice, which is the correct direction.
-- **The three tracking configurations** still sitting in the host's
+- **The three tracking configurations** that used to sit in the host's
   `infrastructure/persistence/configuration/activityHistory/` folder (`DesktopActivityEntry`,
-  `WebExtensionActivityEntry`, `AndroidSessionData`). The folder name lies; those entities belong to
-  Tracking.
+  `WebExtensionActivityEntry`, `AndroidSessionData`). The folder name lied; they belonged to Tracking
+  and moved to `AdhdTimeOrganizer.Tracking` with their entities. The folder is gone.
+
+## What History gained in the Tracking extraction
+
+`application/seam/ActivityHistoryTimeAttributionSink.cs` implements Core's
+**`IActivityTimeAttributionSink`**: "record N seconds against this activity". Tracking's desktop
+heartbeat used to write `ActivityHistory` rows inline, which was a `Tracking → History` project
+reference; the write now comes through this seam, and History is the sole implementer.
+
+Two rules, both load-bearing:
+
+- **It mutates the `DbContext` handed in and must not call `SaveChanges`.** The caller's own save is
+  the transaction, which is what keeps a tracked entry atomic with its attribution.
+- The contiguous-window extension rule (extend an existing row whose `EndTimestamp` equals the new
+  window's start, rather than inserting) is a property of the **ledger's shape**, which is why it
+  belongs here and not in the ingest endpoint it moved out of.
+
+Unlike `IActivityMembershipSource` this is resolved as a **single** service, deliberately: a missing
+registration throws at endpoint activation rather than silently dropping every attribution write.
 
 ## Dependency seams
 

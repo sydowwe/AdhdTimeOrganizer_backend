@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.response.generic;
 using Sydowwe.Framework.application.endpoint.@base.read;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.Core.application.endpoint.activity.activity.query;
 

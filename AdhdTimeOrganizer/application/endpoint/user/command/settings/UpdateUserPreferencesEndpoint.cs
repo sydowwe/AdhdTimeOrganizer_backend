@@ -1,5 +1,4 @@
 using AdhdTimeOrganizer.application.dto.request.user;
-using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Microsoft.AspNetCore.Identity;

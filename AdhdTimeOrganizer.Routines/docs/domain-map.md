@@ -93,15 +93,18 @@ Band **200–299**; the contract is `AdhdTimeOrganizer.Core/infrastructure/persi
 
 ## Jobs — `infrastructure/jobs/`
 
-Both registered in the host's single `AddQuartz` block in `Program.cs`, not through either DI scan;
-`[DisallowConcurrentExecution]`; both resolve `DbContext` from a fresh `IServiceScopeFactory` scope
-because they run unauthenticated.
+Both are keyed `IScheduledJobHandler` implementations (`Sydowwe.Framework.Contracts.scheduling`), **not
+Quartz `IJob`s** — this slice references no Quartz. They are picked up by the `IScopedService` marker
+scan like any other service, and their schedules are pushed on boot by
+`infrastructure/scheduling/RoutinesScheduledJobsRegistrar` through `IScheduler`. Both take the scoped
+`DbContext` directly (the Scheduler's dispatcher opens the scope per fire) and run unauthenticated.
+`DisallowConcurrent = true` is requested on the registration — it is no longer an attribute on the class.
 
-- `RoutineTodoListResetJob` — 02:00 daily. Sweeps every period, applies `TryReset`, persists
-  completions, notifies after commit.
-- `RoutinePeriodNudgeJob` — 09:00 daily (later than the reset, deliberately: this one is addressed to
-  a person, not the database). Sequential per period — see the file's header comment for why
-  `Task.WhenAll` would break the single scoped `DbContext`.
+- `RoutineTodoListResetJobHandler` (`Routines.TodoListReset`) — 02:00 daily. Sweeps every period,
+  applies `TryReset`, persists completions, notifies after commit.
+- `RoutinePeriodNudgeJobHandler` (`Routines.PeriodNudge`) — 09:00 daily (later than the reset,
+  deliberately: this one is addressed to a person, not the database). Sequential per period — see the
+  file's header comment for why `Task.WhenAll` would break the single scoped `DbContext`.
 
 ## Invariants
 

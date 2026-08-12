@@ -29,7 +29,7 @@ namespace AdhdTimeOrganizer.Core.application.seam;
 /// trip client-side filter.
 /// </para>
 /// </remarks>
-public interface IActivityMembershipSource
+public interface IActivityMembershipSource : ISeam
 {
     /// <summary>
     /// Stable wire key naming this source. It appears in filter DTOs and therefore in the SPA's

@@ -1,6 +1,6 @@
-using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Framework.Testing.baseTests;
@@ -14,6 +14,10 @@ public class ToggleIsHiddenRoutineTimePeriodEndpointTests(AppDbContextFixture fi
     : BaseToggleIsHiddenEndpointTests(fixture)
 {
     protected override string EndpointUrl => "api/routine-time-period/toggle-is-hidden";
+
+    // RoutineTimePeriod is user-owned data; the endpoint does not override AllowedRoles(), so plain
+    // Users can reach it.
+    protected override bool IsAdminOnly => false;
 
     protected override async Task<long> SeedEntityAsync(DbContext db)
     {

@@ -1,7 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
-using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using System.Reflection;
+using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.infrastructure.scheduling;
+using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.Routines.infrastructure.jobs;
+using AdhdTimeOrganizer.Routines.infrastructure.scheduling;
+using AdhdTimeOrganizer.Tracking.infrastructure.jobs;
+using AdhdTimeOrganizer.Tracking.infrastructure.scheduling;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Contracts.gdpr;
@@ -117,6 +124,42 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(PurgeExpiredNotificationHistoryJobHandler.HandlerKey, keys);
         Assert.Contains(PurgeExpiredRunLogsJobHandler.HandlerKey, keys);
         Assert.Contains(OverdueJobSweepJobHandler.HandlerKey, keys);
+
+        // The slice- and host-owned jobs that used to be Quartz IJobs registered by hand in Program.cs.
+        // They are picked up by the marker-interface scan, which only sees an assembly the CLR has already
+        // loaded — so a slice nothing else touches before AddDependencyInjection contributes no handler and
+        // its job fires into nothing.
+        Assert.Contains(RoutineTodoListResetJobHandler.HandlerKey, keys);
+        Assert.Contains(RoutinePeriodNudgeJobHandler.HandlerKey, keys);
+        Assert.Contains(PurgeExpiredActivityTrackingEntriesJobHandler.HandlerKey, keys);
+        Assert.Contains(SuggestionPatternRefreshJobHandler.HandlerKey, keys);
+    }
+
+    /// <summary>
+    /// <b>Sydowwe.Scheduler is the only project allowed to reference Quartz.</b> Every other project owns
+    /// keyed <see cref="IScheduledJobHandler"/>s and pushes <see cref="RecurringJobRegistration"/>s through
+    /// <see cref="IScheduler"/> instead. Nothing about adding a <c>Quartz</c> package reference and writing
+    /// an <c>IJob</c> fails to build — it just quietly reintroduces a second scheduling path that the run
+    /// log, the retry policy, the failure alerting and the dashboard know nothing about.
+    /// </summary>
+    [Fact]
+    public void OnlySchedulerModule_ReferencesQuartz()
+    {
+        Assembly[] ourAssemblies =
+        [
+            typeof(AppDbContext).Assembly,
+            typeof(RoutineTodoListResetJobHandler).Assembly,
+            typeof(PurgeExpiredActivityTrackingEntriesJobHandler).Assembly,
+            typeof(ReminderScanJobHandler).Assembly,
+            typeof(FlushDeferredNotificationsJobHandler).Assembly
+        ];
+
+        var offenders = ourAssemblies
+            .Where(a => a.GetReferencedAssemblies().Any(r => r.Name?.StartsWith("Quartz", StringComparison.Ordinal) == true))
+            .Select(a => a.GetName().Name)
+            .ToList();
+
+        Assert.Empty(offenders);
     }
 
     /// <summary>
@@ -280,6 +323,14 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(PurgeExpiredReminderLedgersJobHandler.HandlerKey, jobKeys);
         Assert.Contains(FlushDeferredNotificationsJobHandler.HandlerKey, jobKeys);
         Assert.Contains(PurgeExpiredNotificationHistoryJobHandler.HandlerKey, jobKeys);
+
+        // The slice- and host-owned schedules, pushed by RoutinesScheduledJobsRegistrar /
+        // TrackingScheduledJobsRegistrar / PortalScheduledJobsRegistrar. A registrar dropped from the host's
+        // AddHostedService list is silent: the handler is still in DI, it simply never fires.
+        Assert.Contains(RoutinesScheduledJobsRegistrar.ResetRegistration.JobKey, jobKeys);
+        Assert.Contains(RoutinesScheduledJobsRegistrar.NudgeRegistration.JobKey, jobKeys);
+        Assert.Contains(TrackingScheduledJobsRegistrar.RetentionPurgeRegistration.JobKey, jobKeys);
+        Assert.Contains(PortalScheduledJobsRegistrar.SuggestionPatternRefreshRegistration.JobKey, jobKeys);
     }
 
     // ---- GDPR erasure fan-out --------------------------------------------------------------------

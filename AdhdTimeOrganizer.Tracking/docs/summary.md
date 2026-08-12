@@ -23,7 +23,9 @@ Owns:
 - **The five endpoint groups** (`application/endpointGroups/`). The whole folder moved: every group in
   it was a tracking group.
 - **17 validators**, the tracking request/response DTOs, `WebExtensionDataFilterRequest`.
-- **Retention** — `PurgeExpiredActivityTrackingEntriesJob` + `ActivityTrackingRetentionOptions`.
+- **Retention** — `PurgeExpiredActivityTrackingEntriesJobHandler` (a keyed `IScheduledJobHandler` on the
+  Scheduler module's substrate, so this slice references no Quartz), its `TrackingScheduledJobsRegistrar`
+  and `ActivityTrackingRetentionOptions`.
 - **The dev `WebExtensionDataSeeder`** (`Order` inside the 600–699 band — see
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md`).
 

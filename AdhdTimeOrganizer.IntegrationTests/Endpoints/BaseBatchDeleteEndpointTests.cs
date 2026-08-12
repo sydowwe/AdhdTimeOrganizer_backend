@@ -14,6 +14,10 @@ public class BatchDeleteActivityCategoryEndpointTests(AppDbContextFixture fixtur
 {
     protected override string EndpointUrl => "api/activity-category/batch-delete";
 
+    // ActivityCategory is user-owned data; the endpoint does not override AllowedRoles(), so plain
+    // Users can reach it.
+    protected override bool IsAdminOnly => false;
+
     protected override async Task<long[]> SeedEntitiesAsync(DbContext db, int count)
     {
         var categories = Enumerable.Range(1, count)

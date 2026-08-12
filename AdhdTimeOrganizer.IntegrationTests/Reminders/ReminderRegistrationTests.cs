@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using AdhdTimeOrganizer.Core.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.application.service.reminder;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;

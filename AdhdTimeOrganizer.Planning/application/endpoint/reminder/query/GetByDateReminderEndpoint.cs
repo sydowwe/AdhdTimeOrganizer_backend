@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
-using AdhdTimeOrganizer.Core.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.response.reminder;
 using AdhdTimeOrganizer.Planning.domain.model.entity.reminder;
 using FastEndpoints;

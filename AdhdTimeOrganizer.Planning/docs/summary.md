@@ -19,7 +19,7 @@ to find a specific type.
 | Task importance | `TaskImportance` | 7 |
 | Planner settings | `UserPlannerSettings` | 2 |
 | Reminders | `Reminder`, `ReminderRegistrationService` | 5 |
-| Suggestion read-models | `PlannerTaskPattern`, `ActivityHistoryPattern`, `TemplateSuggestionPattern` | — |
+| Suggestion read-models | `PlannerSuggestionFromPlannerTask`, `…FromActivityHistory`, `…FromDayTemplate` | — |
 
 Plus their DTOs, 12 validators, `TaskPlannerHelper`, and five seeders (`CalendarSeeder`,
 `TaskImportanceSeeder`, `UserPlannerSettingsSeeder` as per-user defaults; `TaskPlannerDayTemplateSeeder`
@@ -42,7 +42,8 @@ Two edges that the planning docs predicted turned out not to need one:
 
 `review/portal/04-slicing-verification.md` and `slicePrompts/05-planning.md` both record that
 `GetSuggestionsRepeatingPlannerTaskEndpoint` "reads `ActivityHistory`", making History a
-prerequisite. It does not. It reads **`ActivityHistoryPattern`**, the entity mapped over the
+prerequisite. It does not. It reads **`PlannerSuggestionFromActivityHistory`** (named
+`ActivityHistoryPattern` until the suggestion read-models were renamed), the entity mapped over the
 `mv_activity_history_pattern` materialized view — a *different* type that was never in the History
 slice and moved here with its two siblings. The materialized view is itself the decoupling: Planning
 reads a view derived from History's table without naming a single History type.

@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
-using AdhdTimeOrganizer.Core.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using Sydowwe.Framework.application.dto.dto;
 

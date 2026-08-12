@@ -1,13 +1,11 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.infrastructure.jobs;
-using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Moq;
-using Quartz;
 using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Notifications.domain.entity;
 using Xunit;
@@ -80,18 +78,24 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
     }
 
     /// <summary>
-    /// Runs a Quartz job the way the scheduler would. The context is a mock because these jobs use it for
-    /// nothing but the cancellation token — all their state comes from the scope they open themselves.
+    /// Runs a scheduled job the way the Scheduler's dispatcher would: one DI scope per fire (the handlers
+    /// take a scoped <c>DbContext</c>), and a hand-built <see cref="ScheduledJobContext"/> — these handlers
+    /// read nothing off it, all their state comes from the database.
     /// </summary>
-    private async Task RunJobAsync<TJob>() where TJob : IJob
+    private async Task RunJobAsync<THandler>() where THandler : IScheduledJobHandler
     {
-        var services = Fixture.AdminAndUserFactory.Services;
-        var job = (IJob)ActivatorUtilities.CreateInstance(services, typeof(TJob));
+        await using var scope = Fixture.AdminAndUserFactory.Services.CreateAsyncScope();
+        var handler = (IScheduledJobHandler)ActivatorUtilities.CreateInstance(scope.ServiceProvider, typeof(THandler));
 
-        var context = new Mock<IJobExecutionContext>();
-        context.SetupGet(c => c.CancellationToken).Returns(CancellationToken);
-
-        await job.Execute(context.Object);
+        var now = DateTime.UtcNow;
+        await handler.ExecuteAsync(new ScheduledJobContext
+        {
+            ScheduledFireTimeUtc = now,
+            ActualFireTimeUtc = now,
+            JobKey = handler.Key,
+            CorrelationId = "routine-notification-test",
+            TriggerSource = TriggerSource.Manual
+        }, CancellationToken);
     }
 
     private async Task<int> CountNotificationsAsync(NotificationType type)
@@ -119,8 +123,8 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
             await SeedItemAsync(db, period, isDone: false, CancellationToken);
         }
 
-        await RunJobAsync<RoutinePeriodNudgeJob>();
-        await RunJobAsync<RoutinePeriodNudgeJob>();
+        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
+        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
 
         Assert.Equal(1, await CountNotificationsAsync(NotificationType.RoutinePeriodEndingSoon));
 
@@ -144,7 +148,7 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
             await SeedItemAsync(db, period, isDone: true, CancellationToken);
         }
 
-        await RunJobAsync<RoutinePeriodNudgeJob>();
+        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
 
         Assert.Equal(0, await CountNotificationsAsync(NotificationType.RoutinePeriodEndingSoon));
 
@@ -164,7 +168,7 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
             await SeedItemAsync(db, period, isDone: false, CancellationToken);
         }
 
-        await RunJobAsync<RoutinePeriodNudgeJob>();
+        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
 
         Assert.Equal(0, await CountNotificationsAsync(NotificationType.RoutinePeriodEndingSoon));
     }
@@ -182,8 +186,8 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
             await db.SaveChangesAsync(CancellationToken);
         }
 
-        await RunJobAsync<RoutinePeriodNudgeJob>();
-        await RunJobAsync<RoutinePeriodNudgeJob>();
+        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
+        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
 
         Assert.Equal(1, await CountNotificationsAsync(NotificationType.RoutineStreakGraceExpiring));
 
@@ -209,7 +213,7 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
             await SeedItemAsync(db, period, isDone: false, CancellationToken);
         }
 
-        await RunJobAsync<RoutineTodoListResetJob>();
+        await RunJobAsync<RoutineTodoListResetJobHandler>();
 
         Assert.Equal(1, await CountNotificationsAsync(NotificationType.RoutinePeriodEnded));
     }

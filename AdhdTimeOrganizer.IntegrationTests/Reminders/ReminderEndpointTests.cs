@@ -17,6 +17,10 @@ public class CreateReminderEndpointTests(AppDbContextFixture fixture) : BaseCrea
 {
     protected override string EndpointUrl => "api/reminder";
 
+    // Reminder is user-owned data; the endpoint does not override AllowedRoles(), so plain Users can
+    // reach it.
+    protected override bool IsAdminOnly => false;
+
     protected override Task<object> BuildValidPayloadAsync(DbContext db) => Task.FromResult<object>(new
     {
         Title = "Call the dentist",
@@ -36,6 +40,10 @@ public class UpdateReminderEndpointTests(AppDbContextFixture fixture) : BaseUpda
     /// the answer that leaks least.
     /// </summary>
     protected override HttpStatusCode UnauthorizedStatus => HttpStatusCode.NotFound;
+
+    // Reminder is user-owned data; the endpoint does not override AllowedRoles(), so plain Users can
+    // reach it.
+    protected override bool IsAdminOnly => false;
 
     protected override async Task<long> SeedEntityAsync(DbContext db) =>
         (await ReminderSeedHelper.SeedReminderAsync(db, FakeLoggedUserService.TestUserId, DateTime.UtcNow.AddHours(2), ct: TestContext.Current.CancellationToken)).Id;
@@ -64,6 +72,10 @@ public class DeleteReminderEndpointTests(AppDbContextFixture fixture) : BaseDele
     /// <summary>Filtered out of the lookup, same as the update endpoint — see the note there.</summary>
     protected override HttpStatusCode UnauthorizedStatus => HttpStatusCode.NotFound;
 
+    // Reminder is user-owned data; the endpoint does not override AllowedRoles(), so plain Users can
+    // reach it.
+    protected override bool IsAdminOnly => false;
+
     protected override async Task<long> SeedEntityAsync(DbContext db) =>
         (await ReminderSeedHelper.SeedReminderAsync(db, FakeLoggedUserService.TestUserId, DateTime.UtcNow.AddHours(2), ct: TestContext.Current.CancellationToken)).Id;
 
@@ -87,6 +99,10 @@ public class GetByIdReminderEndpointTests(AppDbContextFixture fixture) : BaseGet
     /// stronger answer anyway (a 403 would confirm the id is real).
     /// </summary>
     protected override HttpStatusCode UnauthorizedStatus => HttpStatusCode.NotFound;
+
+    // Reminder is user-owned data; the endpoint does not override AllowedRoles(), so plain Users can
+    // reach it.
+    protected override bool IsAdminOnly => false;
 
     protected override async Task<long> SeedEntityAsync(DbContext db) =>
         (await ReminderSeedHelper.SeedReminderAsync(db, FakeLoggedUserService.TestUserId, DateTime.UtcNow.AddHours(2), ct: TestContext.Current.CancellationToken)).Id;

@@ -15,6 +15,10 @@ public class GridActivityCategoryEndpointTests(AppDbContextFixture fixture)
 {
     protected override string EndpointUrl => "api/activity-category/filtered-table";
 
+    // ActivityCategory is user-owned data; the endpoint does not override AllowedRoles(), so plain
+    // Users can reach it.
+    protected override bool IsAdminOnly => false;
+
     protected override async Task<long> SeedEntityAsync(DbContext db)
     {
         var category = new ActivityCategory { Name = "Table A", Color = "#FF0000", UserId = FakeLoggedUserService.TestUserId };

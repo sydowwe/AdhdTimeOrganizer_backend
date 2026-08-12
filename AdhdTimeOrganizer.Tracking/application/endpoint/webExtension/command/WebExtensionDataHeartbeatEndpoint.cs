@@ -1,0 +1,80 @@
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.heartbeat;
+using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using FastEndpoints;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.security;
+
+namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.webExtension.command;
+
+[AllowExtensionClients]
+public class WebExtensionDataHeartbeatEndpoint(DbContext dbContext) : Endpoint<WebExtensionHeartbeatRequest, int>
+{
+    public override void Configure()
+    {
+        Post("/activity-tracking/web-extension/heartbeat");
+        Validator<WebExtensionHeartbeatValidator>();
+        Summary(s =>
+        {
+            s.Summary = "Receive browser extension heartbeat activity data";
+            s.Description = "Records web extension activity data from browser, creating or updating domain activity records";
+            s.Response<int>(200, "Success - returns count of processed activities");
+            s.Response(400, "Bad request");
+        });
+    }
+
+    public override async Task HandleAsync(WebExtensionHeartbeatRequest req, CancellationToken ct)
+    {
+        var userId = User.GetId();
+        var processedCount = 0;
+
+        foreach (var activity in req.Activities.Where(activity => activity.ActiveSeconds != 0 || activity.BackgroundSeconds != 0))
+        {
+            // Find existing record for this user + window + domain
+            var existing = await dbContext.Set<WebExtensionActivityEntry>()
+                .FirstOrDefaultAsync(x =>
+                        x.UserId == userId &&
+                        x.WindowStart == req.WindowStart &&
+                        x.Domain == activity.Domain,
+                    ct);
+
+            if (existing != null)
+            {
+                // UPDATE existing record
+                // Take the values from request (extension sends running totals, not deltas)
+                existing.ActiveSeconds = activity.ActiveSeconds;
+                existing.BackgroundSeconds = activity.BackgroundSeconds;
+
+                // Update URL if provided (keep most recent)
+                if (!string.IsNullOrEmpty(activity.Url))
+                    existing.Url = activity.Url;
+
+                // Update final flag (once true, stays true)
+                if (req.IsFinal)
+                    existing.IsFinal = true;
+            }
+            else
+            {
+                // INSERT new record
+                var record = new WebExtensionActivityEntry
+                {
+                    UserId = userId,
+                    WindowStart = req.WindowStart,
+                    Domain = activity.Domain,
+                    Url = activity.Url,
+                    ActiveSeconds = activity.ActiveSeconds,
+                    BackgroundSeconds = activity.BackgroundSeconds,
+                    IsFinal = req.IsFinal
+                };
+
+                dbContext.Set<WebExtensionActivityEntry>().Add(record);
+            }
+
+            processedCount++;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+
+        await Send.ResponseAsync(processedCount, cancellation: ct);
+    }
+}

@@ -3,7 +3,8 @@
 **Purpose:** the routine domain — recurring to-do items (`RoutineTodoList`) grouped into time
 periods (`RoutineTimePeriod`) with streaks, grace windows, and a completion history
 (`RoutinePeriodCompletion`); the reset/nudge domain logic (`RoutineResetService`); the two nightly
-Quartz jobs that sweep them; and the notification producer that turns a reset, a lead-time nudge, or
+scheduled jobs that sweep them (keyed `IScheduledJobHandler`s on the Scheduler
+module's substrate — this slice references no Quartz); and the notification producer that turns a reset, a lead-time nudge, or
 a grace warning into a `Sydowwe.Framework.Contracts` notification.
 
 **This is the third slice of the portal split.** Read `review/portal/slicePrompts/00-README.md` for
@@ -31,9 +32,9 @@ knowledge of Planning at all.
 
 - **References:** `AdhdTimeOrganizer.Core`, `AdhdTimeOrganizer.TodoLists`, `Sydowwe.Framework`,
   `Sydowwe.Framework.Contracts`. No host reference, by construction — see the comment in the csproj.
-- **Referenced by:** `AdhdTimeOrganizer` (the host), for the Quartz job registration
-  (`AddJob<RoutineTodoListResetJob>` / `AddJob<RoutinePeriodNudgeJob>` in the single `AddQuartz`
-  block) and the two heartbeat/event-handler call sites that still touch a routine item directly
+- **Referenced by:** `AdhdTimeOrganizer` (the host), for the hosted boot registrar
+  (`AddHostedService<RoutinesScheduledJobsRegistrar>()`, which pushes the two job schedules to the
+  Scheduler module) and the two heartbeat/event-handler call sites that still touch a routine item directly
   (`DesktopActivityHeartbeatEndpoint`, `PlannerTaskIsDoneChangedEventHandler`).
 - **`Routines → TodoLists` is the one real outbound slice edge**, verified one-way: `RoutineTodoList`
   derives from TodoLists' `BaseTodoListItem`, and the routine endpoints subclass TodoLists' shared
@@ -72,8 +73,9 @@ knowledge of Planning at all.
   mid-sweep in some code paths. Isolating this area with its own project and tests is *why* it was
   extracted early — fix in follow-up commits, not this one.
 
-- **Background inserts have no authenticated user.** `RoutineTodoListResetJob` and
-  `RoutinePeriodNudgeJob` both run unauthenticated via `IServiceScopeFactory`; if either ever inserts
+- **Background inserts have no authenticated user.** `RoutineTodoListResetJobHandler` and
+  `RoutinePeriodNudgeJobHandler` both run unauthenticated (the Scheduler dispatcher fires them in a
+  bare background scope); if either ever inserts
   an `IEntityWithUser` row it must set `UserId` explicitly, since `BaseWithUserEntitySaveChangesAsync`
   only fills it from an authenticated user. Neither job inserts today (only mutates existing tracked
   rows and adds `RoutinePeriodCompletion`, which is `BaseEntity`, not `IEntityWithUser`) — keep it
@@ -93,9 +95,10 @@ knowledge of Planning at all.
   `AddDependencyInjection` `AppDomain` sweep doubles every `IEnumerable<T>`, so each seeder and
   `RoutineTodoListActivityMembershipSource` registration runs/resolves twice, silently);
   `AppDbContext.ApplyHostConfigurations` (missing → the three tables vanish from the model); and the
-  solution file. The Quartz jobs are a **fifth** registration point, but a separate one: they are
-  wired into the host's single `AddQuartz` block in `Program.cs`, not through either DI scan —
-  `AddJob<T>` registers the job type with Quartz's own service-provider job factory directly.
+  solution file. The two scheduled jobs are a **fifth** registration point: the handlers themselves come
+  from the ordinary `IScopedService` scan, but their *schedules* only exist if
+  `AddHostedService<RoutinesScheduledJobsRegistrar>()` is in `Program.cs`. Dropping that line builds
+  fine — the jobs simply never fire.
 
 - **Seeder `Order` is banded.** Routines owns **200–299**. See
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md` before adding a

@@ -53,7 +53,8 @@ and is therefore denied to extension clients by the `Program.cs` configurator's 
 
 | Concern | File |
 |---|---|
-| Retention purge (GDPR Art. 5(1)(e)) | `infrastructure/jobs/PurgeExpiredActivityTrackingEntriesJob.cs` — `ExecuteDeleteAsync` with `IgnoreQueryFilters`, so it purges every user's rows |
+| Retention purge (GDPR Art. 5(1)(e)) | `infrastructure/jobs/PurgeExpiredActivityTrackingEntriesJobHandler.cs` — a keyed `IScheduledJobHandler` (**not** a Quartz `IJob`; this slice references no Quartz). `ExecuteDeleteAsync` with `IgnoreQueryFilters`, so it purges every user's rows |
+| Its 03:30-daily schedule | `infrastructure/scheduling/TrackingScheduledJobsRegistrar.cs` — pushed to the Scheduler module on every boot through `IScheduler` (the RAM job store drops triggers on restart) |
 | Retention policy | `infrastructure/persistence/retention/ActivityTrackingRetentionOptions.cs` — bound in `Program.cs` |
 | Dev fixture | `infrastructure/persistence/seeder/dev/WebExtensionDataSeeder.cs` — truncates, so it is a dev seeder, not a default one |
 
@@ -71,7 +72,7 @@ Open these when changing tracking, even though they are not in this project:
 | `ActivityTracking` policy definition | `config/IdentityServiceExtensions.cs` |
 | `ActivityTracking` role grant | `infrastructure/extService/user/auth/ExtensionRoleClaimsProvider.cs` |
 | Completion automation | `application/eventHandler/ActivityTimeRecordedEventHandler.cs` |
-| Quartz registration of the purge job | `Program.cs` |
+| Hosted registrar that schedules the purge | `Program.cs` (`AddHostedService<TrackingScheduledJobsRegistrar>()`) — dropping it builds fine and the purge silently never fires |
 
 ⚠ The policy name, the role name, and the `AutoTagOverride("ActivityTracking")` Swagger tag in
 `application/endpointGroups/` are **three different constants that happen to share one string**.

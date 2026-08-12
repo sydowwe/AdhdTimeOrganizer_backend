@@ -41,8 +41,9 @@ erDiagram
 ```
 
 Three read-only pattern sources back the suggestion engine (materialized views, not tables):
-`PlannerTaskPattern` (`mv_planner_task_pattern`), `ActivityHistoryPattern`
-(`mv_activity_history_pattern`), `TemplateSuggestionPattern` (`mv_template_suggestion_pattern`).
+`PlannerSuggestionFromPlannerTask` (`mv_planner_task_pattern`), `PlannerSuggestionFromActivityHistory`
+(`mv_activity_history_pattern`), `PlannerSuggestionFromDayTemplate`
+(`mv_template_suggestion_pattern`) — all three entities live in `AdhdTimeOrganizer.Planning`.
 
 Tracking ingests raw, unmapped rows — `DesktopActivityEntry`, `WebExtensionActivityEntry`,
 `AndroidSessionData` — which the `Tracker*MappingByPattern` rules attribute to an Activity / Role /
@@ -279,11 +280,12 @@ something the base classes do not.
 | ReminderRegistrationService | Service | The only class that knows the Reminders module's key/schedule/payload shape | `application/service/reminder/ReminderRegistrationService.cs` |
 | UserDefaultsService | Service | `IUserDefaultsService` — runs per-user default seeders at sign-up | `application/service/UserDefaultsService.cs` |
 | TaskPlannerHelper | Helper | `WithIncludes()` for planner reads; `TasksOverlap` | `application/helper/TaskPlannerHelper.cs` |
-| RoutineTodoListResetJob | Quartz job | 02:00 daily period reset + completion history + summary notification | `infrastructure/jobs/RoutineTodoListResetJob.cs` |
-| RoutinePeriodNudgeJob | Quartz job | 09:00 daily lead-time nudge + grace-expiry warning sweep | `infrastructure/jobs/RoutinePeriodNudgeJob.cs` |
+| RoutineTodoListResetJobHandler | Scheduled job handler | 02:00 daily period reset + completion history + summary notification | `AdhdTimeOrganizer.Routines/infrastructure/jobs/RoutineTodoListResetJobHandler.cs` |
+| RoutinePeriodNudgeJobHandler | Scheduled job handler | 09:00 daily lead-time nudge + grace-expiry warning sweep | `AdhdTimeOrganizer.Routines/infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
 | AppDbContext | DbContext | Portal + module DbSets, identity mapping, the `WebExtensionActivityEntry` combined filter | `infrastructure/persistence/AppDbContext.cs` |
 | SuggestionPatternRefreshInterceptor | Interceptor | Marks the matching pattern view dirty after saves touching planner/history/calendar (does not refresh itself) | `infrastructure/persistence/interceptors/SuggestionPatternRefreshInterceptor.cs` |
-| SuggestionPatternRefreshJob | Quartz job | Drains the dirty-view queue every 10s and REFRESHes the pattern views off the request thread | `infrastructure/jobs/SuggestionPatternRefreshJob.cs` |
+| SuggestionPatternRefreshJobHandler | Scheduled job handler | Drains the dirty-view queue every 10s and REFRESHes the pattern views off the request thread; scheduled by `PortalScheduledJobsRegistrar` | `infrastructure/jobs/SuggestionPatternRefreshJobHandler.cs` |
+| PortalScheduledJobsRegistrar | Hosted service | Pushes the portal's own recurring-job registrations to the Scheduler on every boot | `infrastructure/scheduling/PortalScheduledJobsRegistrar.cs` |
 | SuggestionPatternViewInstaller | Installer | Creates missing pattern views at boot from embedded SQL | `infrastructure/persistence/SuggestionPatternViewInstaller.cs` |
 | SeedUserIdProvider | Service | `ISeedUserProvider` — how Framework seeders find users | `infrastructure/persistence/seeder/SeedUserIdProvider.cs` |
 | PerUserDefaultMatcher | Helper | Shared matching for per-user default seeders | `infrastructure/persistence/seeder/userDefault/PerUserDefaultMatcher.cs` |

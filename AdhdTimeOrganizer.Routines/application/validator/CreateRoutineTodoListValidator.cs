@@ -2,7 +2,6 @@ using AdhdTimeOrganizer.Routines.application.dto.request.todoList;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using FastEndpoints;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.Routines.application.validator;
 

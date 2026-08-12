@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using Sydowwe.Framework.application.dto.dto;

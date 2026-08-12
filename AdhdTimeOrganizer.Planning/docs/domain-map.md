@@ -33,7 +33,7 @@ project** — see below.
 | `TaskImportance` | `domain/model/entity/activityPlanning/TaskImportance.cs` |
 | `UserPlannerSettings` | `domain/model/entity/activityPlanning/UserPlannerSettings.cs` |
 | `Reminder` | `domain/model/entity/reminder/Reminder.cs` |
-| `PlannerTaskPattern` / `ActivityHistoryPattern` / `TemplateSuggestionPattern` | `domain/model/entity/suggestion/` |
+| `PlannerSuggestionFromPlannerTask` / `…FromActivityHistory` / `…FromDayTemplate` | `domain/model/entity/suggestion/` |
 
 ## The one cross-slice relationship
 
@@ -59,12 +59,17 @@ suggestion endpoints are their only consumers.
 
 | Entity | View | Consumed by |
 |---|---|---|
-| `PlannerTaskPattern` | `mv_planner_task_pattern` | `GetSuggestionsRepeatingPlannerTaskEndpoint` |
-| `ActivityHistoryPattern` | `mv_activity_history_pattern` | `GetSuggestionsRepeatingPlannerTaskEndpoint` |
-| `TemplateSuggestionPattern` | `mv_template_suggestion_pattern` | `GetSuggestionsTaskPlannerDayTemplateEndpoint` |
+| `PlannerSuggestionFromPlannerTask` | `mv_planner_task_pattern` | `GetSuggestionsRepeatingPlannerTaskEndpoint` |
+| `PlannerSuggestionFromActivityHistory` | `mv_activity_history_pattern` | `GetSuggestionsRepeatingPlannerTaskEndpoint` |
+| `PlannerSuggestionFromDayTemplate` | `mv_template_suggestion_pattern` | `GetSuggestionsTaskPlannerDayTemplateEndpoint` |
 
-`ActivityHistoryPattern` is why this slice does **not** depend on History: it is a view over
-`activity_history`, not the `ActivityHistory` entity. The view is the seam.
+The names carry both halves on purpose: `PlannerSuggestion…` is who consumes the rows (the two
+planner suggestion endpoints), `…From<Source>` is which table they were aggregated from. **The class
+names are decoupled from the view names** — every configuration pins its view with an explicit
+`ToView(...)`, so renaming an entity never touches the schema.
+
+`PlannerSuggestionFromActivityHistory` is why this slice does **not** depend on History: it is a view
+over `activity_history`, not the `ActivityHistory` entity. The view is the seam.
 
 ## Endpoints
 

@@ -17,6 +17,10 @@ public class TemplatePlannerTaskChangeSpanEndpointTests(AppDbContextFixture fixt
 {
     protected override string EndpointUrl => "api/template-planner-task";
 
+    // TemplatePlannerTask is user-owned data; the endpoint does not override AllowedRoles(), so plain
+    // Users can reach it.
+    protected override bool IsAdminOnly => false;
+
     protected override async Task<long> SeedEntityAsync(DbContext db)
     {
         var ctx = (AppDbContext)db;

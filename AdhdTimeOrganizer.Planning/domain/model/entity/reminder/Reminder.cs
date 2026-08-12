@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
-using AdhdTimeOrganizer.Core.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 
 namespace AdhdTimeOrganizer.Planning.domain.model.entity.reminder;

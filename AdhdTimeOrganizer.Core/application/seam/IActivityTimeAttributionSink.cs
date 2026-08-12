@@ -26,7 +26,7 @@ namespace AdhdTimeOrganizer.Core.application.seam;
 /// activation rather than silently dropping every attribution write.
 /// </para>
 /// </remarks>
-public interface IActivityTimeAttributionSink
+public interface IActivityTimeAttributionSink : ISeam
 {
     /// <summary>
     /// Attributes <paramref name="activeSeconds"/> to <paramref name="activityId"/> for the window

@@ -1,7 +1,6 @@
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.Routines.infrastructure.persistence.extensions;
 

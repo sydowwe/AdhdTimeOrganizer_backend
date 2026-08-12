@@ -1,6 +1,6 @@
-using Sydowwe.Framework.domain.serviceContract;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.result;
+using Sydowwe.Framework.domain.serviceContract;
 using Sydowwe.Framework.infrastructure.persistence;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
 

@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.timer;
+using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
-using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.Core.infrastructure.persistence.seeder.userDefault;
 

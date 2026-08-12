@@ -1,12 +1,12 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
-using Sydowwe.Framework.domain.serviceContract;
-using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+using AdhdTimeOrganizer.Core.infrastructure.security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
-using AdhdTimeOrganizer.Core.infrastructure.security;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.domain.serviceContract;
+using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
 
 namespace AdhdTimeOrganizer.Core.infrastructure.persistence.seeder.@default;
 

@@ -2,8 +2,8 @@ using System.Net;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using Sydowwe.Framework.Testing;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
+using Sydowwe.Framework.Testing;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;

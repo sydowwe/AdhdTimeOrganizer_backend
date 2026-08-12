@@ -1,10 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using AdhdTimeOrganizer.Core.infrastructure.security;
-using AdhdTimeOrganizer.infrastructure.security;
 using Sydowwe.Framework.domain.@enum;
 using Xunit;
 

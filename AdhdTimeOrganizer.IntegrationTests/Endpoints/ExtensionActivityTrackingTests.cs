@@ -1,12 +1,20 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using AdhdTimeOrganizer.application.dto.request.activityTracking.android;
-using AdhdTimeOrganizer.application.dto.request.activityTracking.desktop;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
+using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.Planning.domain.model.entity;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.application.dto.request.user;
 using Sydowwe.Framework.application.dto.response.user;
@@ -163,6 +171,131 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
         var response = await extensionClient.GetAsync("user/sessions");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    /// <summary>
+    /// The wiring half of the Tracking seam, end to end over HTTP: a heartbeat entry that a pattern
+    /// mapping resolves to an activity must (a) land in <c>ActivityHistory</c> — which Tracking no
+    /// longer writes itself, it goes through Core's <c>IActivityTimeAttributionSink</c> that History
+    /// implements — and (b) drive planner-task completion through
+    /// <c>ActivityTimeRecordedEvent</c>.
+    /// <para>
+    /// Both halves fail <b>silently</b> if broken. An unregistered sink throws at activation (loud, by
+    /// design), but a handler FastEndpoints never discovered, or an event that is built and never
+    /// published, simply leaves the planner task untouched with a 200 on the wire. The branch matrix
+    /// behind (b) lives in <c>ActivityTimeAutomationTests</c>; this case exists to prove the two ends
+    /// are connected at all.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Heartbeat_MappedEntry_AttributesTimeAndCompletesPlannerTask()
+    {
+        var email = "heartbeat-automation@test.com";
+        await CreateUserWithExtensionAccess(email, true);
+
+        long userId;
+        long activityId;
+        long plannerTaskId;
+        await using (var db = CreateDbContext())
+        {
+            userId = (await db.Set<User>().FirstAsync(u => u.Email == email, CancellationToken)).Id;
+
+            var role = new ActivityRole { UserId = userId, Name = "Automation role", Color = "#0f0f0f" };
+            db.Set<ActivityRole>().Add(role);
+            await db.SaveChangesAsync(CancellationToken);
+
+            var activity = new Activity { UserId = userId, Name = "Automated activity", RoleId = role.Id };
+            db.Set<Activity>().Add(activity);
+            await db.SaveChangesAsync(CancellationToken);
+            activityId = activity.Id;
+
+            // Exact-match on the process name the heartbeat below reports, so the entry attributes.
+            db.Set<TrackerDesktopMappingByPattern>().Add(new TrackerDesktopMappingByPattern
+            {
+                UserId = userId,
+                ProcessName = "automated.exe",
+                ProcessNameMatchType = PatternMatchType.Exact,
+                IsActive = true,
+                ActivityId = activityId
+            });
+
+            var day = DateOnly.FromDateTime(DateTime.UtcNow);
+            var calendar = new Calendar
+            {
+                UserId = userId,
+                Date = day,
+                DayType = DayType.Workday,
+                WakeUpTime = new TimeOnly(7, 0),
+                BedTime = new TimeOnly(23, 0)
+            };
+            db.Set<Calendar>().Add(calendar);
+            await db.SaveChangesAsync(CancellationToken);
+
+            // 5 planned minutes against the five one-minute heartbeats below, so the threshold is met
+            // exactly. A heartbeat window is one minute (DesktopActivityHeartbeatValidator caps the
+            // entries at 60 seconds), so crossing a multi-minute threshold takes several of them.
+            var task = new PlannerTask
+            {
+                UserId = userId,
+                ActivityId = activityId,
+                CalendarId = calendar.Id,
+                StartTime = new TimeOnly(9, 0),
+                EndTime = new TimeOnly(9, 5),
+                IsBackground = false,
+                Status = PlannerTaskStatus.NotStarted
+            };
+            db.Set<PlannerTask>().Add(task);
+            await db.SaveChangesAsync(CancellationToken);
+            plannerTaskId = task.Id;
+        }
+
+        var loginResult = await ExtensionLoginSuccessAsync(email);
+        using var extensionClient = CreateCookieClient();
+        extensionClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
+
+        // Five contiguous windows: each one starts exactly where the previous ended, which is what makes
+        // the sink extend the single ActivityHistory row rather than emit one row per heartbeat.
+        var firstWindowStart = DateTime.UtcNow.Date.AddHours(9);
+        for (var minute = 0; minute < 5; minute++)
+        {
+            var response = await extensionClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", new DesktopActivityWindowDto
+            {
+                WindowStart = firstWindowStart.AddMinutes(minute),
+                Entries =
+                [
+                    new DesktopActivityEntryDto
+                    {
+                        ProcessName = "automated.exe",
+                        ProductName = "Automated",
+                        WindowTitle = "Automated",
+                        ExecutablePath = @"C:\a\automated.exe",
+                        IsFullscreen = false,
+                        ActiveSeconds = 60,
+                        BackgroundSeconds = 0,
+                        IsPlayingSound = false,
+                        ActiveMonitor = 0
+                    }
+                ]
+            });
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        await using var assertDb = CreateDbContext();
+
+        var attributed = await assertDb.Set<ActivityHistory>()
+            .IgnoreQueryFilters()
+            .Where(h => h.UserId == userId && h.ActivityId == activityId)
+            .ToListAsync(CancellationToken);
+        attributed.Should().ContainSingle("the heartbeat must attribute through IActivityTimeAttributionSink")
+            .Which.Length.TotalSeconds.Should().Be(300);
+
+        var plannerTask = await assertDb.Set<PlannerTask>()
+            .IgnoreQueryFilters()
+            .FirstAsync(t => t.Id == plannerTaskId, CancellationToken);
+        plannerTask.Status.Should().Be(PlannerTaskStatus.Completed,
+            "ActivityTimeRecordedEvent must reach ActivityTimeRecordedEventHandler -- if this is still " +
+            "NotStarted the event was never published or the handler was never discovered");
     }
 
     private async Task<ExtensionLoginResponse> ExtensionLoginSuccessAsync(string email)

@@ -1,0 +1,57 @@
+using AdhdTimeOrganizer.TodoLists.application.dto.filter;
+using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using FastEndpoints;
+using Sydowwe.Framework.application.dto.request.@base.table;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.persistence;
+
+namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListCategory.query;
+
+public class GetFilterSortTodoListCategoryEndpoint(DbContext dbContext)
+    : Endpoint<BaseFilterSortRequest<TodoListCategoryFilterRequest>, List<TodoListCategoryResponse>>
+{
+    public override void Configure()
+    {
+        Post("/todo-list-category/filter-sort");
+
+        Summary(s =>
+        {
+            s.Summary = "Get categories that have todo lists, with optional name filter";
+            s.Description = "Returns only categories used by the current user's todo lists. Appends 'Other' (id=-1) if uncategorized items exist.";
+            s.Response<List<TodoListCategoryResponse>>(200, "Success");
+        });
+    }
+
+    public override async Task HandleAsync(BaseFilterSortRequest<TodoListCategoryFilterRequest> req, CancellationToken ct)
+    {
+        var userId = User.GetId();
+        var hideEmpty = req is { UseFilter: true, Filter.HideEmpty: true };
+
+        var query = dbContext.Set<TodoListCategory>()
+            .Where(c => c.UserId == userId);
+
+        if (hideEmpty)
+            query = query.Where(c => dbContext.Set<TodoList>().Any(tl => tl.UserId == userId && tl.CategoryId == c.Id));
+
+        if (req is { UseFilter: true, Filter: not null } && !string.IsNullOrWhiteSpace(req.Filter.Name))
+            query = query.Where(c => c.Name.Contains(req.Filter.Name));
+
+        var result = await TodoListCategoryResponse.Projection(query.SortByMany(req.SortBy)).ToListAsync(ct);
+
+        var hasUncategorized = await dbContext.Set<TodoList>()
+            .AnyAsync(tl => tl.UserId == userId && tl.CategoryId == null, ct);
+
+        if (hasUncategorized)
+            result.Add(new TodoListCategoryResponse
+            {
+                Id = -1,
+                Name = "Other",
+                Color = "default",
+                Icon = "fas fa-ellipsis",
+                Text = null
+            });
+
+        await Send.OkAsync(result, ct);
+    }
+}

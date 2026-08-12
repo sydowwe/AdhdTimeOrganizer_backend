@@ -1,10 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using AdhdTimeOrganizer.Core.domain.model.entity.@base;
-using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.@base;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;

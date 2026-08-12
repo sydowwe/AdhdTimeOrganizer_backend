@@ -1,5 +1,5 @@
+using AdhdTimeOrganizer.Routines.domain.model.@enum;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
-using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;

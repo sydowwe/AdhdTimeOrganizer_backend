@@ -28,14 +28,10 @@
         <Using Include="Microsoft.EntityFrameworkCore"/>
     </ItemGroup>
 
-    <!-- PurgeExpiredActivityTrackingEntriesJob needs IJob / IJobExecutionContext /
-         DisallowConcurrentExecution from Quartz core. Registration itself (AddJob/AddTrigger) stays
-         host-side in the single AddQuartz call - this is only the package the job class compiles
-         against. Version pinned to match the host, Sydowwe.Scheduler and AdhdTimeOrganizer.Routines so
-         the solution carries one Quartz version. -->
-    <ItemGroup>
-        <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.1"/>
-    </ItemGroup>
+    <!-- No Quartz here, deliberately. The retention purge is a keyed IScheduledJobHandler
+         (PurgeExpiredActivityTrackingEntriesJobHandler) whose schedule TrackingScheduledJobsRegistrar
+         pushes through Sydowwe.Framework.Contracts' IScheduler. Sydowwe.Scheduler is the only project in
+         the solution that references Quartz — don't add the package back to write an IJob. -->
 
     <!-- The five endpoint groups carry AutoTagOverride, which is FastEndpoints' Swagger surface rather
          than its core. Sydowwe.Framework brings in FastEndpoints but not this, so it is named here.

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -8,8 +9,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Sydowwe.Framework.domain.entity.user;
-using AdhdTimeOrganizer.Core.infrastructure.security;
-using AdhdTimeOrganizer.infrastructure.security;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
@@ -116,6 +115,12 @@ public class AppDbContextFixture : PostgresContainerFixture<Program, AppDbContex
         await db.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// The two outbound services every auth test would otherwise really call. Recaptcha verification fails
+    /// closed (403 "Recaptcha failed." on sign-up, 400 on sign-in), and the mail sender would try a real SMTP
+    /// connection, so without these swaps the whole auth suite fails on infrastructure rather than behaviour.
+    /// They belong here rather than on individual clients because the flows under test span several factories.
+    /// </summary>
     protected override Action<IServiceCollection> ConfigureGlobalServices => services =>
     {
         services.RemoveAll<IGoogleRecaptchaService>();

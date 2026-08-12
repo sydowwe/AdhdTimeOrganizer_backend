@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.Core.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using FastEndpoints;
 using FluentValidation;

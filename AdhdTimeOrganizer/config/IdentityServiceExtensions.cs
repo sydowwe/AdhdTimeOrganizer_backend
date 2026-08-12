@@ -1,9 +1,8 @@
 using System.Security.Claims;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
-using AdhdTimeOrganizer.infrastructure.persistence;
-using AdhdTimeOrganizer.infrastructure.extService.user.auth;
 using AdhdTimeOrganizer.Core.infrastructure.security;
-using AdhdTimeOrganizer.infrastructure.security;
+using AdhdTimeOrganizer.infrastructure.extService.user.auth;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;

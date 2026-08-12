@@ -15,6 +15,10 @@ public class FilterSortTodoListEndpointTests(AppDbContextFixture fixture)
 {
     protected override string EndpointUrl => "api/todo-list/filter-sort";
 
+    // TodoList is user-owned data; the endpoint does not override AllowedRoles(), so plain Users can
+    // reach it.
+    protected override bool IsAdminOnly => false;
+
     protected override async Task<long> SeedEntityAsync(DbContext db)
     {
         var todoList = new TodoList { Name = "List Alpha", UserId = FakeLoggedUserService.TestUserId };

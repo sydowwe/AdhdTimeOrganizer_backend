@@ -45,7 +45,8 @@ submodule and are consumed through `Sydowwe.Framework.Contracts`.
 - **Saving `PlannerTask`, `ActivityHistory` or `Calendar` marks the matching pattern view dirty.**
   `SuggestionPatternRefreshInterceptor` no longer runs `REFRESH MATERIALIZED VIEW CONCURRENTLY`
   itself — it queues the view name in the singleton `ISuggestionPatternRefreshQueue`, and
-  `SuggestionPatternRefreshJob` (Quartz, every 10s, `[DisallowConcurrentExecution]`) drains the queue
+  `SuggestionPatternRefreshJobHandler` (a keyed `IScheduledJobHandler` on the Scheduler module's
+  substrate, every 10s, `DisallowConcurrent`) drains the queue
   and does the actual refresh off the request thread, coalescing several saves in the same window into
   one refresh per view. A refresh failure (42P01 if the view is missing — hence
   `SuggestionPatternViewInstaller` at boot and the fixture's `OnSchemaCreatedAsync` in tests) is logged
@@ -65,10 +66,13 @@ submodule and are consumed through `Sydowwe.Framework.Contracts`.
   re-derives from `LastResetAt` + `LengthInDays` + `ResetAnchorDay` on every call, which is *why* the
   idempotency marks (`EndingSoonNotifiedFor`, `GraceNotifiedFor`) compare against a freshly computed
   instant rather than a bool. Change the anchor and the period correctly earns a fresh nudge.
-- **Two Quartz jobs are registered directly in `Program.cs`** (`routine-reset` at 02:00,
-  `routine-nudge` at 09:00) rather than through the Scheduler module — they are portal domain jobs.
-  There is a **`StartNow` verify trigger on `routine-reset` marked TEMP** in `Program.cs`; it fires the
-  reset on every boot. Remove it once verified.
+- **Every scheduled job in the solution now runs on the Scheduler module's substrate.** `Program.cs`
+  makes exactly one scheduling call — `services.AddSchedulerSubstrate()` — plus one
+  `AddHostedService<…ScheduledJobsRegistrar>()` per owner (Notifications, Reminders, Scheduler, Routines,
+  Tracking, Portal). `Sydowwe.Scheduler` is the only project that references Quartz; nobody else writes
+  an `IJob`. The routine reset (02:00) and nudge (09:00) are now
+  `Routines.TodoListReset` / `Routines.PeriodNudge` handlers registered by
+  `RoutinesScheduledJobsRegistrar`.
 - **Notification dispatch from the routine domain is best-effort and deliberately post-commit.**
   `RoutinePeriodNotificationService` swallows exceptions and logs the period **id** only — `Text` is
   user-authored, so it stays out of logs (no-PII rule).
@@ -103,9 +107,13 @@ submodule and are consumed through `Sydowwe.Framework.Contracts`.
   (`ICreateRequest<T>.ToEntity`, `IUpdateRequest<T>.UpdateEntity`, `IProjectionResponse<TRes,TEntity>.Projection`),
   never a mapper. A `FluentValidation` validator goes in `application/validator/`. Registration is
   automatic (assembly is already in `o.Assemblies`); the role gate defaults to User-or-higher.
-- **Add a scheduled portal job:** `IJob` in `infrastructure/jobs/`, registered in the single
-  `AddQuartz` block in `Program.cs` with `[DisallowConcurrentExecution]`. Resolve `AppDbContext` from
-  a fresh `IServiceScopeFactory` scope; remember the unauthenticated-insert trap above.
+- **Add a scheduled portal job:** an `IScheduledJobHandler` + `IScopedService` in
+  `infrastructure/jobs/` (a `HandlerKey` const, inject the scoped services you need directly — the
+  dispatcher opens the scope per fire), then a `RecurringJobRegistration` in
+  `infrastructure/scheduling/PortalScheduledJobsRegistrar.cs` carrying the cadence and
+  `DisallowConcurrent`. **Never** add a Quartz `IJob` or a second `AddQuartz` call — the substrate is
+  `services.AddSchedulerSubstrate()` and Quartz belongs to `Sydowwe.Scheduler` alone. Remember the
+  unauthenticated-insert trap above.
 - **Add a routine/reminder notification:** don't call `INotificationService` directly from a job or
   endpoint — go through `IRoutinePeriodNotificationService` / `IReminderRegistrationService`. They are
   the only classes here that know the Contracts payload shapes, and keeping that true is what stops

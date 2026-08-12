@@ -24,9 +24,10 @@ tables it was copied with have been deleted.
   migrations, DI wiring, `Program.cs`).
 - `AdhdTimeOrganizer.Core` — **the first vertical slice project.** `User` and `Activity` plus the
   roles and categories hanging directly off them, timer presets, the base shims and the
-  `IsManyWithOne*` configuration helpers, the shared enums, the extendable/generic DTO bases, the
-  cross-slice event records, and the remaining 26 activity + 10 timer endpoints. **It references only
-  `Sydowwe.Framework` and `Sydowwe.Framework.Contracts` — never the host**, which is why everything
+  `IsManyWithOne*` configuration helpers, the three genuinely shared enums (below), the
+  extendable/generic DTO bases, the cross-slice event records, and the remaining 26 activity + 10
+  timer endpoints. **It references only `Sydowwe.Framework` and `Sydowwe.Framework.Contracts` — never
+  the host**, which is why everything
   in it takes a plain `DbContext` rather than `AppDbContext`. Read
   `AdhdTimeOrganizer.Core/docs/summary.md` before working in it, and `.../seeder/SeederOrderBands.md`
   before adding a seeder **anywhere** in the solution. Six slices now sit on it — TodoLists,
@@ -36,6 +37,25 @@ tables it was copied with have been deleted.
 
   ⚠ The four activity lookups, the three activity profiles and memory anchors are **no longer here** —
   they are `AdhdTimeOrganizer.ActivityProfiles` (below), which took 52 of Core's 89 endpoint files.
+
+  ⚠ **Core's enum folders hold exactly three enums, and an enum earns a place there only by being
+  Core's own or by having two consumers that cannot see each other.** `domain/model/enum/` has
+  `DayType` (part of `ICalendarDayLookup`'s record — History and Planning both read it) and
+  `Location` (ActivityProfiles, Planning and the host); `application/dto/enum/` has
+  `ActivityDateRangeType`, used by Core's own `DateRangeDto`. Everything else went to its owning slice: `PlannerTaskStatus` / `RecurrenceType` /
+  `ReminderRecurrence` / `SuggestionSourceType` → Planning, `TrackerDesktopMappingTypeEnum` /
+  `BaselineType` → Tracking, `HistoryGroupBy` → History, `StreakOutcome` → Routines. Each kept its
+  layer — domain enums under `domain/model/enum/`, DTO enums under `application/dto/enum/`. A
+  single-consumer enum parked in Core is drift, not sharing: put it in the slice that owns it, and
+  reach for a seam (not a Core enum) if a second slice later needs it.
+
+  Moving one is schema-neutral and needs **no migration** — `EnumColumn()` persists these as strings
+  and the snapshot records them as `b.Property<string>("…")`, so no CLR type name reaches the
+  database. Two rules when rewriting the `using`s: match the enum name only in **type position**
+  (`t.RecurrenceType` is a member access, and `BasePlannerTask.Location` is a `string` property that
+  merely shares `Location`'s name — treating either as a type usage pins a Core using nothing needs),
+  and write **LF**. `.gitattributes` pins `* text=auto eol=lf`; a bulk rewrite that joins lines with
+  CRLF turns a one-line diff into a whole-file one.
 - `AdhdTimeOrganizer.TodoLists` — **the second slice.** Lists, items, steps, categories and the
   per-user `TaskPriority` lookup, plus the shared to-do primitives the Routines slice builds on
   (`BaseTodoListItem`, `TodoListStep`, `BaseTodoListConfigure`, `TodoListExtensions`,
@@ -47,8 +67,9 @@ tables it was copied with have been deleted.
   `PlannerTaskConfiguration`, which exists because EF derives that name from the order the
   `ApplyConfigurationsFromAssembly` calls run in, and every new slice shifts that order.
 - `AdhdTimeOrganizer.History` — **the third slice.** `ActivityHistory`, its 13 endpoints (CRUD, the
-  `gird` grid, and the six `HistoryDetail*` / `HistorySummary*` dashboards), DTOs, validator and dev
-  seeder. **References Core and the framework only — not TodoLists, not Routines.** That is the
+  `gird` grid, and the six `HistoryDetail*` / `HistorySummary*` dashboards), DTOs, the
+  `HistoryGroupBy` enum, validator and dev seeder.
+  **References Core and the framework only — not TodoLists, not Routines.** That is the
   point of it: the grid's to-do / routine membership filters were rewritten onto Core's
   `IActivityMembershipSource` seam (below), which is what let History land *before* Routines despite
   the plan sequencing it after. `CalendarActivityEndpoint` and the whole suggestion-pattern
@@ -73,8 +94,11 @@ tables it was copied with have been deleted.
 - `AdhdTimeOrganizer.Planning` — **the fourth slice, and it includes reminders** (there is no
   `AdhdTimeOrganizer.Reminders`). Calendar, the four planner-task types, day templates,
   `TaskImportance`, `UserPlannerSettings`, `Reminder` + `ReminderRegistrationService`, the three
-  suggestion-pattern read-models, ~49 endpoints, 12 validators, five seeders. **References Core and
-  the framework only — zero outbound slice edges**, because both of its predicted dependencies turned
+  suggestion-pattern read-models, ~49 endpoints, 12 validators, five seeders, and five enums
+  (`PlannerTaskStatus`, `RecurrenceType`, `ReminderRecurrence`, `SuggestionSourceType` in
+  `domain/model/enum/`, `ApplyTemplateConflictResolutionEnum` in `application/dto/enum/`).
+  **References Core and the framework only — zero outbound slice edges**, because both of its
+  predicted dependencies turned
   out to be avoidable:
   - `Planning → History` never existed. The suggestions endpoint reads
     `PlannerSuggestionFromActivityHistory` (the entity over `mv_activity_history_pattern`; it was
@@ -113,9 +137,11 @@ tables it was copied with have been deleted.
 - `AdhdTimeOrganizer.Tracking` — **the fifth and last slice.** The three raw ingest ledgers
   (`DesktopActivityEntry`, `WebExtensionActivityEntry`, `AndroidSessionData`), the two
   `Tracker*MappingByPattern` lookups, 29 endpoints (desktop/web-extension/android ingest + twelve
-  dashboards + the mapping grids), the five endpoint groups, 17 validators, the retention purge job
-  and the dev `WebExtensionDataSeeder`. **References Core and the framework only — zero outbound
-  slice edges**, which the plan said was impossible: its dependencies were **writes**, so none of the
+  dashboards + the mapping grids), the five endpoint groups, 17 validators, the retention purge job,
+  the dev `WebExtensionDataSeeder` and two enums (`TrackerDesktopMappingTypeEnum` in
+  `domain/model/enum/`, `BaselineType` in `application/dto/enum/` — note the first is named for
+  desktop but the android mapping grid uses it too). **References Core and the framework only — zero
+  outbound slice edges**, which the plan said was impossible: its dependencies were **writes**, so none of the
   three patterns above could invert them. Two Core seams did, and they are the reason this slice
   exists:
   - **`IActivityTimeAttributionSink`** (`AdhdTimeOrganizer.Core/application/seam/`) — the heartbeat's
