@@ -685,7 +685,7 @@ auto-scoping `FilteredByUser => true` override went with its deleted copies. Wha
 
 - **Portal reads are saved by the DbContext, not the endpoint.** `AppDbContext.OnModelCreating`
   applies a global query filter to every `IEntityWithUser`
-  (`ApplyUserQueryFilters`: `!IsAuthenticated || e.UserId == currentUserId`), so portal reads over
+  (`ApplyUserQueryFilters`: `ScopeUserId == null || e.UserId == ScopeUserId`), so portal reads over
   those entities are scoped no matter which role or endpoint reaches them.
   - `WebExtensionActivityEntry` is **excluded** from that call and carries its own filter combining
     the same user check with `RecordDate >= CurrentPartitionDate`.
@@ -700,6 +700,21 @@ auto-scoping `FilteredByUser => true` override went with its deleted copies. Wha
 - `FilteredByUser(userId)` still exists as an explicit `IQueryable` extension
   (`framework/Sydowwe.Framework/infrastructure/persistence/QueryableEntityExtensions.cs`) and is called by hand
   in ~8 portal endpoints. Nothing calls it for you.
+
+⚠ **A query filter must read the current-user id off the DbContext, never off a captured service.** EF
+evaluates any subtree of a filter that it can evaluate and that does **not** reference the DbContext,
+inlines the result into the SQL as a **literal**, and caches the compiled query — per EF internal
+service provider, which every host configuring the DbContext identically shares. So a filter built from
+`Expression.Constant(loggedUserService)` (which is what `ApplyUserQueryFilters` did) resolves the user
+*once*, when the shape is first compiled, and every later execution — any user, any request, any host in
+the process — runs with the first caller's id. Nothing throws and nothing logs; the second user reads the
+first user's rows. A member read rooted at the context is the documented exception: EF rewrites it into
+an accessor over the executing context and re-evaluates it per execution. Hence
+`IUserScopedDbContext.ScopeUserId`, a property on `BaseDbContext` — use it, and keep new hand-written
+filters (`AppDbContext`'s `WebExtensionActivityEntry` one) reading context members too. Note
+`EF.Parameter` does **not** work here: EF 10 throws while normalizing the filter. Guard is
+`UserScopingQueryFilterTests` — it asserts the generated SQL parameterizes the id, and that two users
+hitting one endpoint in one process each see only their own rows.
 
 # Auth Plumbing Outside the Endpoints
 

@@ -186,6 +186,13 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     /// behind (b) lives in <c>ActivityTimeAutomationTests</c>; this case exists to prove the two ends
     /// are connected at all.
     /// </para>
+    /// <para>
+    /// It also happens to be the only test that ever noticed the global user query filter baking the
+    /// first caller's id into the cached SQL — it signs in as a real user, so it read user 999's rows
+    /// whenever <c>ActivityTimeAutomationTests</c> compiled the shapes first, and passed in isolation.
+    /// That is now pinned deterministically by <c>UserScopingQueryFilterTests</c>; if this one starts
+    /// failing on <c>Status</c> again, check there before suspecting the event wiring.
+    /// </para>
     /// </summary>
     [Fact]
     public async Task Heartbeat_MappedEntry_AttributesTimeAndCompletesPlannerTask()
