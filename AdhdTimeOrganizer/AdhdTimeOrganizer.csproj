@@ -35,7 +35,10 @@
         <PackageReference Include="MimeKit" Version="4.17.0" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
         <PackageReference Include="QRCoder" Version="1.8.0" />
-        <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.1" />
+<!-- No Quartz package reference: scheduling comes from Sydowwe.Scheduler
+             (services.AddSchedulerSubstrate()), which owns the single AddQuartz call and the generic
+             dispatcher job. Host jobs are keyed IScheduledJobHandlers registered by
+             PortalScheduledJobsRegistrar. -->
         <PackageReference Include="Scrutor" Version="7.0.0" />
         <PackageReference Include="Serilog" Version="4.3.1" />
         <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
@@ -55,17 +58,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Folder Include="application\dto\request\base\" />
-        <Folder Include="application\endpoint\activityHistory\activityHistory\command\" />
-        <Folder Include="application\endpoint\activityHistory\activityHistory\query\dashboard\" />
-        <Folder Include="application\endpoint\activityTracking\desktop\" />
-        <Folder Include="application\endpoint\activity\activity\query\" />
-        <Folder Include="application\endpoint\activity\role\command\" />
         <Folder Include="application\preprocessor\" />
         <Folder Include="domain\" />
-        <Folder Include="domain\extension\" />
-        <Folder Include="domain\model\dto\" />
-        <Folder Include="infrastructure\persistence\converter\" />
         <Folder Include="logs\" />
     </ItemGroup>
 
@@ -97,5 +91,7 @@
         <ProjectReference Include="..\AdhdTimeOrganizer.History\AdhdTimeOrganizer.History.csproj" />
         <ProjectReference Include="..\AdhdTimeOrganizer.Routines\AdhdTimeOrganizer.Routines.csproj" />
         <ProjectReference Include="..\AdhdTimeOrganizer.Planning\AdhdTimeOrganizer.Planning.csproj" />
+        <ProjectReference Include="..\AdhdTimeOrganizer.Tracking\AdhdTimeOrganizer.Tracking.csproj" />
+        <ProjectReference Include="..\AdhdTimeOrganizer.ActivityProfiles\AdhdTimeOrganizer.ActivityProfiles.csproj" />
     </ItemGroup>
 </Project>

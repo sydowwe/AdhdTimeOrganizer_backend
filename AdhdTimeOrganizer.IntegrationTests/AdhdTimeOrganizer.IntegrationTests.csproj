@@ -32,6 +32,8 @@
         <ProjectReference Include="..\AdhdTimeOrganizer.History\AdhdTimeOrganizer.History.csproj" />
         <ProjectReference Include="..\AdhdTimeOrganizer.Routines\AdhdTimeOrganizer.Routines.csproj" />
         <ProjectReference Include="..\AdhdTimeOrganizer.Planning\AdhdTimeOrganizer.Planning.csproj" />
+        <ProjectReference Include="..\AdhdTimeOrganizer.Tracking\AdhdTimeOrganizer.Tracking.csproj" />
+        <ProjectReference Include="..\AdhdTimeOrganizer.ActivityProfiles\AdhdTimeOrganizer.ActivityProfiles.csproj" />
     </ItemGroup>
 
 </Project>

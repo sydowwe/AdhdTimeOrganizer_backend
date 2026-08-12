@@ -1,5 +1,4 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
-using AdhdTimeOrganizer.Core.domain.model.entity.activity.memoryAnchor;
 using Sydowwe.Framework.domain.audit;
 using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.entityInterface;
@@ -38,7 +37,6 @@ public sealed class User : BaseUser, IBaseTableEntity
     public ICollection<Activity> ActivityList { get; set; } = new List<Activity>();
     public ICollection<ActivityCategory> CategoryList { get; set; } = new List<ActivityCategory>();
     public ICollection<ActivityRole> RoleList { get; set; } = new List<ActivityRole>();
-    public ICollection<MemoryAnchor> MemoryAnchors { get; set; } = new List<MemoryAnchor>();
 
     // Framework's RefreshToken (Sydowwe.Framework.domain.entity.user) carries no User navigation, so
     // this collection is configured from the principal end in RefreshTokenConfiguration. It is the

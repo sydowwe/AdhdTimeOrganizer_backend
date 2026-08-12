@@ -7,16 +7,18 @@ using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.config.swagger;
-using AdhdTimeOrganizer.infrastructure.jobs;
+using AdhdTimeOrganizer.infrastructure.scheduling;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
-using AdhdTimeOrganizer.infrastructure.persistence.retention;
-using AdhdTimeOrganizer.infrastructure.security;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.infrastructure.scheduling;
+using AdhdTimeOrganizer.Tracking.infrastructure.persistence.retention;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
-using AdhdTimeOrganizer.Routines.infrastructure.jobs;
+using AdhdTimeOrganizer.Routines.infrastructure.scheduling;
+using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using DotNetEnv;
 using FastEndpoints;
@@ -28,7 +30,6 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Quartz;
 using Serilog;
 using Serilog.Events;
 using Sydowwe.Framework.application.middleware;
@@ -44,8 +45,8 @@ using Sydowwe.Notifications.infrastructure.realtime;
 using Sydowwe.Notifications.infrastructure.scheduling;
 using Sydowwe.Reminders.domain.entity;
 using Sydowwe.Reminders.infrastructure.scheduling;
+using Sydowwe.Scheduler;
 using Sydowwe.Scheduler.domain.entity;
-using Sydowwe.Scheduler.infrastructure;
 using Sydowwe.Scheduler.infrastructure.scheduling;
 
 try
@@ -231,6 +232,17 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             // deliberately NOT here: the Google integration stayed host-side and is covered by
             // typeof(Program).Assembly above.
             typeof(PlannerTask).Assembly,
+            // AdhdTimeOrganizer.Tracking — the 29 ingest / pattern-mapping / dashboard endpoints for
+            // desktop, web-extension and android. Note the ingest ones carry [AllowExtensionClients]
+            // and the ActivityTracking policy: if this entry is missing they 404, but if the attribute
+            // were lost in the move they would 403 instead — two different silent failures, so
+            // TrackingRouteSmokeTests checks both.
+            typeof(DesktopActivityEntry).Assembly,
+            // AdhdTimeOrganizer.ActivityProfiles — the 52 backlog / bucket-list / project profile,
+            // memory-anchor and activity-lookup endpoints. This is the largest single block of routes
+            // outside the host, so a missing entry here is a very visible 404 storm rather than a
+            // subtle one; ActivityProfilesRouteSmokeTests covers one route per endpoint family.
+            typeof(ActivityBacklogProfile).Assembly,
             typeof(Notification).Assembly,
             typeof(ReminderDefinition).Assembly,
             typeof(ScheduledJob).Assembly
@@ -279,55 +291,23 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     // Background services
     services.AddHostedService<RefreshTokenCleanupService>();
 
-    services.AddQuartz(q =>
-    {
-        // Registers the Scheduler module's generic dispatcher job that every IScheduler-registered
-        // recurring trigger points at. Must be inside the host's single AddQuartz call.
-        q.AddSchedulerQuartzDefaults();
+    // The whole scheduling substrate, owned by Sydowwe.Scheduler: the single AddQuartz call, the generic
+    // dispatcher job every IScheduler-registered trigger points at, and the Quartz hosted service. Nothing
+    // else here (host or slice) references Quartz — a job is a keyed IScheduledJobHandler plus a
+    // RecurringJobRegistration pushed by its owner's registrar below. Do NOT add a second AddQuartz call or a
+    // host-side AddJob<T>: that reintroduces the coupling this replaced, and a stray AddQuartz silently
+    // reconfigures the same scheduler.
+    services.AddSchedulerSubstrate();
 
-        q.AddJob<RoutineTodoListResetJob>(opts =>
-            opts.WithIdentity("routine-reset", "routine"));
-
-        q.AddTrigger(opts => opts
-            .ForJob("routine-reset", "routine")
-            .WithIdentity("routine-reset-trigger", "routine")
-            .WithCronSchedule("0 0 2 * * ?")); // 2:00 AM daily
-
-        q.AddJob<RoutinePeriodNudgeJob>(opts =>
-            opts.WithIdentity("routine-nudge", "routine"));
-
-        // 9:00, not 2:00: unlike the reset above, this one is addressed to a person who is meant to act on it.
-        q.AddTrigger(opts => opts
-            .ForJob("routine-nudge", "routine")
-            .WithIdentity("routine-nudge-trigger", "routine")
-            .WithCronSchedule("0 0 9 * * ?")); // 9:00 AM daily
-
-        q.AddJob<PurgeExpiredActivityTrackingEntriesJob>(opts =>
-            opts.WithIdentity("purge-activity-tracking", "retention"));
-
-        q.AddTrigger(opts => opts
-            .ForJob("purge-activity-tracking", "retention")
-            .WithIdentity("purge-activity-tracking-trigger", "retention")
-            .WithCronSchedule("0 30 3 * * ?")); // 3:30 AM daily
-
-        // Drains the dirty set SuggestionPatternRefreshInterceptor fills; see that class + this job's
-        // header comment for why the refresh moved off the request path.
-        q.AddJob<SuggestionPatternRefreshJob>(opts =>
-            opts.WithIdentity("suggestion-pattern-refresh", "suggestion-pattern"));
-
-        q.AddTrigger(opts => opts
-            .ForJob("suggestion-pattern-refresh", "suggestion-pattern")
-            .WithIdentity("suggestion-pattern-refresh-trigger", "suggestion-pattern")
-            .WithSimpleSchedule(s => s.WithIntervalInSeconds(10).RepeatForever()));
-    });
-    services.AddQuartzHostedService(SchedulerQuartzConfig.ConfigureSchedulerHostedService);
-
-    // Owner-side boot reconciliation: each module pushes its recurring-job registrations to the Scheduler
-    // via Sydowwe.Framework.Contracts's IScheduler. Idempotent upserts by JobKey, and required on every boot because the
-    // Quartz RAM job store loses all triggers on restart.
+    // Owner-side boot reconciliation: each module and slice pushes its recurring-job registrations to the
+    // Scheduler via Sydowwe.Framework.Contracts's IScheduler. Idempotent upserts by JobKey, and required on
+    // every boot because the Quartz RAM job store loses all triggers on restart.
     services.AddHostedService<NotificationsScheduledJobsRegistrar>();
     services.AddHostedService<RemindersScheduledJobsRegistrar>();
     services.AddHostedService<SchedulerScheduledJobsRegistrar>();
+    services.AddHostedService<RoutinesScheduledJobsRegistrar>();
+    services.AddHostedService<TrackingScheduledJobsRegistrar>();
+    services.AddHostedService<PortalScheduledJobsRegistrar>();
 
     // Caching
     services.AddDistributedMemoryCache();

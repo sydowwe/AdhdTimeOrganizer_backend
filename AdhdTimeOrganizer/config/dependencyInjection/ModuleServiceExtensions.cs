@@ -6,6 +6,8 @@ using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Notifications.application;
@@ -58,8 +60,12 @@ public static class ModuleServiceExtensions
         // carry lifetime markers, so being in this list (and out of the AppDomain sweep) is what keeps
         // them registered exactly once.
         typeof(TodoList).Assembly,
-        // AdhdTimeOrganizer.History — same reasoning again: ActivityHistorySeeder carries a lifetime
-        // marker. Note History registers no IActivityMembershipSource of its own; it only consumes them.
+        // AdhdTimeOrganizer.History — same reasoning again: ActivityHistorySeeder and
+        // ActivityHistoryTimeAttributionSink carry lifetime markers. Note History registers no
+        // IActivityMembershipSource of its own; it only consumes them. The sink is the other direction:
+        // History is the sole implementer of Core's IActivityTimeAttributionSink, and Tracking's
+        // heartbeat is its only consumer. Drop this entry and the heartbeat 500s on activation — which
+        // is the intended failure, not a silent one; see the interface's remarks.
         typeof(ActivityHistory).Assembly,
         // AdhdTimeOrganizer.Routines — same reasoning: RoutineTimePeriodSeeder / RoutineTodoListSeeder
         // and RoutineTodoListActivityMembershipSource carry lifetime markers.
@@ -69,6 +75,16 @@ public static class ModuleServiceExtensions
         // ReminderRegistrationService. Being in this list (and therefore out of the AppDomain sweep)
         // is what keeps each of them registered exactly once.
         typeof(PlannerTask).Assembly,
+        // AdhdTimeOrganizer.Tracking — same reasoning: WebExtensionDataSeeder carries a lifetime
+        // marker, so being in this list (and therefore out of the AppDomain sweep) is what keeps it
+        // registered exactly once. It is a dev seeder that truncates web_extension_activity_entry, so a
+        // double registration would truncate and reseed twice per run.
+        typeof(DesktopActivityEntry).Assembly,
+        // AdhdTimeOrganizer.ActivityProfiles — same reasoning, and this slice has the most seeders of
+        // any: four per-user default seeders (the activity lookups) plus eight dev seeders. The dev
+        // ones truncate, so a double registration would truncate and reseed each table twice per run,
+        // and the per-user defaults would insert every default twice on sign-up.
+        typeof(ActivityBacklogProfile).Assembly,
         typeof(Notification).Assembly,
         typeof(ReminderDefinition).Assembly,
         typeof(ScheduledJob).Assembly

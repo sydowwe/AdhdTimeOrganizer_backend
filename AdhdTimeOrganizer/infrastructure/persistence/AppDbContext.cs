@@ -1,10 +1,11 @@
-using AdhdTimeOrganizer.domain.model.entity;
+using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.ActivityProfiles.infrastructure.persistence.configuration;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
-using AdhdTimeOrganizer.Core.domain.model.entity.activity.lookup;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking.android;
-using AdhdTimeOrganizer.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.infrastructure.persistence.configuration.activityTracking.desktop;
 using AdhdTimeOrganizer.Core.domain.model.entity.timer;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
@@ -68,9 +69,9 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<TimerPreset> TimerPresets { get; set; }
     public DbSet<PomodoroTimerPreset> PomodoroTimerPresets { get; set; }
     public DbSet<UserPlannerSettings> UserPlannerSettings { get; set; }
-    public DbSet<PlannerTaskPattern> PlannerTaskPatterns { get; set; }
-    public DbSet<ActivityHistoryPattern> ActivityHistoryPatterns { get; set; }
-    public DbSet<TemplateSuggestionPattern> TemplateSuggestionPatterns { get; set; }
+    public DbSet<PlannerSuggestionFromPlannerTask> PlannerSuggestionsFromPlannerTask { get; set; }
+    public DbSet<PlannerSuggestionFromActivityHistory> PlannerSuggestionsFromActivityHistory { get; set; }
+    public DbSet<PlannerSuggestionFromDayTemplate> PlannerSuggestionsFromDayTemplate { get; set; }
     public DbSet<Reminder> Reminders { get; set; }
 
     // --- Notifications module ---
@@ -148,9 +149,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         // call per slice project, for the same reason. Drop it and those four tables vanish from the
         // model while the routine tables that FK into them remain, which fails at model-build time.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TodoListConfiguration).Assembly);
-        // AdhdTimeOrganizer.History (ActivityHistory). The three tracking configurations that still sit
-        // in the host's configuration/activityHistory/ folder — Desktop, WebExtension, AndroidSessionData
-        // — belong to Tracking, not History, and are covered by the host call below.
+        // AdhdTimeOrganizer.History (ActivityHistory).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ActivityHistoryConfiguration).Assembly);
         // AdhdTimeOrganizer.Routines (RoutineTodoList, RoutineTimePeriod, RoutinePeriodCompletion).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RoutineTimePeriodConfiguration).Assembly);
@@ -158,7 +157,23 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         // TaskPlannerDayTemplate, UserPlannerSettings, Reminder, and the three suggestion-pattern
         // views). Reminders are part of this slice — there is no AdhdTimeOrganizer.Reminders.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlannerTaskConfiguration).Assembly);
+        // AdhdTimeOrganizer.Tracking (DesktopActivityEntry, WebExtensionActivityEntry, AndroidSessionData
+        // and the two Tracker*MappingByPattern lookups). Three of these five configurations used to sit
+        // in the host's configuration/activityHistory/ folder despite being Tracking's — the folder
+        // structure lied, and they moved with their entities rather than with the folder. Two of the
+        // tables are partitioned (IsPartitionedByRange); the generator that emits the partition DDL is
+        // wired host-side in Program.cs and AppCommandDbContextFactory and stays there.
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(DesktopActivityEntryConfiguration).Assembly);
+        // AdhdTimeOrganizer.ActivityProfiles (the three Activity*Profile rows, the four per-user
+        // activity lookups they FK into, and MemoryAnchor). Drop this call and all eight tables vanish
+        // from the model — and because nothing else FKs into them, the model still builds cleanly and
+        // the next `migrations add` emits eight DROP TABLEs.
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ActivityBacklogProfileConfiguration).Assembly);
 
+        // Anchored on AppDbContext, which cannot move slices. Do not re-anchor this on a configuration
+        // type: the Planning extraction moved the type this used to name, silently turning the host's
+        // own scan into a second Planning scan and dropping every remaining host configuration from the
+        // model — no build error, and the next `migrations add` emitted ~500 lines of table renames.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
         // Last, because it needs entity types from two slices that cannot see each other.

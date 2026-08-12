@@ -1,10 +1,16 @@
 # AdhdTimeOrganizer.Core — Agent Summary
 
 **Purpose:** The shared core every vertical slice depends on. It owns the two hub entities — `User`
-and `Activity` — everything hanging directly off them (roles, categories, the four activity lookups,
-the three activity profiles, memory anchors, timer presets), the primitives the slices build on
-(the closing base shims, the `IsManyWithOneUser` / `IsManyWithOneActivity` configuration helpers, the
-shared enums, the extendable/generic request+response bases), and the cross-slice **event records**.
+and `Activity` — the roles and categories hanging directly off them, the timer presets, the
+primitives the slices build on (the closing base shims, the `IsManyWithOneUser` /
+`IsManyWithOneActivity` configuration helpers, the shared enums, the extendable/generic
+request+response bases), and the cross-slice **event records**.
+
+⚠ Core no longer owns the four activity lookups, the three activity profiles or memory anchors —
+those became **`AdhdTimeOrganizer.ActivityProfiles`**, the sixth slice and the only one carved out of
+Core rather than the host. It took 52 of Core's 89 endpoint files with it. `Activity` and `User` lost
+five navigation properties in that move (`BacklogProfile`, `ProjectProfile`, `BucketListProfile`,
+`Activity.MemoryAnchors`, `User.MemoryAnchors`); do not add them back.
 
 **This is the first project of the portal split.** Read
 `review/portal/slicePrompts/00-README.md` for the plan; six more slices (TodoLists, Routines,
@@ -13,8 +19,10 @@ order.
 
 ## Bounded context
 
-Owns: the hub entities and their EF configurations, the 78 activity endpoints and 10 timer
-endpoints, their DTOs and validators, the activity/timer/user seeders, and `PortalRoleCatalog`.
+Owns: the hub entities and their EF configurations, the remaining 26 activity endpoints (activity,
+category, role) and 10 timer endpoints, their DTOs and validators, the activity/timer/user seeders,
+and `PortalRoleCatalog`. The other 52 activity endpoints — profiles, lookups, memory anchors — are
+`AdhdTimeOrganizer.ActivityProfiles`.
 
 Does **not** own — and must never reference: `AppDbContext`, `Program.cs`, the migrations, the DI
 wiring, or any feature slice. Core sits *below* everything; a reference back to the host would make
@@ -39,17 +47,15 @@ the split circular on day one.
   `UpdateEntityAsync`, …) all extend `DbContext` and work unchanged.
 
 - **Do not re-add inverse collections to `User` or `Activity`.** A completed refactor removed 22 of
-  them precisely so Core would stop pointing into the feature areas; each of those four files carries
-  a comment saying so. What legitimately remains is Core→Core only: `User` keeps `ActivityList`,
-  `CategoryList`, `RoleList`, `MemoryAnchors`, `RefreshTokens`; `Activity` keeps `MemoryAnchors`, the
-  three profile references and its `Role` / `Category`. For "this user's planner tasks", query the
-  DbSet — the global filter scopes it for you.
+  them precisely so Core would stop pointing into the feature areas, and the ActivityProfiles
+  extraction removed the last 5; each of those files carries a comment saying so. What legitimately
+  remains is Core→Core only: `User` keeps `ActivityList`, `CategoryList`, `RoleList`,
+  `RefreshTokens`; `Activity` keeps only its `Role` / `Category`. For "this user's planner tasks",
+  query the DbSet — the global filter scopes it for you.
 
-- **The three `Activity*Profile` entities are not `IEntityWithUser` and get no global query filter.**
-  They are scoped by hand, through `p.Activity.UserId == userId`, in `ApplyUserScoping` on the three
-  profile grids — deliberately in `ApplyUserScoping` and not `ApplyCustomFiltering`, because the base
-  only calls the latter when the request actually carries a filter. That hand-scoping is the only
-  thing keeping other users' profiles out. `ActivityProfileGridTests` pins it.
+- **The three `Activity*Profile` entities moved to `AdhdTimeOrganizer.ActivityProfiles`**, along with
+  the hand-written user scoping they depend on. Read that project's `docs/summary.md` before touching
+  them — they are still the one entity family in the solution with no global query filter.
 
 - **Registering Core with the host is four places, none of which break the build.** FastEndpoints
   `o.Assemblies` in `Program.cs` (missing → every activity/timer route silently 404s);

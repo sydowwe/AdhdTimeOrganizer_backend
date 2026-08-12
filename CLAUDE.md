@@ -22,17 +22,20 @@ tables it was copied with have been deleted.
 
 - `AdhdTimeOrganizer` — the portal (the remaining feature areas, endpoints, `AppDbContext`,
   migrations, DI wiring, `Program.cs`).
-- `AdhdTimeOrganizer.Core` — **the first vertical slice project.** `User` and `Activity` plus
-  everything hanging directly off them (roles, categories, the four activity lookups, the three
-  activity profiles, memory anchors, timer presets), the base shims and the `IsManyWithOne*`
-  configuration helpers, the shared enums, the extendable/generic DTO bases, the cross-slice event
-  records, and the 78 activity + 10 timer endpoints. **It references only `Sydowwe.Framework` and
-  `Sydowwe.Framework.Contracts` — never the host**, which is why everything in it takes a plain
-  `DbContext` rather than `AppDbContext`. Read `AdhdTimeOrganizer.Core/docs/summary.md` before
-  working in it, and `.../seeder/SeederOrderBands.md` before adding a seeder **anywhere** in the
-  solution. Five more slices follow it — TodoLists, Routines, History, Planning and Tracking have
-  **all landed; the split is finished**, and no feature slice carries an outbound slice reference
-  except Routines → TodoLists. The record is `review/portal/slicePrompts/00-README.md`.
+- `AdhdTimeOrganizer.Core` — **the first vertical slice project.** `User` and `Activity` plus the
+  roles and categories hanging directly off them, timer presets, the base shims and the
+  `IsManyWithOne*` configuration helpers, the shared enums, the extendable/generic DTO bases, the
+  cross-slice event records, and the remaining 26 activity + 10 timer endpoints. **It references only
+  `Sydowwe.Framework` and `Sydowwe.Framework.Contracts` — never the host**, which is why everything
+  in it takes a plain `DbContext` rather than `AppDbContext`. Read
+  `AdhdTimeOrganizer.Core/docs/summary.md` before working in it, and `.../seeder/SeederOrderBands.md`
+  before adding a seeder **anywhere** in the solution. Six slices now sit on it — TodoLists,
+  Routines, History, Planning, Tracking and ActivityProfiles have **all landed; the split is
+  finished**, and no feature slice carries an outbound slice reference except Routines → TodoLists.
+  The record is `review/portal/slicePrompts/00-README.md`.
+
+  ⚠ The four activity lookups, the three activity profiles and memory anchors are **no longer here** —
+  they are `AdhdTimeOrganizer.ActivityProfiles` (below), which took 52 of Core's 89 endpoint files.
 - `AdhdTimeOrganizer.TodoLists` — **the second slice.** Lists, items, steps, categories and the
   per-user `TaskPriority` lookup, plus the shared to-do primitives the Routines slice builds on
   (`BaseTodoListItem`, `TodoListStep`, `BaseTodoListConfigure`, `TodoListExtensions`,
@@ -51,11 +54,16 @@ tables it was copied with have been deleted.
   the plan sequencing it after. `CalendarActivityEndpoint` and the whole suggestion-pattern
   machinery stayed host-side. Read `AdhdTimeOrganizer.History/docs/summary.md` before working in it.
 
+  ⚠ **Every cross-slice seam is listed in `AdhdTimeOrganizer.Core/application/seam/README.md`** —
+  read it before adding one. Three interface seams marked `ISeam` and four events marked
+  `ISeamEvent`; both markers exist so the whole surface shows up in one type hierarchy, and
+  `SeamWiringTests` pins the registry (placement, key coverage, no unhandled events).
+
   ⚠ **`IActivityMembershipSource`** (`AdhdTimeOrganizer.Core/application/seam/`) is the pattern to
   reuse whenever one slice needs to filter on another's rows: Core declares the interface and the
   key constants, the **owning** slice implements it (`TodoListActivityMembershipSource` in
-  TodoLists; `RoutineTodoListActivityMembershipSource` still host-side until Routines exists — move
-  it with the entity), the **consuming** slice resolves `IEnumerable<IActivityMembershipSource>` and
+  TodoLists, `RoutineTodoListActivityMembershipSource` in Routines), the **consuming** slice resolves
+  `IEnumerable<IActivityMembershipSource>` and
   matches on `Key`. Neither side references the other. Two rules: the returned `IQueryable<long>`
   must stay **composable** (callers use it as a subquery, so `ToList()` turns one `EXISTS` into a
   client-side filter), and because resolution is by *string key* a missing or misregistered
@@ -68,8 +76,12 @@ tables it was copied with have been deleted.
   suggestion-pattern read-models, ~49 endpoints, 12 validators, five seeders. **References Core and
   the framework only — zero outbound slice edges**, because both of its predicted dependencies turned
   out to be avoidable:
-  - `Planning → History` never existed. The suggestions endpoint reads `ActivityHistoryPattern` (the
-    entity over `mv_activity_history_pattern`), not the `ActivityHistory` entity. The materialized
+  - `Planning → History` never existed. The suggestions endpoint reads
+    `PlannerSuggestionFromActivityHistory` (the entity over `mv_activity_history_pattern`; it was
+    called `ActivityHistoryPattern` before the read-model rename), not the `ActivityHistory` entity.
+    The three suggestion read-models are named `PlannerSuggestionFrom<Source>` — consumer first,
+    source second — and each pins its view with an explicit `ToView(...)`, so the class names are
+    free to change without touching the schema. The materialized
     view is the decoupling; the view SQL, installer, interceptor and refresh job stay host-side.
   - `Planning → TodoLists` was **deleted**. `PlannerTask.TodolistItemId` keeps its FK and its
     `SetNull`; the unused `PlannerTask.TodolistItem` navigation was removed and the relationship
@@ -129,6 +141,31 @@ tables it was copied with have been deleted.
   an out-of-range row rather than inspecting metadata.
 
   Read `AdhdTimeOrganizer.Tracking/docs/summary.md` before working in it.
+- `AdhdTimeOrganizer.ActivityProfiles` — **the sixth slice, and the only one carved out of Core
+  rather than the host.** The three `Activity*Profile` entities, the four per-user activity lookups
+  they FK into (`ActivityLocationType`, `ActivityWeatherDependency`, `ActivityExpectedCostTier`,
+  `ActivityExperienceType`), `MemoryAnchor`, 52 endpoints, 8 validators, 4 profile-only enums, and 12
+  seeders. **References Core and the framework only — zero outbound slice edges, and it needed no
+  seam to get there**: nothing outside Core had ever referenced these eight entities, so unlike
+  History and Tracking there was no dependency to invert. Named for what it holds rather than
+  "Leisure" — `ActivityProjectProfile` is DIY (difficulty, materials, tools, readiness), not leisure.
+  Read `AdhdTimeOrganizer.ActivityProfiles/docs/summary.md` before working in it.
+
+  ⚠ **The five inbound edges were deleted, not inverted** — `Activity.BacklogProfile` /
+  `.ProjectProfile` / `.BucketListProfile` / `.MemoryAnchors` and `User.MemoryAnchors`. Each only fed
+  a configuration helper a navigation expression. Adding one back requires a project reference **from
+  Core**, which inverts the direction every slice depends on, and it compiles fine —
+  `ActivityProfilesRouteSmokeTests.Core_DoesNotReferenceActivityProfiles` is the guard.
+
+  ⚠ **Four FK constraint names are pinned with `HasConstraintName(...)`** in this slice's
+  configurations. EF derives an FK's name from the principal-end navigation, so deleting those four
+  navigations silently renames the constraint, and each rename is a DROP + ADD CONSTRAINT pair
+  (ACCESS EXCLUSIVE lock + full revalidation) for zero schema benefit. The pins are what make the
+  `ActivityProfilesSlice` migration empty. Same reasoning as `PlannerTaskConfiguration`'s pinned name.
+
+  ⚠ **Its seeders share Core's 010–099 `Order` band on purpose** — the dev chain interleaves
+  (lookups 10–13 → Core's `Activity` 40 → profiles 50–52 → anchors 60). It is the only shared band;
+  see `SeederOrderBands.md`.
 - `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding seven projects:
   - `framework/Sydowwe.Framework` — the shared framework, used by **the portal and the modules
     alike**. Base entities, base endpoints, builder extensions, DbContext helpers, seeders, auth
@@ -219,9 +256,20 @@ run it after touching anything below, because none of these break the build.
   aliases `DbContext` → `AppDbContext`. Without it ~34 of them fail to activate.
 - **FastEndpoints discovery is an explicit assembly list** in `Program.cs`. A module missing from it is not
   an error — its endpoints just 404.
-- **Boot reconciliation:** each module's `…ScheduledJobsRegistrar` is an `IHostedService` that upserts its
-  recurring jobs through Kernel's `IScheduler`. Required on **every** boot — the Quartz RAM job store drops
-  all triggers on restart.
+- **Boot reconciliation:** each module's *and slice's* `…ScheduledJobsRegistrar` is an `IHostedService` that
+  upserts its recurring jobs through Kernel's `IScheduler`. Required on **every** boot — the Quartz RAM job
+  store drops all triggers on restart. Six are wired in `Program.cs`: Notifications, Reminders, Scheduler,
+  Routines, Tracking and `PortalScheduledJobsRegistrar` (the host's own).
+- **`Sydowwe.Scheduler` is the only project in the solution that references Quartz.** The host's scheduling
+  surface is one call — `services.AddSchedulerSubstrate()` — which owns the single `AddQuartz`, the durable
+  generic dispatcher job and the Quartz hosted service. Everything else is a keyed `IScheduledJobHandler`
+  (picked up by the ordinary lifetime-marker scan) plus a `RecurringJobRegistration` its owner's registrar
+  pushes. **Never write a Quartz `IJob`, add a `Quartz.*` package reference, or make a second `AddQuartz`
+  call** — none of that fails to build, it just creates a second scheduling path invisible to the run log,
+  the retry policy, the failure alerting and the dashboard. `ModuleWiringTests.OnlySchedulerModule_
+  ReferencesQuartz` and `ScheduledJobHandlers_AreAllDiscoverableByKey` are the guards; note a handler in DI
+  with no registration, and a registrar dropped from `Program.cs`, are both **silent** — the job simply
+  never fires.
 - **`IQuietHoursReader` must resolve to Notifications' `QuietHoursReader`.** Reminders ships
   `NoQuietHoursReader` for hosts without Notifications; it carries no lifetime marker on purpose, because an
   auto-registered no-op would silently disable quiet hours everywhere.
