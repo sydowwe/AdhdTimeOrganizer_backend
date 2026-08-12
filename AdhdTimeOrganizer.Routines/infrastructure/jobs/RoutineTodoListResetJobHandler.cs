@@ -38,14 +38,17 @@ public class RoutineTodoListResetJobHandler(
 
         var now = DateTime.UtcNow;
         var totalReset = 0;
-        var graceChanged = false;
+        var periodsChanged = false;
         var completionRecords = new List<RoutinePeriodCompletion>();
         var reset = new List<(RoutineTimePeriod Period, RoutineResetService.RoutinePeriodReset Result)>();
 
         foreach (var period in periods)
         {
             var items = period.RoutineTodoListColl.ToList();
-            graceChanged |= RoutineResetService.CheckGrace(period, now);
+            periodsChanged |= RoutineResetService.CheckGrace(period, now);
+            // The freeze budget refills lazily, so the nightly sweep is the one thing that brings a period the
+            // user has not opened in a month back to a full budget before they look at it.
+            periodsChanged |= RoutineStreakFreezeService.RefreshFreezeBudget(period, now);
             var result = RoutineResetService.TryReset(period, items, now);
             if (result is { } r)
             {
@@ -55,7 +58,7 @@ public class RoutineTodoListResetJobHandler(
             }
         }
 
-        if (reset.Count == 0 && !graceChanged)
+        if (reset.Count == 0 && !periodsChanged)
         {
             logger.LogInformation("No items to reset");
             return;

@@ -43,7 +43,7 @@ public class GetCompletionHistoryRoutineTimePeriodEndpoint(DbContext dbContext)
             .Where(c => c.TimePeriodId == period.Id)
             .OrderByDescending(c => c.PeriodStart)
             .Take(period.HistoryDepth)
-            .Select(c => new PeriodCompletionRecord(c.PeriodStart, c.PeriodEnd, c.CompletedCount, c.TotalCount))
+            .Select(c => new PeriodCompletionRecord(c.PeriodStart, c.PeriodEnd, c.CompletedCount, c.TotalCount, c.IsFrozen))
             .ToListAsync(ct);
 
         completions.Reverse();

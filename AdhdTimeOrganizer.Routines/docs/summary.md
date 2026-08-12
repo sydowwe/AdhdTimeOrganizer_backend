@@ -1,8 +1,9 @@
 # AdhdTimeOrganizer.Routines — Agent Summary
 
 **Purpose:** the routine domain — recurring to-do items (`RoutineTodoList`) grouped into time
-periods (`RoutineTimePeriod`) with streaks, grace windows, and a completion history
-(`RoutinePeriodCompletion`); the reset/nudge domain logic (`RoutineResetService`); the two nightly
+periods (`RoutineTimePeriod`) with streaks, grace windows, budgeted streak freezes and a completion
+history (`RoutinePeriodCompletion`); the reset/nudge domain logic (`RoutineResetService`) and the
+freeze logic (`RoutineStreakFreezeService`); the two nightly
 scheduled jobs that sweep them (keyed `IScheduledJobHandler`s on the Scheduler
 module's substrate — this slice references no Quartz); and the notification producer that turns a reset, a lead-time nudge, or
 a grace warning into a `Sydowwe.Framework.Contracts` notification.
@@ -14,8 +15,10 @@ before this one, via the membership-source seam below).
 ## Bounded context
 
 Owns: `RoutineTodoList`, `RoutineTimePeriod`, `RoutinePeriodCompletion`, their EF configurations, the
-20 routine endpoints (time-period CRUD + select-options + completion-history, and the to-do list
+21 routine endpoints (time-period CRUD + select-options + completion-history + streak-freeze, and the
+to-do list
 CRUD + grouped-by-period + steps + toggle/reorder), their DTOs and validators, `RoutineResetService`,
+`RoutineStreakFreezeService`,
 `IRoutinePeriodNotificationService` / `RoutinePeriodNotificationService`,
 `RoutineTodoListActivityMembershipSource`, and the `RoutineTimePeriodSeeder` /
 `RoutineTodoListSeeder` pair.
@@ -66,6 +69,31 @@ knowledge of Planning at all.
   (`application/dto/response/todoList/PeriodCompletionRecord.cs`) referenced only from
   `GetCompletionHistoryRoutineTimePeriodEndpoint` and `RoutineTimePeriodResponse` — both of which
   moved here — so it came along rather than staying behind as a single-consumer host leftover.
+
+- **The freeze budget refills lazily, and nothing sweeps it.** There is no job behind
+  `RoutineStreakFreezeService.RefreshFreezeBudget` — every surface that *shows* or *spends*
+  `FreezesRemaining` has to call it first. Three sites do today: the grouped read, the nightly reset
+  job, and `Apply` itself. A new read path that forgets it serves a stale count and refuses a freeze
+  the user is owed, with an ordinary 400 and nothing in the logs. The window is a **calendar month**,
+  not one period length — "two per period" would hand a daily routine two skips a day.
+
+- **A freeze carries the run; it does not extend it.** `RecomputeStreak` walks the whole completion
+  history oldest-first: a met period increments, an unfrozen miss zeroes, and a frozen one — like an
+  item-less one — is skipped, so the run survives across it. If a freeze ever started incrementing,
+  spending one would be worth more than actually doing the routine. It also only ever *raises*
+  `Streak` / `BestStreak`: history is finite, a run can predate its oldest row, and the one operation
+  the user spends a resource on to protect a streak must never be what cuts it down.
+
+- **`StreakGraceDays` and the freeze budget are different leniencies and both stay.** Grace is
+  time-based (finish late, keep the run) and expires on its own; a freeze is budgeted (skip entirely,
+  keep the run). `Apply` clears `StreakGraceUntil` / `GraceNotifiedFor` **only** when the frozen entry
+  is the newest one, because only that entry can own the open window — freezing an older miss leaves
+  a live window alone.
+
+- **The counts on a frozen completion row are left exactly as recorded.** A freeze changes how a
+  period is *scored*, not what happened in it, so the completion rate stays honest and only the streak
+  walk treats the period as neutral. `ck_routine_period_completion_frozen_at_matches_is_frozen` pins
+  `IsFrozen` and `FrozenAt` together — a half-written pair reads as a freeze that never happened.
 
 - **Two known-open correctness findings were deliberately NOT fixed during this move**: the reset job
   drops grace-expiry streak breaks; the two `TryReset` overloads (single-item vs. list) disagree on

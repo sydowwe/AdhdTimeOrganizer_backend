@@ -185,12 +185,20 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     /// here rather than forcing a project reference purely to name the principal.
     /// </summary>
     /// <remarks>
-    /// There is exactly one today: <c>PlannerTask.TodolistItemId</c> → <c>TodoListItem</c>. Planning
+    /// Three today. The first: <c>PlannerTask.TodolistItemId</c> → <c>TodoListItem</c>. Planning
     /// keeps the id column; the navigation property was deleted, because nothing read it — every call
     /// site passes the bare id — and it was the only thing that would have forced a
     /// Planning → TodoLists project reference. Configured with no navigation on either end, which is
     /// what <c>HasOne&lt;T&gt;()</c> / <c>WithMany()</c> without lambdas means; column name, nullability
     /// and <c>SetNull</c> are all unchanged, so this produces no migration.
+    /// <para>
+    /// The other two are <c>ActivityHistory.TodoListItemId</c> → <c>TodoListItem</c> and
+    /// <c>ActivityHistory.RoutineTodoListId</c> → <c>RoutineToDoList</c>: which task a recording was
+    /// saved from, stamped when the user accepts the save-to-history prompt on completing one. They
+    /// are what makes the daily recap's per-item time exact instead of inferred from the shared
+    /// activity. Same navigation-free shape and the same reasoning — History can see neither
+    /// TodoLists nor Routines.
+    /// </para>
     /// </remarks>
     private static void ConfigureCrossSliceRelationships(ModelBuilder modelBuilder)
     {
@@ -206,6 +214,26 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
             // real table name and silently emits a constraint rename. Naming it here makes the FK
             // independent of assembly order, which will keep shifting as further slices come out.
             .HasConstraintName("fk_planner_task_todo_list_items_todolist_item_id");
+
+        // SetNull, not Cascade, on both: ActivityHistory is the source of truth for recorded time, and
+        // deleting a task must not delete the record that you spent that time. The row survives with
+        // its link cleared — it simply stops being attributable to an item, which is the same state
+        // every recording made before this column existed is already in.
+        modelBuilder.Entity<ActivityHistory>()
+            .HasOne<TodoListItem>()
+            .WithMany()
+            .HasForeignKey(h => h.TodoListItemId)
+            .OnDelete(DeleteBehavior.SetNull)
+            // Pinned for the same reason as the FK above — the derived name depends on the order the
+            // ApplyConfigurationsFromAssembly calls run in, which shifts whenever a slice moves.
+            .HasConstraintName("fk_activity_history_todo_list_item_todo_list_item_id");
+
+        modelBuilder.Entity<ActivityHistory>()
+            .HasOne<RoutineTodoList>()
+            .WithMany()
+            .HasForeignKey(h => h.RoutineTodoListId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_activity_history_routine_todo_list_routine_todo_list_id");
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

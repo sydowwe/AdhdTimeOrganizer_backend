@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Routines.domain.service;
 using Sydowwe.Framework.application.dto.request.@base;
 using Sydowwe.Framework.application.dto.request.@interface;
 
@@ -25,6 +26,13 @@ public record RoutineTimePeriodRequest : TextColorRequest, ICreateRequest<Routin
     public int HistoryDepth { get; init; } = 16;
 
     /// <summary>
+    /// 0 to <see cref="RoutineStreakFreezeService.MaxFreezeBudget"/> — streak freezes granted per calendar month.
+    /// 0 means this period grants none. The remaining count is not settable: it is spent through the freeze
+    /// endpoint and refilled by the service.
+    /// </summary>
+    public int FreezeBudget { get; init; } = RoutineStreakFreezeService.DefaultFreezeBudget;
+
+    /// <summary>
     /// 1 to LengthInDays-1 — how many days before the reset to be nudged about unfinished items.
     /// <c>null</c> (the default) = no nudge for this period.
     /// </summary>
@@ -42,6 +50,9 @@ public record RoutineTimePeriodRequest : TextColorRequest, ICreateRequest<Routin
         StreakGraceDays = StreakGraceDays,
         HistoryDepth = HistoryDepth,
         ReminderLeadDays = ReminderLeadDays,
+        FreezeBudget = FreezeBudget,
+        // A new period starts its first window full, so the freeze is available before any read refreshes it.
+        FreezesRemaining = FreezeBudget,
         UserId = 0
     };
 
@@ -61,6 +72,12 @@ public record RoutineTimePeriodRequest : TextColorRequest, ICreateRequest<Routin
         entity.StreakGraceDays = StreakGraceDays;
         entity.HistoryDepth = HistoryDepth;
         entity.ReminderLeadDays = ReminderLeadDays;
+
+        entity.FreezeBudget = FreezeBudget;
+        // Lowering the budget mid-window must not leave more freezes banked than the new budget allows —
+        // ck_routine_time_period_freezes_remaining_range would reject the update, and silently topping the
+        // count up on the way down would hand out freezes for editing a setting.
+        entity.FreezesRemaining = Math.Min(entity.FreezesRemaining, FreezeBudget);
 
         if (scheduleChanged)
             entity.EndingSoonNotifiedFor = null;

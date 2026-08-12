@@ -15,8 +15,9 @@ namespace AdhdTimeOrganizer.IntegrationTests.Modules;
 /// <c>AdhdTimeOrganizer.Core/application/seam/README.md</c>.
 /// <para>
 /// Every failure mode here is invisible to the compiler, and only one of them throws at runtime. The
-/// two single-service seams (<see cref="IActivityTimeAttributionSink"/>,
-/// <see cref="ICalendarDayLookup"/>) fail at endpoint activation, which is deliberate. But
+/// three single-service seams (<see cref="IActivityTimeAttributionSink"/>,
+/// <see cref="ICalendarDayLookup"/>, <see cref="ITodoListItemLoggedTimeSource"/>) fail at endpoint
+/// activation, which is deliberate. But
 /// <see cref="IActivityMembershipSource"/> is resolved as a keyed <c>IEnumerable&lt;&gt;</c> and its
 /// consumer falls back to <em>not filtering</em> when no source matches the key — so a slice dropped
 /// from <c>ModuleServiceExtensions.ModuleAssemblies</c>, a renamed key, or a duplicate key silently
@@ -54,6 +55,7 @@ public class SeamWiringTests(AppDbContextFixture fixture) : PostgresTestBase(fix
 
         AssertRegisteredOnce<IActivityTimeAttributionSink>(sp);
         AssertRegisteredOnce<ICalendarDayLookup>(sp);
+        AssertRegisteredOnce<ITodoListItemLoggedTimeSource>(sp);
     }
 
     /// <summary>

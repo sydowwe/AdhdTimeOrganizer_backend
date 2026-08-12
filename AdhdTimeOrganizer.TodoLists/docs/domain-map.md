@@ -31,7 +31,7 @@ Routines slice. `PlannerTask` points at `TodoListItem` from the Planning side on
 |---|---|
 | `BaseTodoListItem` | The shared base: `DisplayOrder`, `IsDone`, `DoneCount` / `TotalCount`, the `TodoListStep` collection. **Routines derives from this**, which is why it lives here and not in Core. `SetDone` only rewrites `DoneCount` when `TotalCount.HasValue` — deliberate. |
 | `TodoList` | Grouped by an optional `TodoListCategory`. |
-| `TodoListItem` | `BaseTodoListItem` + `TodoListId`, `TaskPriorityId`, `ActivityId`, `DueDate` / `DueTime`. **No `PlannerTask` navigation** — the relationship is owned from Planning. |
+| `TodoListItem` | `BaseTodoListItem` + `TodoListId`, `TaskPriorityId`, `ActivityId`, `DueDate` / `DueTime`, `PairedLeisureActivityId`, `CompletedTimestamp`. **No `PlannerTask` navigation** — the relationship is owned from Planning. `CompletedTimestamp` is written **only** by `TodoListItemCompletionInterceptor`, never by hand. |
 | `TodoListCategory` | Per-user lookup. |
 | `TodoListStep` | The sub-items of any `BaseTodoListItem`. |
 | `TaskPriority` | Per-user lookup; unique key is `(user_id, priority)`, **not** `Text`. Matters when writing `Collides` in its seeder. |
@@ -47,6 +47,7 @@ Routines slice. `PlannerTask` points at `TodoListItem` from the Planning side on
 | `configuration/extensions/TodoListEntityConfigurationExtensions.cs` | `BaseTodoListConfigure<TEntity>()`, applied by the routine configurations too. |
 | `extensions/TodoListExtensions.cs` | `GetNextDisplayOrder<TEntity>` (generic), `GetNextDisplayOrder(DbSet<TodoListItem>, …)`, `GetDisplayOrderById`, `GetGroupIdById`. The `DbSet<RoutineTodoList>` overload is **not** here — see `summary.md`. |
 | `settings/TodoListSettings.cs` | `DisplayOrderStart` / `DisplayOrderGap`. Bound in `Program.cs`; consumed by the reorder endpoints and both seeders. |
+| `interceptor/TodoListItemCompletionInterceptor.cs` | The sole writer of `TodoListItem.CompletedTimestamp`. Registered host-side in `Program.cs`'s `AddInterceptors` call — the class lives here because it names `TodoListItem`, but nothing in this slice wires it up. Fires only on a genuine `IsDone` transition; `ExecuteUpdateAsync` bypasses it. |
 
 Everything general (`BaseEntityConfigure`, `EnumColumn`, …) comes from `Sydowwe.Framework`; the
 `IsManyWithOneUser` / `IsManyWithOneActivity` helpers come from Core.
@@ -58,7 +59,7 @@ Everything general (`BaseEntityConfigure`, `EnumColumn`, …) comes from `Sydoww
 | Shared bases: toggle-is-done, toggle-step-is-done, change-display-order | 3 | `*.cs` at the folder root |
 | Shared step bases: create / update / delete | 3 | `steps/` |
 | `TodoList` | 6 | `todoList/` |
-| `TodoListItem` | 14 | `todoListItem/` |
+| `TodoListItem` | 15 | `todoListItem/` |
 | `TodoListCategory` | 6 | `todoListCategory/` |
 | `TaskPriority` | 7 | `taskPriority/` |
 
@@ -86,6 +87,13 @@ Band **100–199**; the contract is `AdhdTimeOrganizer.Core/infrastructure/persi
    keep their FKs and cascades.
 3. **The shared bases stay in this project.** Routines depends on them from here; moving them to
    Core would grow the thing that is supposed to shrink.
-4. **Nothing here may name a Routines or Planning type.** Both edges point inward, not out.
-5. **Class names are table names.** Renaming a type here is a migration; moving it is not — but see
+4. **Nothing here may name a Routines or Planning type.** Both edges point inward, not out. The same
+   goes for History: the daily recap reads logged time through Core's `ITodoListItemLoggedTimeSource`
+   rather than touching `ActivityHistory`.
+5. **`CompletedTimestamp` is stamped from the ChangeTracker, not at the call sites.** There are five
+   places that write `IsDone` and a sixth is always one feature away; a site that forgot to stamp
+   would break nothing visible, the item would just never appear in a daily recap.
+   `TodoListItemCompletionInterceptor` owns it, registered host-side in `Program.cs`. Anything that
+   bypasses the ChangeTracker — `ExecuteUpdateAsync` in particular — bypasses the stamp too.
+6. **Class names are table names.** Renaming a type here is a migration; moving it is not — but see
    the pinned FK constraint name in `summary.md` for the one case where *ordering* changed a name.

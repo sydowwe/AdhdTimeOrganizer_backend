@@ -13,6 +13,8 @@ public record CreateTodoListItemRequest : BaseCreateTodoListRequest, ICreateRequ
     public DateOnly? DueDate { get; init; }
     public TimeOnly? DueTime { get; init; }
 
+    public long? PairedLeisureActivityId { get; init; }
+
     public TodoListItem ToEntity => new()
     {
         UserId = 0,
@@ -23,6 +25,7 @@ public record CreateTodoListItemRequest : BaseCreateTodoListRequest, ICreateRequ
         TaskPriorityId = TaskPriorityId,
         TodoListId = TodoListId,
         DueDate = DueDate,
-        DueTime = DueTime
+        DueTime = DueTime,
+        PairedLeisureActivityId = PairedLeisureActivityId
     };
 }

@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Routines.application.dto.request.todoList;
+using AdhdTimeOrganizer.Routines.domain.service;
 using FastEndpoints;
 using FluentValidation;
 
@@ -15,6 +16,11 @@ public class RoutineTimePeriodValidator : Validator<RoutineTimePeriodRequest>
 
         RuleFor(x => x.StreakThreshold)
             .InclusiveBetween(1, 100);
+
+        // Mirrors ck_routine_time_period_freeze_budget_range. 0 is legal — it means the period grants no
+        // freezes, which the client renders as an empty budget rather than hiding the feature.
+        RuleFor(x => x.FreezeBudget)
+            .InclusiveBetween(0, RoutineStreakFreezeService.MaxFreezeBudget);
 
         RuleFor(x => x.StreakGraceDays)
             .GreaterThanOrEqualTo(0)

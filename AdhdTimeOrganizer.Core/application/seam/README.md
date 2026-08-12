@@ -16,6 +16,7 @@ if the two ever drift apart.
 | `IActivityMembershipSource` | read | keyed `IEnumerable<>` | TodoLists (`todoList`), Routines (`routineTodoList`) | History — `GetFilteredTableActivityHistoryEndpoint` |
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint` |
+| `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint` |
 
 ## Event seams (`ISeamEvent`)
 
@@ -76,8 +77,14 @@ None of these break the build, and only one of them throws.
   dropped from `ModuleAssemblies`, a renamed key, or a second implementation claiming an existing key
   all just quietly stop narrowing the grid. `SeamWiringTests.ActivityMembershipSources_CoverEveryKey_Exactly`
   and `HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam` are the guards.
-- **The two single seams throw at endpoint activation** if unregistered. That is the point of
+- **The three single seams throw at endpoint activation** if unregistered. That is the point of
   resolving them as a single service rather than an `IEnumerable<>`.
+- **`ITodoListItemLoggedTimeSource` has a failure mode registration cannot catch.** It reads
+  `ActivityHistory.TodoListItemId`, the link stamped when a user saves a recording from a completed
+  task. Widening it to "any time logged against this item's activity" — which looks like it would
+  only ever find *more* — double-counts, because two to-do items may share one activity and would
+  each be credited the same seconds. `TodoListItemDailyRecapTests.TimeIsAttributedByItem_NotByActivity`
+  is the guard, and it asserts on the returned totals rather than on the query.
 - **Seam events fail silently in both directions**: an event with no handler is inert, and a handler
   that throws is logged and swallowed by design. Guarded by
   `SeamWiringTests.SeamEvents_AllHaveAHandler` plus behavioural tests on rows —

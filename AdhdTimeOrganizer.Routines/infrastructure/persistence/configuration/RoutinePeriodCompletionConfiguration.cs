@@ -14,6 +14,14 @@ public class RoutinePeriodCompletionConfiguration : IEntityTypeConfiguration<Rou
         builder.Property(x => x.CompletedCount).IsRequired();
         builder.Property(x => x.TotalCount).IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
+        builder.Property(x => x.IsFrozen).IsRequired();
+
+        // The two travel together: a frozen row records when the freeze was spent, an unfrozen one has nothing
+        // to record. Enforced here rather than trusted to the service, because a half-written pair reads as a
+        // freeze that never happened in the ledger and nothing else would notice.
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_routine_period_completion_frozen_at_matches_is_frozen",
+            "(\"is_frozen\" AND \"frozen_at\" IS NOT NULL) OR (NOT \"is_frozen\" AND \"frozen_at\" IS NULL)"));
 
         builder.HasOne(x => x.RoutineTimePeriod)
             .WithMany(t => t.CompletionHistoryColl)

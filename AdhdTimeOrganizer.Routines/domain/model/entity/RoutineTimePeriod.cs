@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.Routines.domain.service;
 using Sydowwe.Framework.domain.entityInterface;
 
 namespace AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
@@ -19,6 +20,30 @@ public class RoutineTimePeriod : BaseEntityWithUser, IEntityWithIsHidden, IBaseT
     public DateTime? StreakGraceUntil { get; set; }
 
     public int HistoryDepth { get; set; } = 16;
+
+    /// <summary>
+    /// How many streak freezes this period grants per refill window. A freeze is spent on an elapsed period
+    /// that fell short of <see cref="StreakThreshold"/> and makes it carry the streak instead of breaking it.
+    /// <para>0 disables freezes for this period without hiding the feature — the client still renders the
+    /// budget, it just reads "0 left". Capped at <see cref="RoutineStreakFreezeService.MaxFreezeBudget"/> by a
+    /// CHECK constraint, because a budget as large as the history depth would make the streak meaningless.</para>
+    /// </summary>
+    public int FreezeBudget { get; set; } = RoutineStreakFreezeService.DefaultFreezeBudget;
+
+    /// <summary>
+    /// Freezes still spendable in the current window. Refilled to <see cref="FreezeBudget"/> lazily by
+    /// <see cref="RoutineStreakFreezeService.RefreshFreezeBudget"/> once <see cref="FreezeBudgetResetsAt"/>
+    /// passes — there is no job for it, because every surface that shows or spends the budget refreshes first.
+    /// </summary>
+    public int FreezesRemaining { get; set; } = RoutineStreakFreezeService.DefaultFreezeBudget;
+
+    /// <summary>
+    /// When the freeze budget next refills — midnight UTC on the first of the next calendar month. The window
+    /// is deliberately a calendar month rather than one period length: "two freezes per period" would hand a
+    /// daily routine two skips a day, which is not leniency, it is switching the streak off.
+    /// <para><c>null</c> until the first refresh opens a window; treated as "due now".</para>
+    /// </summary>
+    public DateTime? FreezeBudgetResetsAt { get; set; }
 
     /// <summary>
     /// How many days before the period resets to nudge about unfinished items. <c>null</c> = no lead-time

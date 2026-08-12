@@ -25,6 +25,17 @@ public class UpdateTodoListItemValidator : Validator<UpdateTodoListItemRequest>
             .WithMessage("DoneCount must not exceed TotalCount.")
             .OverridePropertyName(nameof(UpdateTodoListItemRequest.DoneCount));
 
+        RuleFor(x => x.PairedLeisureActivityId)
+            .GreaterThan(0L)
+            .When(x => x.PairedLeisureActivityId.HasValue);
+
+        // Same rule as on create — see CreateTodoListItemValidator for why existence and
+        // leisure-ness are deliberately not checked here.
+        RuleFor(x => x.PairedLeisureActivityId)
+            .NotEqual(x => (long?)x.ActivityId)
+            .When(x => x.PairedLeisureActivityId.HasValue)
+            .WithMessage("A task cannot be paired with its own activity.");
+
         RuleFor(x => x.Note)
             .MaximumLength(1000)
             .When(x => x.Note != null);

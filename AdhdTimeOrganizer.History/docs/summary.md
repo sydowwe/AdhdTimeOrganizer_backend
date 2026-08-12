@@ -88,6 +88,20 @@ error, no exception, the filter just stops narrowing.
   applies a global query filter to every `IEntityWithUser`, and `ActivityHistory` is one. The base
   endpoints' `ApplyUserScoping` is a no-op virtual — do not rely on it. Keep `ActivityHistory`
   `IEntityWithUser` with its FKs and cascades intact.
+- **`ActivityHistory` carries two nullable item links, and they are the source of recap accuracy.**
+  `TodoListItemId` / `RoutineTodoListId` record *which task* a recording was saved from, stamped when
+  the user accepts the save-to-history prompt on completing an item (a step's prompt sends the parent
+  item's id). Both are navigation-free and declared **host-side** in
+  `AppDbContext.ConfigureCrossSliceRelationships` — this slice can see neither TodoLists nor Routines
+  — with pinned constraint names and `SetNull`, because `ActivityHistory` is the source of truth for
+  recorded time and deleting a task must not delete it. Most rows are null on both: everything the
+  tracking heartbeat attributes arrives keyed by activity alone.
+  `ActivityHistoryRequest.UpdateEntity` deliberately does **not** write them — the edit form does not
+  carry them, so assigning them would unlink the row on every ordinary edit.
+- **`TodoListItemLoggedTimeSource` (`application/seam/`) must key on `TodoListItemId` only.** It
+  serves TodoLists' daily recap through Core's `ITodoListItemLoggedTimeSource`. Widening it to match
+  on the activity looks strictly more generous and is wrong: two to-do items may share one activity,
+  and the same seconds would be credited to both.
 - **A save touching `ActivityHistory` needs the three materialized views to exist**, or Postgres
   fails with 42P01. The app installs them via `SuggestionPatternViewInstaller` (embedded resources);
   the test fixture applies `sqlScripts/*.sql` in `AppDbContextFixture.OnSchemaCreatedAsync`. If

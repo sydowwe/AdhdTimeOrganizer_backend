@@ -10,6 +10,8 @@ public record UpdateTodoListItemRequest : BaseUpdateTodoListRequest, IUpdateRequ
     public DateOnly? DueDate { get; init; }
     public TimeOnly? DueTime { get; init; }
 
+    public long? PairedLeisureActivityId { get; init; }
+
     public void UpdateEntity(TodoListItem e)
     {
         e.ActivityId = ActivityId;
@@ -22,5 +24,6 @@ public record UpdateTodoListItemRequest : BaseUpdateTodoListRequest, IUpdateRequ
         e.TaskPriorityId = TaskPriorityId;
         e.DueDate = DueDate;
         e.DueTime = DueTime;
+        e.PairedLeisureActivityId = PairedLeisureActivityId;
     }
 }

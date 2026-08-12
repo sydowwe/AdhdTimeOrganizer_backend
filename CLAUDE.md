@@ -66,6 +66,12 @@ tables it was copied with have been deleted.
   working in it — in particular the note on the **pinned FK constraint name** in
   `PlannerTaskConfiguration`, which exists because EF derives that name from the order the
   `ApplyConfigurationsFromAssembly` calls run in, and every new slice shifts that order.
+
+  ⚠ **`TodoListItem.CompletedTimestamp` is written by an interceptor, never at a call site.**
+  `TodoListItemCompletionInterceptor` stamps it off the ChangeTracker on every genuine `IsDone`
+  transition; five places write `IsDone` and a missed one would not fail to build, the item would
+  just never appear in a daily recap. It is registered host-side in `Program.cs`'s `AddInterceptors`
+  call, and `ExecuteUpdateAsync` bypasses it — keep `IsDone` writes on tracked entities.
 - `AdhdTimeOrganizer.History` — **the third slice.** `ActivityHistory`, its 13 endpoints (CRUD, the
   `gird` grid, and the six `HistoryDetail*` / `HistorySummary*` dashboards), DTOs, the
   `HistoryGroupBy` enum, validator and dev seeder.
@@ -75,8 +81,19 @@ tables it was copied with have been deleted.
   the plan sequencing it after. `CalendarActivityEndpoint` and the whole suggestion-pattern
   machinery stayed host-side. Read `AdhdTimeOrganizer.History/docs/summary.md` before working in it.
 
+  ⚠ **`ActivityHistory` carries two nullable item links**, `TodoListItemId` / `RoutineTodoListId` —
+  which task a recording was saved from, stamped when the user accepts the save-to-history prompt on
+  completing one (a step's prompt sends its *parent item's* id). Navigation-free and declared
+  host-side in `ConfigureCrossSliceRelationships` with pinned names and `SetNull`: `ActivityHistory`
+  is the source of truth for recorded time, so deleting a task must not delete it. They are a link,
+  not a copy. `TodoListItemLoggedTimeSource` serves TodoLists' daily recap off the first one and
+  **must key on it alone** — widening to "any time logged against this item's activity" looks
+  strictly more generous and is wrong, because two to-do items may share one activity and would each
+  be credited the same seconds. `ActivityHistoryRequest.UpdateEntity` deliberately does not write
+  either column: the edit form does not carry them, so assigning would unlink the row on every edit.
+
   ⚠ **Every cross-slice seam is listed in `AdhdTimeOrganizer.Core/application/seam/README.md`** —
-  read it before adding one. Three interface seams marked `ISeam` and four events marked
+  read it before adding one. Four interface seams marked `ISeam` and four events marked
   `ISeamEvent`; both markers exist so the whole surface shows up in one type hierarchy, and
   `SeamWiringTests` pins the registry (placement, key coverage, no unhandled events).
 
@@ -129,8 +146,10 @@ tables it was copied with have been deleted.
 
   ⚠ **Four ways to avoid a slice→slice reference, all now in use.** Try each before accepting a
   project reference or a sequencing constraint: a **materialized view** (Planning ← History), a
-  **navigation-free FK declared in the host** (Planning → TodoLists), the
-  `IActivityMembershipSource` **seam** (History ← TodoLists / Routines), and — for a **write**, which
+  **navigation-free FK declared in the host** (Planning → TodoLists, and History → TodoLists /
+  Routines for the recording↔task links), the
+  `IActivityMembershipSource` **seam** (History ← TodoLists / Routines; the same shape carries
+  `ITodoListItemLoggedTimeSource` the other way, TodoLists ← History), and — for a **write**, which
   none of the other three can invert — an **event whose decision moves to a subscriber**
   (Tracking → Planning / TodoLists / Routines, via `ActivityTimeRecordedEvent`). All four fail
   silently when broken, so each needs a behavioural test rather than a route smoke test.

@@ -2,11 +2,13 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.Testing;
 using Xunit;
@@ -136,6 +138,81 @@ public class HistoryRouteSmokeTests(AppDbContextFixture fixture) : PostgresTestB
                 "IsFromTodoList=false must exclude activities present on a to-do list -- if both " +
                 "assertions' sets are identical, IActivityMembershipSource did not resolve and the " +
                 "filter degraded to a no-op");
+    }
+
+    /// <summary>
+    /// The per-activity aggregate the to-do calibration chip reads. Three properties matter to the
+    /// caller and none of them are visible from the route alone: rows are summed <b>per activity id</b>
+    /// (the pie-chart endpoint this replaces groups by non-unique activity <em>name</em>), an id with no
+    /// logged history is <b>omitted</b> rather than returned as a zero — so the caller may divide by
+    /// <c>entryCount</c> unguarded — and another user's rows are never counted.
+    /// </summary>
+    [Fact]
+    public async Task AggregateByActivity_SumsPerId_OmitsEmptyIds_AndExcludesOtherUsers()
+    {
+        const long userId = FakeLoggedUserService.TestUserId;
+        const long otherUserId = FakeLoggedUserService.TestUserId + 9_100;
+
+        long loggedActivityId;
+        long unloggedActivityId;
+        long otherUsersActivityId;
+
+        await using (var db = CreateDbContext())
+        {
+            loggedActivityId = await SeedActivityAsync(db, userId, "Aggregate logged");
+            unloggedActivityId = await SeedActivityAsync(db, userId, "Aggregate unlogged");
+
+            // The other user needs to exist for the FK; only the id matters.
+            if (!await db.Set<User>().IgnoreQueryFilters().AnyAsync(u => u.Id == otherUserId, CancellationToken))
+            {
+                db.Set<User>().Add(new User
+                {
+                    Id = otherUserId,
+                    Email = "aggregate-other@test.com",
+                    NormalizedEmail = "AGGREGATE-OTHER@TEST.COM",
+                    UserName = "aggregate-other@test.com",
+                    NormalizedUserName = "AGGREGATE-OTHER@TEST.COM",
+                    SecurityStamp = Guid.NewGuid().ToString("N"),
+                    ConcurrencyStamp = Guid.NewGuid().ToString("N"),
+                    Locale = AvailableLocales.En,
+                    Timezone = TimeZoneInfo.Utc
+                });
+                await db.SaveChangesAsync(CancellationToken);
+            }
+
+            otherUsersActivityId = await SeedActivityAsync(db, otherUserId, "Aggregate theirs");
+
+            // Two rows on the one activity, months apart: the aggregate spans all of the user's history
+            // with no date range, so both must land in the same total.
+            db.Set<ActivityHistory>().AddRange(
+                NewHistory(userId, loggedActivityId, DateTime.UtcNow.AddDays(-90)),
+                NewHistory(userId, loggedActivityId, DateTime.UtcNow.AddHours(-3)),
+                NewHistory(otherUserId, otherUsersActivityId, DateTime.UtcNow.AddHours(-4)));
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        var response = await CreateUserRoleClient().PostAsJsonAsync(
+            "/api/activity-history/aggregate-by-activity",
+            new { activityIds = new[] { loggedActivityId, unloggedActivityId, otherUsersActivityId } },
+            JsonOpts,
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var entries = (await response.Content.ReadFromJsonAsync<JsonElement>(JsonOpts, TestContext.Current.CancellationToken))
+            .EnumerateArray()
+            .ToDictionary(e => e.GetProperty("activityId").GetInt64());
+
+        entries.Should().ContainKey(loggedActivityId);
+        entries[loggedActivityId].GetProperty("entryCount").GetInt32().Should().Be(2);
+        // NewHistory logs 30 minutes per row.
+        entries[loggedActivityId].GetProperty("totalSeconds").GetInt64().Should().Be(2 * 30 * 60);
+
+        entries.Should().NotContainKey(unloggedActivityId,
+            "an activity with no logged history is omitted, not returned with zeros");
+        entries.Should().NotContainKey(otherUsersActivityId,
+            "another user's logged history must never be aggregated into a response -- if this id is " +
+            "present the endpoint's UserId predicate was dropped");
     }
 
     // ---- helpers ---------------------------------------------------------

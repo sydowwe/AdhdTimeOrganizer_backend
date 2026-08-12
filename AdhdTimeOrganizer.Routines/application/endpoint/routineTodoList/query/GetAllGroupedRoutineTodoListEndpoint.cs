@@ -47,6 +47,10 @@ public class GetAllGroupedRoutineTodoListEndpoint(
         {
             var items = period.RoutineTodoListColl.ToList();
             changed |= RoutineResetService.CheckGrace(period, now);
+            // No job refills the freeze budget — the refill is lazy, so the surface that renders the budget is
+            // the one that has to bring it current. Skipping it here would serve a stale count and refuse a
+            // freeze the user is owed.
+            changed |= RoutineStreakFreezeService.RefreshFreezeBudget(period, now);
             var result = RoutineResetService.TryReset(period, items, now);
             if (result is { } r)
             {
@@ -82,21 +86,17 @@ public class GetAllGroupedRoutineTodoListEndpoint(
                 g =>
                 {
                     var depth = periods.First(p => p.Id == g.Key).HistoryDepth;
-                    return g.Take(depth)
-                        .Reverse()
-                        .Select(c => new PeriodCompletionRecord(c.PeriodStart, c.PeriodEnd, c.CompletedCount, c.TotalCount))
-                        .ToList();
+                    return g.Take(depth).Reverse().ToList();
                 }
             );
 
         var data = periods
             .Select(tp => new RoutineTodoListGroupedResponse
             {
-                RoutineTimePeriod = RoutineTimePeriodResponse.Projection(new[] { tp }.AsQueryable()).Single() with
-                {
-                    NextResetAt = RoutineResetService.ComputeNextReset(tp, now),
-                    CompletionHistory = completionsByPeriod.GetValueOrDefault(tp.Id, [])
-                },
+                RoutineTimePeriod = RoutineTimePeriodResponse.From(
+                    tp,
+                    completionsByPeriod.GetValueOrDefault(tp.Id, []),
+                    now),
                 Items = tp.RoutineTodoListColl
                     .OrderBy(e => e.IsDone).ThenBy(e => e.DisplayOrder)
                     .Select(e => RoutineTodoListResponse.Projection(new[] { e }.AsQueryable()).Single())

@@ -16,6 +16,7 @@ using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.infrastructure.scheduling;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.interceptor;
 using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using AdhdTimeOrganizer.Tracking.infrastructure.persistence.retention;
@@ -178,6 +179,11 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     services.AddSingleton<ISuggestionPatternRefreshQueue, SuggestionPatternRefreshQueue>();
     services.AddScoped<SuggestionPatternRefreshInterceptor>();
 
+    // Stamps TodoListItem.CompletedTimestamp on every IsDone transition, wherever it is written from.
+    // Stateless, hence singleton. Dropping this registration breaks nothing loudly — items still
+    // complete, they just stop appearing in the daily recap.
+    services.AddSingleton<TodoListItemCompletionInterceptor>();
+
     // Per-user global query filters (BaseDbContext). Framework defaults this off; in this portal every
     // row belongs to exactly one user and nothing reads across users, so it is on by default here.
     // Bound after the code default so a deployment can still switch it off via UserScoping:Enabled.
@@ -190,7 +196,9 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
         options.UseNpgsql(DatabaseStringsHelper.GetDefaultDatabaseConnectionString, b => b.MigrationsAssembly(typeof(AdhdTimeOrganizer.Program).Assembly.FullName))
             .UseSnakeCaseNamingConvention()
             .ReplaceService<IMigrationsSqlGenerator, PartitionedNpgsqlMigrationsSqlGenerator>()
-            .AddInterceptors(sp.GetRequiredService<SuggestionPatternRefreshInterceptor>());
+            .AddInterceptors(
+                sp.GetRequiredService<SuggestionPatternRefreshInterceptor>(),
+                sp.GetRequiredService<TodoListItemCompletionInterceptor>());
         if (isDevelopment)
             options.LogTo(Console.WriteLine);
     });

@@ -18,6 +18,19 @@ public class CreateTodoListItemValidator : Validator<CreateTodoListItemRequest>
             .InclusiveBetween(2, 99)
             .When(x => x.TotalCount.HasValue);
 
+        RuleFor(x => x.PairedLeisureActivityId)
+            .GreaterThan(0L)
+            .When(x => x.PairedLeisureActivityId.HasValue);
+
+        // Bundling a task with its own activity is meaningless — the reward has to be a different
+        // activity than the work. That the id exists and belongs to the caller is not checked here:
+        // the FK covers existence, and this slice cannot see ActivityProfiles to ask whether the
+        // activity is a leisure one. Offering only backlog entries is the picker's job.
+        RuleFor(x => x.PairedLeisureActivityId)
+            .NotEqual(x => (long?)x.ActivityId)
+            .When(x => x.PairedLeisureActivityId.HasValue)
+            .WithMessage("A task cannot be paired with its own activity.");
+
         RuleFor(x => x.Note)
             .MaximumLength(1000)
             .When(x => x.Note != null);

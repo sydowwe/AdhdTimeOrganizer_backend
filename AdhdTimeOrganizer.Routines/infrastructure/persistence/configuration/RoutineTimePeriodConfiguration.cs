@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Routines.domain.service;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sydowwe.Framework.infrastructure.persistence.configuration.extensions;
 
@@ -18,6 +19,8 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
         builder.Property(t => t.BestStreak).IsRequired();
         builder.Property(t => t.StreakThreshold).IsRequired();
         builder.Property(t => t.StreakGraceDays).IsRequired();
+        builder.Property(t => t.FreezeBudget).IsRequired();
+        builder.Property(t => t.FreezesRemaining).IsRequired();
 
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_routine_time_period_reset_anchor_day_range",
@@ -54,6 +57,19 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_routine_time_period_reminder_lead_days_range",
             "\"reminder_lead_days\" IS NULL OR (\"reminder_lead_days\" >= 1 AND \"reminder_lead_days\" < \"length_in_days\")"));
+
+        // A budget the size of the history depth would mean every miss can be papered over, so the streak would
+        // stop meaning anything. 0 is legal and means "this period grants no freezes" — the client still shows
+        // the chip, reading zero, rather than hiding the feature (which is what a null budget signals).
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_routine_time_period_freeze_budget_range",
+            $"\"freeze_budget\" >= 0 AND \"freeze_budget\" <= {RoutineStreakFreezeService.MaxFreezeBudget}"));
+
+        // Held by RoutineStreakFreezeService: the refill sets it to the budget, spending decrements it, and an
+        // update that lowers the budget clamps it. Nothing else writes it.
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_routine_time_period_freezes_remaining_range",
+            "\"freezes_remaining\" >= 0 AND \"freezes_remaining\" <= \"freeze_budget\""));
 
         builder.HasMany(r => r.RoutineTodoListColl)
             .WithOne(t => t.RoutineTimePeriod)

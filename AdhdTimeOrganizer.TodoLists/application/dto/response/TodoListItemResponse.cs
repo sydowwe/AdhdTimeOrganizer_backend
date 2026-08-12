@@ -11,6 +11,9 @@ public record TodoListItemResponse : BaseTodoListResponse,
     public DateOnly? DueDate { get; init; }
     public TimeOnly? DueTime { get; init; }
 
+    /// <summary>Activity id of the paired leisure activity, or null when the task is unpaired.</summary>
+    public long? PairedLeisureActivityId { get; init; }
+
     public static IQueryable<TodoListItemResponse> Projection(IQueryable<TodoListItem> q)
     {
         return q.Select(e => new TodoListItemResponse
@@ -62,7 +65,8 @@ public record TodoListItemResponse : BaseTodoListResponse,
                 Priority = e.TaskPriority.Priority
             },
             DueDate = e.DueDate,
-            DueTime = e.DueTime
+            DueTime = e.DueTime,
+            PairedLeisureActivityId = e.PairedLeisureActivityId
         });
     }
 }
