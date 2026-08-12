@@ -1,0 +1,9 @@
+using Sydowwe.Framework.application.dto.response.generic;
+
+namespace AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop;
+
+public record DesktopCategoriesAndRolesByPattern
+{
+    public required IEnumerable<SelectOptionResponse> Categories { get; set; }
+    public required IEnumerable<SelectOptionResponse> Roles { get; set; }
+}

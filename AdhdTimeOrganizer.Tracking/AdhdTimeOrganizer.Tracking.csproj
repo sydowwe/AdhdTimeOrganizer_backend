@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>14</LangVersion>
+        <RootNamespace>AdhdTimeOrganizer.Tracking</RootNamespace>
+    </PropertyGroup>
+
+    <!-- Same shape as AdhdTimeOrganizer.Core / .TodoLists / .History / .Planning: a plain
+         (Microsoft.NET.Sdk) library that holds endpoints, so it needs the ASP.NET Core surface, and the
+         Web SDK's implicit usings are not in scope here and are re-declared below. -->
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Microsoft.AspNetCore.Builder"/>
+        <Using Include="Microsoft.AspNetCore.Http"/>
+        <Using Include="Microsoft.Extensions.Configuration"/>
+        <Using Include="Microsoft.Extensions.DependencyInjection"/>
+        <Using Include="Microsoft.Extensions.Hosting"/>
+        <Using Include="Microsoft.Extensions.Logging"/>
+        <!-- Every endpoint, job and seeder here takes a plain DbContext (the host aliases it to
+             AppDbContext in DI), so Microsoft.EntityFrameworkCore is named by almost every file in
+             the project. Global rather than 40-odd identical using lines. -->
+        <Using Include="Microsoft.EntityFrameworkCore"/>
+    </ItemGroup>
+
+    <!-- PurgeExpiredActivityTrackingEntriesJob needs IJob / IJobExecutionContext /
+         DisallowConcurrentExecution from Quartz core. Registration itself (AddJob/AddTrigger) stays
+         host-side in the single AddQuartz call - this is only the package the job class compiles
+         against. Version pinned to match the host, Sydowwe.Scheduler and AdhdTimeOrganizer.Routines so
+         the solution carries one Quartz version. -->
+    <ItemGroup>
+        <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.1"/>
+    </ItemGroup>
+
+    <!-- The five endpoint groups carry AutoTagOverride, which is FastEndpoints' Swagger surface rather
+         than its core. Sydowwe.Framework brings in FastEndpoints but not this, so it is named here.
+         Version pinned to the host's. -->
+    <ItemGroup>
+        <PackageReference Include="FastEndpoints.Swagger" Version="8.1.0"/>
+    </ItemGroup>
+
+    <!-- Core only. This slice was the one the plan expected to need three outbound references — the
+         desktop heartbeat wrote ActivityHistory (History), transitioned PlannerTask.Status (Planning)
+         and ticked off to-do / routine items (TodoLists, Routines). Those were *writes*, so they could
+         not be inverted the way History's read filters were; they were replaced by two Core seams
+         instead, both built before any file moved:
+
+           - IActivityTimeAttributionSink  -> History implements it, the heartbeat calls it.
+           - ActivityTimeRecordedEvent     -> the heartbeat announces day totals; the host's
+                                              ActivityTimeRecordedEventHandler owns the completion rule.
+
+         So do not add a ProjectReference here to reclaim a direct write. It would restore three edges
+         at once, and the exclusivity rule the automation implements (to-do fallback only when no
+         planner task matched) cannot be expressed once it is split across slices anyway - see
+         ActivityTimeAutomationTests.PlannerTaskMatched_TodoFallback_DoesNotRun. -->
+    <ItemGroup>
+        <ProjectReference Include="..\AdhdTimeOrganizer.Core\AdhdTimeOrganizer.Core.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
+        <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>
+    </ItemGroup>
+
+</Project>

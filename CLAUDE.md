@@ -30,8 +30,9 @@ tables it was copied with have been deleted.
   `Sydowwe.Framework.Contracts` — never the host**, which is why everything in it takes a plain
   `DbContext` rather than `AppDbContext`. Read `AdhdTimeOrganizer.Core/docs/summary.md` before
   working in it, and `.../seeder/SeederOrderBands.md` before adding a seeder **anywhere** in the
-  solution. Five more slices follow it — TodoLists, Routines, History and Planning have landed;
-  only **Tracking** remains. The plan is `review/portal/slicePrompts/00-README.md`.
+  solution. Five more slices follow it — TodoLists, Routines, History, Planning and Tracking have
+  **all landed; the split is finished**, and no feature slice carries an outbound slice reference
+  except Routines → TodoLists. The record is `review/portal/slicePrompts/00-README.md`.
 - `AdhdTimeOrganizer.TodoLists` — **the second slice.** Lists, items, steps, categories and the
   per-user `TaskPriority` lookup, plus the shared to-do primitives the Routines slice builds on
   (`BaseTodoListItem`, `TodoListStep`, `BaseTodoListConfigure`, `TodoListExtensions`,
@@ -90,11 +91,44 @@ tables it was copied with have been deleted.
   `ApplyConfigurationsFromAssembly`, `ModuleAssemblies`, FastEndpoints `o.Assemblies` — on a type
   that can move slices.**
 
-  ⚠ **Three ways to avoid a slice→slice reference, all now in use.** Try each before accepting a
+  ⚠ **Four ways to avoid a slice→slice reference, all now in use.** Try each before accepting a
   project reference or a sequencing constraint: a **materialized view** (Planning ← History), a
-  **navigation-free FK declared in the host** (Planning → TodoLists), and the
-  `IActivityMembershipSource` **seam** (History ← TodoLists / Routines). All three fail silently when
-  broken, so each needs a behavioural test rather than a route smoke test.
+  **navigation-free FK declared in the host** (Planning → TodoLists), the
+  `IActivityMembershipSource` **seam** (History ← TodoLists / Routines), and — for a **write**, which
+  none of the other three can invert — an **event whose decision moves to a subscriber**
+  (Tracking → Planning / TodoLists / Routines, via `ActivityTimeRecordedEvent`). All four fail
+  silently when broken, so each needs a behavioural test rather than a route smoke test.
+- `AdhdTimeOrganizer.Tracking` — **the fifth and last slice.** The three raw ingest ledgers
+  (`DesktopActivityEntry`, `WebExtensionActivityEntry`, `AndroidSessionData`), the two
+  `Tracker*MappingByPattern` lookups, 29 endpoints (desktop/web-extension/android ingest + twelve
+  dashboards + the mapping grids), the five endpoint groups, 17 validators, the retention purge job
+  and the dev `WebExtensionDataSeeder`. **References Core and the framework only — zero outbound
+  slice edges**, which the plan said was impossible: its dependencies were **writes**, so none of the
+  three patterns above could invert them. Two Core seams did, and they are the reason this slice
+  exists:
+  - **`IActivityTimeAttributionSink`** (`AdhdTimeOrganizer.Core/application/seam/`) — the heartbeat's
+    `ActivityHistory` write. History implements it; Tracking calls it. Resolved as a **single**
+    service, not a keyed `IEnumerable` like `IActivityMembershipSource`, so a missing registration
+    throws at activation instead of silently dropping every attribution. Implementations **mutate the
+    caller's `DbContext` and must not `SaveChanges`** — the heartbeat's own save is the transaction.
+  - **`ActivityTimeRecordedEvent`** (`.../application/event/`) — per-activity whole-day totals. The
+    host's `ActivityTimeRecordedEventHandler` owns the planner-task / to-do / routine completion rule
+    that used to run inline in the ingest endpoint.
+
+  ⚠ **That handler is host-side and single on purpose — do not split it per owning slice.** Its rule
+  is exclusive (the to-do/routine fallback runs *only* when no planner task matched), and
+  `Mode.WaitForAll` gives independent subscribers no ordering and no veto, so a split silently
+  double-completes anything holding both. It also logs-and-swallows, because the ingest already
+  committed — so a break is silent. `ActivityTimeAutomationTests` asserts on rows, not routes.
+
+  ⚠ **`WebExtensionActivityEntry` is the one entity the global user filter does not cover.** It is
+  listed in `AppDbContext.UserScopingExcludedTypes` and given a hand-written filter combining the user
+  check with `RecordDate >= CurrentPartitionDate`; the entity is in the slice, both halves are
+  host-side. Losing the user half leaks every user's browsing history to any signed-in caller.
+  `TrackingRouteSmokeTests.WebExtensionActivityEntry_KeepsItsCombinedQueryFilter` seeds two users and
+  an out-of-range row rather than inspecting metadata.
+
+  Read `AdhdTimeOrganizer.Tracking/docs/summary.md` before working in it.
 - `framework/` — a **git submodule** (github.com/sydowwe/Sydowwe.Framework) holding seven projects:
   - `framework/Sydowwe.Framework` — the shared framework, used by **the portal and the modules
     alike**. Base entities, base endpoints, builder extensions, DbContext helpers, seeders, auth
@@ -593,15 +627,20 @@ configurator gives every endpoint role metadata, and an endpoint carrying any au
 never falls back, which is why the deny is attached per endpoint. (The old file was named
 `DenyExtensionClientsByDefaultPreProcessor.cs` and contained no pre-processor; it is gone.)
 
-**What stayed portal, deliberately:**
-- `infrastructure/security/PortalAuthorizationPolicies.cs` — `ActivityTracking`, the policy gating the
-  tracking endpoints. Which clients may report activity is a product decision.
-- `infrastructure/extService/user/auth/ExtensionRoleClaimsProvider.cs` — grants the `ActivityTracking`
-  *role* to extension tokens via Framework's `IAdditionalUserClaimsProvider<TUser>` seam. It exists so
-  Framework never learns this deployment's role names; moving it would invert that.
+**What stayed out of Framework, deliberately:**
+- `AdhdTimeOrganizer.Core/infrastructure/security/PortalAuthorizationPolicies.cs` — `ActivityTracking`,
+  the policy name gating the tracking endpoints. **In Core, not the host**, since the Tracking
+  extraction: a slice project has to name the policy to attach it, and a slice cannot see the host.
+  Only the *name* moved, following `PortalRoleCatalog`'s precedent — what the policy **requires** is
+  still declared host-side in `config/IdentityServiceExtensions.cs`, because which clients may report
+  activity is a product decision. Don't push this further into Framework.
+- `infrastructure/extService/user/auth/ExtensionRoleClaimsProvider.cs` — **still host-side**; grants the
+  `ActivityTracking` *role* to extension tokens via Framework's `IAdditionalUserClaimsProvider<TUser>`
+  seam. It exists so Framework never learns this deployment's role names; moving it would invert that.
 - Note the policy name and the role name are **two different constants that happen to share the string**
   `"ActivityTracking"`. Renaming one does not rename the other. The `AutoTagOverride("ActivityTracking")`
-  in `endpointGroups/` is a third, unrelated use — a Swagger tag. Leave it a literal.
+  in `AdhdTimeOrganizer.Tracking/application/endpointGroups/` is a third, unrelated use — a Swagger tag.
+  Leave it a literal.
 
 **Refresh-token cleanup — `framework/Sydowwe.Framework/infrastructure/extService/user/auth/RefreshTokenCleanupService.cs`.**
 `BackgroundService` next to the `RefreshTokenService` it drives; hosts register it with

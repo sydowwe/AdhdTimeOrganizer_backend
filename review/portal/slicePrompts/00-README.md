@@ -13,7 +13,45 @@ them out of order produces a slice→host reference, which does not compile.
 | ~~3~~ | ~~`03-routines.md`~~ | TodoLists | ✅ **DONE.** `AdhdTimeOrganizer.Routines` exists: routine lists, time periods, completions, the reset service, two Quartz jobs, two seeders. `RoutineTodoListActivityMembershipSource` moved with the entity. |
 | ~~4~~ | ~~`04-history.md`~~ | ~~TodoLists, Routines~~ → **Core only** | ✅ **DONE.** `AdhdTimeOrganizer.History` exists: 39 files. Its two outbound edges were *removed* rather than honoured — see below — so it landed before Routines. |
 | ~~5~~ | ~~`05-planning.md`~~ | ~~TodoLists, History~~ → **Core only** | ✅ **DONE.** `AdhdTimeOrganizer.Planning` exists: 123 files, reminders folded in. **Both** of its predicted edges were deleted rather than honoured — see below. |
-| 6 | `07-tracking.md` | Planning, TodoLists, Routines | Has a **seam to build first** — read the prompt. |
+| ~~6~~ | ~~`07-tracking.md`~~ | ~~Planning, TodoLists, Routines~~ → **Core only** | ✅ **DONE.** `AdhdTimeOrganizer.Tracking` exists: ~120 files. **All three predicted edges were deleted rather than honoured** — see below. The split into two commits (seam, then move) was kept. |
+
+> **🎉 The split is finished. Every feature slice is out, and not one of them carries an outbound
+> slice reference.** Core · TodoLists · Routines · History · Planning · Tracking — six projects, and
+> the only project references among them are TodoLists ← Routines (shared to-do bases) and everything
+> → Core. Every other predicted edge was removed instead of obeyed.
+>
+> **Tracking landed with zero outbound slice edges, which this plan said was impossible.**
+> `04-slicing-verification.md` §4 and this file both recorded Tracking → Planning + TodoLists +
+> Routines as the one set of edges that *"genuinely cannot"* be inverted, because they are **writes**.
+> That was right about reads-vs-writes and wrong about the conclusion: a write inverts through an
+> **event**, it just costs a behaviour change rather than a refactor. Two Core seams did it:
+> - **`IActivityTimeAttributionSink`** — the heartbeat's `ActivityHistory` write. History implements
+>   it; Tracking calls it. This also deleted the `Tracking → History` edge, which the prompt expected
+>   to survive as Tracking's one permanent reference.
+> - **`ActivityTimeRecordedEvent`** — the heartbeat announces per-activity day totals; the host's
+>   `ActivityTimeRecordedEventHandler` owns the planner-task / to-do / routine completion rule.
+>
+> So the **fourth** pattern for killing a slice→slice edge, after the seam, the materialized view and
+> the host-declared FK: **a write inverts into an event, with the decision moved to a subscriber.**
+>
+> ⚠ **The automation is one host-side handler on purpose — do not "tidy" it into one handler per
+> owning slice.** The rule is exclusive (the to-do/routine fallback runs *only* when no planner task
+> matched) and `Mode.WaitForAll` gives independent subscribers no ordering and no veto, so a split
+> silently double-completes anything that has both. The handler also swallows its own exceptions,
+> because the ingest already committed — so a break is silent, and
+> `ActivityTimeAutomationTests.PlannerTaskMatched_TodoFallback_DoesNotRun` is what catches it.
+>
+> ⚠ **`PortalAuthorizationPolicies` moved from the host to Core.** The Tracking endpoints attach the
+> `ActivityTracking` policy by name, and a slice cannot see the host. Only the *name* moved (following
+> `PortalRoleCatalog`'s precedent); what the policy requires is still declared in
+> `IdentityServiceExtensions`, and `ExtensionRoleClaimsProvider` is still host-side.
+>
+> ⚠ **The folder structure lied, as predicted.** Three configurations filed under
+> `configuration/activityHistory/` were Tracking's; the whole `application/endpointGroups/` folder was
+> tracking-only and moved wholesale; and four validators with non-obvious names
+> (`BaseTimelineValidator`, `PieChartValidator`, `TopDomainsValidator`, `DomainDetailsValidator`) were
+> tracking's too. Moving Tracking also emptied the host's `domain/model/entity/` and
+> `infrastructure/persistence/retention/` folders, leaving stale `using`s that only surfaced at build.
 
 > **Planning landed with zero outbound slice edges. Neither predicted dependency was real.**
 > - **`Planning → History` never existed.** `GetSuggestionsRepeatingPlannerTaskEndpoint` reads
@@ -61,7 +99,8 @@ them out of order produces a slice→host reference, which does not compile.
 >
 > Reach for the same trick on any remaining *"slice A filters on slice B's rows"* edge before
 > accepting a sequencing constraint. It does **not** apply to `Tracking → Planning`, which is a
-> **write** (§4 of `../04-slicing-verification.md`) — that one still needs the event seam.
+> **write** (§4 of `../04-slicing-verification.md`) — that one needed the event seam instead, and got
+> it. Every edge in the original graph is now gone; nothing here is outstanding.
 >
 > The cost of the seam is that a source is resolved by *string key*, so a missing or misregistered
 > implementation is silent: no build error, no exception, the filter merely stops narrowing. Every

@@ -1,0 +1,11 @@
+using Sydowwe.Framework.application.dto.response.@base;
+
+namespace AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop;
+
+public record TrackerDesktopDistinctEntriesResponse : IIdResponse
+{
+    public required string ProcessName { get; set; }
+    public string? ProductName { get; init; }
+    public string? WindowTitle { get; set; }
+    public long Id { get; init; } = 0;
+}

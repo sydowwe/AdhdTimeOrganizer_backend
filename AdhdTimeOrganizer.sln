@@ -30,6 +30,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Routines"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Planning", "AdhdTimeOrganizer.Planning\AdhdTimeOrganizer.Planning.csproj", "{A8FB296A-01A7-4B18-8B24-0C9A045F965C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhdTimeOrganizer.Tracking", "AdhdTimeOrganizer.Tracking\AdhdTimeOrganizer.Tracking.csproj", "{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -208,6 +210,18 @@ Global
 		{A8FB296A-01A7-4B18-8B24-0C9A045F965C}.Release|x64.Build.0 = Release|Any CPU
 		{A8FB296A-01A7-4B18-8B24-0C9A045F965C}.Release|x86.ActiveCfg = Release|Any CPU
 		{A8FB296A-01A7-4B18-8B24-0C9A045F965C}.Release|x86.Build.0 = Release|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Debug|x64.Build.0 = Debug|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Debug|x86.Build.0 = Debug|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Release|x64.ActiveCfg = Release|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Release|x64.Build.0 = Release|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Release|x86.ActiveCfg = Release|Any CPU
+		{8C8BCDCB-D85A-48BB-B1EB-15A72EE8B28B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

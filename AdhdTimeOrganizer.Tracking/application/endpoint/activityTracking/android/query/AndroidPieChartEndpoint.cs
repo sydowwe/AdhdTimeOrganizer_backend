@@ -1,0 +1,76 @@
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
+using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android.dashboard;
+using AdhdTimeOrganizer.Core.application.validator;
+using AdhdTimeOrganizer.Tracking.application.validator;
+using FastEndpoints;
+using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.extensions;
+
+namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.android.query;
+
+public class AndroidPieChartEndpoint(DbContext db) : Endpoint<PieChartRequest, AndroidPieChartResponse>
+{
+    public override void Configure()
+    {
+        Post("/activity-tracking/android/pie-chart");
+        Summary(s =>
+        {
+            s.Summary = "Get Android app usage pie chart data";
+            s.Description = "Returns a breakdown of app usage time by package/label for a given date range, filtered by minimum percentage threshold";
+            s.Response<AndroidPieChartResponse>(200, "Success");
+            s.Response(400, "Bad request");
+        });
+        Validator<PieChartValidator>();
+    }
+
+    public override async Task HandleAsync(PieChartRequest req, CancellationToken ct)
+    {
+        var userId = User.GetId();
+
+        var (from, to) = req.ToDateTimeRange();
+
+        var periodData = await db.Set<AndroidSessionData>()
+            .Where(x => x.UserId == userId)
+            .Where(x => x.SessionStartUtc >= from && x.SessionStartUtc < to)
+            .ToListAsync(ct);
+
+        var totalSeconds = periodData.Sum(x => x.DurationSeconds);
+        var totalApps = periodData.Select(x => x.AppLabel).Distinct().Count();
+        var totalSessions = periodData.Count;
+
+        var appGroups = periodData
+            .GroupBy(x => (x.PackageName, x.AppLabel))
+            .Select(g => new AndroidAppPieData
+            {
+                PackageName = g.Key.PackageName,
+                AppLabel = g.Key.AppLabel,
+                Seconds = g.Sum(x => x.DurationSeconds),
+                TotalSeconds = g.Sum(x => x.DurationSeconds)
+            })
+            .OrderByDescending(a => a.Seconds)
+            .ToList();
+
+        var minPercent = req.MinPercent ?? 1.0;
+        List<AndroidAppPieData> result;
+
+        if (totalSeconds > 0)
+        {
+            var minSeconds = totalSeconds * minPercent / 100.0;
+            result = appGroups.Where(a => a.Seconds >= minSeconds).ToList();
+        }
+        else
+        {
+            result = appGroups;
+        }
+
+        var totals = new AndroidPieTotals
+        {
+            TotalSeconds = totalSeconds,
+            TotalApps = totalApps,
+            TotalSessions = totalSessions
+        };
+
+        await Send.ResponseAsync(new AndroidPieChartResponse { Apps = result, Totals = totals }, cancellation: ct);
+    }
+}
