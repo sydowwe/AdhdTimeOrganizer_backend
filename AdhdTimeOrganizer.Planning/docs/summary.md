@@ -11,7 +11,7 @@ to find a specific type.
 
 | Area | Types | Endpoints |
 |---|---|---|
-| Calendar | `Calendar` | 4 (by-date, by-id, filter-sort, update) |
+| Calendar | `Calendar` | 5 (by-date, **day-plan**, by-id, filter-sort, update) |
 | Planner tasks | `BasePlannerTask`, `PlannerTask` | 10 |
 | Repeating planner tasks | `RepeatingPlannerTask` | 6 (incl. suggestions) |
 | Template planner tasks | `TemplatePlannerTask` | 7 |
@@ -121,6 +121,87 @@ client end up disagreeing about the same number. The read is deliberately **unca
 window would turn `BestStreak` into a rolling maximum, so a record the user really set could quietly
 shrink.
 
+## The one-request day plan
+
+`GET /calendar/day-plan/{date}` (`GetDayPlanCalendarEndpoint` → `DayPlanResponse`) returns the
+calendar row, its planner tasks ordered by start time, and the streak. It exists because the home page
+could not ask for a day's tasks in one hop: `PlannerTaskFilter` is keyed on `CalendarId`, and the only
+source of that id was `by-Date`. The two calls were serialised **by contract**, and after the
+dashboard-refresh work they are paid on every stale tab-return and every five-minute poll, not once
+per navigation.
+
+Nothing about the old pair changed. The day-planner view still filters by calendar id and time window,
+which is the shape it genuinely needs; only home stops using it.
+
+Three rulings are baked into the response, and each answers a question the client had been guessing at:
+
+| Question | Answer |
+|---|---|
+| What does a date with no calendar return? | **200 with `Calendar: null`, `Tasks: []`** — never 404. `by-Date` keeps its 404; it is a lookup, this is a page load, and a rejected promise there renders a retry button over a day that is merely unplanned. |
+| Is a calendar created lazily on first task? | **Now yes** — see [below](#lazy-day-creation). It was not: `CalendarSeeder` bulk-created rows for a fixed set of years and nothing else could make one. |
+| Is the `From`/`Until` window meaningful for a whole-day read? | **No.** Home only ever passed 00:00–23:59, so this route has no window at all. |
+| Can a task belong to a date but not a calendar? | **No.** `PlannerTask.CalendarId` is non-nullable, so the calendar id is an implementation detail the client never has to hold. |
+
+⚠ **Calendar presence still does not mean "the user planned this day".** `CalendarSeeder` seeds whole
+years per user, so inside the seeded window every date has a row whether or not it was ever touched.
+A client branching on presence would show its empty state on almost no day it should, so
+`DayPlanResponse.HasPlan` (`Tasks.Count > 0`) is what an empty state reads.
+
+⚠ **The streak is hoisted to the top level here** (`DayPlanResponse.Streak`), and the copy nested on
+`Calendar.Streak` is nulled out. It has to survive a null calendar — it is a fact about the user, not
+about the day — and two copies would eventually be filled in by different code paths and disagree.
+
+Guard: `Endpoints.DayPlanEndpointTests` (6 over HTTP). The status code for an unplanned day and the
+user scoping are both silent failures — a 404 there does not throw, and a lost query filter renders
+somebody else's day rather than erroring.
+
+## Lazy day creation
+
+**A planner task may name its day by `Date` instead of `CalendarId`, and the calendar row is created
+if the user has none.** Exactly one of the two is required, on `PlannerTaskRequest` and on
+`ApplyTemplateToTaskPlannerRequest`; sending both is a 400 rather than a precedence rule, because the
+two can disagree and the loser is a task filed on a day nobody asked for.
+
+The defect it fixes: `CalendarSeeder` filled a hard-coded `{ 2025, 2026 }` at user setup and there is
+**no create-calendar endpoint** — only `UpdateCalendarEndpoint`. Past the last seeded year every date
+resolved to no row, so the planner rendered an ordinary empty day that silently refused every task,
+and nothing in the app could make the row it needed. No exception, no log line, an expiry date on the
+product.
+
+| Type | Role |
+|---|---|
+| `HolidayCalendar` (`domain/service/`) | The holiday tables + Computus, lifted out of `CalendarSeeder` |
+| `CalendarDayFactory` (`domain/service/`) | What an unplanned day *is* — day type, holiday name, default sleep window |
+| `ICalendarProvisioner` / `CalendarProvisioner` | Read-or-create for one (user, date) |
+
+Both creators go through `CalendarDayFactory`, and that is the point of it: a day filled in a year
+ahead and the same day created on its first task have to be the same day. The three callers of the
+provisioner are `CreatePlannerTaskEndpoint`, `UpdatePlannerTaskEndpoint` (a task dragged onto an
+unplanned day) and `ApplyTemplatePlannerTaskEndpoint` (by date; by id it still 404s, because an id
+resolving to nothing is a stale client rather than an unplanned day).
+
+⚠ **`EnsureForDateAsync` commits.** Call it *before* staging your own writes — anything already
+pending on the ambient `DbContext` goes in with the calendar. All three callers resolve up front for
+this reason, which is why the two CRUD ones do it in `BeforeMapping` and not `AfterMapping`.
+
+⚠ **It scopes by hand** (`IgnoreQueryFilters()` + explicit `UserId`), same as `CalendarSeeder` and for
+the same reason: it is told which user to act for, and filtered it would read no row and try to insert
+a duplicate onto the unique `(user_id, date)`.
+
+⚠ **`(user_id, date)` is unique, and the race is real** — a phone and a desktop starting the same
+morning's first task. The loser catches `DbUpdateException`, **detaches** its failed insert (an
+`Added` entity survives a failed `SaveChanges` and would be retried by the endpoint's own next save)
+and reads the winner's row.
+
+`CalendarSeeder`'s year list is now `{ this year, next year }`, resolved when it runs. That is
+hygiene, not the fix — it only helps users created from now on. Lazy creation is what makes an
+arbitrary future date plannable for everyone.
+
+Guard: `Endpoints.LazyCalendarCreationTests` (9 over HTTP, on dates far outside any seeded window).
+The metadata theory is the drift guard — if the seeder and the provisioner ever stop sharing
+`CalendarDayFactory`, a lazily created Christmas quietly loses its holiday name while every "does a
+row exist" assertion still passes.
+
 ## Gotchas
 
 - **Slice code takes a plain `DbContext`**, never `AppDbContext`. There is no `dbContext.PlannerTasks`
@@ -138,7 +219,10 @@ shrink.
   buy nothing but tidiness. Its `Order` (420) is still in Planning's band.
 - **`CalendarSeeder` does not subclass `BasePerUserDefaultSeeder`** — its key is a date range rather
   than a row set, so it hand-rolls `SetupDefaults` / `ResetDefaults` and does its own
-  `IgnoreQueryFilters()`. Deliberate; do not normalise it.
+  `IgnoreQueryFilters()`. Deliberate; do not normalise it. It is also **no longer the only thing that
+  creates a calendar row** — see [lazy day creation](#lazy-day-creation) — and it no longer owns the
+  holiday tables or the day defaults; those moved to `HolidayCalendar` / `CalendarDayFactory` so both
+  creators share them.
 - **The completion fan-out runs through events and must stay that way.** `PlannerTask` and
   `TodoListItem` complete each other through `PlannerTaskIsDoneChangedEvent` /
   `TodoListItemIsDoneChangedEvent`, whose records live in Core. The handlers stay host-side. Never

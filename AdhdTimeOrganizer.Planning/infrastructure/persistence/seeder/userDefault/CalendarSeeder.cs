@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
+using AdhdTimeOrganizer.Planning.domain.service;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.infrastructure.persistence.seeder;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface;
@@ -18,10 +18,23 @@ public class CalendarSeeder(
         await dbContext.TruncateTableCascadeAsync<Calendar>();
     }
 
+    /// <summary>
+    /// This year and next, resolved when the seeder runs rather than hard-coded. It used to say
+    /// <c>{ 2025, 2026 }</c>, which quietly set an expiry date on the whole planner: past the last seeded year
+    /// every date resolved to no calendar row, and with no create-calendar endpoint nothing in the app could
+    /// make one. Lazy creation (<c>CalendarProvisioner</c>) is what actually fixes that; a rolling window is
+    /// just no longer walking into it on purpose.
+    /// </summary>
+    private static int[] SeedYears()
+    {
+        var thisYear = DateTime.UtcNow.Year;
+        return [thisYear, thisYear + 1];
+    }
+
     public async Task SetupDefaults(long userId, CancellationToken ct = default)
     {
-        var years = new[] { 2025, 2026 };
-        var countryCode = "SK";
+        var years = SeedYears();
+        var countryCode = HolidayCalendar.DefaultCountryCode;
 
         foreach (var year in years)
             await SeedYearForUser(year, countryCode, userId, ct);
@@ -54,7 +67,6 @@ public class CalendarSeeder(
                 .ToListAsync(ct))
             .ToHashSet();
 
-        var holidays = GetHolidays(year, countryCode);
         var calendars = new List<Calendar>();
 
         var startDate = new DateOnly(year, 1, 1);
@@ -65,29 +77,10 @@ public class CalendarSeeder(
             if (existingDates.Contains(date))
                 continue;
 
-            var dayOfWeek = date.DayOfWeek;
-            var dayType = DayType.Workday;
-            string? holidayName = null;
-
-            // Check if it's a weekend
-            if (dayOfWeek == DayOfWeek.Saturday || dayOfWeek == DayOfWeek.Sunday)
-                dayType = DayType.Weekend;
-
-            // Check if it's a holiday (holidays override weekends)
-            if (holidays.TryGetValue(date, out var holiday))
-                holidayName = holiday;
-
-            var calendar = new Calendar
-            {
-                WakeUpTime = new TimeOnly(8, 0),
-                BedTime = new TimeOnly(0, 0),
-                Date = date,
-                DayType = dayType,
-                HolidayName = holidayName,
-                UserId = userId
-            };
-
-            calendars.Add(calendar);
+            // Day type, holiday name and the default sleep window all come from CalendarDayFactory, which
+            // CalendarProvisioner also uses. A day filled in here and the same day created lazily on its first
+            // task have to be the same day.
+            calendars.Add(CalendarDayFactory.Create(userId, date, countryCode));
         }
 
         if (calendars.Count == 0)
@@ -112,110 +105,6 @@ public class CalendarSeeder(
     public async Task SeedYear(int year, string countryCode, long userId)
     {
         await SeedYearForUser(year, countryCode, userId);
-    }
-
-    /// <summary>
-    /// Gets holidays for a specific year and country
-    /// </summary>
-    private Dictionary<DateOnly, string> GetHolidays(int year, string countryCode)
-    {
-        return countryCode.ToUpper() switch
-        {
-            "SK" => GetSlovakHolidays(year),
-            "CZ" => GetCzechHolidays(year),
-            _ => new Dictionary<DateOnly, string>()
-        };
-    }
-
-    /// <summary>
-    /// Slovak public holidays
-    /// </summary>
-    private Dictionary<DateOnly, string> GetSlovakHolidays(int year)
-    {
-        var holidays = new Dictionary<DateOnly, string>
-        {
-            // Fixed holidays
-            { new DateOnly(year, 1, 1), "Deň vzniku Slovenskej republiky / Nový rok" },
-            { new DateOnly(year, 1, 6), "Zjavenie Pána (Traja králi)" },
-            { new DateOnly(year, 5, 1), "Sviatok práce" },
-            { new DateOnly(year, 5, 8), "Deň víťazstva nad fašizmom" },
-            { new DateOnly(year, 7, 5), "Sviatok svätého Cyrila a Metoda" },
-            { new DateOnly(year, 8, 29), "Výročie SNP" },
-            { new DateOnly(year, 9, 1), "Deň Ústavy Slovenskej republiky" },
-            { new DateOnly(year, 9, 15), "Sedembolestná Panna Mária" },
-            { new DateOnly(year, 11, 1), "Sviatok Všetkých svätých" },
-            { new DateOnly(year, 11, 17), "Deň boja za slobodu a demokraciu" },
-            { new DateOnly(year, 12, 24), "Štedrý deň" },
-            { new DateOnly(year, 12, 25), "Prvý sviatok vianočný" },
-            { new DateOnly(year, 12, 26), "Druhý sviatok vianočný" }
-        };
-
-        // Moveable holidays (Easter-based)
-        var easterDate = CalculateEaster(year);
-
-        // Good Friday (Veľký piatok) - 2 days before Easter
-        holidays.Add(easterDate.AddDays(-2), "Veľký piatok");
-
-        // Easter Monday (Veľkonočný pondelok) - 1 day after Easter
-        holidays.Add(easterDate.AddDays(1), "Veľkonočný pondelok");
-
-        return holidays;
-    }
-
-    /// <summary>
-    /// Czech public holidays
-    /// </summary>
-    private Dictionary<DateOnly, string> GetCzechHolidays(int year)
-    {
-        var holidays = new Dictionary<DateOnly, string>
-        {
-            // Fixed holidays
-            { new DateOnly(year, 1, 1), "Den obnovy samostatného českého státu / Nový rok" },
-            { new DateOnly(year, 5, 1), "Svátek práce" },
-            { new DateOnly(year, 5, 8), "Den vítězství" },
-            { new DateOnly(year, 7, 5), "Den slovanských věrozvěstů Cyrila a Metoděje" },
-            { new DateOnly(year, 7, 6), "Den upálení mistra Jana Husa" },
-            { new DateOnly(year, 9, 28), "Den české státnosti" },
-            { new DateOnly(year, 10, 28), "Den vzniku samostatného československého státu" },
-            { new DateOnly(year, 11, 17), "Den boje za svobodu a demokracii" },
-            { new DateOnly(year, 12, 24), "Štědrý den" },
-            { new DateOnly(year, 12, 25), "1. svátek vánoční" },
-            { new DateOnly(year, 12, 26), "2. svátek vánoční" }
-        };
-
-        // Moveable holidays (Easter-based)
-        var easterDate = CalculateEaster(year);
-
-        // Good Friday (Velký pátek) - 2 days before Easter
-        holidays.Add(easterDate.AddDays(-2), "Velký pátek");
-
-        // Easter Monday (Velikonoční pondělí) - 1 day after Easter
-        holidays.Add(easterDate.AddDays(1), "Velikonoční pondělí");
-
-        return holidays;
-    }
-
-    /// <summary>
-    /// Calculates Easter Sunday using Computus algorithm (Anonymous Gregorian algorithm)
-    /// </summary>
-    private static DateOnly CalculateEaster(int year)
-    {
-        var a = year % 19;
-        var b = year / 100;
-        var c = year % 100;
-        var d = b / 4;
-        var e = b % 4;
-        var f = (b + 8) / 25;
-        var g = (b - f + 1) / 3;
-        var h = (19 * a + b - d - g + 15) % 30;
-        var i = c / 4;
-        var k = c % 4;
-        var l = (32 + 2 * e + 2 * i - h - k) % 7;
-        var m = (a + 11 * h + 22 * l) / 451;
-        var month = (h + l - 7 * m + 114) / 31;
-        var day = (h + l - 7 * m + 114) % 31 + 1;
-
-        return new DateOnly(year, month, day);
     }
 
     public async Task<bool> ResetDefaults(long userId, CancellationToken ct = default)

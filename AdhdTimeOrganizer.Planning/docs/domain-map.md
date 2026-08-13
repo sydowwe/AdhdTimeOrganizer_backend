@@ -83,15 +83,28 @@ function; the query that feeds it is one grouped read.
 | `PlannerStreakReader` | `application/service/taskPlanner/PlannerStreakReader.cs` — the qualifying-task predicate + the day boundary |
 | `PlannerStreakResponse` | `application/dto/response/taskPlanner/PlannerStreakResponse.cs` |
 
-Delivered on `CalendarResponse.Streak`, filled in by `GetByDateCalendarEndpoint` **after** the
-projection (a streak is a walk across days; `Projection` runs per row). Every other calendar read
-leaves it null. See [`summary.md`](summary.md#day-plan-completion-streak) for the rules and why they
+Delivered two ways: on `CalendarResponse.Streak`, filled in by `GetByDateCalendarEndpoint` **after**
+the projection (a streak is a walk across days; `Projection` runs per row), and on
+`DayPlanResponse.Streak` at the top level, where it survives a day with no calendar row. Every other
+calendar read leaves it null. See [`summary.md`](summary.md#day-plan-completion-streak) for the rules and why they
 are what they are.
 
 Guards: `Services.PlannerStreakServiceTests` (17 rule tests, no DB) and
 `Endpoints.PlannerStreakTests` (8 over HTTP, including the un-tick round-trip).
 
 ## Endpoints
+
+Lazy day creation — a task may name its day by `Date` instead of `CalendarId`, and the calendar row is
+created if there is none. `HolidayCalendar` + `CalendarDayFactory` (`domain/service/`) define what an
+unplanned day is; `ICalendarProvisioner` (`domain/serviceContract/`) / `CalendarProvisioner`
+(`application/service/taskPlanner/`) read-or-create it. Callers: `CreatePlannerTaskEndpoint`,
+`UpdatePlannerTaskEndpoint`, `ApplyTemplatePlannerTaskEndpoint`. It **commits** — resolve before
+staging your own writes. See [`summary.md`](summary.md#lazy-day-creation).
+
+`GetDayPlanCalendarEndpoint` (`application/endpoint/calendar/`) → `DayPlanResponse` is the home
+page's single read for a day: calendar + tasks + streak, 200 even when the day has no calendar row.
+See [`summary.md`](summary.md#the-one-request-day-plan). `GetByDateCalendarEndpoint` is unchanged and
+still 404s.
 
 `application/endpoint/activityPlanning/` — `calendar/`, `plannerSettings/`, `plannerTask/`,
 `repeatingPlannerTask/`, `taskImportance/`, `taskPlannerDayTemplate/`, `templatePlannerTask/`.

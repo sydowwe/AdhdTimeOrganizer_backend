@@ -13,7 +13,10 @@ using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plannerTask.command;
 
-public class ApplyTemplatePlannerTaskEndpoint(DbContext dbContext, IReminderRegistrationService reminders)
+public class ApplyTemplatePlannerTaskEndpoint(
+    DbContext dbContext,
+    IReminderRegistrationService reminders,
+    ICalendarProvisioner calendars)
     : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
 {
     public override void Configure()
@@ -36,8 +39,14 @@ public class ApplyTemplatePlannerTaskEndpoint(DbContext dbContext, IReminderRegi
     {
         try
         {
+            // Provisioning first, and it commits — so nothing of this request's own is staged yet. A template
+            // applied by date to a day the user has never opened creates that day; by id it still 404s, because
+            // an id that resolves to nothing is a stale client, not an unplanned day.
+            var calendarId = req.CalendarId
+                             ?? (await calendars.EnsureForDateAsync(User.GetId(), req.Date!.Value, ct)).Id;
+
             var calendar = await dbContext.Set<Calendar>().Include(t => t.Tasks)
-                .FirstOrDefaultAsync(e => e.Id == req.CalendarId, ct);
+                .FirstOrDefaultAsync(e => e.Id == calendarId, ct);
             if (calendar == null)
             {
                 AddError("Calendar not found");
@@ -61,6 +70,9 @@ public class ApplyTemplatePlannerTaskEndpoint(DbContext dbContext, IReminderRegi
             {
                 var entity = t.ToEntity;
                 entity.UserId = User.GetId();
+                // The one resolved calendar wins over whatever each task carried. The client used to repeat
+                // the id per task, which could only ever agree with the request's own or be a bug.
+                entity.CalendarId = calendar.Id;
                 return entity;
             }).ToList();
             var existingTasks = calendar.Tasks.ToList();
