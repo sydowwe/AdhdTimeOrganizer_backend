@@ -84,6 +84,24 @@ never falls back, which is why the deny is attached per endpoint.
   `AutoTagOverride("ActivityTracking")` in `AdhdTimeOrganizer.Tracking/application/endpointGroups/` is a
   third, unrelated use — a Swagger tag. Leave it a literal.
 
+**Framework's auth services are open generics with no DI marker interface**, so the Scrutor scans in
+`config/dependencyInjection/DependencyInjectionExtensions.cs` cannot see them — `IJwtService<User>`,
+`IJwtService`, `ITwoFactorAuthService<User>` and `IUserEmailSenderService<User>` are registered
+explicitly there. Dropping a portal service in favour of a generic Framework one **compiles** and then
+throws at runtime on first resolution; add the explicit registration in the same commit.
+`IRefreshTokenService` is the exception — non-generic and carrying `IScopedService`, so the scan finds it.
+
+**`ThrottleHeaderKey` defaults to `TrustedIpMiddleware.ClientIpHeaderName`.** A host that does not call
+`UseTrustedClientIpHeader()` must override it to `null`, or every caller shares a single throttle bucket
+and the per-client limit silently becomes a global one. This host does call it —
+`Program.cs` has `UseTrustedClientIpHeader()` directly after `UseForwardedHeaders()`, and that order is
+load-bearing: before it, `RemoteIpAddress` is the proxy and every request buckets together anyway.
+
+⚠ **The 2FA single-use guard is per-process.** `Program.cs` registers `AddDistributedMemoryCache()`, so
+the "one attempt per password step" guarantee that `TwoFactorAuthService.ValidatePendingLoginToken`
+enforces (keyed on the pending token's `jti`) holds only within one instance. Running a second instance
+lets a pending token be spent once per process. Redis before scaling out.
+
 **Refresh-token cleanup — `framework/Sydowwe.Framework/infrastructure/extService/user/auth/RefreshTokenCleanupService.cs`.**
 `BackgroundService` next to the `RefreshTokenService` it drives; hosts register it with
 `AddHostedService<RefreshTokenCleanupService>()`. First sweep runs at **startup**, then every `Interval`

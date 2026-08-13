@@ -20,6 +20,16 @@ namespace AdhdTimeOrganizer.config.swagger;
 /// <c>SchemaSettings.SchemaProcessors</c>.
 /// </para>
 /// <para>
+/// <b>It must run before FastEndpoints' own <c>ValidationSchemaProcessor</c>, and that is not automatic.</b>
+/// FastEndpoints registers its processor inside <c>EnableFastEndpoints</c> and only afterwards invokes the
+/// host's <c>DocumentSettings</c> action, so registering this one with a plain <c>Add</c> places it *behind*
+/// the validation processor — which then walks a schema that still carries <c>ToEntity</c>, descends into the
+/// cyclic EF navigation graph and kills the process with a <see cref="StackOverflowException"/> on the first
+/// request for <c>/swagger/v1/swagger.json</c>. That is not catchable, and it was diagnosed for a long time as
+/// an upstream bug. <c>Program.cs</c> therefore rebuilds the collection to put this processor first; keep it
+/// that way.
+/// </para>
+/// <para>
 /// Note this runs <i>after</i> the type's schema is generated, so the entity schemas may still be left behind
 /// in the document's definitions — unreferenced and harmless. What it guarantees is that no request body
 /// advertises a <c>toEntity</c> field.
@@ -28,6 +38,24 @@ namespace AdhdTimeOrganizer.config.swagger;
 public sealed class RemoveToEntitySchemaProcessor : ISchemaProcessor
 {
     private const string ToEntityProperty = nameof(ICreateRequest<>.ToEntity);
+
+    /// <summary>
+    /// Registers a <see cref="RemoveToEntitySchemaProcessor"/> as the <b>first</b> processor in
+    /// <paramref name="processors"/>, preserving the relative order of everything already there.
+    /// <para>
+    /// Call this instead of <c>processors.Add(new RemoveToEntitySchemaProcessor())</c> — see the type remarks
+    /// for why running after FastEndpoints' <c>ValidationSchemaProcessor</c> overflows the stack. The
+    /// collection is <see cref="ICollection{T}"/> (NSwag exposes no indexer), so prepending means rebuilding.
+    /// </para>
+    /// </summary>
+    public static void PrependTo(ICollection<ISchemaProcessor> processors)
+    {
+        var existing = processors.ToList();
+        processors.Clear();
+        processors.Add(new RemoveToEntitySchemaProcessor());
+        foreach (var processor in existing)
+            processors.Add(processor);
+    }
 
     public void Process(SchemaProcessorContext context)
     {

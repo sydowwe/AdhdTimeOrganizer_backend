@@ -712,31 +712,54 @@ Grouped; each is one line from a fragment. Full detail in `findings/`.
   runtime string as the message template; braces in it would be parsed as Serilog holes. The file was
   deleted under `CQ-8` (verified gone), so there is nothing left to fix here. Note the *pattern* may
   well exist elsewhere in the 670 unreviewed portal files — this closes the one instance, not the class.
-- `CQ-33` (2 of 3 fixed; the third is now diagnosed, not just deferred) `Program.cs:167-176,199-203,372-373`
-  — three pieces of TEMP debug scaffolding left in the composition root: a `StartNow()` trigger that
-  fired `RoutineTodoListResetJob` on **every boot** (✅ removed), `Console.WriteLine` stack-trace dumps
-  on `ApplicationStopping` (✅ removed, `logger.LogInformation` kept), and the
-  `ValidationSchemaProcessor` removal that degrades dev Swagger.
+- `CQ-33` ✅ FIXED (all 3) `Program.cs:167-176,199-203,372-373` — three pieces of TEMP debug scaffolding
+  left in the composition root: a `StartNow()` trigger that fired `RoutineTodoListResetJob` on **every
+  boot** (✅ removed), `Console.WriteLine` stack-trace dumps on `ApplicationStopping` (✅ removed,
+  `logger.LogInformation` kept), and the `ValidationSchemaProcessor` removal that degrades dev Swagger
+  (✅ removed 2026-08-13 — root cause below).
 
-  **The third one stays, and is no longer a guess.** Reproduced live: started the app in Development
-  with the removal block deleted, requested `/swagger/v1/swagger.json` — the process died with
-  `Stack overflow.` The captured trace is thousands of identical frames of
-  `FastEndpoints.Swagger.ValidationSchemaProcessor.ApplyRulesToSchema` recursing into itself via
-  `NJsonSchema.JsonSchema.get_ActualProperties`. That method carries a `HashSet<Type>` cycle guard, but
-  it guards on **Type** while the recursion runs over schema **nodes**, so a self-referential schema
-  defeats it. Not catchable — a `StackOverflowException` terminates the process.
+  **Root cause: our own registration order, not an upstream bug.** The earlier diagnosis (a
+  self-referential schema defeating `ApplyRulesToSchema`'s `HashSet<Type>` guard) described the
+  mechanism correctly but blamed the wrong party, so the hunt for "the culprit validator" was chasing
+  something that does not exist. What actually fed the recursion was
+  `ICreateRequest<TEntity>.ToEntity` — the get-only mapping property that pulls the raw, cyclic EF
+  navigation graph into the schema. `RemoveToEntitySchemaProcessor` exists precisely to strip it and
+  *was* registered, but with `SchemaProcessors.Add(...)`: FastEndpoints registers its own
+  `ValidationSchemaProcessor` inside `EnableFastEndpoints` and only **afterwards** invokes the host's
+  `DocumentSettings` action, so appending placed our stripper **behind** the validation processor. It
+  ran too late, every time. That is why the overflow persisted "even with `RemoveToEntitySchemaProcessor`
+  active", and why 8.2.0 changed nothing — the version was never the variable.
 
-  **Upgrade tested and rejected:** bumped `FastEndpoints` + `FastEndpoints.Swagger` 8.1.0 → 8.2.0
-  (2026-08-10, latest at the time), solution built clean, removal block deleted, same crash on the same
-  request. Reverted both to 8.1.0 — the upgrade buys nothing here. The removal block is now restored
-  with the full diagnosis, the 8.2.0 result, and its cost (dev Swagger loses FluentValidation-derived
-  constraints on request schemas; routes, verbs and shapes are unaffected) written into the comment
-  instead of "TEMP DIAGNOSTIC".
+  **Fix:** `RemoveToEntitySchemaProcessor.PrependTo(...)` rebuilds the collection so the stripper is
+  first (`SchemaProcessors` is an `ICollection` with no indexer, so prepending means rebuilding);
+  the `ValidationSchemaProcessor` removal block is deleted. Verified live on 8.1.0:
+  `/swagger/v1/swagger.json` returns **200** (774 KB, 240 paths, 461 schemas), `/swagger/index.html`
+  returns 200, the process survives, and `toEntity` appears **0** times in the document. Processor order
+  at runtime confirmed as `RemoveToEntitySchemaProcessor | ValidationSchemaProcessor |
+  PolymorphismSchemaProcessor`. **No package change and no DTO/validator reshaping was needed**, so the
+  8.2.0 revert stands on its own merits and the FastEndpoints pins stay at 8.1.0. No upstream issue is
+  warranted.
 
-  ⚠ **Open lead, not yet chased:** the recursion needs a self-referential schema to feed it, which
-  points at a specific request DTO / validator pair in this portal rather than at every app on 8.1.0.
-  Identifying it may allow removing the workaround without waiting on upstream. See
-  `review/portal/handoff-cq33-swagger-overflow.md`.
+  Guard: `AdhdTimeOrganizer.IntegrationTests/Infrastructure/SwaggerSchemaProcessorOrderTests.cs`
+  (3 tests, no DB). It asserts the ordering invariant rather than regenerating the document, for two
+  reasons: Swagger is registered only under Development, which the test host is not; and a
+  `StackOverflowException` cannot be caught or contained, so a test that regenerated the document would
+  take the entire xunit run down with it and report nothing on regression.
+
+  ⚠ **Follow-up, separate from this finding — the validation processor contributes nothing today.**
+  With ordering fixed and `ValidationSchemaProcessor` live, the generated document is **byte-identical**
+  (SHA-256 match) to one generated with that processor removed, even though 91 endpoints have a
+  validator attached. Every length/range constraint in the document traces to a
+  `[StringLength]` / `[MaxLength]` / `[Range]` data annotation — the `minLength: 0` companions are the
+  `[StringLength]` signature, and no property carries the `minLength: 1` that an unconditional
+  FluentValidation `NotEmpty()` would produce. So the stated cost of the old workaround ("dev Swagger
+  loses FluentValidation-derived constraints") was never actually being paid. Part of the explanation is
+  by design — FastEndpoints skips rules with a `When(...)` condition, and most validators here are
+  conditional — but `PomodoroTimerPresetValidator.Name` is unconditional `NotEmpty().MaximumLength(255)`
+  and still does not land. Unverified hypothesis: a property-name casing mismatch (the document emits
+  **PascalCase** property names while the processor looks rules up by its own naming policy). Worth its
+  own finding if the FluentValidation constraints are actually wanted in dev Swagger; keeping the
+  processor enabled costs nothing either way.
 - `CQ-34` ✅ FIXED `SuggestionPatternViewInstaller.cs:30-31` — resource matching uses `Contains` rather than an
   anchored prefix, and creation order is alphabetical-by-resource-name with no explicit dependency
   declaration. Resource matching now anchors with `StartsWith($"{assembly.GetName().Name}{ResourceFolder}")`;

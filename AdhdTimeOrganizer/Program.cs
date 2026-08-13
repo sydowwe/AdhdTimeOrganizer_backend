@@ -265,29 +265,14 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
                 // ICreateRequest<TEntity>.ToEntity pulls the raw EF navigation graph into the schema — several
                 // of those graphs are cyclic and overflow the stack inside FastEndpoints' validation schema
                 // processor. See RemoveToEntitySchemaProcessor for the full explanation.
-                s.SchemaSettings.SchemaProcessors.Add(new RemoveToEntitySchemaProcessor());
-
-                // Strip FastEndpoints' own ValidationSchemaProcessor (SwaggerDocument() adds it
-                // internally). It recurses without bound and kills the process with a StackOverflowException
-                // the first time /swagger/v1/swagger.json is requested — not an exception you can catch.
                 //
-                // Confirmed upstream bug, not a misconfiguration here. The captured trace is thousands of
-                // frames of ValidationSchemaProcessor.ApplyRulesToSchema calling itself via
-                // NJsonSchema.JsonSchema.get_ActualProperties. That method takes a HashSet<Type> cycle
-                // guard, but it guards on *Type* while the recursion runs over schema *nodes*, so a
-                // self-referential schema (this app has several) defeats it.
-                //
-                // Verified still broken on FastEndpoints.Swagger 8.2.0 (2026-08-10): upgraded, removed this
-                // block, requested the document, process died the same way. Reverted to 8.1.0 — the upgrade
-                // buys nothing here. Needs an upstream report; re-test this block on the next release.
-                //
-                // Cost of keeping it: dev Swagger loses FluentValidation-derived constraints (required,
-                // min/max, etc.) on request schemas. Routes, verbs and shapes are all still documented.
-                var validationProcessors = s.SchemaSettings.SchemaProcessors
-                    .Where(p => p.GetType().Name == "ValidationSchemaProcessor")
-                    .ToList();
-                foreach (var processor in validationProcessors)
-                    s.SchemaSettings.SchemaProcessors.Remove(processor);
+                // PrependTo, NOT Add: order is load-bearing. FastEndpoints registers its own
+                // ValidationSchemaProcessor inside EnableFastEndpoints and only *then* invokes this
+                // DocumentSettings action, so a plain Add() puts us behind it — ToEntity would still be on
+                // the schema when that processor walks it, and walking the cyclic EF navigation graph is what
+                // killed the process with a StackOverflowException on the first /swagger/v1/swagger.json
+                // request. Pinned by SwaggerSchemaProcessorOrderTests.
+                RemoveToEntitySchemaProcessor.PrependTo(s.SchemaSettings.SchemaProcessors);
             };
         });
 

@@ -111,9 +111,14 @@ two revoke endpoints sit under Framework's `command/auth/` even though their por
 `GoogleSignInService`, and the `GoogleSignIn*` DTOs all stay in `AdhdTimeOrganizer`. It was moved to
 Framework once and reverted: a *usable* provider has to ship the implementation, which puts
 `Google.Apis.Auth` (+ `Newtonsoft.Json`) in `Sydowwe.Framework.csproj` for every solution, enabled or
-not. Don't re-attempt it as part of a sweep — see `migration/stays-portal.md`. If a second federated
+not. Don't re-attempt it as part of a sweep. If a second federated
 provider ever appears, the shape is a separate `Sydowwe.Framework.GoogleAuth` project, not a package
 reference on the core. Google **Calendar** is unrelated and also stays portal.
+
+⚠ **Google sign-up ignores the caller's locale.** When `GoogleSignInEndpoint` auto-registers a new
+account it hardcodes `CurrentLocale = AvailableLocales.En` and `TwoFactorEnabled = false`, so a
+Slovak user who first arrives through Google lands in English. Fixing it is one line here plus a
+field on the SPA's sign-in call; nothing else depends on the current behaviour.
 
 ⚠ `BaseLogoutEndpoint` sets `AllowAnonymous()` **deliberately** — logout authenticates nothing, it acts
 on whatever refresh token the cookie carries. Requiring a token 401s a caller whose access token

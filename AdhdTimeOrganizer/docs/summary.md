@@ -83,10 +83,14 @@ submodule and are consumed through `Sydowwe.Framework.Contracts`.
   `DisableAutoDiscovery = true`). A new module's endpoints 404 until it's added. Extension clients are
   **deny-by-default** via a per-endpoint policy in the endpoint configurator — not a fallback policy,
   which would never be reached.
-- **Swagger has two live workarounds** in `Program.cs`: `RemoveToEntitySchemaProcessor` (cyclic EF nav
-  graphs pulled in by `ICreateRequest<TEntity>.ToEntity`) and a **temporary** removal of FastEndpoints'
-  own `ValidationSchemaProcessor` (stack overflow in FastEndpoints.Swagger 8.1.0). The second is a
-  diagnostic, not a decision — it needs an upgrade/report/keep call.
+- **Swagger has one live workaround, and its registration order is load-bearing.**
+  `RemoveToEntitySchemaProcessor` strips `ICreateRequest<TEntity>.ToEntity`, which otherwise pulls the
+  cyclic EF nav graph into the schema. It is registered with `PrependTo(...)`, **not** `Add(...)`:
+  FastEndpoints adds its own `ValidationSchemaProcessor` inside `EnableFastEndpoints` and only then
+  invokes the host's `DocumentSettings` action, so appending runs the stripper too late and
+  `/swagger/v1/swagger.json` kills the process with an uncatchable `StackOverflowException`. That was
+  mistaken for an upstream FastEndpoints bug for a while (CQ-33); it is not, and no package bump is
+  needed. Pinned by `SwaggerSchemaProcessorOrderTests`.
 - **Request bodies are logged.** `UseSerilogRequestLogging` buffers and logs up to 1000 chars of every
   non-GET body. That is a PII surface — do not add endpoints that take names/addresses in the body
   without revisiting it.
