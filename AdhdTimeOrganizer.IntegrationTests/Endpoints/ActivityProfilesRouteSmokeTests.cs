@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.ActivityProfiles.domain.service;
+using AdhdTimeOrganizer.ActivityProfiles.infrastructure.extService.weather;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
@@ -74,6 +76,23 @@ public class ActivityProfilesRouteSmokeTests(AppDbContextFixture fixture) : Post
         AssertNoDuplicates(sp.GetServices<IPerUserDefaultSeeder>().Select(s => s.SeederName));
         AssertNoDuplicates(sp.GetServices<IPerUserDevSeeder>().Select(s => s.SeederName));
         AssertNoDuplicates(sp.GetServices<IAppWideDevSeeder>().Select(s => s.SeederName));
+    }
+
+    /// <summary>
+    /// The leisure weather provider is the one service in this slice the marker scans cannot see: it is a typed
+    /// <c>HttpClient</c>, so <c>Program.cs</c> registers it by name. Two things go wrong silently here. Drop the
+    /// registration and <c>GET /leisure-weather-fit</c> 500s on activation — visible, but only to whoever calls
+    /// it. Add a lifetime marker to the provider "so the scan picks it up" and it is registered <i>twice</i>,
+    /// because this slice is in <c>ModuleAssemblies</c>: the last one wins for a single resolution, so the
+    /// duplicate is invisible until someone resolves the interface as a collection.
+    /// </summary>
+    [Fact]
+    public void TheWeatherProvider_IsRegisteredExactlyOnce()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+
+        scope.ServiceProvider.GetServices<IDailyWeatherProvider>()
+            .Should().ContainSingle().Which.Should().BeOfType<OpenMeteoWeatherProvider>();
     }
 
     /// <summary>

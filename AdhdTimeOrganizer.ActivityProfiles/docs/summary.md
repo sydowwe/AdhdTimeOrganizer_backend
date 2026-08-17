@@ -15,14 +15,16 @@ alike.
 
 ## Bounded context
 
-Owns: the nine entities and their EF configurations, 55 endpoints (22 profile, 24 lookup, 7 memory
-anchor, 2 leisure draw), their DTOs, 11 validators, 4 filter requests, 6 slice-only enums
+Owns: the nine entities and their EF configurations, 56 endpoints (22 profile, 24 lookup, 7 memory
+anchor, 3 leisure), their DTOs, 11 validators, 4 filter requests, 6 slice-only enums
 (`EnergyLevel`, `EffortType`, `DifficultyLevel`, `ReadinessStatus`, `LeisureSuggestionSource`,
 `LeisureSuggestionOutcome`), 4 per-user default seeders and 8 dev seeders.
 
 It also owns **the leisure picker's ranking rule** — `domain/service/LeisureDrawRanker.cs` — which is
-the only real logic in the slice. Everything else here is CRUD over the facets of an `Activity`; that
-file decides what the app recommends when the user says "I'm bored".
+the only real logic in the slice, and **the leisure weather signal** (`WeatherFitRule` plus the
+Open-Meteo provider under `infrastructure/extService/weather/`, the one outbound HTTP call any slice
+makes). Everything else here is CRUD over the facets of an `Activity`; those files decide what the app
+recommends when the user says "I'm bored".
 
 Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all Core's. Nor
 `AppDbContext`, `Program.cs`, the migrations or the DI wiring, all host-side.
@@ -96,6 +98,27 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   *rendered* draw records nothing: recording on render would demote the very cards on screen and stop a
   seeded URL from reproducing its own draw. Rows are swept after 90 days on the next write by the same
   user, so there is no scheduled job to forget to register.
+
+- **The weather signal answers 200 with an empty list for every kind of failure, and that is the
+  contract.** No location on the user, a place that does not geocode, a provider outage, a provider that
+  breaks its own never-throw promise — all of them come back as "no weather opinion". The client cannot
+  tell them apart and does not try: nothing ranks up, no badge renders, **nothing is ever excluded**. So
+  the failure mode to watch for is not an error, it is the badge quietly never appearing — which is why
+  `LeisureWeatherFitTests` asserts on the resolved id set rather than on a 200, and why the endpoint has
+  its own `catch` around the provider on top of the provider's own.
+
+- **`ActivityWeatherDependency.Code` is what the signal matches on; `Text` is the user's to rename.**
+  The lookup is per-user and editable, so matching a row to a condition by its label would break on the
+  first rename and never work in the second locale — that is also why the endpoint returns **ids** and
+  the client only does `includes(row.id)`. The code is written by `ActivityWeatherDependencySeeder` and
+  by nothing else: the CRUD DTOs do not carry it, so an update cannot clear it. A row with no code (one
+  the user invented) falls back to `WeatherDependencyCodes.Infer(text)` at read time, and the guess is
+  deliberately **not** stored — persisting it would turn a heuristic into a fact the user cannot correct.
+
+- **The provider is registered by name in `Program.cs`, and must not carry a lifetime marker.** It is a
+  typed `HttpClient`, which the marker scans cannot produce at all; adding `IScopedService` to "help"
+  registers it twice, because this slice is in `ModuleAssemblies`. Pinned by
+  `ActivityProfilesRouteSmokeTests.TheWeatherProvider_IsRegisteredExactlyOnce`.
 
 - **The profile validators no longer traverse `Activity`.** `CreateActivityBacklogProfileValidator`
   and its two siblings, plus `CreateMemoryAnchorValidator`, enforce "one profile per activity" and

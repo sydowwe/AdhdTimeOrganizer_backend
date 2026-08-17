@@ -24,6 +24,9 @@ public class UserEntityConfiguration : IEntityTypeConfiguration<User>
                 tz => tz.Id,
                 id => TimeZoneInfo.FindSystemTimeZoneById(id));
         builder.Property(u => u.FirstDayOfWeek).HasDefaultValue(1).IsRequired();
+        // Nullable and unindexed: it is read once per weather call, by user id, and "not set" is a first-class
+        // state (no weather signal) rather than a missing value to be defaulted.
+        builder.Property(u => u.WeatherLocation).HasMaxLength(120);
         builder.Property(u => u.AskBeforeDelete).HasDefaultValue(true).IsRequired();
         // BaseUser's `= true` initializer is C#-only; without this the migration backfills existing rows
         // with `false` and deactivates every user.

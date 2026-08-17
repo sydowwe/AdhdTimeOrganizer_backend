@@ -117,7 +117,8 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
                     locale = user.Locale.ToString().ToUpperInvariant(),
                     timezone = user.Timezone.Id,
                     firstDayOfWeek = user.FirstDayOfWeek,
-                    askBeforeDelete = user.AskBeforeDelete
+                    askBeforeDelete = user.AskBeforeDelete,
+                    weatherLocation = user.WeatherLocation
                 }
             },
             plannerTasks,

@@ -64,13 +64,13 @@ standalone auth endpoint. Those generic over `TUser` are closed on the portal's 
 | `BaseChangePasswordEndpoint<TUser>` | `ChangePasswordEndpoint`; hook `AfterPasswordChangedAsync` |
 | `BaseValidateTwoFactorAuthForLoginEndpoint<TUser>` | `ValidateTwoFactorAuthForLoginWebEndpoint` + `…ExtensionEndpoint` |
 | `BaseSetupTwoFactorForLoginEndpoint<TUser>` | `SetupTwoFactorForLoginEndpoint` — empty; web only (reads the partial-auth *cookie*, so the extension flow has no equivalent) |
-| `BaseGetCurrentUserEndpoint<TUser>` | `GetUserDataEndpoint` — empty; route is **GET** `/user/data` |
+| `BaseGetCurrentUserEndpoint<TUser, TResponse>` | `GetCurrentUserEndpoint` → `AppUserDataResponse`; hook `Enrich` adds `firstDayOfWeek` + `weatherLocation`. Route is **GET** `/user/data`. The one-parameter `BaseGetCurrentUserEndpoint<TUser>` is for hosts with no columns of their own — deriving from it here would silently stop those two fields reaching the client |
 | `BaseUserRoleGetAllSelectOptionsEndpoint` | **none** — the portal exposes no role-options route |
 | `BaseLogoutAllEndpoint` (non-generic) | `LogoutAllEndpoint` — empty |
 | `BaseRevokeSessionEndpoint` (non-generic) | `RevokeSessionEndpoint` — empty; 404 not-found / 400 current-session are load-bearing |
 | `BaseRevokeAllOtherSessionsEndpoint` (non-generic) | `RevokeAllOtherSessionsEndpoint` — empty |
 | `BaseGetUserSessionsEndpoint` (non-generic) | `GetUserSessionsEndpoint` — empty |
-| `BaseUpdateUserPreferencesEndpoint<TUser, TRequest>` | `UpdateUserPreferencesEndpoint`; hook `ApplyExtraPreferences`, and override `Configure` to attach the validator |
+| `BaseUpdateUserPreferencesEndpoint<TUser, TRequest>` | `UpdateUserPreferencesEndpoint`; hook `ApplyExtraPreferences`, and override `Configure` to attach the validator. Convention is "null leaves it unchanged", so a *clearable* string preference needs a second signal — `weatherLocation` takes `""` as the clear |
 | `BaseForgotPasswordEndpoint<TUser>` | `ForgotPasswordEndpoint` — empty; hook `BuildResetLink` |
 | `BaseResetPasswordEndpoint<TUser>` | `ResetPasswordEndpoint` — empty |
 | `BaseGetTwoFactorAuthStatusEndpoint<TUser>` | `GetTwoFactorAuthStatusEndpoint` — empty |

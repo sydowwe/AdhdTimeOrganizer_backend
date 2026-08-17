@@ -19,5 +19,10 @@ public class UpdateUserPreferencesEndpoint(UserManager<User> userManager)
     {
         if (req.FirstDayOfWeek.HasValue)
             user.FirstDayOfWeek = req.FirstDayOfWeek.Value;
+
+        // Null keeps whatever is stored (the base's convention for every field); an empty or whitespace-only
+        // string is the client clearing the setting, and is stored as null so "not set" has one representation.
+        if (req.WeatherLocation is not null)
+            user.WeatherLocation = string.IsNullOrWhiteSpace(req.WeatherLocation) ? null : req.WeatherLocation.Trim();
     }
 }

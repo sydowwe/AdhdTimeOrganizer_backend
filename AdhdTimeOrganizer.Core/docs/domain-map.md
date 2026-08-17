@@ -6,7 +6,7 @@ Navigation index. Open only what you need; `summary.md` is the orientation.
 
 | Type | Path | Notes |
 |---|---|---|
-| `User` | `user/User.cs` | `BaseUser` + `IBaseTableEntity`. Google OAuth id + calendar refresh token (encrypted), `HasExtensionAccess`, `FirstDayOfWeek`. Setting `Email` also sets `UserName`. |
+| `User` | `user/User.cs` | `BaseUser` + `IBaseTableEntity`. Google OAuth id + calendar refresh token (encrypted), `HasExtensionAccess`, `FirstDayOfWeek`, `WeatherLocation` (free text, nullable — the leisure weather signal's only input; personal data, never log it). Setting `Email` also sets `UserName`. |
 | `BaseEntityWithUser` | `user/BaseEntityWithUser.cs` | The portal's closing type over `BaseEntityWithUser<User>`. C# can't infer `TUser` from a constraint, so every user-scoped entity names this shim. |
 | `BaseLookupWithUser` | `base/BaseLookupWithUser.cs` | Same idea for `BaseLookupWithUser<User>`. |
 | `BaseEntityWithIsDone` | `base/BaseEntityWithIsDone.cs` | Shared base for the done/total-count markers. |

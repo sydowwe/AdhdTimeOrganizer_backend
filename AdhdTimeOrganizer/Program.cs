@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.ActivityProfiles.domain.service;
+using AdhdTimeOrganizer.ActivityProfiles.infrastructure.extService.weather;
 using AdhdTimeOrganizer.application.endpoint.@base;
 using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.config.dependencyInjection;
@@ -280,6 +282,19 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
 
     services.Configure<ActivityTrackingRetentionOptions>(
         configuration.GetSection(ActivityTrackingRetentionOptions.SectionName));
+
+    // The leisure weather signal (GET /leisure-weather-fit). Registered here by name rather than picked up by a
+    // marker scan on purpose: ActivityProfiles is in ModuleAssemblies, so a lifetime marker on the provider would
+    // register it a second time, and a typed HttpClient cannot be produced by those scans at all.
+    //
+    // The timeout is the load-bearing part. The picker calls this alongside the draw and never retries, so a
+    // provider that hangs must become "no weather opinion" in seconds rather than hold a request thread — every
+    // failure inside OpenMeteoWeatherProvider, this timeout included, comes back as a null and then as an empty
+    // matching set.
+    services.Configure<LeisureWeatherOptions>(configuration.GetSection(LeisureWeatherOptions.SectionName));
+    services.AddMemoryCache();
+    services.AddHttpClient<IDailyWeatherProvider, OpenMeteoWeatherProvider>(client =>
+        client.Timeout = TimeSpan.FromSeconds(5));
 
     // Background services
     services.AddHostedService<RefreshTokenCleanupService>();

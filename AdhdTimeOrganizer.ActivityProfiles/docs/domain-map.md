@@ -14,7 +14,7 @@ three namespaces and bought nothing once they were alone in a project.
 | `ActivityProjectProfile` | `BaseTableEntity` | `Activity` (1:1) | Difficulty, project area, estimated hours, messy, `jsonb` materials + tools, readiness. No lookup FKs. |
 | `ActivityBucketListProfile` | `BaseTableEntity` | `Activity` (1:1) | Experience type, comfort-zone step, travel, financial goal, inspiration source. |
 | `ActivityLocationType` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. |
-| `ActivityWeatherDependency` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. |
+| `ActivityWeatherDependency` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. **The one lookup with a second column**: nullable `Code` (`WeatherDependencyCodes`), written by the seeder and never by the CRUD endpoints, which is what ties a renameable row to a weather condition. |
 | `ActivityExpectedCostTier` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. |
 | `ActivityExperienceType` | `BaseLookupWithUser` | user | Per-user lookup. Bucket list only. |
 | `MemoryAnchor` | `BaseEntityWithActivity` | user + `Activity` | Month/year/rating/note. Two check constraints, max 2 per activity per month (validator, not DB). |
@@ -47,6 +47,28 @@ is not an API break, and a new member cannot reach the wire unspelled: the mappe
 
 `LeisureDrawRankerTests` (no database) is the guard on all of it.
 
+The weather signal is a second, much smaller pure rule in the same folder:
+
+- `WeatherFitRule` — which of the four `WeatherDependencyCodes` a day fits. Thresholds are deliberately
+  generous: the signal only ever ranks **up** and paints a badge, so a false negative costs the feature
+  while a false positive costs one odd card.
+- `DailyWeather` — the four numbers the rule reads, and the whole of what a provider must supply.
+- `IDailyWeatherProvider` — place name → today's numbers, **or null; never an exception**. The
+  implementation lives in `infrastructure/extService/weather/` (Open-Meteo, no API key, two cached calls).
+
+`WeatherFitRuleTests` (no database, no provider) guards the rule and the label-inference fallback.
+
+## Outbound HTTP — `infrastructure/extService/weather/`
+
+The only outbound call any slice in this solution makes. `OpenMeteoWeatherProvider` geocodes the user's
+free-text `User.WeatherLocation` and reads one day's forecast, caching both in `IMemoryCache` (the
+forecast entry capped at the location's next local midnight). Registered **by name** in `Program.cs` —
+`services.AddHttpClient<IDailyWeatherProvider, OpenMeteoWeatherProvider>(…)` with a 5s timeout — because
+a typed `HttpClient` cannot come from a marker scan, and a lifetime marker on it would double-register
+it (this slice is in `ModuleAssemblies`). `ActivityProfilesRouteSmokeTests.TheWeatherProvider_IsRegisteredExactlyOnce`
+is the guard. Settings: the `LeisureWeather` section (`LeisureWeatherOptions`), including an `Enabled`
+switch that turns the outbound calls off without unregistering anything.
+
 ## Configurations — `infrastructure/persistence/configuration/`
 
 Nine, one per entity, all in one namespace. The three profile configurations and
@@ -60,12 +82,13 @@ Nine, one per entity, all in one namespace. The three profile configurations and
   (`ck_memory_anchor_month`, `ck_memory_anchor_rating`) and the `(ActivityId, AnchorYear, AnchorMonth)`
   index.
 
-The four lookup configurations are one-liners over Framework's `BaseLookupWithUserConfiguration<User,
-T>`.
+Three of the four lookup configurations are one-liners over Framework's
+`BaseLookupWithUserConfiguration<User, T>`. `ActivityWeatherDependencyConfiguration` **composes** that base
+instead of inheriting it (its `Configure` is not virtual) so it can add the `Code` column.
 
 ## Endpoints — `application/endpoint/`
 
-55 total, in six families. None of them declare an endpoint group; the lookup and anchor routes come
+56 total, in six families. None of them declare an endpoint group; the lookup and anchor routes come
 from `BaseGridEndpoint`'s `EntityName.Kebaberize()` convention rather than a literal string, so
 renaming one of those entities moves its route.
 
@@ -76,7 +99,7 @@ renaming one of those entities moves its route.
 | `project/` | 8 | `/api/activity-project-profile*` — explicit routes, incl. the status-only `PATCH .../{id}/status` |
 | `memoryAnchor/` | 7 | `/api/memory-anchor/*` — derived |
 | `lookup/{expectedCostTier,experienceType,locationType,weatherDependency}/` | 24 | `/api/activity-*-type/*` etc. — derived |
-| `leisureSuggestion/` | 2 | `POST /api/leisure-suggestion` (the ranked draw) and `POST /api/leisure-suggestion/seen` (its outcome, 204) — explicit routes, hand-written rather than base-derived |
+| `leisureSuggestion/` | 3 | `POST /api/leisure-suggestion` (the ranked draw), `POST /api/leisure-suggestion/seen` (its outcome, 204) and `GET /api/leisure-weather-fit` (today's matching weather-dependency ids) — explicit routes, hand-written rather than base-derived |
 
 The three `Grid*ProfileEndpoint`s are the ones carrying the hand-written `ApplyUserScoping`; the two
 leisure endpoints scope by hand for the same reason and are not built on any CRUD base — the draw is a

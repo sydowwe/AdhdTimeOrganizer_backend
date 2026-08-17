@@ -17,6 +17,19 @@ public sealed class User : BaseUser, IBaseTableEntity
     public bool HasExtensionAccess { get; set; } = false;
     public int FirstDayOfWeek { get; set; } = 1;
 
+    /// <summary>
+    /// Free text the user typed for "where I am", e.g. <c>Bratislava, SK</c> — the only input the leisure
+    /// weather signal has. Null means the user has not set one, which every weather-dependent path must treat
+    /// as "no opinion" rather than as an error.
+    ///
+    /// <para>Free text rather than a lat/lng pair on purpose: geocoding, the provider and the caching are the
+    /// backend's business, and keeping the column a string means changing any of them needs no migration.</para>
+    ///
+    /// <para><b>Do not log this value.</b> A town is not a name or an address, but it is still personal data
+    /// and log files survive a GDPR erasure — log <c>{UserId}</c> instead, as the weather endpoint does.</para>
+    /// </summary>
+    public string? WeatherLocation { get; set; }
+
 
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
 
