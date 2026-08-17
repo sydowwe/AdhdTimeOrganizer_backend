@@ -424,6 +424,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("Code")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
                     b.Property<DateTime>("CreatedTimestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1071,6 +1076,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("user_name");
+
+                    b.Property<string>("WeatherLocation")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("weather_location");
 
                     b.Property<uint>("row_version")
                         .IsConcurrencyToken()
