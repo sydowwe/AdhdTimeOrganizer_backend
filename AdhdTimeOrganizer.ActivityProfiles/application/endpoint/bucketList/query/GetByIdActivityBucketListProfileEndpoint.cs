@@ -36,6 +36,24 @@ public class GetByIdActivityBucketListProfileEndpoint(DbContext dbContext)
             return;
         }
 
-        await Send.OkAsync(ActivityBucketListProfileResponse.Projection(new[] { entity }.AsQueryable()).Single(), ct);
+        // Projection runs over an in-memory array and so cannot reach the anchors. Overlay them from a
+        // second read rather than let this route answer isAnchored: false for an entry the grid shows as
+        // done.
+        var anchorId = await dbContext.Set<MemoryAnchor>()
+            .Where(m => m.UserId == userId && m.ActivityId == entity.ActivityId)
+            .OrderByDescending(m => m.AnchorYear)
+            .ThenByDescending(m => m.AnchorMonth)
+            .ThenByDescending(m => m.Id)
+            .Select(m => (long?)m.Id)
+            .FirstOrDefaultAsync(ct);
+
+        var response = ActivityBucketListProfileResponse.Projection(new[] { entity }.AsQueryable()).Single()
+            with
+            {
+                IsAnchored = anchorId is not null,
+                MemoryAnchorId = anchorId
+            };
+
+        await Send.OkAsync(response, ct);
     }
 }

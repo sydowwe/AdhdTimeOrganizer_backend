@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.ActivityProfiles.application.dto.response;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.backlog.query;
 
@@ -10,6 +11,20 @@ public class GridActivityBacklogProfileEndpoint(DbContext dbContext)
     : BaseGridEndpoint<ActivityBacklogProfile, ActivityBacklogProfileResponse, ActivityBacklogProfileFilterRequest>(dbContext)
 {
     public override string EndpointPath => "grid";
+
+    /// <summary>
+    /// The caller's anchors. Scoped by hand for the same reason the profiles are: MemoryAnchor does carry a
+    /// global query filter, but this subquery decides a field the client treats as "done", and it is one
+    /// line to stop depending on a filter configured in another project.
+    /// </summary>
+    private IQueryable<MemoryAnchor> ScopedAnchors() => dbContext.Set<MemoryAnchor>().Where(m => m.UserId == User.GetId());
+
+    /// <summary>
+    /// Overridden so IsAnchored / MemoryAnchorId are computed in SQL rather than overlaid afterwards: the
+    /// base sorts the projected queryable, so a field filled in by PostProcessItems would sort on false.
+    /// </summary>
+    protected override Func<IQueryable<ActivityBacklogProfile>, IQueryable<ActivityBacklogProfileResponse>> Projection =>
+        query => ActivityBacklogProfileResponse.ProjectionWithAnchors(query, ScopedAnchors());
 
     /// <summary>
     /// Ownership belongs here, not in <see cref="ApplyCustomFiltering"/> — the base only calls that one
@@ -32,6 +47,19 @@ public class GridActivityBacklogProfileEndpoint(DbContext dbContext)
 
         if (filter.IsRepeatable.HasValue)
             query = query.Where(p => p.IsRepeatable == filter.IsRepeatable.Value);
+
+        if (filter.IsOneTime.HasValue)
+            query = query.Where(p => p.IsRepeatable != filter.IsOneTime.Value);
+
+        if (filter.IsAnchored.HasValue)
+        {
+            var anchors = ScopedAnchors();
+            // Mirrors ProjectionWithAnchors: a repeatable entry is never anchored, so it belongs on the
+            // false side whatever its activity's anchors say.
+            query = filter.IsAnchored.Value
+                ? query.Where(p => !p.IsRepeatable && anchors.Any(m => m.ActivityId == p.ActivityId))
+                : query.Where(p => p.IsRepeatable || !anchors.Any(m => m.ActivityId == p.ActivityId));
+        }
 
         return query;
     }

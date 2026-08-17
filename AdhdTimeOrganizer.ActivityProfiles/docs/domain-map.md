@@ -86,6 +86,13 @@ read expressed as a POST body, and `seen` is an upsert keyed on a composite the 
 
 `request/` (3 profile requests + `MemoryAnchorRequest`, which implements Core's `IActivityIdRequest`),
 `response/` (4, all `IProjectionResponse`), `filter/` (4 `IFilterRequest`s used by the four grids).
+
+⚠ `ActivityBucketListProfileResponse` and `ActivityBacklogProfileResponse` each carry a **second**
+projection, `ProjectionWithAnchors(query, anchors)`, which is the only one that fills `IsAnchored` /
+`MemoryAnchorId`. The two grids use it through `BaseGridEndpoint.Projection`; the plain `Projection`
+answers "not done" for both fields. The matching `IsAnchored` filter field is tri-state, and the backlog
+filter also accepts `IsOneTime` — the inverse of `IsRepeatable`, under the name the clients use. See
+`summary.md` for why the fields cannot be overlaid after the query.
 The lookups reuse Framework's generic `LookupResponse<T>` / `LookupFilter` and need no DTOs of their
 own.
 

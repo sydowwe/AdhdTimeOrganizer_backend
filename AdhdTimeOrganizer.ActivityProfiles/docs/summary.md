@@ -66,6 +66,24 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   sources, and `RecordSeenLeisureSuggestionEndpoint` checks ownership of every activity id it was given
   before writing a row for it. Both are pinned by `LeisureSuggestionTests`.
 
+- **"Done" on the bucket list and the one-time backlog is derived from `MemoryAnchor`, not stored.** A
+  bucket-list entry is complete exactly when its activity has an anchor; a backlog entry is complete when
+  it has an anchor **and** is not `IsRepeatable` (a repeatable entry is never finished, however many
+  anchors its activity carries). Nothing in the schema records this, so `isAnchored` / `memoryAnchorId`
+  drifting from that rule costs no migration, throws nothing and still answers 200 — the B1 tests in
+  `ActivityProfileGridTests` are the only thing that notices. Keep the response projection, the
+  `ApplyCustomFiltering` predicate and the GetById overlay saying the same thing; they are three
+  separate copies of one rule.
+
+- **Those two fields are computed in the projection, deliberately, because they must be sortable.**
+  `BaseGridEndpoint` sorts the *projected* queryable, so a field overlaid by `PostProcessItems` would sort
+  on `false` for every row — the page would come back in an arbitrary order with no error. The two grids
+  therefore override the framework's `Projection` hook (added for exactly this) and call
+  `ProjectionWithAnchors`, which takes the caller's anchor set because the static `Projection` has no
+  DbContext and no navigation to reach it: `Activity.MemoryAnchors` was deleted in the extraction and must
+  stay deleted. The plain `Projection` leaves both fields at their defaults, so any *new* caller of it
+  reports "not done" — `GetById*ProfileEndpoint` overlays them from a second read for that reason.
+
 - **The leisure draw is deterministic in `(request, data, history)`, and that is a contract, not an
   implementation detail.** The seed lives in the picker's URL, so reloading the page must show the same
   cards; the jitter therefore hashes the candidate key rather than walking a sequential RNG, and equal

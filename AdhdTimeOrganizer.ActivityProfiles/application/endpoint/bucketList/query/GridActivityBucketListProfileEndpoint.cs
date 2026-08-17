@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.ActivityProfiles.application.dto.response;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.bucketList.query;
 
@@ -10,6 +11,20 @@ public class GridActivityBucketListProfileEndpoint(DbContext dbContext)
     : BaseGridEndpoint<ActivityBucketListProfile, ActivityBucketListProfileResponse, ActivityBucketListProfileFilterRequest>(dbContext)
 {
     public override string EndpointPath => "grid";
+
+    /// <summary>
+    /// The caller's anchors. Scoped by hand for the same reason the profiles are: MemoryAnchor does carry a
+    /// global query filter, but this subquery decides a field the client treats as "done", and it is one
+    /// line to stop depending on a filter configured in another project.
+    /// </summary>
+    private IQueryable<MemoryAnchor> ScopedAnchors() => dbContext.Set<MemoryAnchor>().Where(m => m.UserId == User.GetId());
+
+    /// <summary>
+    /// Overridden so IsAnchored / MemoryAnchorId are computed in SQL rather than overlaid afterwards: the
+    /// base sorts the projected queryable, so a field filled in by PostProcessItems would sort on false.
+    /// </summary>
+    protected override Func<IQueryable<ActivityBucketListProfile>, IQueryable<ActivityBucketListProfileResponse>> Projection =>
+        query => ActivityBucketListProfileResponse.ProjectionWithAnchors(query, ScopedAnchors());
 
     /// <summary>
     /// Ownership belongs here, not in <see cref="ApplyCustomFiltering"/> — the base only calls that one
@@ -29,6 +44,14 @@ public class GridActivityBucketListProfileEndpoint(DbContext dbContext)
 
         if (filter.ComfortZoneStep.HasValue)
             query = query.Where(p => p.ComfortZoneStep == filter.ComfortZoneStep.Value);
+
+        if (filter.IsAnchored.HasValue)
+        {
+            var anchors = ScopedAnchors();
+            query = filter.IsAnchored.Value
+                ? query.Where(p => anchors.Any(m => m.ActivityId == p.ActivityId))
+                : query.Where(p => !anchors.Any(m => m.ActivityId == p.ActivityId));
+        }
 
         return query;
     }
