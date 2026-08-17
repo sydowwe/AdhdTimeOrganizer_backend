@@ -50,7 +50,7 @@ Does **not** own:
 
 ### ⚠ Two seams — the whole reason this slice could be extracted at all
 
-`04-slicing-verification.md` §4 recorded Tracking as the one slice that could **not** have its
+The pre-split analysis recorded Tracking as the one slice that could **not** have its
 dependencies inverted, because they were **writes**, not reads. `DesktopActivityHeartbeatEndpoint`
 used to, in one request: write `ActivityHistory` rows (History), transition `PlannerTask.Status`
 (Planning), and tick off to-do and routine items with a streak bump (TodoLists, Routines). Four

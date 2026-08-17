@@ -40,9 +40,8 @@ Two edges that the planning docs predicted turned out not to need one:
 
 ### 1. `Planning → History` does not exist
 
-`review/portal/04-slicing-verification.md` and `slicePrompts/05-planning.md` both record that
-`GetSuggestionsRepeatingPlannerTaskEndpoint` "reads `ActivityHistory`", making History a
-prerequisite. It does not. It reads **`PlannerSuggestionFromActivityHistory`** (named
+The pre-split analysis recorded that `GetSuggestionsRepeatingPlannerTaskEndpoint` "reads
+`ActivityHistory`", making History a prerequisite. It does not. It reads **`PlannerSuggestionFromActivityHistory`** (named
 `ActivityHistoryPattern` until the suggestion read-models were renamed), the entity mapped over the
 `mv_activity_history_pattern` materialized view — a *different* type that was never in the History
 slice and moved here with its two siblings. The materialized view is itself the decoupling: Planning
