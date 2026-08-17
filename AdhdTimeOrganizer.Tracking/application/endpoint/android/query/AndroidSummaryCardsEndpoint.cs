@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.@enum;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android.dashboard;
@@ -8,7 +9,7 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.android.query;
 
-public class AndroidSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCardsRequest, List<AndroidAppSummaryDto>>
+public class AndroidSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<SummaryCardsRequest, List<AndroidAppSummaryDto>>
 {
     public override void Configure()
     {
@@ -27,7 +28,7 @@ public class AndroidSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCardsRe
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange();
+        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
 
         var currentData = await db.Set<AndroidSessionData>()
             .Where(x => x.UserId == userId)

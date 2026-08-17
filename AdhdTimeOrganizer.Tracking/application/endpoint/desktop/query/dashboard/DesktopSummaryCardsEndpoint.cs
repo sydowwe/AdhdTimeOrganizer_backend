@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.@enum;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop.dashboard;
@@ -6,10 +7,11 @@ using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.query.dashboard;
 
-public class DesktopSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCardsRequest, List<DesktopProcessSummaryDto>>
+public class DesktopSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<SummaryCardsRequest, List<DesktopProcessSummaryDto>>
 {
     public override void Configure()
     {
@@ -28,13 +30,14 @@ public class DesktopSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCardsRe
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange();
+        var timeZone = await timeZones.GetAsync(userId, ct);
+        var (from, to) = req.ToDateTimeRange(timeZone);
 
         var currentPeriodData = await GetPeriodData(userId, from, to, ct);
 
         var (baselineFrom, baselineTo, baselineDays) = CalculateBaselineRange(from, to, req.Baseline);
 
-        var baselineData = await GetBaselineAverages(userId, baselineFrom, baselineTo, baselineDays, req.Baseline, ct);
+        var baselineData = await GetBaselineAverages(userId, baselineFrom, baselineTo, baselineDays, req.Baseline, timeZone, ct);
 
         var allProcesses = currentPeriodData
             .GroupBy(x => x.ProcessName)
@@ -82,8 +85,14 @@ public class DesktopSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCardsRe
         };
     }
 
+    /// <summary>
+    /// Both the weekday match and the all-time day span are calendar questions, so both are asked of the
+    /// user's calendar rather than UTC's. Read straight off the stored instant, a session at half past
+    /// midnight on a Tuesday in Bratislava counts as Monday, and the day span of a user's history could
+    /// come out a day short — the divisor of every average on these cards.
+    /// </summary>
     private async Task<Dictionary<string, DesktopBaselineStats>> GetBaselineAverages(
-        long userId, DateTime from, DateTime to, int days, BaselineType baseline, CancellationToken ct)
+        long userId, DateTime from, DateTime to, int days, BaselineType baseline, TimeZoneInfo timeZone, CancellationToken ct)
     {
         var data = await db.Set<DesktopActivityEntry>()
             .Where(x => x.UserId == userId)
@@ -92,14 +101,14 @@ public class DesktopSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCardsRe
 
         if (baseline == BaselineType.SameWeekday)
         {
-            var targetWeekday = from.DayOfWeek;
-            data = data.Where(x => x.WindowStart.DayOfWeek == targetWeekday).ToList();
+            var targetWeekday = WallClockZone.FromUtc(from, timeZone).DayOfWeek;
+            data = data.Where(x => WallClockZone.FromUtc(x.WindowStart, timeZone).DayOfWeek == targetWeekday).ToList();
         }
 
         if (days == -1 && data.Count > 0)
         {
-            var minDate = data.Min(x => x.WindowStart).Date;
-            var maxDate = data.Max(x => x.WindowStart).Date;
+            var minDate = WallClockZone.FromUtc(data.Min(x => x.WindowStart), timeZone).Date;
+            var maxDate = WallClockZone.FromUtc(data.Max(x => x.WindowStart), timeZone).Date;
             days = (int)(maxDate - minDate).TotalDays + 1;
         }
 

@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.application.dto.@enum;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.detail;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
@@ -8,7 +9,8 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.History.application.endpoint.activityHistory.activityHistory.query.dashboard.detail;
 
-public class HistoryDetailPieChartEndpoint(DbContext db) : Endpoint<HistoryDetailPieChartRequest, HistoryPieChartResponse>
+public class HistoryDetailPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
+    : Endpoint<HistoryDetailPieChartRequest, HistoryPieChartResponse>
 {
     public override void Configure()
     {
@@ -19,7 +21,7 @@ public class HistoryDetailPieChartEndpoint(DbContext db) : Endpoint<HistoryDetai
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange();
+        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
 
         var records = await db.Set<ActivityHistory>()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)

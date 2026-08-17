@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.application.dto.@enum;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.detail;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
@@ -8,7 +9,8 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.History.application.endpoint.activityHistory.activityHistory.query.dashboard.detail;
 
-public class HistoryDetailStackedBarsEndpoint(DbContext db) : Endpoint<HistoryDetailStackedBarsRequest, HistoryStackedBarsResponse>
+public class HistoryDetailStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
+    : Endpoint<HistoryDetailStackedBarsRequest, HistoryStackedBarsResponse>
 {
     public override void Configure()
     {
@@ -19,7 +21,7 @@ public class HistoryDetailStackedBarsEndpoint(DbContext db) : Endpoint<HistoryDe
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange();
+        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
 
         var records = await db.Set<ActivityHistory>()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)

@@ -1,13 +1,15 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.stackedBars;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.webExtension.query;
 
-public class WebExtensionStackedBarsEndpoint(DbContext dbContext) : Endpoint<WebExtensionStackedBarsRequest, IEnumerable<WebExtensionStackedBarsWindow>>
+public class WebExtensionStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones) : Endpoint<WebExtensionStackedBarsRequest, IEnumerable<WebExtensionStackedBarsWindow>>
 {
     public override void Configure()
     {
@@ -26,7 +28,8 @@ public class WebExtensionStackedBarsEndpoint(DbContext dbContext) : Endpoint<Web
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange();
+        var timeZone = await timeZones.GetAsync(userId, ct);
+        var (from, to) = req.ToDateTimeRange(timeZone);
 
         // 1. Fetch raw 1-min window data from DB
         var rawData = await dbContext.Set<WebExtensionActivityEntry>()
@@ -38,7 +41,7 @@ public class WebExtensionStackedBarsEndpoint(DbContext dbContext) : Endpoint<Web
         var windowMinutes = req.WindowMinutes;
 
         // 3. Re-aggregate into target window size
-        var aggregated = AggregateIntoWindows(rawData, windowMinutes);
+        var aggregated = AggregateIntoWindows(rawData, windowMinutes, timeZone);
 
         // 4. Apply minimum seconds filter
         if (req.MinSeconds is > 0)
@@ -89,17 +92,28 @@ public class WebExtensionStackedBarsEndpoint(DbContext dbContext) : Endpoint<Web
             .ToList();
     }
 
+    /// <summary>
+    /// Buckets the one-minute ledger rows into the requested band width. Bands are aligned to the
+    /// <b>user's</b> clock: a 60-minute band runs 09:00–10:00 where the user is, not 09:00–10:00 UTC, which
+    /// is what an alignment computed off the raw instant produced — bars an offset out of step with their
+    /// own labels for everyone not on UTC, and half an hour out in the half-hour zones.
+    /// <para>
+    /// Both bounds are converted back through the zone rather than the end being the start plus the band
+    /// width, so the band that contains a DST transition covers the wall clock it claims to.
+    /// </para>
+    /// </summary>
     private static List<WebExtensionStackedBarsWindow> AggregateIntoWindows(
         List<WebExtensionActivityEntry> rawData,
-        int targetWindowMinutes)
+        int targetWindowMinutes,
+        TimeZoneInfo timeZone)
     {
         // Group raw records into target window buckets
         var grouped = rawData
-            .GroupBy(x => AlignToWindow(x.WindowStart, targetWindowMinutes))
+            .GroupBy(x => AlignToWindow(x.WindowStart, targetWindowMinutes, timeZone))
             .Select(windowGroup => new WebExtensionStackedBarsWindow
             {
-                WindowStart = windowGroup.Key,
-                WindowEnd = windowGroup.Key.AddMinutes(targetWindowMinutes),
+                WindowStart = WallClockZone.ToUtc(windowGroup.Key, timeZone),
+                WindowEnd = WallClockZone.ToUtc(windowGroup.Key.AddMinutes(targetWindowMinutes), timeZone),
                 Activities = windowGroup
                     // Group by domain within the window
                     .GroupBy(x => x.Domain)
@@ -124,14 +138,17 @@ public class WebExtensionStackedBarsEndpoint(DbContext dbContext) : Endpoint<Web
         return grouped;
     }
 
-    private static DateTime AlignToWindow(DateTime time, int windowMinutes)
+    /// <summary>
+    /// The band an instant falls in, as a zone-less wall clock on the user's calendar day — rounded down to
+    /// the nearest boundary, so with 15-minute bands the user's 09:07 lands on 09:00 and their 09:18 on
+    /// 09:15. Returned as a label rather than an instant because the caller needs it to derive the band's
+    /// far edge too.
+    /// </summary>
+    private static DateTime AlignToWindow(DateTime instant, int windowMinutes, TimeZoneInfo timeZone)
     {
-        // Round down to nearest window boundary
-        // e.g., 09:07 with 15-min windows -> 09:00
-        // e.g., 09:18 with 15-min windows -> 09:15
-        var totalMinutes = (int)time.TimeOfDay.TotalMinutes;
-        var alignedMinutes = totalMinutes / windowMinutes * windowMinutes;
-        return time.Date.AddMinutes(alignedMinutes);
+        var wallClock = WallClockZone.FromUtc(instant, timeZone);
+        var alignedMinutes = (int)wallClock.TimeOfDay.TotalMinutes / windowMinutes * windowMinutes;
+        return wallClock.Date.AddMinutes(alignedMinutes);
     }
 
     private static List<WebExtensionStackedBarsWindow> FilterByMinSeconds(

@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop.dashboard.pieChart;
 using AdhdTimeOrganizer.Tracking.application.validator;
@@ -7,7 +8,7 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.query.dashboard;
 
-public class DesktopPieChartEndpoint(DbContext db) : Endpoint<PieChartRequest, DesktopPieChartResponse>
+public class DesktopPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<PieChartRequest, DesktopPieChartResponse>
 {
     public override void Configure()
     {
@@ -26,7 +27,7 @@ public class DesktopPieChartEndpoint(DbContext db) : Endpoint<PieChartRequest, D
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange();
+        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
 
         var periodData = await db.Set<DesktopActivityEntry>()
             .Where(x => x.UserId == userId)

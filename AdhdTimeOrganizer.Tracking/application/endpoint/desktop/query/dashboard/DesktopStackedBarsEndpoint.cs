@@ -1,13 +1,15 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.query.dashboard;
 
-public class DesktopStackedBarsEndpoint(DbContext dbContext) : Endpoint<WebExtensionStackedBarsRequest, IEnumerable<DesktopStackedBarsWindow>>
+public class DesktopStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones) : Endpoint<WebExtensionStackedBarsRequest, IEnumerable<DesktopStackedBarsWindow>>
 {
     public override void Configure()
     {
@@ -26,7 +28,8 @@ public class DesktopStackedBarsEndpoint(DbContext dbContext) : Endpoint<WebExten
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange();
+        var timeZone = await timeZones.GetAsync(userId, ct);
+        var (from, to) = req.ToDateTimeRange(timeZone);
 
         var rawData = await dbContext.Set<DesktopActivityEntry>()
             .Where(x => x.UserId == userId)
@@ -37,7 +40,7 @@ public class DesktopStackedBarsEndpoint(DbContext dbContext) : Endpoint<WebExten
 
         var windowMinutes = req.WindowMinutes;
 
-        var aggregated = AggregateIntoWindows(rawData, windowMinutes);
+        var aggregated = AggregateIntoWindows(rawData, windowMinutes, timeZone);
 
         if (req.MinSeconds is > 0)
             aggregated = FilterByMinSecondsWithOther(aggregated, req.MinSeconds.Value);
@@ -86,16 +89,27 @@ public class DesktopStackedBarsEndpoint(DbContext dbContext) : Endpoint<WebExten
             .ToList();
     }
 
+    /// <summary>
+    /// Buckets the one-minute ledger rows into the requested band width. Bands are aligned to the
+    /// <b>user's</b> clock: a 60-minute band runs 09:00–10:00 where the user is, not 09:00–10:00 UTC, which
+    /// is what an alignment computed off the raw instant produced — bars an offset out of step with their
+    /// own labels for everyone not on UTC, and half an hour out in the half-hour zones.
+    /// <para>
+    /// Both bounds are converted back through the zone rather than the end being the start plus the band
+    /// width, so the band that contains a DST transition covers the wall clock it claims to.
+    /// </para>
+    /// </summary>
     private static List<DesktopStackedBarsWindow> AggregateIntoWindows(
         List<DesktopActivityEntry> rawData,
-        int targetWindowMinutes)
+        int targetWindowMinutes,
+        TimeZoneInfo timeZone)
     {
         return rawData
-            .GroupBy(x => AlignToWindow(x.WindowStart, targetWindowMinutes))
+            .GroupBy(x => AlignToWindow(x.WindowStart, targetWindowMinutes, timeZone))
             .Select(windowGroup => new DesktopStackedBarsWindow
             {
-                WindowStart = windowGroup.Key,
-                WindowEnd = windowGroup.Key.AddMinutes(targetWindowMinutes),
+                WindowStart = WallClockZone.ToUtc(windowGroup.Key, timeZone),
+                WindowEnd = WallClockZone.ToUtc(windowGroup.Key.AddMinutes(targetWindowMinutes), timeZone),
                 Activities = windowGroup
                     .GroupBy(x => x.ProcessName)
                     .Select(processGroup => new DesktopStackedBarsEntry
@@ -114,10 +128,14 @@ public class DesktopStackedBarsEndpoint(DbContext dbContext) : Endpoint<WebExten
             .ToList();
     }
 
-    private static DateTime AlignToWindow(DateTime time, int windowMinutes)
+    /// <summary>
+    /// The band an instant falls in, as a zone-less wall clock on the user's calendar day. Returned as a
+    /// label rather than an instant because the caller needs it to derive the band's far edge too.
+    /// </summary>
+    private static DateTime AlignToWindow(DateTime instant, int windowMinutes, TimeZoneInfo timeZone)
     {
-        var totalMinutes = (int)time.TimeOfDay.TotalMinutes;
-        var alignedMinutes = totalMinutes / windowMinutes * windowMinutes;
-        return time.Date.AddMinutes(alignedMinutes);
+        var wallClock = WallClockZone.FromUtc(instant, timeZone);
+        var alignedMinutes = (int)wallClock.TimeOfDay.TotalMinutes / windowMinutes * windowMinutes;
+        return wallClock.Date.AddMinutes(alignedMinutes);
     }
 }

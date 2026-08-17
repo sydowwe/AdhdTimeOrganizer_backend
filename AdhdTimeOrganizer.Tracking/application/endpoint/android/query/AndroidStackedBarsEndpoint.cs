@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
@@ -7,7 +8,7 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.android.query;
 
-public class AndroidStackedBarsEndpoint(DbContext db) : Endpoint<AndroidStackedBarsRequest, IEnumerable<AndroidStackedBarsWindow>>
+public class AndroidStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<AndroidStackedBarsRequest, IEnumerable<AndroidStackedBarsWindow>>
 {
     public override void Configure()
     {
@@ -26,7 +27,7 @@ public class AndroidStackedBarsEndpoint(DbContext db) : Endpoint<AndroidStackedB
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange();
+        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
 
         var sessions = await db.Set<AndroidSessionData>()
             .Where(x => x.UserId == userId)

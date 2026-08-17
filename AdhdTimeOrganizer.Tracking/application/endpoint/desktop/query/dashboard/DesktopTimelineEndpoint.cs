@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
@@ -7,7 +8,7 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.query.dashboard;
 
-public class DesktopTimelineEndpoint(DbContext dbContext)
+public class DesktopTimelineEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones)
     : Endpoint<BaseTimelineRequest, DesktopTimelineResponse>
 {
     private const int ContextWindowRadius = 2;
@@ -30,7 +31,7 @@ public class DesktopTimelineEndpoint(DbContext dbContext)
     public override async Task HandleAsync(BaseTimelineRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
-        var (from, to) = req.ToDateTimeRange();
+        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
 
         var rawData = await dbContext.Set<DesktopActivityEntry>()
             .Where(x => x.UserId == userId)

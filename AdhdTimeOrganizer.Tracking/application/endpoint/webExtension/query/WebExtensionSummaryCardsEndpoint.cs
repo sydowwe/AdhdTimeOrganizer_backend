@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.@enum;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.summaryCards;
@@ -5,10 +6,11 @@ using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.webExtension.query;
 
-public class WebExtensionSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCardsRequest, List<DomainSummaryDto>>
+public class WebExtensionSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<SummaryCardsRequest, List<DomainSummaryDto>>
 {
     public override void Configure()
     {
@@ -28,7 +30,8 @@ public class WebExtensionSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCa
         var userId = User.GetId();
 
         // Construct DateTime from DateOnly and TimeDto
-        var (from, to) = req.ToDateTimeRange();
+        var timeZone = await timeZones.GetAsync(userId, ct);
+        var (from, to) = req.ToDateTimeRange(timeZone);
 
         // 1. Get current period data
         var currentPeriodData = await GetPeriodData(userId, from, to, ct);
@@ -39,7 +42,7 @@ public class WebExtensionSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCa
         var (baselineFrom, baselineTo, baselineDays) = CalculateBaselineRange(from, to, req.Baseline);
 
         // 4. Get baseline data (daily averages)
-        var baselineData = await GetBaselineAverages(userId, baselineFrom, baselineTo, baselineDays, req.Baseline, ct);
+        var baselineData = await GetBaselineAverages(userId, baselineFrom, baselineTo, baselineDays, req.Baseline, timeZone, ct);
 
         // 5. Get all domains by total time (active + background)
         var allDomains = currentPeriodData
@@ -128,6 +131,7 @@ public class WebExtensionSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCa
         DateTime to,
         int days,
         BaselineType baseline,
+        TimeZoneInfo timeZone,
         CancellationToken ct)
     {
         var query = db.Set<WebExtensionActivityEntry>()
@@ -136,18 +140,19 @@ public class WebExtensionSummaryCardsEndpoint(DbContext db) : Endpoint<SummaryCa
 
         var data = await query.ToListAsync(ct);
 
-        // For SameWeekday, filter to matching weekdays in memory
+        // Weekday is a question about the user's calendar, not UTC's: read off the stored instant, a
+        // Tuesday 00:30 session in Bratislava counts as Monday and lands in the wrong baseline.
         if (baseline == BaselineType.SameWeekday)
         {
-            var targetWeekday = from.DayOfWeek;
-            data = data.Where(x => x.WindowStart.DayOfWeek == targetWeekday).ToList();
+            var targetWeekday = WallClockZone.FromUtc(from, timeZone).DayOfWeek;
+            data = data.Where(x => WallClockZone.FromUtc(x.WindowStart, timeZone).DayOfWeek == targetWeekday).ToList();
         }
 
-        // Calculate actual number of days if AllTime
+        // Likewise the span of days the history covers — this is the divisor of every average below.
         if (days == -1 && data.Any())
         {
-            var minDate = data.Min(x => x.WindowStart).Date;
-            var maxDate = data.Max(x => x.WindowStart).Date;
+            var minDate = WallClockZone.FromUtc(data.Min(x => x.WindowStart), timeZone).Date;
+            var maxDate = WallClockZone.FromUtc(data.Max(x => x.WindowStart), timeZone).Date;
             days = (int)(maxDate - minDate).TotalDays + 1;
         }
 

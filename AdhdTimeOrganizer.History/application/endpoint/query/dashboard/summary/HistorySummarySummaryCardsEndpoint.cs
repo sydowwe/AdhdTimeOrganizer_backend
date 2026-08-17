@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.application.dto.@enum;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.summary;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
@@ -8,7 +9,8 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.History.application.endpoint.activityHistory.activityHistory.query.dashboard.summary;
 
-public class HistorySummarySummaryCardsEndpoint(DbContext db) : Endpoint<HistorySummarySummaryCardsRequest, HistorySummaryCardsResponse>
+public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
+    : Endpoint<HistorySummarySummaryCardsRequest, HistorySummaryCardsResponse>
 {
     public override void Configure()
     {
@@ -19,9 +21,9 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db) : Endpoint<History
     {
         var userId = User.GetId();
 
+        // The user's days, not UTC's — see DateRangeDto.ToUtcRange.
         var (fromDate, toDate) = req.ToDateRange();
-        var from = fromDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var to = toDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var (from, to) = req.ToUtcRange(await timeZones.GetAsync(userId, ct));
         var dayCount = (int)Math.Ceiling((to - from).TotalDays);
 
         var currentRecords = await db.Set<ActivityHistory>()

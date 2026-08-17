@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.application.dto.@enum;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.summary;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
@@ -5,10 +6,12 @@ using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.History.application.endpoint.activityHistory.activityHistory.query.dashboard.summary;
 
-public class HistorySummaryStackedBarsEndpoint(DbContext db) : Endpoint<HistorySummaryStackedBarsRequest, HistoryStackedBarsResponse>
+public class HistorySummaryStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
+    : Endpoint<HistorySummaryStackedBarsRequest, HistoryStackedBarsResponse>
 {
     public override void Configure()
     {
@@ -19,9 +22,14 @@ public class HistorySummaryStackedBarsEndpoint(DbContext db) : Endpoint<HistoryS
     {
         var userId = User.GetId();
 
+        // The user's own days and the user's own clock. WindowStartTime / WindowEndTime are bare TimeDto,
+        // which in this solution means zone-less wall clock — the same convention the detail dashboard and
+        // every command path use. They used to be added as raw offsets to a UTC midnight, i.e. read as UTC,
+        // which put this endpoint's bars in a different hour range than the detail endpoint's for the same
+        // picked window.
+        var timeZone = await timeZones.GetAsync(userId, ct);
         var (fromDate, toDate) = req.ToDateRange();
-        var from = fromDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var to = toDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var (from, to) = req.ToUtcRange(timeZone);
 
         var records = await db.Set<ActivityHistory>()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
@@ -35,15 +43,11 @@ public class HistorySummaryStackedBarsEndpoint(DbContext db) : Endpoint<HistoryS
         List<(DateTime Start, DateTime End)> windows;
 
         if (windowMinutes < 1440)
-        {
-            var startOffset = TimeSpan.FromHours(req.WindowStartTime.Hours).Add(TimeSpan.FromMinutes(req.WindowStartTime.Minutes));
-            var endOffset = TimeSpan.FromHours(req.WindowEndTime.Hours).Add(TimeSpan.FromMinutes(req.WindowEndTime.Minutes));
-            windows = GenerateFixedWindows(from, to, windowMinutes, startOffset, endOffset);
-        }
+            windows = GenerateFixedWindows(
+                fromDate, toDate, windowMinutes,
+                req.WindowStartTime.ToTimeOnly(), req.WindowEndTime.ToTimeOnly(), timeZone);
         else
-        {
-            windows = GenerateWindows(from, to, windowMinutes / 1440);
-        }
+            windows = GenerateWindows(fromDate, toDate, windowMinutes / 1440, timeZone);
 
         var response = new HistoryStackedBarsResponse
         {
@@ -68,18 +72,26 @@ public class HistorySummaryStackedBarsEndpoint(DbContext db) : Endpoint<HistoryS
         await Send.ResponseAsync(response, cancellation: ct);
     }
 
+    /// <summary>
+    /// One sub-day band per day, between the user's chosen wall-clock hours. The outer walk is over
+    /// <b>calendar dates</b> and each band boundary is resolved through the zone, rather than the previous
+    /// walk over UTC ticks: on a DST transition day the user's 08:00 is a different number of hours after
+    /// the previous 08:00, and adding 24h to an instant silently slides every bar by the offset change.
+    /// </summary>
     private static List<(DateTime Start, DateTime End)> GenerateFixedWindows(
-        DateTime from, DateTime to, int windowMinutes, TimeSpan startOffset, TimeSpan endOffset)
+        DateOnly fromDate, DateOnly toDate, int windowMinutes,
+        TimeOnly startTime, TimeOnly endTime, TimeZoneInfo timeZone)
     {
         var windows = new List<(DateTime Start, DateTime End)>();
-        var day = from.Date;
 
-        while (day < to)
+        for (var day = fromDate; day <= toDate; day = day.AddDays(1))
         {
-            var dayStart = day.Add(startOffset);
-            var dayEnd = day.Add(endOffset);
-            if (dayEnd <= dayStart)
-                dayEnd = dayEnd.AddDays(1);
+            var dayStart = WallClockZone.ToUtc(day, startTime, timeZone);
+            // endTime <= startTime is a band running past midnight into the next date, matching the
+            // over-midnight rule DateAndTimeRangeDto.ToDateTimeRange applies to the detail dashboard.
+            var dayEnd = endTime <= startTime
+                ? WallClockZone.ToUtc(day.AddDays(1), endTime, timeZone)
+                : WallClockZone.ToUtc(day, endTime, timeZone);
 
             var current = dayStart;
             while (current < dayEnd)
@@ -90,24 +102,30 @@ public class HistorySummaryStackedBarsEndpoint(DbContext db) : Endpoint<HistoryS
                 windows.Add((current, next));
                 current = current.AddMinutes(windowMinutes);
             }
-
-            day = day.AddDays(1);
         }
 
         return windows;
     }
 
-    private static List<(DateTime Start, DateTime End)> GenerateWindows(DateTime from, DateTime to, int windowDays)
+    /// <summary>
+    /// Whole-day bands. Boundaries are the user's midnights, so a band is 23 or 25 hours long across a DST
+    /// transition — which is correct: the bar covers the days it says it covers.
+    /// </summary>
+    private static List<(DateTime Start, DateTime End)> GenerateWindows(
+        DateOnly fromDate, DateOnly toDate, int windowDays, TimeZoneInfo timeZone)
     {
         var windows = new List<(DateTime Start, DateTime End)>();
-        var current = from;
-        while (current < to)
+        var endExclusive = toDate.AddDays(1);
+
+        for (var day = fromDate; day < endExclusive; day = day.AddDays(windowDays))
         {
-            var next = current.AddDays(windowDays);
-            if (next > to)
-                next = to;
-            windows.Add((current, next));
-            current = current.AddDays(windowDays);
+            var next = day.AddDays(windowDays);
+            if (next > endExclusive)
+                next = endExclusive;
+
+            windows.Add((
+                WallClockZone.ToUtc(day, TimeOnly.MinValue, timeZone),
+                WallClockZone.ToUtc(next, TimeOnly.MinValue, timeZone)));
         }
 
         return windows;
