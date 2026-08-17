@@ -18,6 +18,8 @@ public record TaskPriorityRequest : TextColorRequest, IMyRequest<TaskPriority>
 
     public void UpdateEntity(TaskPriority entity)
     {
-        throw new NotImplementedException();
+        entity.Text = Text;
+        entity.Color = Color;
+        entity.Priority = Priority;
     }
 }

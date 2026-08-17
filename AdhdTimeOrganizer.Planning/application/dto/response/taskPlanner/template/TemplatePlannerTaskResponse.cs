@@ -57,7 +57,9 @@ public record TemplatePlannerTaskResponse : BasePlannerTaskResponse, IProjection
                     Importance = entity.Importance.Importance
                 },
             TemplateId = entity.TemplateId,
-            Color = entity.Color
+            // Inlined rather than entity.Color: EF Core can't translate a call to that computed property inside
+            // a .Select() that becomes SQL (no implicit client evaluation since EF Core 3).
+            Color = entity.Activity.Role.Color
         });
     }
 }

@@ -24,8 +24,8 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
 
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_routine_time_period_reset_anchor_day_range",
-            "(\"length_in_days\" <= 7 OR \"length_in_days\" % 7 = 0 AND \"reset_anchor_day\" BETWEEN 1 AND 7) OR " +
-            "(\"length_in_days\" > 7 AND \"length_in_days\" % 7 <> 0 AND \"reset_anchor_day\" BETWEEN 1 AND 30)"));
+            "((\"length_in_days\" <= 7 OR \"length_in_days\" % 7 = 0) AND \"reset_anchor_day\" BETWEEN 0 AND 7) OR " +
+            "((\"length_in_days\" > 7 AND \"length_in_days\" % 7 <> 0) AND \"reset_anchor_day\" BETWEEN 0 AND 30)"));
 
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_routine_time_period_length_in_days_range",

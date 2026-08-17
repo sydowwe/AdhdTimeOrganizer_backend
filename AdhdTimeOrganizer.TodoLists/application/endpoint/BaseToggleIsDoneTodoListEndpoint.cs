@@ -105,6 +105,7 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(DbContext dbCont
                 {
                     entity.DoneCount = 0;
                     entity.IsDone = false;
+                    ResetSteps(entity);
                 }
                 else
                 {

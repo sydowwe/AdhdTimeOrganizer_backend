@@ -12,6 +12,12 @@ public static class SerilogConfig
     {
         hostBuilder.UseSerilog((context, config) =>
         {
+            // Enrichment/sinks below are Serilog's own pipeline; writeToProviders additionally forwards
+            // every log event to any ILoggerProvider registered in DI (default false — Serilog normally
+            // owns logging exclusively and ignores them). Without this, nothing else can observe log
+            // output through the standard Microsoft.Extensions.Logging provider seam: registering a
+            // capturing ILoggerProvider in a test, or any other DI-based logging hook, is silently a
+            // no-op.
             config.MinimumLevel.Is(LogEventLevel.Information)
                 .Enrich.FromLogContext()
                 .Enrich.WithCorrelationId()
@@ -76,6 +82,6 @@ public static class SerilogConfig
                     // whatever properties land in the JSONB column persist
                     retentionTime: TimeSpan.FromDays(90)
                 );
-        });
+        }, writeToProviders: true);
     }
 }
