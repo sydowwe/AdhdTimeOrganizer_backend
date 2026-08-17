@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using FastEndpoints;
 using FluentValidation;
 
@@ -38,6 +39,19 @@ public class PlannerTaskValidator : Validator<PlannerTaskRequest>
         RuleFor(x => x.EndTime)
             .Must(t => t.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
             .WithMessage("EndTime hours must be 0–23 and minutes 0–59.");
+
+        RuleFor(x => x.ActualStartTime)
+            .Must(t => t!.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
+            .WithMessage("ActualStartTime hours must be 0–23 and minutes 0–59.")
+            .When(x => x.ActualStartTime != null);
+
+        // "Work began at" only means something for a task that has begun. ApplyStatus clears the actual times
+        // for NotStarted and Cancelled, so accepting one here would store a value the next status change drops
+        // without saying so.
+        RuleFor(x => x.ActualStartTime)
+            .Must((x, _) => x.Status is PlannerTaskStatus.InProgress or PlannerTaskStatus.Completed)
+            .WithMessage("ActualStartTime is only valid with status InProgress or Completed.")
+            .When(x => x.ActualStartTime != null);
 
         RuleFor(x => x.Location)
             .MaximumLength(200)

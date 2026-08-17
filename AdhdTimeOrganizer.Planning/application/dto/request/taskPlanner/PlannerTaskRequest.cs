@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner.template;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
@@ -29,8 +30,28 @@ public record PlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<PlannerTas
 
     public long? TodolistId { get; init; }
 
+    /// <summary>
+    /// The minute work actually began, for a task that is created already under way — "I'm doing this now",
+    /// which is how the leisure picker commits a suggestion. Without it that flow had to POST the task and then
+    /// PATCH its status, and a create that named <c>InProgress</c> produced a task the planner and the home
+    /// now-bar could not show as started, since they read this column rather than the status alone.
+    /// <para>
+    /// Only meaningful for <c>InProgress</c> / <c>Completed</c>: <c>PlannerTask.ApplyStatus</c> clears the actual
+    /// times for the other two, so <c>PlannerTaskValidator</c> rejects the combination rather than accepting a
+    /// value the next status change would silently drop.
+    /// </para>
+    /// <para>
+    /// <b>Create-only: <see cref="UpdateEntity"/> deliberately leaves the column alone.</b> A full PUT that
+    /// omitted this field would otherwise wipe the start time of a task already under way — which is every
+    /// existing update caller, since the day-planner dialog and the drag-to-move path do not send it.
+    /// Changing the time afterwards is what <c>PATCH /planner-task/{id}/status</c> is for.
+    /// </para>
+    /// </summary>
+    public TimeDto? ActualStartTime { get; init; }
+
     public PlannerTask ToEntity => new()
     {
+        ActualStartTime = ActualStartTime?.ToTimeOnly(),
         UserId = 0,
         StartTime = StartTime.ToTimeOnly(),
         EndTime = EndTime.ToTimeOnly(),

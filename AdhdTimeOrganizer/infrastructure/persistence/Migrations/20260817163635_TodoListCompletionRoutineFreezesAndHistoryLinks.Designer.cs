@@ -3,6 +3,7 @@ using System;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260817163635_TodoListCompletionRoutineFreezesAndHistoryLinks")]
+    partial class TodoListCompletionRoutineFreezesAndHistoryLinks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -467,71 +470,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasDatabaseName("ix_activity_weather_dependency_user_id_text");
 
                     b.ToTable("activity_weather_dependency", "public");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.ActivityProfiles.domain.model.entity.LeisureSuggestionRecord", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ActivityId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("activity_id");
-
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("LastOutcome")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("last_outcome");
-
-                    b.Property<DateTime>("LastSuggestedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_suggested_at");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("source");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("row_version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id")
-                        .HasName("pk_leisure_suggestion_record");
-
-                    b.HasIndex("ActivityId")
-                        .HasDatabaseName("ix_leisure_suggestion_record_activity_id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_leisure_suggestion_record_user_id");
-
-                    b.HasIndex("UserId", "Source", "ActivityId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_leisure_suggestion_record_user_id_source_activity_id");
-
-                    b.ToTable("leisure_suggestion_record", "public");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.ActivityProfiles.domain.model.entity.MemoryAnchor", b =>
@@ -4590,27 +4528,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_activity_weather_dependency_user_user_id");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.ActivityProfiles.domain.model.entity.LeisureSuggestionRecord", b =>
-                {
-                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
-                        .WithMany()
-                        .HasForeignKey("ActivityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_leisure_suggestion_record_activity_activity_id");
-
-                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_leisure_suggestion_record_user_user_id");
-
-                    b.Navigation("Activity");
 
                     b.Navigation("User");
                 });

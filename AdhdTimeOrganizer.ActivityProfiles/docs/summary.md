@@ -15,9 +15,14 @@ alike.
 
 ## Bounded context
 
-Owns: the eight entities and their EF configurations, 52 endpoints (21 profile, 24 lookup, 7 memory
-anchor), their DTOs, 8 validators, 4 filter requests, 4 profile-only enums (`EnergyLevel`,
-`EffortType`, `DifficultyLevel`, `ReadinessStatus`), 4 per-user default seeders and 8 dev seeders.
+Owns: the nine entities and their EF configurations, 55 endpoints (22 profile, 24 lookup, 7 memory
+anchor, 2 leisure draw), their DTOs, 11 validators, 4 filter requests, 6 slice-only enums
+(`EnergyLevel`, `EffortType`, `DifficultyLevel`, `ReadinessStatus`, `LeisureSuggestionSource`,
+`LeisureSuggestionOutcome`), 4 per-user default seeders and 8 dev seeders.
+
+It also owns **the leisure picker's ranking rule** — `domain/service/LeisureDrawRanker.cs` — which is
+the only real logic in the slice. Everything else here is CRUD over the facets of an `Activity`; that
+file decides what the app recommends when the user says "I'm bored".
 
 Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all Core's. Nor
 `AppDbContext`, `Program.cs`, the migrations or the DI wiring, all host-side.
@@ -56,7 +61,23 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   only calls the latter when the request actually carries a filter. That hand-scoping is the only
   thing keeping other users' profiles out, and `ApplyUserScoping` is a no-op virtual, so deleting the
   override is silent. `ActivityProfileGridTests` pins it. The four lookups and `MemoryAnchor` *are*
-  `IEntityWithUser` and are covered by the global filter.
+  `IEntityWithUser` and are covered by the global filter. **The two leisure endpoints scope the same
+  way** — `DrawLeisureSuggestionEndpoint` reaches the owner through `p.Activity.UserId` on all three
+  sources, and `RecordSeenLeisureSuggestionEndpoint` checks ownership of every activity id it was given
+  before writing a row for it. Both are pinned by `LeisureSuggestionTests`.
+
+- **The leisure draw is deterministic in `(request, data, history)`, and that is a contract, not an
+  implementation detail.** The seed lives in the picker's URL, so reloading the page must show the same
+  cards; the jitter therefore hashes the candidate key rather than walking a sequential RNG, and equal
+  scores break the tie on the key. Anything that makes the order depend on row order — dropping the
+  `ThenBy`, ranking in a `HashSet`, ordering by `Id` — breaks a promise no exception will report. The
+  hash pair (FNV-1a + mulberry32) is also bit-compatible with the client rule this endpoint replaced,
+  deliberately.
+
+- **The draw's memory is `LeisureSuggestionRecord`, written only by `/leisure-suggestion/seen`.** A
+  *rendered* draw records nothing: recording on render would demote the very cards on screen and stop a
+  seeded URL from reproducing its own draw. Rows are swept after 90 days on the next write by the same
+  user, so there is no scheduled job to forget to register.
 
 - **The profile validators no longer traverse `Activity`.** `CreateActivityBacklogProfileValidator`
   and its two siblings, plus `CreateMemoryAnchorValidator`, enforce "one profile per activity" and
@@ -72,7 +93,7 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   a lookup while a profile still referenced it.
 
 - **Registering with the host is four places, none of which break the build.** FastEndpoints
-  `o.Assemblies` in `Program.cs` (missing → all 52 routes 404);
+  `o.Assemblies` in `Program.cs` (missing → all 55 routes 404);
   `ModuleServiceExtensions.ModuleAssemblies` (missing → the 12 seeders register *twice*, since the
   `AppDomain` sweep then also sees them: the dev ones truncate and reseed twice, the per-user defaults
   double-insert); `AppDbContext.ApplyHostConfigurations` (missing → all eight tables vanish from the
