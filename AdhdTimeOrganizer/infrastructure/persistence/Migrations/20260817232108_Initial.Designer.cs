@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260817190434_Initial")]
+    [Migration("20260817232108_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -426,6 +426,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
 
                     b.Property<DateTime>("CreatedTimestamp")
                         .ValueGeneratedOnAdd()
@@ -1074,6 +1079,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("user_name");
+
+                    b.Property<string>("WeatherLocation")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("weather_location");
 
                     b.Property<uint>("row_version")
                         .IsConcurrencyToken()

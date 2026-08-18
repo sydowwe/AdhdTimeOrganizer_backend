@@ -51,7 +51,15 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     /// <summary>
     /// The dashboard POSTs across all three trackers. Asserting on <c>OK</c> rather than "not 404"
     /// avoids the trap that a GET against a POST-only route answers 405, which passes a
-    /// <c>NotBe(NotFound)</c> check for entirely the wrong reason.
+    /// <c>NotBe(NotFound)</c> check for entirely the wrong reason — and the larger trap that a body the
+    /// endpoint rejects passes it too.
+    /// <para>
+    /// That larger trap was live here: this case asserted only "not 404 / not 405", and every one of the
+    /// twelve routes was answering <b>400</b>, because <c>DashboardBody</c> sent <c>from</c>/<c>to</c> as
+    /// <c>DateTime</c> while all twelve requests derive from <c>DateAndTimeRangeDto</c>, whose
+    /// <c>From</c>/<c>To</c> are <c>TimeDto</c> (the portal's time-of-day convention). Model binding
+    /// failed before any handler ran, so the case proved only that something was bound to each route.
+    /// </para>
     /// </summary>
     [Theory]
     [InlineData("/api/activity-tracking/desktop/pie-chart")]
@@ -71,8 +79,7 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
         var response = await CreateUserRoleClient()
             .PostAsJsonAsync(route, DashboardBody(), JsonOpts, TestContext.Current.CancellationToken);
 
-        response.StatusCode.Should().NotBe(HttpStatusCode.NotFound);
-        response.StatusCode.Should().NotBe(HttpStatusCode.MethodNotAllowed);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     /// <summary>
@@ -87,6 +94,15 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     /// <c>EndpointPath</c> defaulting to <c>filtered-table</c> — so they answer under the entity name,
     /// not under <c>gird</c>.
     /// </para>
+    /// <para>
+    /// Asserting on <c>OK</c> rather than "not 404" is what makes this case mean anything, and the two
+    /// settings rows are why. They previously passed on a <b>400</b>: <c>GridBody</c> sent
+    /// <c>filter: {}</c>, and both mapping filters declare <c>required TrackerDesktopMappingTypeEnum
+    /// Type</c>, which System.Text.Json enforces during deserialization — so the request never reached
+    /// the handler and the case proved only that <em>something</em> was bound to the route, which a
+    /// stray 400 from anywhere would equally have satisfied. See <c>GridBody</c> for why the body now
+    /// sends <c>filter: null</c>.
+    /// </para>
     /// </summary>
     [Theory]
     [InlineData("/api/activity-tracking/desktop/settings/tracker-desktop-mapping-by-pattern/filtered-table")]
@@ -98,8 +114,7 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
         var response = await CreateUserRoleClient()
             .PostAsJsonAsync(route, GridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
-        response.StatusCode.Should().NotBe(HttpStatusCode.NotFound);
-        response.StatusCode.Should().NotBe(HttpStatusCode.MethodNotAllowed);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -258,24 +273,43 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
 
     /// <summary>
     /// Superset body covering the pie-chart / summary-cards / stacked-bars / timeline request shapes.
-    /// Extra members are ignored on either side, and since these cases assert only on routing, a 400
-    /// from a stricter validator is still a pass.
+    /// Extra members are ignored on either side, but every member each route <em>does</em> read has to be
+    /// both bindable and valid, because the case now asserts <c>OK</c> — a 400 no longer passes.
+    /// <list type="bullet">
+    /// <item><c>from</c>/<c>to</c> are <c>TimeDto</c> (<c>{hours, minutes}</c>), not <c>DateTime</c> —
+    /// all twelve requests derive from <c>DateAndTimeRangeDto</c>, and every validator here has a
+    /// <c>RuleFor(x =&gt; x.From).NotEmpty()</c>.</item>
+    /// <item><c>windowMinutes</c> is <c>required</c> on the two stacked-bars requests and is checked
+    /// against a fixed set (15/20/30/60/90/120).</item>
+    /// <item><c>baseline</c> is deliberately <b>omitted</b>. It is a <c>BaselineType</c> enum validated
+    /// with <c>IsInEnum</c>, this file's <c>JsonOpts</c> has no string-enum converter, and the DTO
+    /// already defaults it to <c>Last7Days</c> — so sending it as a string is the one way to break it.
+    /// (The old body sent <c>"Day"</c>, which is not even a member of the enum.)</item>
+    /// </list>
     /// </summary>
     private static object DashboardBody() => new
     {
         date = DateOnly.FromDateTime(DateTime.UtcNow),
-        from = DateTime.UtcNow.Date,
-        to = DateTime.UtcNow.Date.AddDays(1),
-        baseline = "Day",
+        from = new { hours = 0, minutes = 0 },
+        to = new { hours = 23, minutes = 59 },
+        windowMinutes = 30,
         topN = 5,
         minPercent = 1.0,
         minSeconds = 60
     };
 
+    /// <summary>
+    /// <c>filter: null</c>, not <c>filter: {}</c>. <c>BaseFilterRequest.Filter</c> is
+    /// <c>required TFilter?</c>, so an explicit null satisfies the required-presence check without
+    /// deserializing a filter object at all — which is the only body shape all four grids accept. An
+    /// empty object is fine for the two distinct-entry filters (every member nullable) but 400s on the
+    /// two mapping filters, whose <c>Type</c> is <c>required</c>. Since <c>useFilter</c> is false, none
+    /// of the four reaches its <c>ApplyCustomFiltering</c> either way.
+    /// </summary>
     private static object GridBody() => new
     {
         useFilter = false,
-        filter = new { },
+        filter = (object?)null,
         sortBy = Array.Empty<object>(),
         itemsPerPage = 20,
         page = 1

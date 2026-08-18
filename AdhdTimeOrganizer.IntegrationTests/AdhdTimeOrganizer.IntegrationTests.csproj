@@ -19,14 +19,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- The materialized views live in hand-written SQL rather than a migration, and EnsureCreated
-             (how the test schema is built) skips them. Copied next to the test binaries so the fixture
-             can apply them in OnSchemaCreatedAsync — without them SuggestionPatternRefreshInterceptor
-             throws 42P01 on any save that touches PlannerTask / ActivityHistory / Calendar. -->
-        <Content Include="..\AdhdTimeOrganizer\infrastructure\persistence\sqlScripts\*.sql" Link="sqlScripts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    </ItemGroup>
-
-    <ItemGroup>
         <ProjectReference Include="..\AdhdTimeOrganizer\AdhdTimeOrganizer.csproj" />
         <ProjectReference Include="..\framework\Sydowwe.Framework.Testing\Sydowwe.Framework.Testing.csproj" />
         <ProjectReference Include="..\AdhdTimeOrganizer.History\AdhdTimeOrganizer.History.csproj" />

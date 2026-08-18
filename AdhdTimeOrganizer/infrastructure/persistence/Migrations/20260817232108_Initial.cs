@@ -185,6 +185,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     google_calendar_refresh_token = table.Column<string>(type: "text", nullable: true),
                     has_extension_access = table.Column<bool>(type: "boolean", nullable: false),
                     first_day_of_week = table.Column<int>(type: "integer", nullable: false, defaultValue: 1),
+                    weather_location = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
                     email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     user_name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
@@ -507,6 +508,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    code = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),

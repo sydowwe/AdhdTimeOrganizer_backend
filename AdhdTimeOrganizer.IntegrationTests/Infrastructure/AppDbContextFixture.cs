@@ -59,19 +59,17 @@ public class AppDbContextFixture : PostgresContainerFixture<Program, AppDbContex
     public const string TestUserPassword = "Test@1234!";
 
     /// <summary>
-    /// Applies the three suggestion-pattern materialized views. They are hand-written SQL rather than
-    /// migration output, so <c>EnsureCreated</c> does not produce them — and
+    /// Applies the three suggestion-pattern materialized views via the real
+    /// <see cref="SuggestionPatternViewInstaller"/> — the same code path production uses — rather than
+    /// re-reading the copied <c>.sql</c> files here, so the two can no longer drift. They are
+    /// hand-written SQL rather than migration output, so <c>EnsureCreated</c> does not produce them — and
     /// <c>SuggestionPatternRefreshInterceptor</c> issues a REFRESH on every save that touches
     /// <c>PlannerTask</c>, <c>ActivityHistory</c> or <c>Calendar</c>, which fails with 42P01 when the
     /// view is missing. That made anything seeding a per-user Calendar (registration, for one)
     /// impossible to test.
     /// </summary>
-    protected override async Task OnSchemaCreatedAsync(AppDbContext db)
-    {
-        var scriptDirectory = Path.Combine(AppContext.BaseDirectory, "sqlScripts");
-        foreach (var script in Directory.EnumerateFiles(scriptDirectory, "*.sql").Order())
-            await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(script));
-    }
+    protected override Task OnSchemaCreatedAsync(AppDbContext db) =>
+        SuggestionPatternViewInstaller.EnsureViewsCreatedAsync(db, NullLogger<AppDbContextFixture>.Instance);
 
     protected override async Task SeedFixtureAsync(AppDbContext db)
     {

@@ -8,6 +8,7 @@ using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.Testing;
@@ -34,7 +35,9 @@ namespace AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 /// <c>KnownGap</c> here. This file re-targets the prompt's scenarios at the current architecture: interceptor
 /// flag correctness (originally Scenario C), the flag-reset guarantee (Scenario B, now already-passing), the job
 /// handler's per-view failure isolation (Scenario A's intent, moved to the job), the unique-index precondition
-/// (Scenario E), and the dual-installation-path parity check (Scenario F). Scenario D (PERF) is skipped — it
+/// (Scenario E), and view-installation coverage (Scenario F — originally a parity check between the two
+/// installation paths; the fixture now calls <see cref="SuggestionPatternViewInstaller"/> itself, so there is
+/// only one path left and the check is instead enum-vs-scripts). Scenario D (PERF) is skipped — it
 /// would only be meaningful against the old synchronous-refresh-on-save design.
 /// </para>
 /// </summary>
@@ -95,19 +98,12 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
     private static async Task DropViewAsync(DbContext db, SuggestionPatternView view, CancellationToken ct) =>
         await db.Database.ExecuteSqlRawAsync($"DROP MATERIALIZED VIEW {ViewNames[view]}", ct);
 
-    private async Task RestoreViewAsync(SuggestionPatternView view, CancellationToken ct)
+    // Goes through the real installer rather than re-reading the script here: it already skips views that
+    // still exist, so restoring one dropped view is exactly "install whatever is missing".
+    private async Task RestoreMissingViewsAsync(CancellationToken ct)
     {
-        await using var db = CreateDbContext();
-        var exists = await db.Database
-            .SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", $"public.{ViewNames[view]}")
-            .SingleAsync(ct);
-        if (exists)
-            return;
-
-        var resourceName = $"{typeof(SuggestionPatternViewInstaller).Assembly.GetName().Name}.infrastructure.persistence.sqlScripts.{ViewNames[view]}.sql";
-        await using var stream = typeof(SuggestionPatternViewInstaller).Assembly.GetManifestResourceStream(resourceName)!;
-        using var reader = new StreamReader(stream);
-        await db.Database.ExecuteSqlRawAsync(await reader.ReadToEndAsync(ct), ct);
+        await using var db = fixture.CreateDbContext();
+        await SuggestionPatternViewInstaller.EnsureViewsCreatedAsync(db, NullLogger.Instance, ct);
     }
 
     private static async Task<int> ViewRowCountAsync(DbContext db, SuggestionPatternView view, CancellationToken ct) =>
@@ -247,7 +243,7 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
         }
         finally
         {
-            await RestoreViewAsync(SuggestionPatternView.TemplateSuggestion, CancellationToken);
+            await RestoreMissingViewsAsync(CancellationToken);
         }
     }
 
@@ -295,7 +291,7 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
         }
         finally
         {
-            await RestoreViewAsync(SuggestionPatternView.PlannerTask, CancellationToken);
+            await RestoreMissingViewsAsync(CancellationToken);
         }
     }
 
@@ -317,26 +313,34 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
             $"REFRESH MATERIALIZED VIEW CONCURRENTLY fails outright on {ViewNames[view]} without a unique index, and the job would then fail every save touching this entity type");
     }
 
-    // ---- the two installation paths must agree ---------------------------------------------------------
+    // ---- every declared view is actually installed ------------------------------------------------------
 
+    // Replaces the old embedded-resources-vs-copied-files parity check: there is now only one installation
+    // path (AppDbContextFixture calls SuggestionPatternViewInstaller), so the drift that check guarded
+    // against cannot happen. What can still drift is SuggestionPatternView / ViewNames against the scripts
+    // in sqlScripts/ — a view enum member with no script, or a script the enum doesn't know about.
     [Fact]
-    public void EmbeddedResourceScripts_MatchTheFilesTheTestFixtureCopies()
+    public async Task EveryDeclaredView_ExistsAfterInstallation()
     {
         var assembly = typeof(SuggestionPatternViewInstaller).Assembly;
         var resourcePrefix = $"{assembly.GetName().Name}.infrastructure.persistence.sqlScripts.";
-        var embeddedViewNames = assembly.GetManifestResourceNames()
+        var scriptViewNames = assembly.GetManifestResourceNames()
             .Where(name => name.StartsWith(resourcePrefix, StringComparison.Ordinal) && name.EndsWith(".sql", StringComparison.Ordinal))
             .Select(name => name[resourcePrefix.Length..^".sql".Length])
             .Order()
             .ToList();
 
-        var scriptDirectory = Path.Combine(AppContext.BaseDirectory, "sqlScripts");
-        var copiedViewNames = Directory.EnumerateFiles(scriptDirectory, "*.sql")
-            .Select(Path.GetFileNameWithoutExtension)
-            .Order()
-            .ToList();
+        scriptViewNames.Should().BeEquivalentTo(ViewNames.Values.Order(),
+            "SuggestionPatternView drives the refresh queue while the scripts in sqlScripts/ drive installation -- a member on only one side means either a REFRESH of a view that was never created (42P01) or a view nothing ever refreshes");
 
-        embeddedViewNames.Should().BeEquivalentTo(copiedViewNames,
-            "SuggestionPatternViewInstaller (embedded resources) and AppDbContextFixture (copied Content files) install the same scripts by two different mechanisms -- a script added to only one drifts silently until a save hits 42P01 at runtime");
+        await using var db = CreateDbContext();
+        foreach (var viewName in scriptViewNames)
+        {
+            var exists = await db.Database
+                .SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", $"public.{viewName}")
+                .SingleAsync(CancellationToken);
+
+            exists.Should().BeTrue($"the fixture runs the real SuggestionPatternViewInstaller, so {viewName} must exist in the test schema");
+        }
     }
 }
