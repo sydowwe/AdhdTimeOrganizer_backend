@@ -17,6 +17,7 @@ public class TaskPlannerDayTemplateConfiguration : IEntityTypeConfiguration<Task
         builder.Property(t => t.Description).HasMaxLength(1000);
         builder.Property(t => t.Icon).HasMaxLength(50);
         builder.Property(t => t.IsActive).HasDefaultValue(true).IsRequired();
+        builder.Property(t => t.IsPinned).HasDefaultValue(false).IsRequired();
         builder.Property(t => t.UsageCount).HasDefaultValue(0).IsRequired();
         builder.Property(t => t.SuggestedForDayType).IsRequired();
 

@@ -432,7 +432,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
     /// <item>Lookups and settings the exported rows refer to by id, so the export is readable but not
     /// self-contained: the <c>Activity*</c> family, <c>TodoListCategory</c>, <c>TaskPriority</c>,
     /// <c>TaskImportance</c>, <c>RoutineTimePeriod</c>, <c>UserPlannerSettings</c>,
-    /// <c>PlannerSuggestionFromDayTemplate</c>.</item>
+    /// <c>UserRoutineSettings</c>, <c>PlannerSuggestionFromDayTemplate</c>.</item>
     /// </list>
     /// </summary>
     private static readonly string[] KnownGaps =
@@ -462,7 +462,8 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         "TodoListCategory",
         "TrackerAndroidMappingByPattern",
         "TrackerDesktopMappingByPattern",
-        "UserPlannerSettings"
+        "UserPlannerSettings",
+        "UserRoutineSettings"
     ];
 }
 

@@ -110,6 +110,14 @@ still 404s.
 `repeatingPlannerTask/`, `taskImportance/`, `taskPlannerDayTemplate/`, `templatePlannerTask/`.
 `application/endpoint/reminder/` — `command/{Create,Update,Delete}`, `query/{GetById,GetByDate}`.
 
+`SetPinnedTaskPlannerDayTemplateEndpoint` (`taskPlannerDayTemplate/command/`) is a `BasePatchEndpoint`
+on a **suffixed** route — `PATCH /task-planner-day-template/{id}/pinned` — leaving the base's generic
+`/{id}` patch route free. It sets `TaskPlannerDayTemplate.IsPinned` absolutely rather than toggling, so
+two devices pinning the same template converge. `IsPinned` is deliberately **absent** from
+`TaskPlannerDayTemplateRequest`: an edit submitted from a form opened before the pin must not carry a
+stale `false` back. `GetAllTaskPlannerDayTemplateEndpoint` sorts pinned first, then the existing
+last-used/name order.
+
 Not here, deliberately: `SyncCalendarToGoogleEndpoint` and the rest of the Google Calendar
 integration (host-side, carries `Google.Apis.Auth`), and `CalendarActivityEndpoint`.
 

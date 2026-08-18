@@ -38,6 +38,7 @@ erDiagram
 
     Activity ||--o{ TimerPreset : "timed by"
     User ||--o| UserPlannerSettings : configures
+    User ||--o| UserRoutineSettings : configures
 ```
 
 Three read-only pattern sources back the suggestion engine (materialized views, not tables):
@@ -195,6 +196,10 @@ raw ingest.
 **Account data** — `GET /user/data-export` returns a JSON dump of the user's own rows, throttled to
 one request per minute via `IDistributedCache`. Account deletion fans out over `ISubjectDataEraser`
 inside `UserManager.DeleteAsync`'s transaction, because most module tables are deliberately FK-free.
+`GET /user/account-deletion-summary` is what the SPA's warning card shows *before* that: per-category
+counts of what the delete destroys, as one projection of correlated subqueries spanning every slice.
+It deliberately reads with `IgnoreQueryFilters()` and scopes by hand, so the web-extension ledger's
+partition-window filter cannot understate the damage.
 
 ## Glossary
 
@@ -266,6 +271,7 @@ something the base classes do not.
 | CloneActivityEndpoint / QuickEditActivityEndpoint | Endpoints | Shallow-clone an activity; inline edit from the planner | `application/endpoint/activity/activity/command/` |
 | GetUserDataExportEndpoint | Endpoint | GDPR-style JSON export, 1/min throttle via `IDistributedCache` | `application/endpoint/user/read/GetUserDataExportEndpoint.cs` |
 | DeleteUserAccountEndpoint | Endpoint | Account deletion + `ISubjectDataEraser` fan-out in the same transaction | `application/endpoint/user/command/settings/DeleteUserAccountEndpoint.cs` |
+| GetAccountDeletionSummaryEndpoint | Endpoint | Cold-path per-category counts of what deleting the account destroys, for the SPA's warning card | `application/endpoint/user/read/GetAccountDeletionSummaryEndpoint.cs` |
 | GoogleSignInEndpoint | Endpoint | Federated sign-up/sign-in through `UserRegistrationFlow` | `application/endpoint/user/command/auth/GoogleSignInEndpoint.cs` |
 | Google Calendar endpoints | Endpoints | Auth URL, connect, disconnect, status | `application/endpoint/user/command/googleCalendar/` |
 | ErrorLoggingPostProcessor | Post-processor | Global endpoint error logging (registered as `IGlobalPostProcessor`) | `application/endpoint/base/ErrorLoggingPostProcessor.cs` |

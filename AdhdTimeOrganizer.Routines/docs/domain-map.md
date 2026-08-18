@@ -28,6 +28,7 @@ navigation to `RoutineTodoList` — the completion fan-out is entirely event-bas
 |---|---|
 | `RoutineTimePeriod` | `BaseEntityWithUser` + `IEntityWithIsHidden` + `IBaseTextColorEntity`. `LengthInDays` / `ResetAnchorDay` drive `RoutineResetService.ComputeNextReset`. Two unique indexes: `(UserId, Text)` and `(UserId, LengthInDays)`. Carries `Streak` / `BestStreak` / `StreakGraceUntil`, the freeze budget (`FreezeBudget` / `FreezesRemaining` / `FreezeBudgetResetsAt`) and the two notification idempotency marks `EndingSoonNotifiedFor` / `GraceNotifiedFor`. |
 | `RoutineTodoList` | Derives from TodoLists' `BaseTodoListItem` — the one real outbound edge (see `summary.md`). Adds `TimePeriodId`, its own `Streak` / `BestStreak` / `LastCompletedAt`, and `SuggestedDays` / `SuggestedDayOfMonth`. |
+| `UserRoutineSettings` | `BaseEntityWithUser`, one row per user (`IsOneWithOneUser`, unique on `UserId`). Holds `RoutineReviewDismissedForWeekStart` — the week-start the user last dismissed the weekly "fresh start" review card for. **Stored, never interpreted:** which week that *is* depends on the caller's `FirstDayOfWeek` and device time zone, so no job and no query here compares it against "now". The row exists so the dismissal follows the user to a second device; before B5 it lived in one browser's `localStorage`. |
 | `RoutinePeriodCompletion` | Plain `BaseEntity` (no `UserId` — scoped transitively through `TimePeriodId`). One row per elapsed period: `PeriodStart` / `PeriodEnd` / `CompletedCount` / `TotalCount`, plus `IsFrozen` / `FrozenAt` (paired by a CHECK). Unique on `(TimePeriodId, PeriodStart)`. |
 
 ## Domain logic — `domain/service/RoutineResetService.cs`
@@ -77,6 +78,7 @@ already committed.
 | `configuration/todoList/RoutineTimePeriodConfiguration.cs` | Nine `CHECK` constraints (anchor-day range, length range, non-negative streaks, threshold/grace/history-depth/reminder-lead ranges, and the two freeze ones — budget `0..MaxFreezeBudget`, remaining `0..budget`) plus the two unique indexes. |
 | `configuration/todoList/RoutineToDoListConfiguration.cs` | `BaseTodoListConfigure()` (from TodoLists) + `IsManyWithOneUser()` / `IsManyWithOneActivity()` (from Core) + the `SuggestedDays` array conversion. |
 | `configuration/todoList/RoutinePeriodCompletionConfiguration.cs` | Cascade FK to `RoutineTimePeriod`; unique on `(TimePeriodId, PeriodStart)`; a `CHECK` pairing `IsFrozen` with `FrozenAt`. |
+| `configuration/todoList/UserRoutineSettingsConfiguration.cs` | `BaseEntityConfigure()` + `IsOneWithOneUser<UserRoutineSettings>()` — the unique `user_id` index is what makes "one settings row per user" a constraint rather than a convention. |
 | `extensions/RoutineTodoListExtensions.cs` | The `DbSet<RoutineTodoList>` overload of `GetNextDisplayOrder` grouped by `TimePeriodId`. The generic version stays in TodoLists' `TodoListExtensions` — naming `RoutineTodoList` there would have inverted the one-way edge. |
 
 ## HTTP surface — `application/endpoint/todoList/`
@@ -86,6 +88,11 @@ already committed.
 | `RoutineTimePeriod` CRUD + toggle-is-hidden + select-options + completion-history + streak-freeze | 9 | `routineTimePeriod/` |
 | `RoutineTodoList` CRUD + grouped-by-period + toggle-is-done + change-display-order | 9 | `routineTodoList/command`, `routineTodoList/query` |
 | `RoutineTodoList` step create/update/delete | 3 | `routineTodoList/steps/` |
+| Per-user routine settings — `GET`/`PUT /routine/settings` | 2 | `routineSettings/` |
+
+⚠ `GetRoutineSettingsEndpoint` does **not** create a row on read, unlike Planning's
+`GetPlannerSettingsEndpoint`. Every field defaults to null, so a read-created row would hold nothing,
+and this is the most common read in the module. The row is created by the `PUT`.
 
 ⚠ `SpendStreakFreezeRoutineTimePeriodEndpoint` lives under `routineTimePeriod/command/` but routes to
 **`POST /routine-todo-list/time-period/{timePeriodId}/streak-freeze`**, not under `/routine-time-period`

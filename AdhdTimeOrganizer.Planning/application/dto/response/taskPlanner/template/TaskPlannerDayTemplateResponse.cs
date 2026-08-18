@@ -13,6 +13,7 @@ public record TaskPlannerDayTemplateResponse : IdResponse, IProjectionResponse<T
     public string? Description { get; init; }
     public string? Icon { get; init; }
     public required bool IsActive { get; init; }
+    public required bool IsPinned { get; init; }
     public TimeDto? DefaultWakeUpTime { get; init; }
     public TimeDto? DefaultBedTime { get; init; }
     public required int UsageCount { get; init; }
@@ -31,6 +32,7 @@ public record TaskPlannerDayTemplateResponse : IdResponse, IProjectionResponse<T
             Description = t.Description,
             Icon = t.Icon,
             IsActive = t.IsActive,
+            IsPinned = t.IsPinned,
             DefaultWakeUpTime = t.DefaultWakeUpTime != null ? new TimeDto(t.DefaultWakeUpTime.Value.Hour, t.DefaultWakeUpTime.Value.Minute) : null,
             DefaultBedTime = t.DefaultBedTime != null ? new TimeDto(t.DefaultBedTime.Value.Hour, t.DefaultBedTime.Value.Minute) : null,
             UsageCount = t.UsageCount,

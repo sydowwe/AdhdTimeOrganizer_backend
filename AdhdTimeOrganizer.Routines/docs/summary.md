@@ -14,7 +14,9 @@ before this one, via the membership-source seam below).
 
 ## Bounded context
 
-Owns: `RoutineTodoList`, `RoutineTimePeriod`, `RoutinePeriodCompletion`, their EF configurations, the
+Owns: `RoutineTodoList`, `RoutineTimePeriod`, `RoutinePeriodCompletion`, `UserRoutineSettings`
+(the per-user routine preferences behind `GET`/`PUT /routine/settings` — today just the weekly
+review-card dismissal), their EF configurations, the
 21 routine endpoints (time-period CRUD + select-options + completion-history + streak-freeze, and the
 to-do list
 CRUD + grouped-by-period + steps + toggle/reorder), their DTOs and validators, `RoutineResetService`,

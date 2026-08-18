@@ -48,5 +48,9 @@ worth copying the shape of:
   users hitting one endpoint in one process each see only their own rows.
 - `PlanningRouteSmokeTests.PlannerTaskToTodoListItem_ForeignKey_SurvivesTheSliceSplit`.
 - `ActivityProfilesRouteSmokeTests.Core_DoesNotReferenceActivityProfiles`.
+- `AccountDeletionSummaryTests` — the deletion-warning counts. Seeds a *different* row count into every
+  category, so a subquery aimed at the neighbouring table lands on the wrong number instead of
+  coincidentally the right one, and pins that the web-extension count deliberately reads past the
+  partition-window query filter.
 - `ModuleWiringTests` — the whole composition root.
 - `PerUserDefaultMatcherTests` — no DB needed.
