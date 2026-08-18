@@ -369,6 +369,12 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials()
+                // AllowAnyHeader() governs the *request* headers; a browser will not hand a response header
+                // to JS cross-origin unless it is named here. Without this every download endpoint's
+                // Content-Disposition is invisible to the SPA (it reads `undefined` and falls back to a
+                // guessed name) while curl and the integration tests -- which bypass CORS entirely -- see the
+                // header perfectly. Pinned by Export_ExposesContentDispositionToTheBrowser.
+                .WithExposedHeaders("Content-Disposition")
                 .SetIsOriginAllowedToAllowWildcardSubdomains();
         });
     });

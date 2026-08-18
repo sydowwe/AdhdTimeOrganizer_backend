@@ -5,6 +5,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.read;
 
@@ -104,9 +105,16 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
             .Select(e => new { e.Id, e.CreatedTimestamp })
             .ToListAsync(ct);
 
+        // Both the stamp in the payload and the one in the filename are read on the account's own clocks, so
+        // "the export I took on the 18th" names the same file the user would name. DateTimeOffset keeps the
+        // instant unambiguous while still showing the offset the user lives in.
+        var exportedAtUtc = DateTime.UtcNow;
+        var exportedAt = new DateTimeOffset(exportedAtUtc, TimeSpan.Zero)
+            .ToOffset(user.Timezone.GetUtcOffset(exportedAtUtc));
+
         var export = new
         {
-            exportedAt = DateTime.UtcNow,
+            exportedAt,
             user = new
             {
                 email = user.Email,
@@ -136,10 +144,13 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
 
-        var filename = $"antiprocrastination-export-{DateTime.UtcNow:yyyy-MM-dd}.json";
-        HttpContext.Response.Headers.ContentDisposition = $"attachment; filename=\"{filename}\"";
-        HttpContext.Response.ContentType = "application/json";
+        // WallClockZone.FromUtc, not DateTime.UtcNow: a user east of Greenwich taking an export late in the
+        // evening would otherwise get a file dated tomorrow.
+        var localDate = WallClockZone.FromUtc(exportedAtUtc, user.Timezone);
+        var filename = $"antiprocrastination-export-{localDate:yyyy-MM-dd}.json";
 
-        await HttpContext.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(json), ct);
+        // Send.BytesAsync writes the attachment Content-Disposition itself -- same path the Reminders and
+        // Scheduler exports take, rather than hand-rolling the header here.
+        await Send.BytesAsync(Encoding.UTF8.GetBytes(json), filename, "application/json", cancellation: ct);
     }
 }

@@ -267,6 +267,89 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
     }
 
     /// <summary>
+    /// The attachment header above is necessary but not sufficient: a browser refuses to hand any response
+    /// header except the CORS-safelisted ones to JS on a cross-origin response unless the server names it in
+    /// <c>Access-Control-Expose-Headers</c>. The SPA is served from <c>PAGE_URL</c>, a different origin from
+    /// the API, so without that the suggested filename is invisible to <c>useUserApi().exportData()</c> and
+    /// the download silently falls back to a client-guessed name -- while curl, and every other test in this
+    /// file, see the header perfectly, because <c>WebApplicationFactory</c> never sends an <c>Origin</c> and
+    /// so never exercises the CORS middleware. Exactly the class of silent failure this project's doctrine
+    /// warns about, which is why this test sends a real cross-origin <c>Origin</c> header.
+    /// <para>
+    /// The policy in <c>Program.cs</c> is solution-wide, so this equally guards the Reminders and Scheduler
+    /// CSV/XLSX downloads, which read the same header through <c>filenameFromContentDisposition()</c>.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Export_ExposesContentDispositionToTheBrowser()
+    {
+        var callerId = await Seed.SecondUserAsync(Fixture, $"export-cors-{Guid.NewGuid():N}@test.com");
+
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, callerId);
+        using var client = factory.CreateClient();
+
+        // https://localhost:3000 is hard-coded into the AllowFrontend origin list, so this holds regardless
+        // of what PAGE_URL is set to in the test environment.
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/user/data-export");
+        request.Headers.Add("Origin", "https://localhost:3000");
+
+        var response = await client.SendAsync(request, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Headers.Should().ContainKey("Access-Control-Allow-Origin",
+            "the request really was cross-origin -- if this fails the test is not exercising CORS at all");
+
+        response.Headers.Should().ContainKey("Access-Control-Expose-Headers",
+            "AllowAnyHeader() does not expose any response header -- the policy must name this one explicitly");
+
+        response.Headers.GetValues("Access-Control-Expose-Headers")
+            .SelectMany(v => v.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Should().Contain(h => string.Equals(h, "Content-Disposition", StringComparison.OrdinalIgnoreCase),
+                "the frontend cannot read the suggested filename unless the server exposes the header");
+    }
+
+    /// <summary>
+    /// The filename and the payload stamp are read on the account's own clocks, not the server's. A user in a
+    /// far-eastern zone taking an export in their evening would otherwise receive a file dated tomorrow, and
+    /// one whose name disagrees with the date the frontend computes for the same download.
+    /// <para>
+    /// The offset assertion is the deterministic half -- it holds at every hour of the day. The filename-date
+    /// assertion computes the expected local date the same way the endpoint does, so it is always correct,
+    /// and diverges from a UTC-stamped name for most of the day in this zone.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Export_StampsFilenameAndPayloadInTheAccountsOwnZone()
+    {
+        // +14, and no DST, so the offset is a constant the test can assert on.
+        var kiritimati = TimeZoneInfo.FindSystemTimeZoneById("Pacific/Kiritimati");
+
+        var callerId = await Seed.SecondUserAsync(Fixture, $"export-zone-{Guid.NewGuid():N}@test.com");
+        await using (var db = (AppDbContext)Fixture.CreateDbContext())
+        {
+            var user = await db.Users.IgnoreQueryFilters().FirstAsync(u => u.Id == callerId, CancellationToken);
+            user.Timezone = kiritimati;
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, callerId);
+        var response = await factory.CreateClient().GetAsync("api/user/data-export", CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOpts, CancellationToken);
+        var exportedAt = body.GetProperty("exportedAt").GetDateTimeOffset();
+        exportedAt.Offset.Should().Be(TimeSpan.FromHours(14),
+            "the export stamp carries the account's offset, not the server's");
+        exportedAt.UtcDateTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(5),
+            "shifting the offset must not move the instant");
+
+        var expectedDate = WallClockZone.FromUtc(exportedAt.UtcDateTime, kiritimati).ToString("yyyy-MM-dd");
+        response.Content.Headers.ContentDisposition!.FileName!.Trim('"')
+            .Should().Be($"antiprocrastination-export-{expectedDate}.json");
+    }
+
+    /// <summary>
     /// The endpoint advertises "max 1/min" and enforces it with a distributed-cache key. The throttle is the
     /// only thing standing between a full-database-read endpoint and a trivially repeatable one.
     /// </summary>
