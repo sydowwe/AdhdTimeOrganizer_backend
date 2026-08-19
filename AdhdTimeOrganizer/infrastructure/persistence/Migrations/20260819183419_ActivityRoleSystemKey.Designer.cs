@@ -3,6 +3,7 @@ using System;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260819183419_ActivityRoleSystemKey")]
+    partial class ActivityRoleSystemKey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -628,12 +631,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnName("created_timestamp")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<bool>("IsArchived")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_archived");
-
                     b.Property<bool>("IsUnavoidable")
                         .HasColumnType("boolean")
                         .HasColumnName("is_unavoidable");
@@ -685,9 +682,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("UserId", "CategoryId")
                         .HasDatabaseName("ix_activity_user_id_category_id");
-
-                    b.HasIndex("UserId", "IsArchived")
-                        .HasDatabaseName("ix_activity_user_id_is_archived");
 
                     b.HasIndex("UserId", "Name")
                         .IsUnique()

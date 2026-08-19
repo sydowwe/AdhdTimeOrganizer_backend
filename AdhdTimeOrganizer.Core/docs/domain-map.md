@@ -10,8 +10,8 @@ Navigation index. Open only what you need; `summary.md` is the orientation.
 | `BaseEntityWithUser` | `user/BaseEntityWithUser.cs` | The portal's closing type over `BaseEntityWithUser<User>`. C# can't infer `TUser` from a constraint, so every user-scoped entity names this shim. |
 | `BaseLookupWithUser` | `base/BaseLookupWithUser.cs` | Same idea for `BaseLookupWithUser<User>`. |
 | `BaseEntityWithIsDone` | `base/BaseEntityWithIsDone.cs` | Shared base for the done/total-count markers. |
-| `Activity` | `activity/Activity.cs` | The second hub. Required `Role`, optional `Category`, the three profiles, memory anchors. `Clone()` is a `MemberwiseClone` that resets the four navigations — see CQ-17. |
-| `ActivityRole` / `ActivityCategory` | `activity/` | Per-user lookups. `ActivityRole`'s key is `(user_id, name)`. |
+| `Activity` | `activity/Activity.cs` | The second hub. Required `Role`, optional `Category`, the three profiles, memory anchors. `IsArchived` retires it from every picker while keeping every referencing row — a flag, not a soft delete, and written **only** by `PATCH /activity/{id}/archived`. `Clone()` is a `MemberwiseClone` that resets the four navigations — see CQ-17. |
+| `ActivityRole` / `ActivityCategory` | `activity/` | Per-user lookups. `ActivityRole` has two unique keys: `(user_id, name)`, and `(user_id, system_key)` filtered to non-null. `SystemKey` is set by the seeder on the three roles quick-create files activities under and is `null` everywhere else; it is the identity the name is not, so those three can be renamed or localized freely. Deleting a keyed role is refused. |
 | `BaseEntityWithActivity` | `activity/BaseEntityWithActivity.cs` | Base for anything hanging off an `Activity`. |
 | 4 activity lookups | `activity/lookup/` | `ActivityLocationType`, `ActivityWeatherDependency`, `ActivityExpectedCostTier`, `ActivityExperienceType`. |
 | 3 activity profiles | `activity/profile/` | `ActivityBacklogProfile`, `ActivityProjectProfile`, `ActivityBucketListProfile`. **Not `IEntityWithUser`** — no global query filter. |

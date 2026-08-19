@@ -13,9 +13,14 @@ public class ActivityConfiguration : IEntityTypeConfiguration<Activity>
         builder.BaseNameTextEntityConfigure();
 
         builder.Property(x => x.IsUnavoidable).IsRequired();
+        builder.Property(x => x.IsArchived).IsRequired().HasDefaultValue(false);
 
         builder.IsManyWithOneUser(u => u.ActivityList);
         builder.HasIndex(e => new { e.UserId, e.Name }).IsUnique();
+
+        // The four pickers and the settings grid's default view all filter on this, and the grid pages
+        // over it, so it leads the composite rather than trailing UserId alone.
+        builder.HasIndex(e => new { e.UserId, e.IsArchived });
 
         builder.HasOne(e => e.Role)
             .WithMany(r => r.Activities)

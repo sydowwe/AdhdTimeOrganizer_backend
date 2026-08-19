@@ -17,6 +17,25 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(DbContext d
 
     public abstract string EntityRoute { get; }
 
+    /// <summary>
+    /// The query-string name that opts an archived activity back into the list.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Default <c>false</c>, so every call site that existed before A9 keeps its current behaviour and
+    /// the record-creating forms need no change at all. This is the one place where "only pickers
+    /// exclude archived activities" cuts against itself, and the parameter is the resolution.
+    /// </para>
+    /// <para>
+    /// <c>/activity-history/form-select-options</c> is the case that forced it: it does not feed a form
+    /// for creating a record, it feeds <c>HistoryPanelFilter</c> — the filter over history. Excluding
+    /// archived activities there would mean archiving an activity silently removes the user's ability to
+    /// filter their own history by it, while the records stay visible and keep showing its name. Losing
+    /// a filter you can still see the rows of is a bad trade, so filter surfaces pass
+    /// <c>?includeArchived=true</c> and creation surfaces do not.
+    /// </para>
+    /// </remarks>
+    private const string IncludeArchivedQueryParam = "includeArchived";
 
     public override void Configure()
     {
@@ -25,7 +44,9 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(DbContext d
         Summary(s =>
         {
             s.Summary = $"Get {EntityRoute} form select options";
-            s.Description = $"Retrieves all combinations of activity categories and roles from {EntityRoute} as select options";
+            s.Description = $"Retrieves all combinations of activity categories and roles from {EntityRoute} as select options. "
+                            + "Archived activities are excluded unless ?includeArchived=true is passed — pass it from filter "
+                            + "surfaces, never from forms that create a record.";
             s.Response<List<ActivityFormSelectOptionsResponse>>(200, "Success");
         });
     }
@@ -33,7 +54,11 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(DbContext d
     public override async Task HandleAsync(CancellationToken ct)
     {
         var userId = User.GetId();
+        var includeArchived = Query<bool?>(IncludeArchivedQueryParam, isRequired: false) ?? false;
+
         var query = GetBaseQuery(userId);
+        if (!includeArchived)
+            query = query.Where(a => !a.IsArchived);
 
         var activities = await query
             .Include(a => a.Category)

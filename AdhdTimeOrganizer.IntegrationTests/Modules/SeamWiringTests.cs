@@ -1,5 +1,6 @@
 using System.Reflection;
 using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FastEndpoints;
 using Microsoft.Extensions.DependencyInjection;
@@ -93,6 +94,61 @@ public class SeamWiringTests(AppDbContextFixture fixture) : PostgresTestBase(fix
             $"ActivityMembershipSourceKeys declares [{string.Join(", ", declaredKeys.OrderBy(k => k))}] "
             + $"but the container resolved [{string.Join(", ", resolvedKeys.OrderBy(k => k))}]. A key with "
             + "no source silently stops narrowing the History grid; a source with no key is dead code.");
+    }
+
+    /// <summary>
+    /// The activity <b>reference</b> sources resolve, their keys are distinct, and they cover
+    /// <see cref="ActivityReferenceSourceKeys"/> exactly.
+    /// </summary>
+    /// <remarks>
+    /// Same shape as the membership assertion above and a worse failure than it. This seam backs
+    /// <c>usageCount</c> / <c>canDelete</c> on the activity grid and the repoint half of
+    /// <c>POST /activity/merge</c>, and a missing source is silent in <em>both</em>: the count merely
+    /// comes back lower — so an activity with a year of history reads "Records: 0" and offers an enabled
+    /// delete button — and a merge leaves that slice's rows on activities the same request then deletes,
+    /// cascading them away. Nothing throws and the response still looks plausible. There is no runtime
+    /// check that can tell "genuinely unreferenced" from "the slice never registered", which is why the
+    /// guard has to be here.
+    /// </remarks>
+    [Fact]
+    public void ActivityReferenceSources_CoverEveryKey_Exactly()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+        var sources = scope.ServiceProvider.GetServices<IActivityReferenceSource>().ToList();
+
+        var declaredKeys = typeof(ActivityReferenceSourceKeys)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(f => f is { IsLiteral: true, IsInitOnly: false } && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+
+        var resolvedKeys = sources.Select(s => s.Key).ToList();
+
+        Assert.True(resolvedKeys.Distinct().Count() == resolvedKeys.Count,
+            "Two IActivityReferenceSource implementations claim the same Key, so one of them never runs: "
+            + string.Join(", ", sources.Select(s => $"{s.Key}={s.GetType().Name}")));
+
+        Assert.True(declaredKeys.OrderBy(k => k).SequenceEqual(resolvedKeys.OrderBy(k => k)),
+            $"ActivityReferenceSourceKeys declares [{string.Join(", ", declaredKeys.OrderBy(k => k))}] "
+            + $"but the container resolved [{string.Join(", ", resolvedKeys.OrderBy(k => k))}]. A key with no "
+            + "source means usageCount undercounts and merge strands that slice's rows on an activity it "
+            + "then deletes; a source with no key is dead code.");
+    }
+
+    /// <summary>
+    /// <c>IActivityReferenceService</c> — the single face the endpoints inject — resolves exactly once.
+    /// </summary>
+    /// <remarks>
+    /// It carries only <c>IScopedService</c> as a lifetime marker, and the Scrutor scan registers
+    /// <c>AsImplementedInterfaces()</c>, so a version of it that forgot to implement the contract
+    /// interface would compile, register as <c>IScopedService</c> alone, and fail every activity grid
+    /// request at endpoint activation.
+    /// </remarks>
+    [Fact]
+    public void ActivityReferenceService_ResolvesExactlyOnce()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+        AssertRegisteredOnce<IActivityReferenceService>(scope.ServiceProvider);
     }
 
     private static void AssertRegisteredOnce<TService>(IServiceProvider sp) where TService : class

@@ -14,6 +14,7 @@ if the two ever drift apart.
 | Seam | Kind | Resolution | Implemented by | Consumed by |
 |---|---|---|---|---|
 | `IActivityMembershipSource` | read | keyed `IEnumerable<>` | TodoLists (`todoList`), Routines (`routineTodoList`) | History — `GetFilteredTableActivityHistoryEndpoint` |
+| `IActivityReferenceSource` | read **+ write**, in the caller's transaction | keyed `IEnumerable<>` | Core (`timerPreset`), History (`activityHistory`), TodoLists (`todoList`), Routines (`routineTodoList`), Planning (`plannerTask`), Tracking (`trackerMapping`), ActivityProfiles (`activityProfile`) | Core — `GridActivityEndpoint`, `GetByIdActivityEndpoint`, `MergeActivityEndpoint`, all through `IActivityReferenceService` |
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint` |
 | `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint` |
@@ -77,8 +78,20 @@ None of these break the build, and only one of them throws.
   dropped from `ModuleAssemblies`, a renamed key, or a second implementation claiming an existing key
   all just quietly stop narrowing the grid. `SeamWiringTests.ActivityMembershipSources_CoverEveryKey_Exactly`
   and `HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam` are the guards.
+- **`IActivityReferenceSource` fails silently in two directions at once**, and it is the worst of the
+  set. `ActivityReferenceService` folds whatever resolved into one `UNION ALL`; a slice dropped from
+  `ModuleAssemblies` or a renamed key simply contributes nothing. On the **read** side `usageCount`
+  comes back lower, so an activity with a year of history reads `Records: 0` and the settings table
+  offers an enabled delete button. On the **write** side `POST /activity/merge` leaves that slice's
+  rows pointing at activities the same request then deletes — and every activity FK in the solution is
+  `Cascade`, so they are destroyed rather than orphaned, while the response still reports a
+  plausible-looking count. `SeamWiringTests.ActivityReferenceSources_CoverEveryKey_Exactly` pins
+  coverage; `ActivityMergeTests.Merge_RepointsEveryReferencingSlice` asserts on surviving rows in six
+  projects rather than on `repointedCount`.
 - **The three single seams throw at endpoint activation** if unregistered. That is the point of
-  resolving them as a single service rather than an `IEnumerable<>`.
+  resolving them as a single service rather than an `IEnumerable<>`. `IActivityReferenceService` —
+  the one face Core's endpoints inject over the keyed sources — is registered the same way and for the
+  same reason.
 - **`ITodoListItemLoggedTimeSource` has a failure mode registration cannot catch.** It reads
   `ActivityHistory.TodoListItemId`, the link stamped when a user saves a recording from a completed
   task. Widening it to "any time logged against this item's activity" — which looks like it would

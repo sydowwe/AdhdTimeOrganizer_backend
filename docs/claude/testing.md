@@ -52,5 +52,20 @@ worth copying the shape of:
   category, so a subquery aimed at the neighbouring table lands on the wrong number instead of
   coincidentally the right one, and pins that the web-extension count deliberately reads past the
   partition-window query filter.
+- `ActivityMergeTests.Merge_RepointsEveryReferencingSlice` — one merge, one referencing row per slice,
+  asserted on the surviving rows in six projects rather than on the endpoint's `repointedCount`. The
+  `IActivityReferenceSource` seam resolves by string key, so a slice dropped from `ModuleAssemblies`
+  leaves its rows on activities the same request then deletes — and every activity FK here is
+  `Cascade`, so they are destroyed, not orphaned, while the response still looks right.
+- `ActivityArchivingTests` — which endpoints exclude archived activities and, just as important, which
+  must not. The rule is "only pickers exclude"; both halves fail as a valid 200 with a list of the
+  wrong length, so every picker is asserted not to contain a seeded archived row and every
+  record-reading surface is asserted to still resolve it. It also pins that the *absent* filter means
+  active-only (the settings table's default view depends on it) and that `usageCount` sorts in SQL —
+  a count applied after projection would sort every row on `0` and return an arbitrary page in
+  convincing order.
 - `ModuleWiringTests` — the whole composition root.
 - `PerUserDefaultMatcherTests` — no DB needed.
+- `ActivityRoleSystemKeyTests` — the three app-referenced activity roles resolve by `SystemKey` after the
+  user renames them, and stay undeletable. The lookup they replaced was by display name, so a rename
+  404'd it and quick-create died in four dialogs with nothing thrown and nothing logged.

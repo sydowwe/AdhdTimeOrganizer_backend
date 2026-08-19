@@ -3,7 +3,7 @@ using Sydowwe.Framework.domain.entity.@base;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 
-public class ActivityBucketListProfile : BaseTableEntity
+public class ActivityBucketListProfile : BaseTableEntity, IActivityProfile
 {
     public long ActivityId { get; set; }
     public Activity Activity { get; set; } = null!;

@@ -12,6 +12,28 @@ public class Activity : BaseEntityWithUser, IBaseNameTextEntity
     public string? Text { get; set; }
     public bool IsUnavoidable { get; set; }
 
+    /// <summary>
+    /// Retired: the activity keeps every row that points at it and keeps rendering its name on those
+    /// rows, but disappears from every <em>picker</em>. This is the lifecycle operation the app never
+    /// had — the only one on offer was a hard delete, which cascades (see the FK note below) and
+    /// therefore silently destroys the history it was supposed to preserve.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A flag, not a soft delete. <c>ISoftDeletable</c> would add a global query filter and the row
+    /// would vanish from the history rows, planner tasks and to-do items that still reference it —
+    /// the exact opposite of what archiving is for. The exclusion is applied per endpoint instead, in
+    /// the four pickers, and nowhere else; <c>ActivityArchivingTests</c> pins both halves.
+    /// </para>
+    /// <para>
+    /// ⚠ Never write this from <c>ActivityRequest</c>. The create/update form does not carry it, so an
+    /// assignment there would silently un-archive on every edit — the same trap
+    /// <c>ActivityHistoryRequest</c> documents for its two item links. <c>PATCH /activity/{id}/archived</c>
+    /// is the only writer.
+    /// </para>
+    /// </remarks>
+    public bool IsArchived { get; set; }
+
     public long RoleId { get; set; }
     public virtual ActivityRole Role { get; set; } = null!;
     public long? CategoryId { get; set; }
