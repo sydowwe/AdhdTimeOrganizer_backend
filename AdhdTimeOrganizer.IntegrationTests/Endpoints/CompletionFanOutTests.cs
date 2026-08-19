@@ -368,7 +368,6 @@ public class CompletionFanOutTests(AppDbContextFixture fixture) : PostgresTestBa
 
     // ---- F: concurrency ---------------------------------------------------------------------------------
 
-    [Trait("Status", "KnownGap")]
     [Fact(DisplayName = "F: concurrent status patches on the same planner task should not surface as an unhandled 500")]
     public async Task ConcurrentStatusPatches_ShouldNotReturnInternalServerError()
     {
@@ -386,10 +385,10 @@ public class CompletionFanOutTests(AppDbContextFixture fixture) : PostgresTestBa
 
         // Both requests load the same PlannerTask row (which carries an EF-managed `row_version`
         // concurrency token — see EntityBuilderExtensions) into their own DbContext before either saves,
-        // so whichever saves second hits a DbUpdateConcurrencyException on SaveChangesAsync. Neither this
-        // handler chain nor PatchPlannerTaskStatusEndpoint itself special-cases that exception type — the
-        // endpoint's blanket `catch (Exception ex) { ThrowError(ex.Message, 500); }` remaps it to a plain
-        // 500, indistinguishable from a real server fault.
+        // so whichever saves second hits a DbUpdateConcurrencyException on SaveChangesAsync. The endpoint
+        // routes its catch through DbUtils.HandleException + EndpointHelper.ToStatusCode, which maps that
+        // exception to DbConcurrencyError → 409, so the loser is told it lost rather than being handed a
+        // 500 indistinguishable from a real server fault.
         var callA = clientA.PatchAsJsonAsync($"api/planner-task/{plannerTaskId}/status", new { Status = "Completed" }, JsonOpts, CancellationToken);
         var callB = clientB.PatchAsJsonAsync($"api/planner-task/{plannerTaskId}/status", new { Status = "Cancelled" }, JsonOpts, CancellationToken);
         var responses = await Task.WhenAll(callA, callB);

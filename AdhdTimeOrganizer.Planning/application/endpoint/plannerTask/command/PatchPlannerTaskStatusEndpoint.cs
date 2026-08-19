@@ -6,6 +6,8 @@ using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using FastEndpoints;
 using Humanizer;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plannerTask.command;
 
@@ -23,6 +25,7 @@ public class PatchPlannerTaskStatusEndpoint(DbContext dbContext, IReminderRegist
             s.Response(204, "Updated");
             s.Response(404, "Not found");
             s.Response(400, "Bad request or validation error");
+            s.Response(409, "Concurrent write to the same task lost the row_version race");
             s.Response(500, "Internal server error");
         });
     }
@@ -76,7 +79,12 @@ public class PatchPlannerTaskStatusEndpoint(DbContext dbContext, IReminderRegist
         }
         catch (Exception ex)
         {
-            ThrowError(ex.Message, 500);
+            // Same mapping every other write endpoint uses (see BasePatchEndpoint): a lost optimistic-
+            // concurrency race on the row_version token is a 409, a unique/FK violation a 409, and only a
+            // genuinely unrecognised fault stays a 500.
+            var result = DbUtils.HandleException(ex, nameof(HandleAsync));
+            AddError(result.ErrorMessage!);
+            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
         }
     }
 }

@@ -8,5 +8,12 @@ namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.memoryAnchor.q
 public class GetSelectOptionsMemoryAnchorEndpoint(DbContext dbContext)
     : BaseGetSelectOptionsEndpoint<MemoryAnchor>(dbContext)
 {
-    protected override IQueryable<SelectOptionResponse> Map(IQueryable<MemoryAnchor> query) => throw new NotImplementedException();
+    protected override IQueryable<SelectOptionResponse> Map(IQueryable<MemoryAnchor> query)
+    {
+        return query.Select(e => new SelectOptionResponse
+        {
+            Id = e.Id,
+            Text = e.HighlightNote
+        });
+    }
 }

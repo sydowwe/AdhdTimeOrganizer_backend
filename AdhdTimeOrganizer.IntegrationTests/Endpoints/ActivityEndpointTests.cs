@@ -483,10 +483,9 @@ public class MemoryAnchorDeleteTests(AppDbContextFixture fixture) : BaseDeleteEn
 }
 
 /// <summary>
-/// GetSelectOptionsMemoryAnchorEndpoint.Map is `throw new NotImplementedException()` in production
-/// code today -- this is not a base-doesn't-fit friction, it's a real defect the base test catches for
-/// free. Left as a normal 200 expectation on purpose: it documents the endpoint is broken (500) rather
-/// than silently skipping it. If this starts passing, the endpoint has been implemented.
+/// This test caught GetSelectOptionsMemoryAnchorEndpoint.Map sitting at `throw new
+/// NotImplementedException()` in production code (the base handler swallows it into a 500). Map is
+/// implemented now -- MemoryAnchor has no Name, so the option text is HighlightNote.
 /// </summary>
 [Collection("Postgres")]
 public class MemoryAnchorSelectOptionsTests(AppDbContextFixture fixture) : BaseGetSelectOptionsEndpointTests(fixture)
