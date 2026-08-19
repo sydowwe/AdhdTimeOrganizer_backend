@@ -9,8 +9,8 @@ Navigation index. Read `summary.md` first; open only the rows you need.
 | `DesktopActivityEntry` | `desktop_activity_entry` | Per-heartbeat desktop window. **RANGE-partitioned** on `RecordDate`. `ExecutablePath` is an `EncryptedColumn`. | `domain/model/entity/activityTracking/desktop/` |
 | `WebExtensionActivityEntry` | `web_extension_activity_entry` | Per-minute browser window. **RANGE-partitioned** on `RecordDate`; `RecordDate` derives from `WindowStart` in the initializer so the two cannot diverge. `WindowStart` must be minute-aligned — the timeline endpoint stitches windows by `WindowStart == previous.EndedAt`. | `domain/model/entity/activityTracking/` |
 | `AndroidSessionData` | `android_session_data` | Per-session android usage, deduplicated on sync by `(DeviceId, PackageName, StartedAt)`. | `domain/model/entity/activityTracking/` |
-| `TrackerDesktopMappingByPattern` | `tracker_desktop_mapping_by_pattern` | Pattern → `Activity`/`Role`/`Category`, or `IsIgnored`. Matched in-memory by `MatchesPattern`. | `domain/model/entity/activityTracking/desktop/` |
-| `TrackerAndroidMappingByPattern` | `tracker_android_mapping_by_pattern` | Android equivalent. | `domain/model/entity/activityTracking/android/` |
+| `TrackerDesktopMappingByPattern` | `tracker_desktop_mapping_by_pattern` | Pattern → `Activity`/`Role`/`Category`, or `IsIgnored`. Matched in-memory by `MatchesPattern`. **Many** patterns to one activity; `activity_id` is `Cascade`. The unique key is the pattern: `(UserId, ProcessName, ProductName, WindowTitle)`, `NULLS NOT DISTINCT`. | `domain/model/entity/activityTracking/desktop/` |
+| `TrackerAndroidMappingByPattern` | `tracker_android_mapping_by_pattern` | Android equivalent; unique on `(UserId, PackageName, AppLabel)`. | `domain/model/entity/activityTracking/android/` |
 
 ## EF configurations
 
@@ -42,12 +42,13 @@ often only the tail. Check the group before assuming a path.
 `Policies(PortalAuthorizationPolicies.ActivityTracking)`. Everything else is an ordinary web endpoint
 and is therefore denied to extension clients by the `Program.cs` configurator's default.
 
-## Seams (both declared in `AdhdTimeOrganizer.Core`)
+## Seams (all declared in `AdhdTimeOrganizer.Core`)
 
 | File | Role |
 |---|---|
 | `Core/application/seam/IActivityTimeAttributionSink.cs` | "record N seconds against this activity" — implemented by History's `ActivityHistoryTimeAttributionSink` |
 | `Core/application/event/ActivityTimeRecordedEvent.cs` | day totals per activity — handled by the host's `ActivityTimeRecordedEventHandler` |
+| `Core/application/seam/IActivityReferenceSource.cs` | this slice's `application/seam/TrackerMappingActivityReferenceSource` — backs `usageCount`/`canDelete` on the activity grid, and repoints both mapping tables on `POST /activity/merge` |
 
 ## Infrastructure
 
@@ -85,3 +86,5 @@ Renaming one renames none of the others.
 | `AdhdTimeOrganizer.IntegrationTests/Endpoints/TrackingRouteSmokeTests.cs` | routing, the combined query filter (behaviourally), the partition annotations, purge-job registration |
 | `.../Endpoints/ExtensionActivityTrackingTests.cs` | extension-client auth on ingest, and the end-to-end attribution + completion path |
 | `.../Endpoints/ActivityTimeAutomationTests.cs` | the completion branch matrix, including the exclusivity rule |
+| `.../Endpoints/TrackerPatternMappingActivityFkTests.cs` | both mapping FKs are N:1 (two patterns, one activity) and `Cascade` (deleting the activity destroys the rule) |
+| `.../Modules/ActivityForeignKeyInventoryTests.cs` | the model-level companion — freezes every activity FK in the solution and its delete behaviour |

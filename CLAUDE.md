@@ -11,7 +11,7 @@ Deeper reference, in `docs/claude/` — open the one your task touches:
 | File | Covers |
 |---|---|
 | [slices.md](docs/claude/slices.md) | What lives in each slice project, the cross-slice seams, the `framework/` submodule |
-| [persistence.md](docs/claude/persistence.md) | Entity bases, EF configuration helpers, DbContext helpers, query filters, seeding, retention, auditing |
+| [persistence.md](docs/claude/persistence.md) | Entity bases, EF configuration helpers, delete behaviour (the `Activity` FK family), DbContext helpers, query filters, seeding, retention, auditing |
 | [endpoints.md](docs/claude/endpoints.md) | FastEndpoints base classes (incl. auth), roles, user scoping, DTO conventions |
 | [wiring.md](docs/claude/wiring.md) | Composition root / module DI, scheduling, auth plumbing, config precedence, email templates |
 | [testing.md](docs/claude/testing.md) | Test infrastructure and the guards that pin the silent-failure mechanisms |

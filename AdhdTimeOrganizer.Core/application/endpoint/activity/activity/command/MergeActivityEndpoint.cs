@@ -42,8 +42,11 @@ namespace AdhdTimeOrganizer.Core.application.endpoint.activity.activity.command;
 /// </para>
 /// <para>
 /// ⚠ <b>Order is load-bearing.</b> Repoint first, delete second. Every activity FK in the solution is
-/// <c>DeleteBehavior.Cascade</c>, so deleting a merged activity before its rows have moved destroys them
-/// silently — no exception, no log line, and the response would still report a plausible-looking count.
+/// <c>DeleteBehavior.Cascade</c> — except <c>TodoListItem.PairedLeisureActivityId</c>, which is
+/// <c>SetNull</c> — so deleting a merged activity before its rows have moved destroys them silently:
+/// no exception, no log line, and the response would still report a plausible-looking count. That
+/// inventory is not a claim to be taken on trust; <c>ActivityForeignKeyInventoryTests</c> freezes the
+/// whole set of activity FKs and their delete behaviours, because it has been quietly false before.
 /// A slice missing from <c>ModuleServiceExtensions.ModuleAssemblies</c> produces exactly that outcome
 /// for its own tables, which is why <c>SeamWiringTests</c> pins source coverage and
 /// <c>ActivityMergeTests</c> asserts on surviving rows in every slice rather than on the returned counts.

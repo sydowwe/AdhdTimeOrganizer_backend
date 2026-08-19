@@ -15,8 +15,20 @@ public class TrackerAndroidMappingByPatternConfiguration : IEntityTypeConfigurat
 
         // All four relationships are configured from this (dependent) side with no inverse navigation:
         // Activity, ActivityRole, ActivityCategory and User deliberately do not name tracking types.
-        builder.HasOne(e => e.Activity).WithOne()
-            .HasForeignKey<TrackerAndroidMappingByPattern>(e => e.ActivityId);
+        // The parameterless WithMany() creates no inverse navigation either — it is WithOne() that
+        // would make this a 1:1, and the domain key here is the pattern, not the activity: a user maps
+        // several packages onto one activity.
+        builder.HasOne(e => e.Activity).WithMany()
+            .HasForeignKey(e => e.ActivityId)
+            .OnDelete(DeleteBehavior.Cascade)
+            // Pinned, for the same reason as the three Activity*Profile configurations — see the
+            // comment on ActivityBacklogProfileConfiguration. This is the name the database already
+            // carries; leaving it derived means any later reshape of the relationship emits a silent
+            // DROP + ADD CONSTRAINT pair with an ACCESS EXCLUSIVE lock and a full revalidation.
+            .HasConstraintName("fk_tracker_android_mapping_by_pattern_activities_activity_id");
+        // Non-unique: TrackerMappingActivityReferenceSource.ReferencingActivityIds scans this column
+        // on every activity-grid page.
+        builder.HasIndex(e => e.ActivityId);
 
         builder.HasOne(e => e.Role).WithMany()
             .HasForeignKey(e => e.RoleId);

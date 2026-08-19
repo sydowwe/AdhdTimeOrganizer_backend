@@ -35,9 +35,11 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// <see cref="Merge_RepointsEveryReferencingSlice"/>.</b> Repointing spans seven
 /// <c>IActivityReferenceSource</c> implementations in six projects, resolved by string key, and a source
 /// that is missing or misregistered fails <em>silently</em>: its rows are left pointing at an activity
-/// the same request then deletes, and every activity FK in the solution is <c>Cascade</c>, so they are
-/// destroyed rather than orphaned. The response still reports a plausible-looking count. That is why
-/// these assert on surviving rows in each slice, never on <c>repointedCount</c>.
+/// the same request then deletes, and every activity FK in the solution is <c>Cascade</c> bar one
+/// (<c>TodoListItem.PairedLeisureActivityId</c>, <c>SetNull</c>), so they are destroyed rather than
+/// orphaned — see <c>ActivityForeignKeyInventoryTests</c>, which freezes that set. The response still
+/// reports a plausible-looking count. That is why these assert on surviving rows in each slice, never
+/// on <c>repointedCount</c>.
 /// </para>
 /// </remarks>
 [Collection("Postgres")]
@@ -273,19 +275,20 @@ public class ActivityMergeTests(AppDbContextFixture fixture) : PostgresTestBase(
     }
 
     /// <summary>
-    /// Tracking's two pattern mappings are <c>HasOne(...).WithOne()</c>, so <c>ActivityId</c> is
-    /// <b>unique</b> — an activity is the target of at most one desktop mapping. Merging two activities
-    /// that each carry one must not violate that index.
+    /// Two pattern rules pointing at two duplicates must <b>both</b> survive the merge, repointed onto
+    /// the survivor. A mapping is a rule, not a record: destroying one silently stops attributing every
+    /// future window that matched it.
     /// </summary>
     /// <remarks>
-    /// This reads like an ordinary nullable FK on the entity and is easy to repoint blindly; doing so
-    /// throws a 23505 out of the merge transaction, which rolls the whole thing back and gives the user
-    /// a generic failure on an action they just confirmed. The losing mapping is deleted rather than
-    /// blanked because <c>CK_TrackerDesktopMappingByPattern_TargetRequired</c> requires exactly one of
-    /// ignored / activity / role-or-category, so a mapping with a null activity fails the constraint.
+    /// This used to keep one and delete the rest, and had to — <c>ActivityId</c> carried a unique index
+    /// because both configurations said <c>HasOne(...).WithOne()</c>. That 1:1 was a slip rather than a
+    /// domain rule (the pattern is the key, and it has its own composite unique index per user), and the
+    /// same slip stopped a user mapping both <c>code.exe</c> and <c>rider64.exe</c> onto "Programming".
+    /// With the FKs now many-to-one there is nothing to collide, so merge no longer destroys a rule the
+    /// user wrote.
     /// </remarks>
     [Fact]
-    public async Task Merge_WhenBothCarryATrackingMapping_KeepsOnlyTheSurvivors()
+    public async Task Merge_WhenBothCarryATrackingMapping_RepointsBothOntoTheSurvivor()
     {
         await using var db = CreateDbContext();
         var survivorId = await SeedActivityAsync(db, "Mapped Survivor");
@@ -312,17 +315,16 @@ public class ActivityMergeTests(AppDbContextFixture fixture) : PostgresTestBase(
 
         var response = await MergeAsync(survivorId, duplicateId);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK, "the unique index must be honoured, not tripped");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         await using var assertDb = CreateDbContext();
         var remaining = await assertDb.Set<TrackerDesktopMappingByPattern>()
             .Where(m => m.ActivityId == survivorId)
+            .Select(m => m.Id)
             .ToListAsync(CancellationToken);
 
-        remaining.Should().ContainSingle("TrackerDesktopMappingByPattern.ActivityId is unique — this is a 1:1, not a 1:many");
-        remaining[0].Id.Should().Be(survivorMapping.Id);
-        (await assertDb.Set<TrackerDesktopMappingByPattern>().AnyAsync(m => m.Id == duplicateMapping.Id, CancellationToken))
-            .Should().BeFalse();
+        remaining.Should().BeEquivalentTo([survivorMapping.Id, duplicateMapping.Id],
+            "both pattern rules are the user's, and an activity may be the target of any number of them");
     }
 
     // ---- the permitted-but-worth-stating cases ---------------------------------------------------

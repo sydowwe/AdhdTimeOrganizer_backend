@@ -81,6 +81,45 @@ each holding only what is tied to a portal type:
   in **both** `Program.cs` and `config/AppCommandDbContextFactory.cs` (the design-time factory). New
   partitioned tables need nothing beyond `IsPartitionedByRange`.
 
+## Delete behaviour — the `Activity` FK family
+
+`Activity` is one of the two hub entities: **17 FK columns across 15 tables in 7 projects** point at it,
+plus two more on the `PlannerSuggestionFrom*` view entities that carry no database constraint. Every one
+is declared in its own slice's configuration — `ConfigureCrossSliceRelationships` declares none of them.
+
+**The rule: archive is the non-destructive path, hard delete means destroy, and the cascade is the
+point.** `PATCH /activity/{id}/archived` is what a user reaches for to retire an activity; `DELETE
+/activity/{id}` is the explicit destructive choice, and it takes history, planner tasks, to-do items,
+routines (with their `Streak` / `BestStreak`), profiles, memory anchors, presets and tracker mappings
+with it. `usageCount` / `canDelete` on the activity grid — summed across the `IActivityReferenceSource`
+implementations — is what stops the UI offering the delete in the first place.
+
+**`Restrict` is not the alternative it looks like.** `activity_id` is `NOT NULL` on 10 of the 17 columns,
+so the dependent row genuinely cannot outlive its activity. `Restrict` there would not protect data, it
+would make any activity that was ever used permanently undeletable.
+
+**One exception, and one that is not available.** `TodoListItem.PairedLeisureActivityId` is `SetNull` —
+it is the optional other half of a temptation bundle, so losing the reward activity unpairs the task
+rather than destroying it. The two `Tracker*MappingByPattern.ActivityId` columns are nullable too but
+still `Cascade`, because `SetNull` is impossible there: `CK_Tracker*MappingByPattern_TargetRequired`
+requires *exactly one* of ignored / activity / role-or-category, so a blanked mapping fails the check
+constraint rather than surviving as an unmapped rule.
+
+⚠ **The authoritative inventory is `ActivityForeignKeyInventoryTests`, not this section.** It freezes
+every activity FK with its `IsRequired` / `IsUnique` / `DeleteBehavior`, asserted off `dbContext.Model`,
+and a new activity FK fails it by existing — which is the intent, because adding one is a decision about
+what a delete destroys. Read that file's remarks before changing a row; some rows are frozen without
+being settled and say so. Prose in this repo has been confidently wrong about this exact subject before
+(`DeletingActivity_CascadesToItsPlannerTasks_NotRestrict` exists to correct a doc claiming `Restrict`).
+
+⚠ **Both ways this goes wrong are one word and silent.** `WithOne()` where `WithMany()` was meant puts a
+**unique** index on the FK and caps the relationship at 1:1 — the entity still reads like an ordinary
+nullable FK. Omitting `OnDelete` on an *optional* relationship gets EF's `ClientSetNull` default, which
+leaves the database constraint at `NO ACTION`, so the delete is refused with a 409 naming no entity.
+Both shipped on the tracker mappings, neither broke a build, a test or a log line, and both were found
+by reading configurations. Prefer `IsManyWithOneActivity()` (default `Cascade`, always `IsRequired`);
+when hand-rolling `HasOne(...)`, state `OnDelete` explicitly and pin the constraint name.
+
 ## DbContext helpers
 
 `framework/Sydowwe.Framework/infrastructure/persistence/DbContextExtensions.cs` is the single copy.
