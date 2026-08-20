@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.validator;
@@ -7,7 +8,8 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.webExtension.query;
 
-public class WebDomainDetailsEndpoint(DbContext db) : Endpoint<DomainDetailsRequest, DomainDetailsResponse>
+public class WebDomainDetailsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
+    : Endpoint<DomainDetailsRequest, DomainDetailsResponse>
 {
     public override void Configure()
     {
@@ -33,6 +35,13 @@ public class WebDomainDetailsEndpoint(DbContext db) : Endpoint<DomainDetailsRequ
             .Where(x => x.Domain == req.Domain)
             .Where(x => x.WindowStart >= req.From && x.WindowStart < req.To)
             .ToListAsync(ct);
+
+        // The caller's envelope spans whole calendar days; when it also names the per-day time-of-day
+        // window the dashboard was drawn with, drop the nights that window excludes. Without this the
+        // panel over-counts against the slice it was opened from.
+        var windows = req.ToDailyWindows(await timeZones.GetAsync(userId, ct));
+        if (windows is not null)
+            records = windows.Restrict(records, x => x.WindowStart);
 
         if (records.Count == 0)
         {

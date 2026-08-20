@@ -8,9 +8,7 @@ public class TopDomainsValidator : Validator<SummaryCardsRequest>
 {
     public TopDomainsValidator()
     {
-        RuleFor(x => x.Date).NotEmpty();
-        RuleFor(x => x.From).NotEmpty();
-        RuleFor(x => x.To).NotEmpty();
+        this.ApplyDateRangeRules();
         RuleFor(x => x.TopN).InclusiveBetween(1, 50).When(x => x.TopN.HasValue);
         RuleFor(x => x.Baseline).IsInEnum();
     }

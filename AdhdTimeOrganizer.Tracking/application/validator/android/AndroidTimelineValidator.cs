@@ -8,7 +8,8 @@ public class AndroidTimelineValidator : Validator<AndroidTimelineRequest>
 {
     public AndroidTimelineValidator()
     {
-        RuleFor(x => x.From).NotEmpty();
+        this.ApplyDateRangeRules();
+        this.ApplySingleDayRule();
         RuleFor(x => x.MinSeconds)
             .GreaterThanOrEqualTo(0)
             .When(x => x.MinSeconds.HasValue);

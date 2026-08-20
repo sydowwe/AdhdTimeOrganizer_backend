@@ -13,5 +13,6 @@ public class DomainDetailsValidator : Validator<DomainDetailsRequest>
         RuleFor(x => x.To).LessThanOrEqualTo(x => x.From.AddDays(31))
             .WithMessage("Maximum range is 31 days");
         RuleFor(x => x.Domain).NotEmpty().MaximumLength(255);
+        this.ApplyDailyWindowMaskRules();
     }
 }

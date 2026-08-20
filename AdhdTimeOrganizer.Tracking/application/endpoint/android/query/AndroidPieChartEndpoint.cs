@@ -27,12 +27,20 @@ public class AndroidPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
+        var windows = req.ToDailyWindows(await timeZones.GetAsync(userId, ct));
 
-        var periodData = await db.Set<AndroidSessionData>()
-            .Where(x => x.UserId == userId)
-            .Where(x => x.SessionStartUtc >= from && x.SessionStartUtc < to)
-            .ToListAsync(ct);
+        // One range predicate over the span's outer envelope, then the gaps between the daily windows
+        // are dropped in memory — an envelope read alone would fold in every night the user's
+        // time-of-day window excludes.
+        var from = windows.EnvelopeFrom;
+        var to = windows.EnvelopeTo;
+
+        var periodData = windows.Restrict(
+            await db.Set<AndroidSessionData>()
+                .Where(x => x.UserId == userId)
+                .Where(x => x.SessionStartUtc >= from && x.SessionStartUtc < to)
+                .ToListAsync(ct),
+            x => x.SessionStartUtc);
 
         var totalSeconds = periodData.Sum(x => x.DurationSeconds);
         var totalApps = periodData.Select(x => x.AppLabel).Distinct().Count();

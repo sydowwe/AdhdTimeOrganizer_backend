@@ -2,10 +2,10 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.stackedBars;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
-using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.webExtension.query;
 
@@ -29,19 +29,23 @@ public class WebExtensionStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneR
         var userId = User.GetId();
 
         var timeZone = await timeZones.GetAsync(userId, ct);
-        var (from, to) = req.ToDateTimeRange(timeZone);
+        var windows = req.ToDailyWindows(timeZone);
 
-        // 1. Fetch raw 1-min window data from DB
-        var rawData = await dbContext.Set<WebExtensionActivityEntry>()
-            .Where(x => x.UserId == userId)
-            .Where(x => x.WindowStart >= from && x.WindowStart < to)
-            .OrderBy(x => x.WindowStart)
-            .ToListAsync(ct);
+        // 1. Fetch raw 1-min window data from DB. One range predicate over the span's outer envelope,
+        //    then the gaps between the daily windows are dropped in memory.
+        var from = windows.EnvelopeFrom;
+        var to = windows.EnvelopeTo;
 
-        var windowMinutes = req.WindowMinutes;
+        var rawData = windows.Restrict(
+            await dbContext.Set<WebExtensionActivityEntry>()
+                .Where(x => x.UserId == userId)
+                .Where(x => x.WindowStart >= from && x.WindowStart < to)
+                .OrderBy(x => x.WindowStart)
+                .ToListAsync(ct),
+            x => x.WindowStart);
 
         // 3. Re-aggregate into target window size
-        var aggregated = AggregateIntoWindows(rawData, windowMinutes, timeZone);
+        var aggregated = AggregateIntoWindows(rawData, windows.Tile(req.WindowMinutes));
 
         // 4. Apply minimum seconds filter
         if (req.MinSeconds is > 0)
@@ -93,27 +97,27 @@ public class WebExtensionStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneR
     }
 
     /// <summary>
-    /// Buckets the one-minute ledger rows into the requested band width. Bands are aligned to the
-    /// <b>user's</b> clock: a 60-minute band runs 09:00–10:00 where the user is, not 09:00–10:00 UTC, which
-    /// is what an alignment computed off the raw instant produced — bars an offset out of step with their
-    /// own labels for everyone not on UTC, and half an hour out in the half-hour zones.
-    /// <para>
-    /// Both bounds are converted back through the zone rather than the end being the start plus the band
-    /// width, so the band that contains a DST transition covers the wall clock it claims to.
-    /// </para>
+    /// Buckets the one-minute ledger rows into the bands <see cref="DailyWindowSet.Tile"/> laid out.
+    /// The bands are the user's, not UTC's, and they are truncated at each day's window edge rather
+    /// than spilling across it — see the tiling rule on <c>Tile</c>. Empty bands are omitted; the client
+    /// generates and merges the empty slots itself, and over a span that is most of them.
+    ///
+    /// <para><c>windowStart</c> is unique across the response because the bands come from one
+    /// chronological tiling rather than from a minute-of-day alignment, which over a span would collide
+    /// between days.</para>
     /// </summary>
     private static List<WebExtensionStackedBarsWindow> AggregateIntoWindows(
         List<WebExtensionActivityEntry> rawData,
-        int targetWindowMinutes,
-        TimeZoneInfo timeZone)
+        IReadOnlyList<AggregationWindow> buckets)
     {
         // Group raw records into target window buckets
         var grouped = rawData
-            .GroupBy(x => AlignToWindow(x.WindowStart, targetWindowMinutes, timeZone))
+            .GroupBy(x => DailyWindowSet.BucketIndexOf(buckets, x.WindowStart))
+            .Where(windowGroup => windowGroup.Key >= 0)
             .Select(windowGroup => new WebExtensionStackedBarsWindow
             {
-                WindowStart = WallClockZone.ToUtc(windowGroup.Key, timeZone),
-                WindowEnd = WallClockZone.ToUtc(windowGroup.Key.AddMinutes(targetWindowMinutes), timeZone),
+                WindowStart = buckets[windowGroup.Key].Start,
+                WindowEnd = buckets[windowGroup.Key].End,
                 Activities = windowGroup
                     // Group by domain within the window
                     .GroupBy(x => x.Domain)
@@ -138,34 +142,4 @@ public class WebExtensionStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneR
         return grouped;
     }
 
-    /// <summary>
-    /// The band an instant falls in, as a zone-less wall clock on the user's calendar day — rounded down to
-    /// the nearest boundary, so with 15-minute bands the user's 09:07 lands on 09:00 and their 09:18 on
-    /// 09:15. Returned as a label rather than an instant because the caller needs it to derive the band's
-    /// far edge too.
-    /// </summary>
-    private static DateTime AlignToWindow(DateTime instant, int windowMinutes, TimeZoneInfo timeZone)
-    {
-        var wallClock = WallClockZone.FromUtc(instant, timeZone);
-        var alignedMinutes = (int)wallClock.TimeOfDay.TotalMinutes / windowMinutes * windowMinutes;
-        return wallClock.Date.AddMinutes(alignedMinutes);
-    }
-
-    private static List<WebExtensionStackedBarsWindow> FilterByMinSeconds(
-        List<WebExtensionStackedBarsWindow> windows,
-        int minSeconds)
-    {
-        return windows
-            .Select(w => new WebExtensionStackedBarsWindow
-            {
-                WindowStart = w.WindowStart,
-                WindowEnd = w.WindowEnd,
-                Activities = w.Activities
-                    .Where(a => a.TotalSeconds >= minSeconds)
-                    .ToList()
-            })
-            // Remove windows with no activities after filtering
-            .Where(w => w.Activities.Count > 0)
-            .ToList();
-    }
 }

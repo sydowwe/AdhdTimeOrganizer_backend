@@ -276,11 +276,15 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     /// Extra members are ignored on either side, but every member each route <em>does</em> read has to be
     /// both bindable and valid, because the case now asserts <c>OK</c> — a 400 no longer passes.
     /// <list type="bullet">
+    /// <item><c>dateFrom</c>/<c>dateTo</c> are the inclusive day span — <c>required</c> on
+    /// <c>DateRangeAndTimeRangeDto</c>, so omitting either is a bind failure rather than a validation
+    /// message. Equal here, which every dashboard accepts including the two timelines, which reject a
+    /// span outright.</item>
     /// <item><c>from</c>/<c>to</c> are <c>TimeDto</c> (<c>{hours, minutes}</c>), not <c>DateTime</c> —
-    /// all twelve requests derive from <c>DateAndTimeRangeDto</c>, and every validator here has a
+    /// they are the time-of-day window applied to each day of the span, and every validator here has a
     /// <c>RuleFor(x =&gt; x.From).NotEmpty()</c>.</item>
     /// <item><c>windowMinutes</c> is <c>required</c> on the two stacked-bars requests and is checked
-    /// against a fixed set (15/20/30/60/90/120).</item>
+    /// against a fixed set.</item>
     /// <item><c>baseline</c> is deliberately <b>omitted</b>. It is a <c>BaselineType</c> enum validated
     /// with <c>IsInEnum</c>, this file's <c>JsonOpts</c> has no string-enum converter, and the DTO
     /// already defaults it to <c>Last7Days</c> — so sending it as a string is the one way to break it.
@@ -289,7 +293,8 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     /// </summary>
     private static object DashboardBody() => new
     {
-        date = DateOnly.FromDateTime(DateTime.UtcNow),
+        dateFrom = DateOnly.FromDateTime(DateTime.UtcNow),
+        dateTo = DateOnly.FromDateTime(DateTime.UtcNow),
         from = new { hours = 0, minutes = 0 },
         to = new { hours = 23, minutes = 59 },
         windowMinutes = 30,

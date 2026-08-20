@@ -6,13 +6,14 @@ namespace AdhdTimeOrganizer.Tracking.application.validator;
 
 public class WebExtensionSummaryValidator : Validator<WebExtensionStackedBarsRequest>
 {
-    private static readonly int[] ValidWindowMinutes = [15, 20, 30, 60, 90, 120];
-
     public WebExtensionSummaryValidator()
     {
-        RuleFor(x => x.From).NotEmpty();
+        this.ApplyDateRangeRules();
         RuleFor(x => x.WindowMinutes)
-            .Must(x => ValidWindowMinutes.Contains(x))
-            .WithMessage("WindowMinutes must be 15, 20, 30, 60, 90, 120");
+            .Must(DashboardDateRangeRules.AllowedWindowMinutes.Contains)
+            .WithMessage(DashboardDateRangeRules.WindowMinutesMessage);
+        RuleFor(x => x.MinSeconds)
+            .GreaterThanOrEqualTo(0)
+            .When(x => x.MinSeconds.HasValue);
     }
 }

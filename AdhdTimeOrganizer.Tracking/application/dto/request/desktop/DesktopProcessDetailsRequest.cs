@@ -2,14 +2,8 @@ using FastEndpoints;
 
 namespace AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
 
-public record DesktopProcessDetailsRequest
+public record DesktopProcessDetailsRequest : DailyWindowMaskRequest
 {
-    [QueryParam]
-    public DateTime From { get; set; }
-
-    [QueryParam]
-    public DateTime To { get; set; }
-
     [QueryParam]
     public string ProcessName { get; set; } = string.Empty;
 }

@@ -63,7 +63,8 @@ public class TrackingDashboardUserZoneTests(AppDbContextFixture fixture) : Postg
 
         var windows = await PostAsync(route, new
         {
-            date = new DateOnly(2026, 7, 15),
+            dateFrom = new DateOnly(2026, 7, 15),
+            dateTo = new DateOnly(2026, 7, 15),
             from = new { hours = 0, minutes = 0 },
             to = new { hours = 23, minutes = 59 },
             windowMinutes = 90
@@ -116,7 +117,8 @@ public class TrackingDashboardUserZoneTests(AppDbContextFixture fixture) : Postg
 
         var cards = await PostAsync("/api/activity-tracking/desktop/summary-cards", new
         {
-            date = new DateOnly(2026, 7, 14),
+            dateFrom = new DateOnly(2026, 7, 14),
+            dateTo = new DateOnly(2026, 7, 14),
             from = new { hours = 0, minutes = 0 },
             to = new { hours = 23, minutes = 59 },
             baseline = "SameWeekday",

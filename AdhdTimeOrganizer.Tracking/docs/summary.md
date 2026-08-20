@@ -101,6 +101,12 @@ would only make the agent re-send the window. That makes a break here silent;
 5. **Tracking's `ApplyConfigurationsFromAssembly` call missing from `AppDbContext`** → the two
    partitioned tables quietly become plain tables in the next migration.
 
+6. **The dashboard date range read as one continuous block** rather than as a time-of-day window
+   repeated on each day of the span → every endpoint still answers 200 with a well-formed body, with
+   totals inflated by every night the user's window excludes. On a narrowed working-day window that is
+   most of the number on the page. `TrackingDashboardDateRangeTests` is the guard and asserts on the
+   numbers; the rule itself lives on `domain/helper/DailyWindowSet.cs`.
+
 `TrackingRouteSmokeTests` covers 1, 4 and 5; `CoreRouteSmokeTests`' seeder-duplication test already
 covers 2 over every registered seeder; `ExtensionActivityTrackingTests` covers 3 and the end-to-end
 seam.

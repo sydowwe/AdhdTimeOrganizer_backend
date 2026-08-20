@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop.dashboard;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.summaryCards;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
@@ -31,13 +32,15 @@ public class DesktopSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
         var userId = User.GetId();
 
         var timeZone = await timeZones.GetAsync(userId, ct);
-        var (from, to) = req.ToDateTimeRange(timeZone);
+        var windows = req.ToDailyWindows(timeZone);
 
-        var currentPeriodData = await GetPeriodData(userId, from, to, ct);
+        var currentPeriodData = await GetPeriodData(userId, windows, ct);
 
-        var (baselineFrom, baselineTo, baselineDays) = CalculateBaselineRange(from, to, req.Baseline);
+        var (baselineFrom, baselineTo, baselineDays) =
+            CalculateBaselineRange(windows.EnvelopeFrom, req.Baseline);
 
-        var baselineData = await GetBaselineAverages(userId, baselineFrom, baselineTo, baselineDays, req.Baseline, timeZone, ct);
+        var baselineData = await GetBaselineAverages(
+            userId, baselineFrom, baselineTo, baselineDays, windows.DayCount, req.Baseline, timeZone, ct);
 
         var allProcesses = currentPeriodData
             .GroupBy(x => x.ProcessName)
@@ -63,17 +66,28 @@ public class DesktopSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
         await Send.ResponseAsync(response, cancellation: ct);
     }
 
+    /// <summary>
+    /// One range predicate over the span's outer envelope, then the gaps between the daily windows are
+    /// dropped in memory. Asking the database for each day separately would be N round trips over a
+    /// partitioned ledger; asking it for the envelope alone would count every night the user's window
+    /// excludes.
+    /// </summary>
     private async Task<List<DesktopActivityEntry>> GetPeriodData(
-        long userId, DateTime from, DateTime to, CancellationToken ct)
+        long userId, DailyWindowSet windows, CancellationToken ct)
     {
-        return await db.Set<DesktopActivityEntry>()
+        var from = windows.EnvelopeFrom;
+        var to = windows.EnvelopeTo;
+
+        var rows = await db.Set<DesktopActivityEntry>()
             .Where(x => x.UserId == userId)
             .Where(x => x.WindowStart >= from && x.WindowStart < to)
             .ToListAsync(ct);
+
+        return windows.Restrict(rows, x => x.WindowStart);
     }
 
     private static (DateTime from, DateTime to, int days) CalculateBaselineRange(
-        DateTime currentFrom, DateTime currentTo, BaselineType baseline)
+        DateTime currentFrom, BaselineType baseline)
     {
         return baseline switch
         {
@@ -90,9 +104,15 @@ public class DesktopSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
     /// user's calendar rather than UTC's. Read straight off the stored instant, a session at half past
     /// midnight on a Tuesday in Bratislava counts as Monday, and the day span of a user's history could
     /// come out a day short — the divisor of every average on these cards.
+    ///
+    /// <para>The mean day is then multiplied by <paramref name="spanDays"/>, because the card's own
+    /// number is a total over the requested span rather than over one day. Comparing a seven-day total
+    /// against a one-day mean would report every week as up 600%. On a single-day request
+    /// <paramref name="spanDays"/> is 1 and the arithmetic is the unchanged one.</para>
     /// </summary>
     private async Task<Dictionary<string, DesktopBaselineStats>> GetBaselineAverages(
-        long userId, DateTime from, DateTime to, int days, BaselineType baseline, TimeZoneInfo timeZone, CancellationToken ct)
+        long userId, DateTime from, DateTime to, int days, int spanDays, BaselineType baseline, TimeZoneInfo timeZone,
+        CancellationToken ct)
     {
         var data = await db.Set<DesktopActivityEntry>()
             .Where(x => x.UserId == userId)
@@ -122,8 +142,8 @@ public class DesktopSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
                 g => new DesktopBaselineStats
                 {
                     Days = days,
-                    AverageActiveSeconds = g.Sum(x => x.ActiveSeconds) / days,
-                    AverageBackgroundSeconds = g.Sum(x => x.BackgroundSeconds) / days
+                    AverageActiveSeconds = ScaleToSpan(g.Sum(x => x.ActiveSeconds), days, spanDays),
+                    AverageBackgroundSeconds = ScaleToSpan(g.Sum(x => x.BackgroundSeconds), days, spanDays)
                 }
             );
     }
@@ -164,6 +184,14 @@ public class DesktopSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
                 : null
         };
     }
+
+    /// <summary>
+    /// The mean day of the baseline, multiplied out to the length of the requested span. Multiplied
+    /// before the divide so a short-but-busy baseline is not rounded away; <c>long</c> because a
+    /// year-long span times a year of seconds overflows <c>int</c> on the way through.
+    /// </summary>
+    private static int ScaleToSpan(int baselineTotalSeconds, int baselineDays, int spanDays) =>
+        (int)((long)baselineTotalSeconds * spanDays / baselineDays);
 
     private static double CalculatePercentChange(int current, int average)
     {

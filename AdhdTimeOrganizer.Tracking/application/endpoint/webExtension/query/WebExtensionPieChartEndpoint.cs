@@ -27,13 +27,21 @@ public class WebExtensionPieChartEndpoint(DbContext db, IUserTimeZoneResolver ti
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
+        var windows = req.ToDailyWindows(await timeZones.GetAsync(userId, ct));
 
-        // Get all data for the period
-        var periodData = await db.Set<WebExtensionActivityEntry>()
-            .Where(x => x.UserId == userId)
-            .Where(x => x.WindowStart >= from && x.WindowStart < to)
-            .ToListAsync(ct);
+        // Get all data for the period. One range predicate over the span's outer envelope, then the
+        // gaps between the daily windows are dropped in memory: an envelope read alone would fold in
+        // every night the user's time-of-day window excludes, and on a narrowed working-day window
+        // that is most of the number on the page.
+        var from = windows.EnvelopeFrom;
+        var to = windows.EnvelopeTo;
+
+        var periodData = windows.Restrict(
+            await db.Set<WebExtensionActivityEntry>()
+                .Where(x => x.UserId == userId)
+                .Where(x => x.WindowStart >= from && x.WindowStart < to)
+                .ToListAsync(ct),
+            x => x.WindowStart);
 
         // Calculate total seconds for percentage calculations
         var totalSeconds = periodData.Sum(x => x.ActiveSeconds + x.BackgroundSeconds);

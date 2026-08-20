@@ -38,6 +38,16 @@ often only the tail. Check the group before assuming a path.
 | Android dashboards | `/activity-tracking/android` | pie-chart, stacked-bars, summary-cards, timeline, `gird` |
 | Android mappings | `/activity-tracking/android/settings` | create / update / delete / `gird` |
 
+**Request shape (all twelve dashboards):** `DateRangeAndTimeRangeDto`
+(`application/dto/request/DateRangeAndTimeRangeDto.cs`) — an inclusive `dateFrom`/`dateTo` day span
+plus `from`/`to`, which are a **time-of-day window repeated on each day of the span**, not the ends of
+the range. It resolves through `domain/helper/DailyWindowSet.cs`, which also lays out the stacked-bars
+bands. Read the span continuously instead and every endpoint still returns a well-formed 200 with
+silently inflated totals — `TrackingDashboardDateRangeTests` is the guard, and it asserts on the
+numbers. The two timelines take the span members for uniformity and reject anything but a single day.
+The two details endpoints take an instant envelope plus the optional
+`windowStartMinutes`/`windowEndMinutes` pair that carries the same daily window across.
+
 **Auth:** the three ingest endpoints carry `[AllowExtensionClients]` **and**
 `Policies(PortalAuthorizationPolicies.ActivityTracking)`. Everything else is an ordinary web endpoint
 and is therefore denied to extension clients by the `Program.cs` configurator's default.

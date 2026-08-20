@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
@@ -7,7 +8,8 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.query.dashboard;
 
-public class DesktopProcessDetailsEndpoint(DbContext db) : Endpoint<DesktopProcessDetailsRequest, DesktopProcessDetailsResponse>
+public class DesktopProcessDetailsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
+    : Endpoint<DesktopProcessDetailsRequest, DesktopProcessDetailsResponse>
 {
     public override void Configure()
     {
@@ -32,6 +34,14 @@ public class DesktopProcessDetailsEndpoint(DbContext db) : Endpoint<DesktopProce
             .Where(x => x.ProcessName == req.ProcessName)
             .Where(x => x.WindowStart >= req.From && x.WindowStart < req.To)
             .ToListAsync(ct);
+
+        // The pie chart opens this panel with the outer envelope of whatever span is selected, and that
+        // envelope spans whole calendar days. When the caller also names the per-day time-of-day window
+        // the chart was drawn with, drop the nights that window excludes — otherwise the panel
+        // over-counts against the slice it is meant to explain.
+        var windows = req.ToDailyWindows(await timeZones.GetAsync(userId, ct));
+        if (windows is not null)
+            records = windows.Restrict(records, x => x.WindowStart);
 
         if (records.Count == 0)
         {

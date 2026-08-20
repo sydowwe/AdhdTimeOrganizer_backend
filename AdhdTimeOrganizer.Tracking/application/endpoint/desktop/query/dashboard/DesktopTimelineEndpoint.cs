@@ -31,7 +31,12 @@ public class DesktopTimelineEndpoint(DbContext dbContext, IUserTimeZoneResolver 
     public override async Task HandleAsync(BaseTimelineRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
-        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
+        // The validator pins this dashboard to a single day, so the span is exactly one window and the
+        // envelope is that window. Resolved through the same path as the other three anyway, so the
+        // over-midnight rule cannot drift between them.
+        var windows = req.ToDailyWindows(await timeZones.GetAsync(userId, ct));
+        var from = windows.EnvelopeFrom;
+        var to = windows.EnvelopeTo;
 
         var rawData = await dbContext.Set<DesktopActivityEntry>()
             .Where(x => x.UserId == userId)

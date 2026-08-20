@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
@@ -27,14 +28,20 @@ public class AndroidStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver time
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
+        var dailyWindows = req.ToDailyWindows(await timeZones.GetAsync(userId, ct));
+
+        // Sessions are spans, not instants, so the read is an overlap test against the span's outer
+        // envelope. The nights between the daily windows are excluded by the buckets rather than by the
+        // read: a session that runs across one is clamped to the buckets it actually overlaps.
+        var envelopeFrom = dailyWindows.EnvelopeFrom;
+        var envelopeTo = dailyWindows.EnvelopeTo;
 
         var sessions = await db.Set<AndroidSessionData>()
             .Where(x => x.UserId == userId)
-            .Where(x => x.SessionStartUtc < to && x.SessionEndUtc > from)
+            .Where(x => x.SessionStartUtc < envelopeTo && x.SessionEndUtc > envelopeFrom)
             .ToListAsync(ct);
 
-        var windows = BuildWindows(sessions, from, to, req.WindowMinutes);
+        var windows = BuildWindows(sessions, dailyWindows.Tile(req.WindowMinutes));
 
         if (req.MinSeconds is > 0)
             windows = FilterByMinSeconds(windows, req.MinSeconds.Value);
@@ -42,19 +49,19 @@ public class AndroidStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver time
         await Send.ResponseAsync(windows.OrderBy(w => w.WindowStart), cancellation: ct);
     }
 
+    /// <summary>
+    /// Fills the bands <see cref="DailyWindowSet.Tile"/> laid out, clamping each session to the band it
+    /// is being counted into. Empty bands are omitted; the client generates and merges the empty slots
+    /// itself, and over a span that is most of them.
+    /// </summary>
     private static List<AndroidStackedBarsWindow> BuildWindows(
         List<AndroidSessionData> sessions,
-        DateTime from,
-        DateTime to,
-        int windowMinutes)
+        IReadOnlyList<AggregationWindow> buckets)
     {
         var windows = new List<AndroidStackedBarsWindow>();
-        var windowStart = from;
 
-        while (windowStart < to)
+        foreach (var (windowStart, windowEnd) in buckets)
         {
-            var windowEnd = windowStart.AddMinutes(windowMinutes);
-
             var overlapping = sessions.Where(s => s.SessionStartUtc < windowEnd && s.SessionEndUtc > windowStart);
 
             var apps = overlapping
@@ -85,8 +92,6 @@ public class AndroidStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver time
                     WindowEnd = windowEnd,
                     Apps = apps
                 });
-
-            windowStart = windowEnd;
         }
 
         return windows;

@@ -28,16 +28,25 @@ public class AndroidSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
+        var windows = req.ToDailyWindows(await timeZones.GetAsync(userId, ct));
 
-        var currentData = await db.Set<AndroidSessionData>()
-            .Where(x => x.UserId == userId)
-            .Where(x => x.SessionStartUtc >= from && x.SessionStartUtc < to)
-            .ToListAsync(ct);
+        // One range predicate over the span's outer envelope, then the gaps between the daily windows
+        // are dropped in memory — an envelope read alone would count every night the window excludes.
+        var envelopeFrom = windows.EnvelopeFrom;
+        var envelopeTo = windows.EnvelopeTo;
 
-        var (baselineFrom, baselineTo, baselineDays) = CalculateBaselineRange(from, to, req.Baseline);
+        var currentData = windows.Restrict(
+            await db.Set<AndroidSessionData>()
+                .Where(x => x.UserId == userId)
+                .Where(x => x.SessionStartUtc >= envelopeFrom && x.SessionStartUtc < envelopeTo)
+                .ToListAsync(ct),
+            x => x.SessionStartUtc);
 
-        var baselineAverages = await GetBaselineAverages(userId, baselineFrom, baselineTo, baselineDays, req.Baseline, ct);
+        var (baselineFrom, baselineTo, baselineDays) =
+            CalculateBaselineRange(windows.EnvelopeFrom, req.Baseline);
+
+        var baselineAverages = await GetBaselineAverages(
+            userId, baselineFrom, baselineTo, baselineDays, windows.DayCount, req.Baseline, ct);
 
         var topN = req.TopN ?? 4;
 
@@ -78,7 +87,7 @@ public class AndroidSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
     }
 
     private static (DateTime from, DateTime to, int days) CalculateBaselineRange(
-        DateTime currentFrom, DateTime currentTo, BaselineType baseline)
+        DateTime currentFrom, BaselineType baseline)
     {
         return baseline switch
         {
@@ -90,8 +99,14 @@ public class AndroidSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
         };
     }
 
+    /// <summary>
+    /// The mean day over the lookback, multiplied by <paramref name="spanDays"/> so it compares like
+    /// with like against a card whose own number is a total over the requested span. Comparing a
+    /// seven-day total against a one-day mean would report every week as up 600%. On a single-day
+    /// request <paramref name="spanDays"/> is 1 and the arithmetic is the unchanged one.
+    /// </summary>
     private async Task<Dictionary<string, long>> GetBaselineAverages(
-        long userId, DateTime from, DateTime to, int days, BaselineType baseline, CancellationToken ct)
+        long userId, DateTime from, DateTime to, int days, int spanDays, BaselineType baseline, CancellationToken ct)
     {
         var data = await db.Set<AndroidSessionData>()
             .Where(x => x.UserId == userId)
@@ -118,7 +133,7 @@ public class AndroidSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
             .GroupBy(x => x.AppLabel)
             .ToDictionary(
                 g => g.Key,
-                g => g.Sum(x => x.DurationSeconds) / days
+                g => g.Sum(x => x.DurationSeconds) * spanDays / days
             );
     }
 

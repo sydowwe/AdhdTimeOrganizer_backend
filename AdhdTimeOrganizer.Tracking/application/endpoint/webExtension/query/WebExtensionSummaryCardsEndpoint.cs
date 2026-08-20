@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.Tracking.application.dto.@enum;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.summaryCards;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
@@ -29,20 +30,20 @@ public class WebExtensionSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolve
     {
         var userId = User.GetId();
 
-        // Construct DateTime from DateOnly and TimeDto
+        // The requested span, as one time-of-day window per calendar day in it
         var timeZone = await timeZones.GetAsync(userId, ct);
-        var (from, to) = req.ToDateTimeRange(timeZone);
+        var windows = req.ToDailyWindows(timeZone);
 
         // 1. Get current period data
-        var currentPeriodData = await GetPeriodData(userId, from, to, ct);
+        var currentPeriodData = await GetPeriodData(userId, windows, ct);
 
-        var totalSeconds = currentPeriodData.Sum(x => x.ActiveSeconds + x.BackgroundSeconds);
+        // 3. Calculate baseline period range, off the first instant of the span
+        var (baselineFrom, baselineTo, baselineDays) =
+            CalculateBaselineRange(windows.EnvelopeFrom, req.Baseline);
 
-        // 3. Calculate baseline period range
-        var (baselineFrom, baselineTo, baselineDays) = CalculateBaselineRange(from, to, req.Baseline);
-
-        // 4. Get baseline data (daily averages)
-        var baselineData = await GetBaselineAverages(userId, baselineFrom, baselineTo, baselineDays, req.Baseline, timeZone, ct);
+        // 4. Get baseline data, scaled from a mean day up to the length of the span
+        var baselineData = await GetBaselineAverages(
+            userId, baselineFrom, baselineTo, baselineDays, windows.DayCount, req.Baseline, timeZone, ct);
 
         // 5. Get all domains by total time (active + background)
         var allDomains = currentPeriodData
@@ -73,27 +74,32 @@ public class WebExtensionSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolve
         await Send.ResponseAsync(response, cancellation: ct);
     }
 
+    /// <summary>
+    /// One range predicate over the span's outer envelope, then the gaps between the daily windows are
+    /// dropped in memory. Asking the database for each day separately would be N round trips over a
+    /// partitioned ledger; asking it for the envelope alone would count every night the user's window
+    /// excludes.
+    /// </summary>
     private async Task<List<WebExtensionActivityEntry>> GetPeriodData(
         long userId,
-        DateTime from,
-        DateTime to,
+        DailyWindowSet windows,
         CancellationToken ct)
     {
-        return await db.Set<WebExtensionActivityEntry>()
+        var from = windows.EnvelopeFrom;
+        var to = windows.EnvelopeTo;
+
+        var rows = await db.Set<WebExtensionActivityEntry>()
             .Where(x => x.UserId == userId)
             .Where(x => x.WindowStart >= from && x.WindowStart < to)
             .ToListAsync(ct);
+
+        return windows.Restrict(rows, x => x.WindowStart);
     }
 
     private (DateTime from, DateTime to, int days) CalculateBaselineRange(
         DateTime currentFrom,
-        DateTime currentTo,
         BaselineType baseline)
     {
-        var currentDays = (int)(currentTo - currentFrom).TotalDays;
-        if (currentDays < 1)
-            currentDays = 1;
-
         return baseline switch
         {
             BaselineType.Last7Days => (
@@ -125,11 +131,19 @@ public class WebExtensionSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolve
         };
     }
 
+    /// <summary>
+    /// The baseline is still "the average day over the lookback", but the card's own number is now a
+    /// span total, so the mean day is multiplied by <paramref name="spanDays"/> before it is compared
+    /// against one. Comparing a seven-day total against a one-day mean would report every week as up
+    /// 600%. On a single-day request <paramref name="spanDays"/> is 1 and the arithmetic is the
+    /// unchanged one.
+    /// </summary>
     private async Task<Dictionary<string, BaselineStats>> GetBaselineAverages(
         long userId,
         DateTime from,
         DateTime to,
         int days,
+        int spanDays,
         BaselineType baseline,
         TimeZoneInfo timeZone,
         CancellationToken ct)
@@ -169,8 +183,8 @@ public class WebExtensionSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolve
                     TotalActiveSeconds = g.Sum(x => x.ActiveSeconds),
                     TotalBackgroundSeconds = g.Sum(x => x.BackgroundSeconds),
                     Days = days,
-                    AverageActiveSeconds = g.Sum(x => x.ActiveSeconds) / days,
-                    AverageBackgroundSeconds = g.Sum(x => x.BackgroundSeconds) / days
+                    AverageActiveSeconds = ScaleToSpan(g.Sum(x => x.ActiveSeconds), days, spanDays),
+                    AverageBackgroundSeconds = ScaleToSpan(g.Sum(x => x.BackgroundSeconds), days, spanDays)
                 }
             );
     }
@@ -210,6 +224,14 @@ public class WebExtensionSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolve
                 : null
         };
     }
+
+    /// <summary>
+    /// The mean day of the baseline, multiplied out to the length of the requested span. Multiplied
+    /// before the divide so a short-but-busy baseline is not rounded away; <c>long</c> because a
+    /// year-long span times a year of seconds overflows <c>int</c> on the way through.
+    /// </summary>
+    private static int ScaleToSpan(int baselineTotalSeconds, int baselineDays, int spanDays) =>
+        (int)((long)baselineTotalSeconds * spanDays / baselineDays);
 
     private static double CalculatePercentChange(int current, int average)
     {
