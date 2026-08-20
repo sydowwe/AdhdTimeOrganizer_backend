@@ -5,24 +5,32 @@ using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.focus
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.helper;
 using FastEndpoints;
+using FluentValidation;
 using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking;
 
 /// <summary>
-/// The fragmentation dashboard, shared by the three sources. Only <see cref="LoadAsync"/> and
-/// <see cref="FirstActivityDayAsync"/> differ between them; everything below — the span arithmetic,
-/// the baseline lookback, and the two-pointer bucketing — is the same on all three, and the
-/// definitions in <see cref="FocusMetricsCalculator"/> are contract, so a second transcription of any
-/// of it would be a second set of answers.
+/// The fragmentation dashboard, shared by the three sources <b>and by the merged one</b>. Only
+/// <see cref="LoadAsync"/> and <see cref="FirstActivityDayAsync"/> differ between them; everything
+/// below — the span arithmetic, the baseline lookback, and the two-pointer bucketing — is the same on
+/// all four, and the definitions in <see cref="FocusMetricsCalculator"/> are contract, so a second
+/// transcription of any of it would be a second set of answers.
 ///
 /// <para><b>Sessions are built one day-window at a time, never over the whole envelope.</b> That is
 /// what keeps a block from spanning two days and the overnight interval out of the gap measure. It
 /// also makes the single-day case identical to what the timeline endpoint returns, which is what the
 /// contract means by "the same sessions".</para>
+///
+/// <para><typeparamref name="TRequest"/> is generic only because the merged route carries a
+/// <c>sources</c> member the three per-source routes do not. The request is handed to
+/// <see cref="LoadAsync"/> rather than stashed on the endpoint: FastEndpoints reuses instances, and a
+/// field written in <c>HandleAsync</c> and read from a loader is the kind of state that works until two
+/// requests arrive together.</para>
 /// </summary>
-public abstract class BaseFocusMetricsEndpoint(IUserTimeZoneResolver timeZones)
-    : Endpoint<FocusMetricsRequest, FocusMetricsResponse>
+public abstract class BaseFocusMetricsEndpoint<TRequest>(IUserTimeZoneResolver timeZones)
+    : Endpoint<TRequest, FocusMetricsResponse>
+    where TRequest : FocusMetricsRequest
 {
     /// <summary>
     /// The far edge of an <c>allTime</c> lookback. <c>allTime</c> over a per-minute ledger with no
@@ -39,18 +47,20 @@ public abstract class BaseFocusMetricsEndpoint(IUserTimeZoneResolver timeZones)
     /// short list.
     /// </summary>
     protected abstract Task<IReadOnlyList<IReadOnlyList<FocusSession>>> LoadAsync(
-        long userId, DailyWindowSet windows, CancellationToken ct);
+        TRequest req, long userId, DailyWindowSet windows, CancellationToken ct);
 
     /// <summary>
     /// The user's earliest tracked day on this source, on their own clock, or <c>null</c> when they
     /// have none. Only <see cref="BaselineType.AllTime"/> asks.
     /// </summary>
-    protected abstract Task<DateOnly?> FirstActivityDayAsync(long userId, TimeZoneInfo timeZone, CancellationToken ct);
+    protected abstract Task<DateOnly?> FirstActivityDayAsync(
+        TRequest req, long userId, TimeZoneInfo timeZone, CancellationToken ct);
 
-    protected void ConfigureFocusMetrics(string route, string source)
+    protected void ConfigureFocusMetrics<TValidator>(string route, string source)
+        where TValidator : IValidator
     {
         Post(route);
-        Validator<FocusMetricsValidator>();
+        Validator<TValidator>();
         Summary(s =>
         {
             s.Summary = $"Get {source} attention-fragmentation metrics, optionally against a baseline";
@@ -63,14 +73,14 @@ public abstract class BaseFocusMetricsEndpoint(IUserTimeZoneResolver timeZones)
         });
     }
 
-    public override async Task HandleAsync(FocusMetricsRequest req, CancellationToken ct)
+    public override async Task HandleAsync(TRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
         var timeZone = await timeZones.GetAsync(userId, ct);
         var windows = req.ToDailyWindows(timeZone);
 
         var span = FocusMetricsCalculator.Compute(
-            windows.Windows, await LoadAsync(userId, windows, ct), req.FocusGapSeconds);
+            windows.Windows, await LoadAsync(req, userId, windows, ct), req.FocusGapSeconds);
 
         var baseline = req.Baseline.HasValue
             ? await BuildBaselineAsync(userId, req, req.Baseline.Value, windows, timeZone, ct)
@@ -106,7 +116,7 @@ public abstract class BaseFocusMetricsEndpoint(IUserTimeZoneResolver timeZones)
     /// </summary>
     private async Task<FocusBaselineDto?> BuildBaselineAsync(
         long userId,
-        FocusMetricsRequest req,
+        TRequest req,
         BaselineType baselineType,
         DailyWindowSet spanWindows,
         TimeZoneInfo timeZone,
@@ -123,7 +133,7 @@ public abstract class BaseFocusMetricsEndpoint(IUserTimeZoneResolver timeZones)
             BaselineType.Last30Days => (req.DateFrom.AddDays(-30), 30, null),
             // Eight weeks back holds exactly eight of any one weekday.
             BaselineType.SameWeekday => (req.DateFrom.AddDays(-56), 8, req.DateFrom.DayOfWeek),
-            BaselineType.AllTime => (await FirstActivityDayAsync(userId, timeZone, ct) ?? earliest, -1, null),
+            BaselineType.AllTime => (await FirstActivityDayAsync(req, userId, timeZone, ct) ?? earliest, -1, null),
             _ => (req.DateFrom.AddDays(-7), 7, null)
         };
 
@@ -137,7 +147,7 @@ public abstract class BaseFocusMetricsEndpoint(IUserTimeZoneResolver timeZones)
             lookbackStart, lookbackEnd, req.From.ToTimeOnly(), req.To.ToTimeOnly(), timeZone);
 
         var result = FocusMetricsCalculator.Compute(
-            lookbackWindows.Windows, await LoadAsync(userId, lookbackWindows, ct), req.FocusGapSeconds);
+            lookbackWindows.Windows, await LoadAsync(req, userId, lookbackWindows, ct), req.FocusGapSeconds);
 
         // SameWeekday reads the weekday off the user's own calendar, which the window set already
         // carries: a Tuesday 00:30 session in Bratislava belongs to Monday's window, not Tuesday's.

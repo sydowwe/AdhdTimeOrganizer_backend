@@ -1,4 +1,6 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
+using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using Sydowwe.Framework.domain.helper;
@@ -6,10 +8,10 @@ using Sydowwe.Framework.domain.helper;
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.query.dashboard;
 
 public class DesktopFocusMetricsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
-    : BaseFocusMetricsEndpoint(timeZones)
+    : BaseFocusMetricsEndpoint<FocusMetricsRequest>(timeZones)
 {
     public override void Configure() =>
-        ConfigureFocusMetrics("/activity-tracking/desktop/focus-metrics", "desktop");
+        ConfigureFocusMetrics<FocusMetricsValidator>("/activity-tracking/desktop/focus-metrics", "desktop");
 
     /// <summary>
     /// The primary lane only — not the detail lane, which is window titles inside a process and would
@@ -21,7 +23,7 @@ public class DesktopFocusMetricsEndpoint(DbContext db, IUserTimeZoneResolver tim
     /// lose the switches between them — and merge everything with a blank product name into one.</para>
     /// </summary>
     protected override async Task<IReadOnlyList<IReadOnlyList<FocusSession>>> LoadAsync(
-        long userId, DailyWindowSet windows, CancellationToken ct)
+        FocusMetricsRequest req, long userId, DailyWindowSet windows, CancellationToken ct)
     {
         var from = windows.EnvelopeFrom;
         var to = windows.EnvelopeTo;
@@ -49,7 +51,7 @@ public class DesktopFocusMetricsEndpoint(DbContext db, IUserTimeZoneResolver tim
     }
 
     protected override async Task<DateOnly?> FirstActivityDayAsync(
-        long userId, TimeZoneInfo timeZone, CancellationToken ct)
+        FocusMetricsRequest req, long userId, TimeZoneInfo timeZone, CancellationToken ct)
     {
         var earliest = await db.Set<DesktopActivityEntry>()
             .Where(x => x.UserId == userId)

@@ -1,10 +1,17 @@
 namespace AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android.dashboard;
 
-public record AndroidTimelineSession
+public record AndroidTimelineSession : IDashboardItem
 {
     public long Id { get; set; }
     public required string PackageName { get; init; }
     public required string AppLabel { get; init; }
+
+    /// <inheritdoc />
+    public string Key => PackageName;
+
+    /// <inheritdoc />
+    public string Label => DashboardItem.LabelOr(AppLabel, PackageName);
+
     public required DateTime StartedAt { get; init; }
     public required DateTime EndedAt { get; init; }
 

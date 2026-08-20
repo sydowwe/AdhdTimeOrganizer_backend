@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
-using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.helper;
@@ -9,7 +9,7 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.android.query;
 
-public class AndroidStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<AndroidStackedBarsRequest, IEnumerable<AndroidStackedBarsWindow>>
+public class AndroidStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<StackedBarsRequest, IEnumerable<AndroidStackedBarsWindow>>
 {
     public override void Configure()
     {
@@ -21,10 +21,10 @@ public class AndroidStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver time
             s.Response<IEnumerable<AndroidStackedBarsWindow>>(200, "Success");
             s.Response(400, "Bad request");
         });
-        Validator<AndroidStackedBarsValidator>();
+        Validator<StackedBarsValidator>();
     }
 
-    public override async Task HandleAsync(AndroidStackedBarsRequest req, CancellationToken ct)
+    public override async Task HandleAsync(StackedBarsRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
 

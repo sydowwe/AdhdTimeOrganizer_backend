@@ -9,12 +9,12 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.webExtension.query;
 
-public class WebExtensionStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones) : Endpoint<WebExtensionStackedBarsRequest, IEnumerable<WebExtensionStackedBarsWindow>>
+public class WebExtensionStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones) : Endpoint<StackedBarsRequest, IEnumerable<WebExtensionStackedBarsWindow>>
 {
     public override void Configure()
     {
         Post("/activity-tracking/web-extension/stacked-bars");
-        Validator<WebExtensionSummaryValidator>();
+        Validator<StackedBarsValidator>();
         Summary(s =>
         {
             s.Summary = "Get web activity aggregated into time windows for a stacked bar chart";
@@ -24,7 +24,7 @@ public class WebExtensionStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneR
         });
     }
 
-    public override async Task HandleAsync(WebExtensionStackedBarsRequest req, CancellationToken ct)
+    public override async Task HandleAsync(StackedBarsRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
 

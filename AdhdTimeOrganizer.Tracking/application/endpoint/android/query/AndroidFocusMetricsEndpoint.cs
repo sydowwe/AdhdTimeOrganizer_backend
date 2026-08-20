@@ -1,4 +1,6 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
+using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using Sydowwe.Framework.domain.helper;
@@ -6,10 +8,10 @@ using Sydowwe.Framework.domain.helper;
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.android.query;
 
 public class AndroidFocusMetricsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
-    : BaseFocusMetricsEndpoint(timeZones)
+    : BaseFocusMetricsEndpoint<FocusMetricsRequest>(timeZones)
 {
     public override void Configure() =>
-        ConfigureFocusMetrics("/activity-tracking/android/focus-metrics", "Android app");
+        ConfigureFocusMetrics<FocusMetricsValidator>("/activity-tracking/android/focus-metrics", "Android app");
 
     /// <summary>
     /// Android has one lane: the ledger already stores real foreground sessions, so there is nothing to
@@ -23,7 +25,7 @@ public class AndroidFocusMetricsEndpoint(DbContext db, IUserTimeZoneResolver tim
     /// hours the user explicitly excluded.</para>
     /// </summary>
     protected override async Task<IReadOnlyList<IReadOnlyList<FocusSession>>> LoadAsync(
-        long userId, DailyWindowSet windows, CancellationToken ct)
+        FocusMetricsRequest req, long userId, DailyWindowSet windows, CancellationToken ct)
     {
         var from = windows.EnvelopeFrom;
         var to = windows.EnvelopeTo;
@@ -54,7 +56,7 @@ public class AndroidFocusMetricsEndpoint(DbContext db, IUserTimeZoneResolver tim
     }
 
     protected override async Task<DateOnly?> FirstActivityDayAsync(
-        long userId, TimeZoneInfo timeZone, CancellationToken ct)
+        FocusMetricsRequest req, long userId, TimeZoneInfo timeZone, CancellationToken ct)
     {
         var earliest = await db.Set<AndroidSessionData>()
             .Where(x => x.UserId == userId)

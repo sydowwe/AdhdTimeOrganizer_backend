@@ -1,4 +1,6 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
+using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using Sydowwe.Framework.domain.helper;
@@ -6,10 +8,10 @@ using Sydowwe.Framework.domain.helper;
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.webExtension.query;
 
 public class WebExtensionFocusMetricsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
-    : BaseFocusMetricsEndpoint(timeZones)
+    : BaseFocusMetricsEndpoint<FocusMetricsRequest>(timeZones)
 {
     public override void Configure() =>
-        ConfigureFocusMetrics("/activity-tracking/web-extension/focus-metrics", "browsing");
+        ConfigureFocusMetrics<FocusMetricsValidator>("/activity-tracking/web-extension/focus-metrics", "browsing");
 
     /// <summary>
     /// The primary lane only. Not the detail lane — that is a finer cut of the same attention (pages
@@ -17,7 +19,7 @@ public class WebExtensionFocusMetricsEndpoint(DbContext db, IUserTimeZoneResolve
     /// background lane, which by definition is what the user was not looking at.
     /// </summary>
     protected override async Task<IReadOnlyList<IReadOnlyList<FocusSession>>> LoadAsync(
-        long userId, DailyWindowSet windows, CancellationToken ct)
+        FocusMetricsRequest req, long userId, DailyWindowSet windows, CancellationToken ct)
     {
         var from = windows.EnvelopeFrom;
         var to = windows.EnvelopeTo;
@@ -40,7 +42,7 @@ public class WebExtensionFocusMetricsEndpoint(DbContext db, IUserTimeZoneResolve
     }
 
     protected override async Task<DateOnly?> FirstActivityDayAsync(
-        long userId, TimeZoneInfo timeZone, CancellationToken ct)
+        FocusMetricsRequest req, long userId, TimeZoneInfo timeZone, CancellationToken ct)
     {
         var earliest = await db.Set<WebExtensionActivityEntry>()
             .Where(x => x.UserId == userId)

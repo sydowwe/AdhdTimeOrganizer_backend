@@ -37,8 +37,10 @@ often only the tail. Check the group before assuming a path.
 | Android ingest | `/activity-tracking/android` | `AndroidSyncEndpoint` (`/sync`) |
 | Android dashboards | `/activity-tracking/android` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, `gird` |
 | Android mappings | `/activity-tracking/android/settings` | create / update / delete / `gird` |
+| Unified dashboards | `/activity-tracking/unified` | sources, pie-chart, summary-cards, stacked-bars, timeline, focus-metrics — see **The unified dashboards** below |
 
-**Request shape (all fifteen dashboards):** `DateRangeAndTimeRangeDto`
+**Request shape (all twenty-one dashboards; the six unified ones add `sources` and nothing else):**
+`DateRangeAndTimeRangeDto`
 (`application/dto/request/DateRangeAndTimeRangeDto.cs`) — an inclusive `dateFrom`/`dateTo` day span
 plus `from`/`to`, which are a **time-of-day window repeated on each day of the span**, not the ends of
 the range. It resolves through `domain/helper/DailyWindowSet.cs`, which also lays out the stacked-bars
@@ -48,7 +50,26 @@ numbers. The two timelines take the span members for uniformity and reject anyth
 The two details endpoints take an instant envelope plus the optional
 `windowStartMinutes`/`windowEndMinutes` pair that carries the same daily window across.
 
-**The three `focus-metrics` dashboards** (`application/endpoint/BaseFocusMetricsEndpoint.cs`) add
+**There is one request class per dashboard, not one per source.** `PieChartRequest`,
+`SummaryCardsRequest`, `StackedBarsRequest`, `BaseTimelineRequest` and `FocusMetricsRequest` are each
+bound by all three sources; the unified routes add `sources` on top. Android used to carry its own copy
+of the stacked-bars and timeline requests, differing only in `MinSeconds` being a `long` — a naming
+accident rather than a distinction, since nothing about a bucket width is source-specific. **The
+response shapes are a different matter and stay separate**: each source carries a different secondary
+detail list (`pages` / `windowTitles` / none) with a matching distinct count, and android has no
+background concept at all, so a shared response would have to ship a structurally-always-zero
+`backgroundSeconds` and a `details` list meaning URLs on one source and window titles on another.
+
+**Every dashboard item also carries a `key`/`label` pair** (`application/dto/response/IDashboardItem.cs`)
+beside its own `domain` / `processName` / `packageName` fields — additive, computed, and the same two
+names on all three sources, so a client hashes one field for colour and prints one field for display
+instead of six across three sources. `label` is never blank; it falls back to `key`.
+`TrackingDashboardItemIdentityTests` is the guard, and the fallback is the half that regresses silently.
+Not to be confused with the unified dashboards' single `label`, where one identity string across sources
+is the whole point — see below.
+
+**The four `focus-metrics` dashboards** (`application/endpoint/BaseFocusMetricsEndpoint.cs` — generic
+over the request only because the merged one carries `sources`) add
 `baseline` (nullable — no comparison at all is a request the client makes deliberately) and
 `focusGapSeconds`, the block-tolerance the client owns and sends. They are the only dashboards
 besides the timelines that need *sessions* rather than sums, and the only ones that accept a span
@@ -66,6 +87,47 @@ and desktop timelines each used to carry their own transcription of it; the focu
 have to report on *the same* primary sessions the timeline draws, and a drifted second copy would make
 the strip disagree with the chart above it while both endpoints' tests passed. Android needs none of
 it — its ledger already stores real sessions.
+
+## The unified dashboards — `application/endpoint/unified/query/`
+
+Six endpoints under `/activity-tracking/unified` that answer over **all three ledgers at once**. They
+bind the same span base as the fifteen per-source dashboards plus one field, `sources` — a non-empty
+subset of `webExtension` / `desktop` / `android`.
+
+**`sources` is a request field, not a client-side filter, and that is the whole reason these endpoints
+exist.** An hour in a browser is credited to the extension while the desktop agent is also selected;
+deselect the extension and that hour has to come *back* to the desktop agent as `Google Chrome`. A
+client filtering a pre-merged payload can only hide a lane — it cannot give the time back.
+
+| File | Role |
+|---|---|
+| `domain/helper/unified/TrackingSource.cs` | the three sources; **the enum's numeric order is level 2 of the overlap rule**, and the wire names, spelled out rather than left to the enum serializer |
+| `domain/helper/unified/UnifiedMinuteMerger.cs` | the overlap rule, in one copy — read this before touching any of the six |
+| `domain/helper/unified/UnifiedLabelResolver.cs` | the single identity string, and the cross-source join |
+| `domain/helper/unified/SecondsAllocator.cs` | largest-remainder rounding, so the parts keep adding up |
+| `application/service/unified/UnifiedActivityLoader.cs` | flattens the three ledgers onto one minute grid |
+| `application/service/unified/UnifiedLedger.cs` | the one rounded ledger every merged figure is read off |
+| `application/service/unified/UnifiedSpan.cs` | one request's load + merge + ledger, plus the exclusive-minute partition |
+
+**Three things about it are contract rather than implementation, and none of them shows in a 200:**
+
+- **The rule has two levels and the order matters.** Foreground beats background whatever the rank;
+  only within one activity class does `webExtension > desktop > android` decide. Level 1 exists because
+  level 2 alone credits a desktop browser window on a second monitor over the phone actually in the
+  user's hands.
+- **Losing is partial.** A source keeps whatever share of a minute the winners did not claim, which is
+  what makes browser time the extension could not see survive as `Google Chrome`. Suppressing the
+  browser process wholesale while the extension is selected is the tempting shortcut and it is wrong.
+- **Everything is read off one rounded ledger.** The source chips, the pie's totals and the cards are
+  all sums of the same rows, so `sum of countedSeconds == totals.totalSeconds` and
+  `countedSeconds + displacedSeconds ==` that source's own dashboard hold by construction. Both are
+  printed on one screen for the user to check.
+
+`focus-metrics` is a **fifth** route beside the three per-source ones, not a replacement, and shares
+`BaseFocusMetricsEndpoint<TRequest>` with them — which is generic only because the merged request
+carries `sources`. Its sessions are keyed on the unified label, and that single decision settles both
+questions the merge raises: a change of label is a switch whatever source either side came from, and
+the same label from two sources is a device change rather than a switch.
 
 **Auth:** the three ingest endpoints carry `[AllowExtensionClients]` **and**
 `Policies(PortalAuthorizationPolicies.ActivityTracking)`. Everything else is an ordinary web endpoint
@@ -115,6 +177,8 @@ Renaming one renames none of the others.
 | `AdhdTimeOrganizer.IntegrationTests/Endpoints/TrackingRouteSmokeTests.cs` | routing, the combined query filter (behaviourally), the partition annotations, purge-job registration |
 | `.../Endpoints/TrackingDashboardDateRangeTests.cs` | the day-span / time-of-day-window semantic across the dashboards, asserted on the numbers |
 | `.../Endpoints/TrackingFocusMetricsTests.cs` | the four fragmentation measures — switch counting, block tolerance, interior-only gaps, median-not-mean, and the day-bounded range rule |
+| `.../Endpoints/TrackingDashboardItemIdentityTests.cs` | the additive `key`/`label` pair on the per-source dashboards, and its never-blank fallback |
+| `.../Endpoints/TrackingUnifiedDashboardTests.cs` | the unified overlap rule, asserted on seconds — both levels of precedence, partial displacement, a deselected source giving the time back, the cross-source label join, the device-change-is-not-a-switch rule, and the non-overlapping timeline lanes |
 | `.../Endpoints/ExtensionActivityTrackingTests.cs` | extension-client auth on ingest, and the end-to-end attribution + completion path |
 | `.../Endpoints/ActivityTimeAutomationTests.cs` | the completion branch matrix, including the exclusivity rule |
 | `.../Endpoints/TrackerPatternMappingActivityFkTests.cs` | both mapping FKs are N:1 (two patterns, one activity) and `Cascade` (deleting the activity destroys the rule) |

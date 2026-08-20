@@ -9,7 +9,7 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.query.dashboard;
 
-public class DesktopStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones) : Endpoint<WebExtensionStackedBarsRequest, IEnumerable<DesktopStackedBarsWindow>>
+public class DesktopStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones) : Endpoint<StackedBarsRequest, IEnumerable<DesktopStackedBarsWindow>>
 {
     public override void Configure()
     {
@@ -21,10 +21,10 @@ public class DesktopStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneResolv
             s.Response<IEnumerable<DesktopStackedBarsWindow>>(200, "Success");
             s.Response(400, "Bad request");
         });
-        Validator<WebExtensionSummaryValidator>();
+        Validator<StackedBarsValidator>();
     }
 
-    public override async Task HandleAsync(WebExtensionStackedBarsRequest req, CancellationToken ct)
+    public override async Task HandleAsync(StackedBarsRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
 

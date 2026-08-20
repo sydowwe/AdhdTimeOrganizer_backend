@@ -2,7 +2,8 @@
 
 **Purpose:** The activity-tracking slice. Owns the three raw ingest ledgers (desktop, browser
 extension, android), the two pattern-mapping lookups that resolve a tracked window to an `Activity`,
-the fifteen tracking dashboards, and the retention purge over the ledgers.
+the twenty-one tracking dashboards — fifteen per-source plus the six **unified** ones that merge the
+three ledgers into one picture of a day — and the retention purge over the ledgers.
 
 **Fifth and last project of the portal split**, after `Core`, `TodoLists`, `Routines`, `History` and
 `Planning`. Plan: `review/portal/slicePrompts/00-README.md`.
@@ -17,12 +18,14 @@ Owns:
   `infrastructure/persistence/configuration/activityHistory/` folder. **The folder name lied** — they
   were always Tracking's, and they moved with their entities. Do not assign files to projects by
   directory here.
-- **32 endpoints** under `application/endpoint/activityTracking/` — desktop ingest + dashboards,
-  web-extension ingest + dashboards, android sync + dashboards, and the two pattern-mapping settings
-  grids with their CRUD.
+- **38 endpoints** under `application/endpoint/activityTracking/` — desktop ingest + dashboards,
+  web-extension ingest + dashboards, android sync + dashboards, the six unified dashboards, and the two
+  pattern-mapping settings grids with their CRUD.
 - **The five endpoint groups** (`application/endpointGroups/`). The whole folder moved: every group in
   it was a tracking group.
-- **17 validators**, the tracking request/response DTOs, `WebExtensionDataFilterRequest`.
+- **Validators** (one per dashboard, not one per source — `StackedBarsValidator` and
+  `BaseTimelineValidator` each cover all three), the tracking request/response DTOs,
+  `WebExtensionDataFilterRequest`.
 - **Retention** — `PurgeExpiredActivityTrackingEntriesJobHandler` (a keyed `IScheduledJobHandler` on the
   Scheduler module's substrate, so this slice references no Quartz), its `TrackingScheduledJobsRegistrar`
   and `ActivityTrackingRetentionOptions`.
@@ -112,6 +115,16 @@ would only make the agent re-send the window. That makes a break here silent;
    pool of the span's sessions produces both, silently and with a well-formed 200. Every measure but
    the median is therefore computed inside one day's window and rolled up; `TrackingFocusMetricsTests`
    is the guard and the rule lives on `domain/helper/FocusMetricsCalculator.cs`.
+
+8. **The unified dashboards' overlap rule computing the wrong number** — the merged day comes back
+   shorter or longer than the day the user lived, in a perfectly well-formed 200, and the three figures
+   that let a user check it (`countedSeconds`, `displacedSeconds`, `displacedTo`) agree with each other
+   while being wrong together. The failure has three separate shapes and all three are silent: the two
+   levels of the rule applied in the wrong order deletes phone time in favour of a browser window left
+   open on a second monitor; a losing source suppressed wholesale rather than partially leaves an hour
+   spent in a browser showing no browser at all; and rounding each item on its own quietly breaks the
+   two arithmetic identities the page prints side by side. `TrackingUnifiedDashboardTests` is the guard
+   and asserts on seconds; the rule itself lives on `domain/helper/unified/UnifiedMinuteMerger.cs`.
 
 `TrackingRouteSmokeTests` covers 1, 4 and 5; `CoreRouteSmokeTests`' seeder-duplication test already
 covers 2 over every registered seeder; `ExtensionActivityTrackingTests` covers 3 and the end-to-end

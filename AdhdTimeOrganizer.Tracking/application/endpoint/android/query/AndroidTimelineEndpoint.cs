@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
-using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
@@ -8,7 +8,7 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.android.query;
 
-public class AndroidTimelineEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<AndroidTimelineRequest, AndroidTimelineResponse>
+public class AndroidTimelineEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<BaseTimelineRequest, AndroidTimelineResponse>
 {
     public override void Configure()
     {
@@ -20,10 +20,10 @@ public class AndroidTimelineEndpoint(DbContext db, IUserTimeZoneResolver timeZon
             s.Response<AndroidTimelineResponse>(200, "Success");
             s.Response(400, "Bad request");
         });
-        Validator<AndroidTimelineValidator>();
+        Validator<BaseTimelineValidator>();
     }
 
-    public override async Task HandleAsync(AndroidTimelineRequest req, CancellationToken ct)
+    public override async Task HandleAsync(BaseTimelineRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
 
