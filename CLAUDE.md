@@ -66,6 +66,13 @@ The portal has been fully split into vertical slices; **the split is finished**.
   closing shims. See [persistence.md](docs/claude/persistence.md).
 - **EF configurations** always use the builder extension helpers — call `BaseEntityConfigure()` first,
   and never hand-roll `ToTable` / `HasKey` / row_version / timestamps.
+- **Every module's tables live in their own schema** (`planning`, `todo`, `tracking`, …; `public` holds
+  only the migration history and the two timer presets). You never pass a schema to `ToTable` — a
+  finalizing convention applies it from the map in `ModuleSchemas.cs`, and a slice missing from that map
+  throws at model build. EF-generated SQL is qualified for you; **hand-written SQL is not**, so any
+  `TRUNCATE` / `REFRESH MATERIALIZED VIEW` / `to_regclass` / `information_schema` must name the schema
+  or it silently resolves against the `search_path`. See
+  [persistence.md](docs/claude/persistence.md#database-schemas--one-per-module).
 - **Endpoints**: check `framework/Sydowwe.Framework/application/endpoint/base/` before writing a
   custom one — there is a base for every CRUD, grid, filter/sort and auth pattern, including ones that
   don't follow the naming convention. Convention is `<Verb><Entity>Endpoint`. Mapping lives on the

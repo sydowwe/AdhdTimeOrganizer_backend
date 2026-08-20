@@ -81,6 +81,66 @@ each holding only what is tied to a portal type:
   in **both** `Program.cs` and `config/AppCommandDbContextFactory.cs` (the design-time factory). New
   partitioned tables need nothing beyond `IsPartitionedByRange`.
 
+## Database schemas — one per module
+
+Every module's tables live in their own Postgres schema. `public` holds almost nothing.
+
+| schema | tables |
+|---|---|
+| `public` | `__EFMigrationsHistory`, `timer_preset`, `pomodoro_timer_preset` |
+| `user` | `user`, `refresh_token`, `AspNetRoles`, and the five Identity satellites |
+| `activity` | `activity`, `activity_category`, `activity_role` |
+| `todo` | `AdhdTimeOrganizer.TodoLists` (4) |
+| `history` | `AdhdTimeOrganizer.History` (1) |
+| `planning` | `AdhdTimeOrganizer.Planning` (8) **and the three `mv_*` materialized views** |
+| `routines` | `AdhdTimeOrganizer.Routines` (4) |
+| `tracking` | `AdhdTimeOrganizer.Tracking` (5, two partitioned) |
+| `activity_profiles` | `AdhdTimeOrganizer.ActivityProfiles` (9) |
+| `notifications` / `reminders` / `scheduler` | the three framework modules |
+| `audit` | `business_audit_log` — the one entity that names its own schema, unchanged |
+
+**You do not pass a schema to `ToTable`.** Table names come from `BaseEntityConfigure`, which knows
+nothing about modules; the schema is applied afterwards in one sweep by `SchemaPerModuleConvention`
+(`framework/Sydowwe.Framework/infrastructure/persistence/`), from the map in
+`AdhdTimeOrganizer/infrastructure/persistence/ModuleSchemas.cs`. A new slice adds one line to that
+map — **its entities have no schema until it does, and the model build throws** rather than quietly
+putting them in `public`.
+
+Three things about that convention are load-bearing, and each was a real failure while it was written:
+
+- It is an `IModelFinalizingConvention`, not a call at the end of `OnModelCreating`. Mid-
+  `OnModelCreating` the model still holds candidate entity types EF has not pruned — `TimeZoneInfo`,
+  discovered from `BaseUser.Timezone` before its value converter is applied — and the sweep tries to
+  place a schema on them. It also makes the result immune to the order of the
+  `ApplyConfigurationsFromAssembly` calls, which keeps shifting as slices move.
+- It writes through the **mutable** metadata API. A convention-source write cannot overwrite what
+  `ToTable` already recorded at `Explicit`, and `BaseEntityConfigure` calls `ToTable` for every entity
+  in the solution — so a convention-source write is silently dropped for all of them.
+- "Already has an explicit schema" is decided by the annotation's **value**, not its configuration
+  source. `ToTable(name)` — the single-argument overload — writes a *null* schema at `Explicit`, so a
+  configuration-source check treats every entity as hand-placed and skips the lot.
+
+Owned types take their **owner's** schema, not the one their own CLR type maps to. `TodoListStep`
+lives in TodoLists but is owned by both `todo_list_item` (→ `todo`) and `routine_todo_list` (→
+`routines`); resolving it by assembly puts its table and schema in disagreement and fails the model
+build.
+
+Cross-schema FKs are ordinary in Postgres and constraint/index names carry no schema, so none of the
+pinned `HasConstraintName` values changed. EF-generated SQL is always fully qualified. **Hand-written
+SQL is not** — anything using `TRUNCATE`, `REFRESH MATERIALIZED VIEW`, `to_regclass` or
+`information_schema` must name the schema, or it silently resolves against the `search_path`. Where
+the relation is in the EF model, derive the schema from it (`GetSchema()`, or `GetViewSchema()` for a
+`ToView` entity) rather than writing the name down a second time — that is what the seeder truncate
+helpers, `SuggestionPatternViewInstaller` and `SuggestionPatternRefreshJobHandler` all do, so the SQL
+cannot drift from the mapping. The `mv_*.sql` scripts are the exception and name their schemas
+literally; nothing in a script is visible to the model.
+
+`ModuleSchemaTests` pins the whole layout: every table and the three materialized views, read back
+out of `information_schema` / `pg_matviews` after the schema is created, plus a truncate through
+`TruncateTableCascadeAsync` (the seeders' raw SQL is otherwise unreachable from tests — they run only
+behind `Seeding:RunOnStartup`). It compares against a literal list on purpose: a test that recomputed
+the expectation from `ModuleSchemas` would agree with the bug.
+
 ## Delete behaviour — the `Activity` FK family
 
 `Activity` is one of the two hub entities: **17 FK columns across 15 tables in 7 projects** point at it,

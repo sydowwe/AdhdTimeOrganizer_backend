@@ -13,14 +13,47 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.EnsureSchema(
-                name: "public");
+                name: "activity");
+
+            migrationBuilder.EnsureSchema(
+                name: "activity_profiles");
+
+            migrationBuilder.EnsureSchema(
+                name: "history");
+
+            migrationBuilder.EnsureSchema(
+                name: "tracking");
+
+            migrationBuilder.EnsureSchema(
+                name: "user");
 
             migrationBuilder.EnsureSchema(
                 name: "audit");
 
+            migrationBuilder.EnsureSchema(
+                name: "planning");
+
+            migrationBuilder.EnsureSchema(
+                name: "notifications");
+
+            migrationBuilder.EnsureSchema(
+                name: "public");
+
+            migrationBuilder.EnsureSchema(
+                name: "reminders");
+
+            migrationBuilder.EnsureSchema(
+                name: "routines");
+
+            migrationBuilder.EnsureSchema(
+                name: "scheduler");
+
+            migrationBuilder.EnsureSchema(
+                name: "todo");
+
             migrationBuilder.CreateTable(
                 name: "AspNetRoles",
-                schema: "public",
+                schema: "user",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -61,7 +94,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "notification_quiet_hours",
-                schema: "public",
+                schema: "notifications",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -80,7 +113,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "reminder_definition",
-                schema: "public",
+                schema: "reminders",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -118,7 +151,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "reminder_kind_preference",
-                schema: "public",
+                schema: "reminders",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -139,7 +172,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "scheduled_job",
-                schema: "public",
+                schema: "scheduler",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -176,7 +209,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "user",
-                schema: "public",
+                schema: "user",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -214,7 +247,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "user_role_claim",
-                schema: "public",
+                schema: "user",
                 columns: table => new
                 {
                     id = table.Column<int>(type: "integer", nullable: false)
@@ -229,7 +262,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_user_role_claim_asp_net_roles_role_id",
                         column: x => x.role_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "AspNetRoles",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -237,7 +270,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "reminder_lead_offset",
-                schema: "public",
+                schema: "reminders",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -254,7 +287,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_reminder_lead_offset_reminder_definition_reminder_definitio",
                         column: x => x.reminder_definition_id,
-                        principalSchema: "public",
+                        principalSchema: "reminders",
                         principalTable: "reminder_definition",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -262,7 +295,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "reminder_occurrence_action",
-                schema: "public",
+                schema: "reminders",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -284,14 +317,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_reminder_occurrence_action_reminder_definition_reminder_def",
                         column: x => x.reminder_definition_id,
-                        principalSchema: "public",
+                        principalSchema: "reminders",
                         principalTable: "reminder_definition",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_reminder_occurrence_action_reminder_occurrence_action_rever",
                         column: x => x.reverses_action_id,
-                        principalSchema: "public",
+                        principalSchema: "reminders",
                         principalTable: "reminder_occurrence_action",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
@@ -299,7 +332,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "reminder_recipient",
-                schema: "public",
+                schema: "reminders",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -316,7 +349,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_reminder_recipient_reminder_definition_reminder_definition_",
                         column: x => x.reminder_definition_id,
-                        principalSchema: "public",
+                        principalSchema: "reminders",
                         principalTable: "reminder_definition",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -324,7 +357,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "scheduled_job_run",
-                schema: "public",
+                schema: "scheduler",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -354,14 +387,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_scheduled_job_run_scheduled_job_run_replays_run_id",
                         column: x => x.replays_run_id,
-                        principalSchema: "public",
+                        principalSchema: "scheduler",
                         principalTable: "scheduled_job_run",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_scheduled_job_run_scheduled_job_scheduled_job_id",
                         column: x => x.scheduled_job_id,
-                        principalSchema: "public",
+                        principalSchema: "scheduler",
                         principalTable: "scheduled_job",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
@@ -369,7 +402,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_category",
-                schema: "public",
+                schema: "activity",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -389,7 +422,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_category_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -397,7 +430,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_expected_cost_tier",
-                schema: "public",
+                schema: "activity_profiles",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -415,7 +448,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_expected_cost_tier_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -423,7 +456,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_experience_type",
-                schema: "public",
+                schema: "activity_profiles",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -441,7 +474,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_experience_type_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -449,7 +482,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_location_type",
-                schema: "public",
+                schema: "activity_profiles",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -467,7 +500,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_location_type_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -475,7 +508,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_role",
-                schema: "public",
+                schema: "activity",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -484,6 +517,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     text = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false),
                     icon = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    system_key = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
@@ -495,7 +529,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_role_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -503,7 +537,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_weather_dependency",
-                schema: "public",
+                schema: "activity_profiles",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -522,7 +556,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_weather_dependency_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -530,7 +564,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "android_session_data",
-                schema: "public",
+                schema: "tracking",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -552,7 +586,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_android_session_data_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -560,7 +594,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "calendar",
-                schema: "public",
+                schema: "planning",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -587,7 +621,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_calendar_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -595,7 +629,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "desktop_activity_entry",
-                schema: "public",
+                schema: "tracking",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -622,7 +656,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_desktop_activity_entry_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -630,7 +664,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "notification",
-                schema: "public",
+                schema: "notifications",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -651,7 +685,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_notification_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -659,7 +693,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "notification_preference",
-                schema: "public",
+                schema: "notifications",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -678,7 +712,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_notification_preference_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -686,7 +720,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "push_subscription",
-                schema: "public",
+                schema: "notifications",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -706,7 +740,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_push_subscription_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -714,7 +748,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "refresh_token",
-                schema: "public",
+                schema: "user",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -741,7 +775,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_refresh_token_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -749,7 +783,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "routine_time_period",
-                schema: "public",
+                schema: "routines",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -793,7 +827,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_routine_time_period_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -801,7 +835,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "task_importance",
-                schema: "public",
+                schema: "planning",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -821,7 +855,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_task_importance_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -829,7 +863,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "task_planner_day_template",
-                schema: "public",
+                schema: "planning",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -844,6 +878,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     scheduled_days = table.Column<string>(type: "text", nullable: false),
                     suggested_location = table.Column<string>(type: "text", nullable: true),
                     tags = table.Column<string>(type: "text", nullable: false),
+                    is_pinned = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     usage_count = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
                     last_used_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
@@ -857,7 +892,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_task_planner_day_template_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -865,7 +900,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "task_priority",
-                schema: "public",
+                schema: "todo",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -884,7 +919,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_task_priority_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -892,7 +927,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "todo_list_category",
-                schema: "public",
+                schema: "todo",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -912,7 +947,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_todo_list_category_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -920,7 +955,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "user__role",
-                schema: "public",
+                schema: "user",
                 columns: table => new
                 {
                     user_id = table.Column<long>(type: "bigint", nullable: false),
@@ -932,14 +967,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_user__role_asp_net_roles_role_id",
                         column: x => x.role_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "AspNetRoles",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_user__role_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -947,7 +982,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "user_claim",
-                schema: "public",
+                schema: "user",
                 columns: table => new
                 {
                     id = table.Column<int>(type: "integer", nullable: false)
@@ -962,7 +997,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_user_claim_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -970,7 +1005,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "user_login",
-                schema: "public",
+                schema: "user",
                 columns: table => new
                 {
                     login_provider = table.Column<string>(type: "text", nullable: false),
@@ -984,7 +1019,32 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_user_login_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
+                        principalTable: "user",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "user_routine_settings",
+                schema: "routines",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.SerialColumn),
+                    routine_review_dismissed_for_week_start = table.Column<DateOnly>(type: "date", nullable: true),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    created_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    modified_timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    user_id = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_user_routine_settings", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_user_routine_settings_user_user_id",
+                        column: x => x.user_id,
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -992,7 +1052,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "user_token",
-                schema: "public",
+                schema: "user",
                 columns: table => new
                 {
                     user_id = table.Column<long>(type: "bigint", nullable: false),
@@ -1006,7 +1066,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_user_token_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1014,7 +1074,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "web_extension_activity_entry",
-                schema: "public",
+                schema: "tracking",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1037,7 +1097,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_web_extension_activity_entry_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1045,7 +1105,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "reminder_dispatch",
-                schema: "public",
+                schema: "reminders",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1071,21 +1131,21 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_reminder_dispatch_reminder_definition_reminder_definition_id",
                         column: x => x.reminder_definition_id,
-                        principalSchema: "public",
+                        principalSchema: "reminders",
                         principalTable: "reminder_definition",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_reminder_dispatch_reminder_dispatch_reverses_dispatch_id",
                         column: x => x.reverses_dispatch_id,
-                        principalSchema: "public",
+                        principalSchema: "reminders",
                         principalTable: "reminder_dispatch",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_reminder_dispatch_reminder_occurrence_actions_reminder_occu",
                         column: x => x.reminder_occurrence_action_id,
-                        principalSchema: "public",
+                        principalSchema: "reminders",
                         principalTable: "reminder_occurrence_action",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
@@ -1093,7 +1153,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity",
-                schema: "public",
+                schema: "activity",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1101,6 +1161,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     text = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     is_unavoidable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_archived = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     role_id = table.Column<long>(type: "bigint", nullable: false),
                     category_id = table.Column<long>(type: "bigint", nullable: true),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
@@ -1114,21 +1175,21 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_activity_categories_category_id",
                         column: x => x.category_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity_category",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_activity_activity_roles_role_id",
                         column: x => x.role_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity_role",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_activity_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1136,7 +1197,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "routine_period_completions",
-                schema: "public",
+                schema: "routines",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1157,7 +1218,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_routine_period_completions_routine_time_periods_time_period",
                         column: x => x.time_period_id,
-                        principalSchema: "public",
+                        principalSchema: "routines",
                         principalTable: "routine_time_period",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1165,7 +1226,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "user_planner_settings",
-                schema: "public",
+                schema: "planning",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1190,14 +1251,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_user_planner_settings_task_planner_day_templates_default_ap",
                         column: x => x.default_apply_template_id,
-                        principalSchema: "public",
+                        principalSchema: "planning",
                         principalTable: "task_planner_day_template",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "fk_user_planner_settings_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1205,7 +1266,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "todo_list",
-                schema: "public",
+                schema: "todo",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1225,14 +1286,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_todo_list_todo_list_category_category_id",
                         column: x => x.category_id,
-                        principalSchema: "public",
+                        principalSchema: "todo",
                         principalTable: "todo_list_category",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "fk_todo_list_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1240,7 +1301,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_backlog_profile",
-                schema: "public",
+                schema: "activity_profiles",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1265,28 +1326,28 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_backlog_profile_activities_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_activity_backlog_profile_activity_expected_cost_tiers_expec",
                         column: x => x.expected_cost_tier_id,
-                        principalSchema: "public",
+                        principalSchema: "activity_profiles",
                         principalTable: "activity_expected_cost_tier",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_activity_backlog_profile_activity_location_types_location_t",
                         column: x => x.location_type_id,
-                        principalSchema: "public",
+                        principalSchema: "activity_profiles",
                         principalTable: "activity_location_type",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_activity_backlog_profile_activity_weather_dependencies_weat",
                         column: x => x.weather_dependency_id,
-                        principalSchema: "public",
+                        principalSchema: "activity_profiles",
                         principalTable: "activity_weather_dependency",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
@@ -1294,7 +1355,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_bucket_list_profile",
-                schema: "public",
+                schema: "activity_profiles",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1315,14 +1376,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_bucket_list_profile_activities_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_activity_bucket_list_profile_activity_experience_types_expe",
                         column: x => x.experience_type_id,
-                        principalSchema: "public",
+                        principalSchema: "activity_profiles",
                         principalTable: "activity_experience_type",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
@@ -1330,7 +1391,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_project_profile",
-                schema: "public",
+                schema: "activity_profiles",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1353,7 +1414,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_project_profile_activities_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1361,7 +1422,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "leisure_suggestion_record",
-                schema: "public",
+                schema: "activity_profiles",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1381,14 +1442,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_leisure_suggestion_record_activity_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_leisure_suggestion_record_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1396,7 +1457,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "memory_anchor",
-                schema: "public",
+                schema: "activity_profiles",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1419,14 +1480,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_memory_anchor_activities_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_memory_anchor_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1458,21 +1519,21 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_pomodoro_timer_preset_activity_focus_activity_id",
                         column: x => x.focus_activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_pomodoro_timer_preset_activity_rest_activity_id",
                         column: x => x.rest_activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_pomodoro_timer_preset_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1480,7 +1541,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "repeating_planner_task",
-                schema: "public",
+                schema: "planning",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1510,21 +1571,21 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_repeating_planner_task_activity_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_repeating_planner_task_task_importances_importance_id",
                         column: x => x.importance_id,
-                        principalSchema: "public",
+                        principalSchema: "planning",
                         principalTable: "task_importance",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "fk_repeating_planner_task_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1532,7 +1593,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "routine_todo_list",
-                schema: "public",
+                schema: "routines",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1569,21 +1630,21 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_routine_todo_list_activity_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_routine_todo_list_routine_time_period_time_period_id",
                         column: x => x.time_period_id,
-                        principalSchema: "public",
+                        principalSchema: "routines",
                         principalTable: "routine_time_period",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_routine_todo_list_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1591,7 +1652,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "template_planner_task",
-                schema: "public",
+                schema: "planning",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1615,28 +1676,28 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_template_planner_task_activity_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_template_planner_task_task_importance_importance_id",
                         column: x => x.importance_id,
-                        principalSchema: "public",
+                        principalSchema: "planning",
                         principalTable: "task_importance",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "fk_template_planner_task_task_planner_day_template_template_id",
                         column: x => x.template_id,
-                        principalSchema: "public",
+                        principalSchema: "planning",
                         principalTable: "task_planner_day_template",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_template_planner_task_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1662,14 +1723,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_timer_preset_activity_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_timer_preset_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1677,7 +1738,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "tracker_android_mapping_by_pattern",
-                schema: "public",
+                schema: "tracking",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1706,25 +1767,26 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_tracker_android_mapping_by_pattern_activities_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
-                        principalColumn: "id");
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_tracker_android_mapping_by_pattern_activity_categories_cate",
                         column: x => x.category_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity_category",
                         principalColumn: "id");
                     table.ForeignKey(
                         name: "fk_tracker_android_mapping_by_pattern_activity_roles_role_id",
                         column: x => x.role_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity_role",
                         principalColumn: "id");
                     table.ForeignKey(
                         name: "fk_tracker_android_mapping_by_pattern_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1732,7 +1794,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "tracker_desktop_mapping_by_pattern",
-                schema: "public",
+                schema: "tracking",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1764,25 +1826,26 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_tracker_desktop_mapping_by_pattern_activities_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
-                        principalColumn: "id");
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_tracker_desktop_mapping_by_pattern_activity_categories_cate",
                         column: x => x.category_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity_category",
                         principalColumn: "id");
                     table.ForeignKey(
                         name: "fk_tracker_desktop_mapping_by_pattern_activity_roles_role_id",
                         column: x => x.role_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity_role",
                         principalColumn: "id");
                     table.ForeignKey(
                         name: "fk_tracker_desktop_mapping_by_pattern_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1790,7 +1853,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "todo_list_item",
-                schema: "public",
+                schema: "todo",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1823,35 +1886,35 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_todo_list_item_activity_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_todo_list_item_activity_paired_leisure_activity_id",
                         column: x => x.paired_leisure_activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "fk_todo_list_item_task_priority_task_priority_id",
                         column: x => x.task_priority_id,
-                        principalSchema: "public",
+                        principalSchema: "todo",
                         principalTable: "task_priority",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_todo_list_item_todo_list_todo_list_id",
                         column: x => x.todo_list_id,
-                        principalSchema: "public",
+                        principalSchema: "todo",
                         principalTable: "todo_list",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_todo_list_item_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1859,7 +1922,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "activity_history",
-                schema: "public",
+                schema: "history",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1881,28 +1944,28 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_activity_history_activity_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_activity_history_routine_todo_list_routine_todo_list_id",
                         column: x => x.routine_todo_list_id,
-                        principalSchema: "public",
+                        principalSchema: "routines",
                         principalTable: "routine_todo_list",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "fk_activity_history_todo_list_item_todo_list_item_id",
                         column: x => x.todo_list_item_id,
-                        principalSchema: "public",
+                        principalSchema: "todo",
                         principalTable: "todo_list_item",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "fk_activity_history_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1910,7 +1973,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "planner_task",
-                schema: "public",
+                schema: "planning",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1941,35 +2004,35 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_planner_task_activity_activity_id",
                         column: x => x.activity_id,
-                        principalSchema: "public",
+                        principalSchema: "activity",
                         principalTable: "activity",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_planner_task_calendar_calendar_id",
                         column: x => x.calendar_id,
-                        principalSchema: "public",
+                        principalSchema: "planning",
                         principalTable: "calendar",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_planner_task_task_importances_importance_id",
                         column: x => x.importance_id,
-                        principalSchema: "public",
+                        principalSchema: "planning",
                         principalTable: "task_importance",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "fk_planner_task_todo_list_items_todolist_item_id",
                         column: x => x.todolist_item_id,
-                        principalSchema: "public",
+                        principalSchema: "todo",
                         principalTable: "todo_list_item",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "fk_planner_task_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -1977,7 +2040,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "reminder",
-                schema: "public",
+                schema: "planning",
                 columns: table => new
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
@@ -1999,14 +2062,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     table.ForeignKey(
                         name: "fk_reminder_planner_task_planner_task_id",
                         column: x => x.planner_task_id,
-                        principalSchema: "public",
+                        principalSchema: "planning",
                         principalTable: "planner_task",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_reminder_user_user_id",
                         column: x => x.user_id,
-                        principalSchema: "public",
+                        principalSchema: "user",
                         principalTable: "user",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
@@ -2014,229 +2077,243 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_category_id",
-                schema: "public",
+                schema: "activity",
                 table: "activity",
                 column: "category_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_role_id",
-                schema: "public",
+                schema: "activity",
                 table: "activity",
                 column: "role_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_user_id",
-                schema: "public",
+                schema: "activity",
                 table: "activity",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_user_id_category_id",
-                schema: "public",
+                schema: "activity",
                 table: "activity",
                 columns: new[] { "user_id", "category_id" });
 
             migrationBuilder.CreateIndex(
+                name: "ix_activity_user_id_is_archived",
+                schema: "activity",
+                table: "activity",
+                columns: new[] { "user_id", "is_archived" });
+
+            migrationBuilder.CreateIndex(
                 name: "ix_activity_user_id_name",
-                schema: "public",
+                schema: "activity",
                 table: "activity",
                 columns: new[] { "user_id", "name" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_user_id_role_id",
-                schema: "public",
+                schema: "activity",
                 table: "activity",
                 columns: new[] { "user_id", "role_id" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_backlog_profile_activity_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_backlog_profile",
                 column: "activity_id",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_backlog_profile_expected_cost_tier_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_backlog_profile",
                 column: "expected_cost_tier_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_backlog_profile_location_type_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_backlog_profile",
                 column: "location_type_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_backlog_profile_weather_dependency_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_backlog_profile",
                 column: "weather_dependency_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_bucket_list_profile_activity_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_bucket_list_profile",
                 column: "activity_id",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_bucket_list_profile_experience_type_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_bucket_list_profile",
                 column: "experience_type_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_category_user_id",
-                schema: "public",
+                schema: "activity",
                 table: "activity_category",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_category_user_id_name",
-                schema: "public",
+                schema: "activity",
                 table: "activity_category",
                 columns: new[] { "user_id", "name" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_expected_cost_tier_user_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_expected_cost_tier",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_expected_cost_tier_user_id_text",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_expected_cost_tier",
                 columns: new[] { "user_id", "text" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_experience_type_user_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_experience_type",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_experience_type_user_id_text",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_experience_type",
                 columns: new[] { "user_id", "text" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_history_activity_id",
-                schema: "public",
+                schema: "history",
                 table: "activity_history",
                 column: "activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_history_routine_todo_list_id",
-                schema: "public",
+                schema: "history",
                 table: "activity_history",
                 column: "routine_todo_list_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_history_todo_list_item_id",
-                schema: "public",
+                schema: "history",
                 table: "activity_history",
                 column: "todo_list_item_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_history_user_id",
-                schema: "public",
+                schema: "history",
                 table: "activity_history",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_history_user_id_activity_id_start_timestamp",
-                schema: "public",
+                schema: "history",
                 table: "activity_history",
                 columns: new[] { "user_id", "activity_id", "start_timestamp" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_history_user_id_start_timestamp",
-                schema: "public",
+                schema: "history",
                 table: "activity_history",
                 columns: new[] { "user_id", "start_timestamp" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_location_type_user_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_location_type",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_location_type_user_id_text",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_location_type",
                 columns: new[] { "user_id", "text" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_project_profile_activity_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_project_profile",
                 column: "activity_id",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_role_user_id",
-                schema: "public",
+                schema: "activity",
                 table: "activity_role",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_role_user_id_name",
-                schema: "public",
+                schema: "activity",
                 table: "activity_role",
                 columns: new[] { "user_id", "name" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "ix_activity_role_user_id_system_key",
+                schema: "activity",
+                table: "activity_role",
+                columns: new[] { "user_id", "system_key" },
+                unique: true,
+                filter: "system_key IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_activity_weather_dependency_user_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_weather_dependency",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_activity_weather_dependency_user_id_text",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "activity_weather_dependency",
                 columns: new[] { "user_id", "text" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_android_session_data_user_id",
-                schema: "public",
+                schema: "tracking",
                 table: "android_session_data",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_android_session_data_user_id_device_id_package_name_session",
-                schema: "public",
+                schema: "tracking",
                 table: "android_session_data",
                 columns: new[] { "user_id", "device_id", "package_name", "session_start_utc" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_android_session_data_user_id_package_name",
-                schema: "public",
+                schema: "tracking",
                 table: "android_session_data",
                 columns: new[] { "user_id", "package_name" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_android_session_data_user_id_session_start_utc",
-                schema: "public",
+                schema: "tracking",
                 table: "android_session_data",
                 columns: new[] { "user_id", "session_start_utc" });
 
             migrationBuilder.CreateIndex(
                 name: "RoleNameIndex",
-                schema: "public",
+                schema: "user",
                 table: "AspNetRoles",
                 column: "normalized_name",
                 unique: true);
@@ -2274,140 +2351,140 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "ix_calendar_day_type",
-                schema: "public",
+                schema: "planning",
                 table: "calendar",
                 column: "day_type");
 
             migrationBuilder.CreateIndex(
                 name: "ix_calendar_user_id",
-                schema: "public",
+                schema: "planning",
                 table: "calendar",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_calendar_user_id_date",
-                schema: "public",
+                schema: "planning",
                 table: "calendar",
                 columns: new[] { "user_id", "date" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_desktop_activity_entry_user_id",
-                schema: "public",
+                schema: "tracking",
                 table: "desktop_activity_entry",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_desktop_activity_entry_user_id_window_start",
-                schema: "public",
+                schema: "tracking",
                 table: "desktop_activity_entry",
                 columns: new[] { "user_id", "window_start" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_desktop_activity_entry_user_id_window_start_record_date_pro",
-                schema: "public",
+                schema: "tracking",
                 table: "desktop_activity_entry",
                 columns: new[] { "user_id", "window_start", "record_date", "process_name", "window_title" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_leisure_suggestion_record_activity_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "leisure_suggestion_record",
                 column: "activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_leisure_suggestion_record_user_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "leisure_suggestion_record",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_leisure_suggestion_record_user_id_source_activity_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "leisure_suggestion_record",
                 columns: new[] { "user_id", "source", "activity_id" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_memory_anchor_activity_id_anchor_year_anchor_month",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "memory_anchor",
                 columns: new[] { "activity_id", "anchor_year", "anchor_month" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_memory_anchor_user_id",
-                schema: "public",
+                schema: "activity_profiles",
                 table: "memory_anchor",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_notification_deferred_until",
-                schema: "public",
+                schema: "notifications",
                 table: "notification",
                 column: "deferred_until",
                 filter: "deferred_until IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "ix_notification_user_id_created_timestamp",
-                schema: "public",
+                schema: "notifications",
                 table: "notification",
                 columns: new[] { "user_id", "created_timestamp" },
                 descending: new[] { false, true });
 
             migrationBuilder.CreateIndex(
                 name: "ix_notification_preference_user_id_type_channel",
-                schema: "public",
+                schema: "notifications",
                 table: "notification_preference",
                 columns: new[] { "user_id", "type", "channel" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_notification_quiet_hours_user_id",
-                schema: "public",
+                schema: "notifications",
                 table: "notification_quiet_hours",
                 column: "user_id",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_planner_task_activity_id",
-                schema: "public",
+                schema: "planning",
                 table: "planner_task",
                 column: "activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_planner_task_calendar_id",
-                schema: "public",
+                schema: "planning",
                 table: "planner_task",
                 column: "calendar_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_planner_task_importance_id",
-                schema: "public",
+                schema: "planning",
                 table: "planner_task",
                 column: "importance_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_planner_task_status",
-                schema: "public",
+                schema: "planning",
                 table: "planner_task",
                 column: "status");
 
             migrationBuilder.CreateIndex(
                 name: "ix_planner_task_todolist_item_id",
-                schema: "public",
+                schema: "planning",
                 table: "planner_task",
                 column: "todolist_item_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_planner_task_user_id",
-                schema: "public",
+                schema: "planning",
                 table: "planner_task",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_planner_task_user_id_calendar_id_start_time",
-                schema: "public",
+                schema: "planning",
                 table: "planner_task",
                 columns: new[] { "user_id", "calendar_id", "start_time" });
 
@@ -2431,238 +2508,238 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "ix_push_subscription_endpoint",
-                schema: "public",
+                schema: "notifications",
                 table: "push_subscription",
                 column: "endpoint",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_push_subscription_user_id",
-                schema: "public",
+                schema: "notifications",
                 table: "push_subscription",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_refresh_token_expires_at",
-                schema: "public",
+                schema: "user",
                 table: "refresh_token",
                 column: "expires_at");
 
             migrationBuilder.CreateIndex(
                 name: "ix_refresh_token_token_hash",
-                schema: "public",
+                schema: "user",
                 table: "refresh_token",
                 column: "token_hash");
 
             migrationBuilder.CreateIndex(
                 name: "ix_refresh_token_user_revoked",
-                schema: "public",
+                schema: "user",
                 table: "refresh_token",
                 columns: new[] { "user_id", "is_revoked" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_planner_task_id",
-                schema: "public",
+                schema: "planning",
                 table: "reminder",
                 column: "planner_task_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_user_id",
-                schema: "public",
+                schema: "planning",
                 table: "reminder",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_user_id_remind_at",
-                schema: "public",
+                schema: "planning",
                 table: "reminder",
                 columns: new[] { "user_id", "remind_at" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_definition_owner_module_subject_type_subject_id_ki",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_definition",
                 columns: new[] { "owner_module", "subject_type", "subject_id", "kind" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_definition_status_next_occurrence_at",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_definition",
                 columns: new[] { "status", "next_occurrence_at" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_dispatch_outcome",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_dispatch",
                 column: "outcome",
                 filter: "outcome = 'Failed'");
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_dispatch_reminder_definition_id_occurrence_at",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_dispatch",
                 columns: new[] { "reminder_definition_id", "occurrence_at" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_dispatch_reminder_occurrence_action_id",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_dispatch",
                 column: "reminder_occurrence_action_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_dispatch_reverses_dispatch_id",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_dispatch",
                 column: "reverses_dispatch_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_kind_preference_user_id_owner_module_kind",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_kind_preference",
                 columns: new[] { "user_id", "owner_module", "kind" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_lead_offset_reminder_definition_id",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_lead_offset",
                 column: "reminder_definition_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_occurrence_action_action_type_snooze_until",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_occurrence_action",
                 columns: new[] { "action_type", "snooze_until" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_occurrence_action_reminder_definition_id_occurrenc",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_occurrence_action",
                 columns: new[] { "reminder_definition_id", "occurrence_at", "user_id" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_occurrence_action_reverses_action_id",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_occurrence_action",
                 column: "reverses_action_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_recipient_reminder_definition_id",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_recipient",
                 column: "reminder_definition_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_reminder_recipient_user_id",
-                schema: "public",
+                schema: "reminders",
                 table: "reminder_recipient",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_repeating_planner_task_activity_id",
-                schema: "public",
+                schema: "planning",
                 table: "repeating_planner_task",
                 column: "activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_repeating_planner_task_importance_id",
-                schema: "public",
+                schema: "planning",
                 table: "repeating_planner_task",
                 column: "importance_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_repeating_planner_task_recurrence_type",
-                schema: "public",
+                schema: "planning",
                 table: "repeating_planner_task",
                 column: "recurrence_type");
 
             migrationBuilder.CreateIndex(
                 name: "ix_repeating_planner_task_user_id",
-                schema: "public",
+                schema: "planning",
                 table: "repeating_planner_task",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_repeating_planner_task_user_id_is_active",
-                schema: "public",
+                schema: "planning",
                 table: "repeating_planner_task",
                 columns: new[] { "user_id", "is_active" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_period_completions_time_period_id_period_start",
-                schema: "public",
+                schema: "routines",
                 table: "routine_period_completions",
                 columns: new[] { "time_period_id", "period_start" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_time_period_user_id_length_in_days",
-                schema: "public",
+                schema: "routines",
                 table: "routine_time_period",
                 columns: new[] { "user_id", "length_in_days" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_time_period_user_id_text",
-                schema: "public",
+                schema: "routines",
                 table: "routine_time_period",
                 columns: new[] { "user_id", "text" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_todo_list_activity_id",
-                schema: "public",
+                schema: "routines",
                 table: "routine_todo_list",
                 column: "activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_todo_list_time_period_id",
-                schema: "public",
+                schema: "routines",
                 table: "routine_todo_list",
                 column: "time_period_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_todo_list_user_id",
-                schema: "public",
+                schema: "routines",
                 table: "routine_todo_list",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_todo_list_user_id_time_period_id",
-                schema: "public",
+                schema: "routines",
                 table: "routine_todo_list",
                 columns: new[] { "user_id", "time_period_id" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_routine_todo_list_user_id_time_period_id_activity_id",
-                schema: "public",
+                schema: "routines",
                 table: "routine_todo_list",
                 columns: new[] { "user_id", "time_period_id", "activity_id" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_scheduled_job_job_key",
-                schema: "public",
+                schema: "scheduler",
                 table: "scheduled_job",
                 column: "job_key",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_scheduled_job_run_outcome_started_at",
-                schema: "public",
+                schema: "scheduler",
                 table: "scheduled_job_run",
                 columns: new[] { "outcome", "started_at" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_scheduled_job_run_replays_run_id",
-                schema: "public",
+                schema: "scheduler",
                 table: "scheduled_job_run",
                 column: "replays_run_id");
 
             migrationBuilder.CreateIndex(
                 name: "ux_scheduled_job_run_occurrence",
-                schema: "public",
+                schema: "scheduler",
                 table: "scheduled_job_run",
                 columns: new[] { "scheduled_job_id", "scheduled_fire_time" },
                 unique: true,
@@ -2670,69 +2747,69 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "ix_task_importance_importance",
-                schema: "public",
+                schema: "planning",
                 table: "task_importance",
                 column: "importance");
 
             migrationBuilder.CreateIndex(
                 name: "ix_task_importance_user_id_importance",
-                schema: "public",
+                schema: "planning",
                 table: "task_importance",
                 columns: new[] { "user_id", "importance" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_task_planner_day_template_suggested_for_day_type",
-                schema: "public",
+                schema: "planning",
                 table: "task_planner_day_template",
                 column: "suggested_for_day_type");
 
             migrationBuilder.CreateIndex(
                 name: "ix_task_planner_day_template_user_id",
-                schema: "public",
+                schema: "planning",
                 table: "task_planner_day_template",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_task_planner_day_template_user_id_name",
-                schema: "public",
+                schema: "planning",
                 table: "task_planner_day_template",
                 columns: new[] { "user_id", "name" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_task_priority_priority",
-                schema: "public",
+                schema: "todo",
                 table: "task_priority",
                 column: "priority");
 
             migrationBuilder.CreateIndex(
                 name: "ix_task_priority_user_id_priority",
-                schema: "public",
+                schema: "todo",
                 table: "task_priority",
                 columns: new[] { "user_id", "priority" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_template_planner_task_activity_id",
-                schema: "public",
+                schema: "planning",
                 table: "template_planner_task",
                 column: "activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_template_planner_task_importance_id",
-                schema: "public",
+                schema: "planning",
                 table: "template_planner_task",
                 column: "importance_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_template_planner_task_template_id_start_time",
-                schema: "public",
+                schema: "planning",
                 table: "template_planner_task",
                 columns: new[] { "template_id", "start_time" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_template_planner_task_user_id",
-                schema: "public",
+                schema: "planning",
                 table: "template_planner_task",
                 column: "user_id");
 
@@ -2750,113 +2827,112 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_category_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list",
                 column: "category_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_user_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_user_id_name",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list",
                 columns: new[] { "user_id", "name" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_category_user_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_category",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_category_user_id_name",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_category",
                 columns: new[] { "user_id", "name" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_item_activity_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_item",
                 column: "activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_item_paired_leisure_activity_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_item",
                 column: "paired_leisure_activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_item_task_priority_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_item",
                 column: "task_priority_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_item_todo_list_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_item",
                 column: "todo_list_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_item_user_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_item",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_item_user_id_activity_id_todo_list_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_item",
                 columns: new[] { "user_id", "activity_id", "todo_list_id" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_item_user_id_completed_timestamp",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_item",
                 columns: new[] { "user_id", "completed_timestamp" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_todo_list_item_user_id_task_priority_id",
-                schema: "public",
+                schema: "todo",
                 table: "todo_list_item",
                 columns: new[] { "user_id", "task_priority_id" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_android_mapping_by_pattern_activity_id",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_android_mapping_by_pattern",
-                column: "activity_id",
-                unique: true);
+                column: "activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_android_mapping_by_pattern_category_id",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_android_mapping_by_pattern",
                 column: "category_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_android_mapping_by_pattern_role_id",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_android_mapping_by_pattern",
                 column: "role_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_android_mapping_by_pattern_user_id",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_android_mapping_by_pattern",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_android_mapping_by_pattern_user_id_package_name_app",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_android_mapping_by_pattern",
                 columns: new[] { "user_id", "package_name", "app_label" },
                 unique: true)
@@ -2864,32 +2940,31 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_desktop_mapping_by_pattern_activity_id",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_desktop_mapping_by_pattern",
-                column: "activity_id",
-                unique: true);
+                column: "activity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_desktop_mapping_by_pattern_category_id",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_desktop_mapping_by_pattern",
                 column: "category_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_desktop_mapping_by_pattern_role_id",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_desktop_mapping_by_pattern",
                 column: "role_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_desktop_mapping_by_pattern_user_id",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_desktop_mapping_by_pattern",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_tracker_desktop_mapping_by_pattern_user_id_process_name_pro",
-                schema: "public",
+                schema: "tracking",
                 table: "tracker_desktop_mapping_by_pattern",
                 columns: new[] { "user_id", "process_name", "product_name", "window_title" },
                 unique: true)
@@ -2897,69 +2972,76 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "EmailIndex",
-                schema: "public",
+                schema: "user",
                 table: "user",
                 column: "normalized_email");
 
             migrationBuilder.CreateIndex(
                 name: "UserNameIndex",
-                schema: "public",
+                schema: "user",
                 table: "user",
                 column: "normalized_user_name",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_user__role_role_id",
-                schema: "public",
+                schema: "user",
                 table: "user__role",
                 column: "role_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_user_claim_user_id",
-                schema: "public",
+                schema: "user",
                 table: "user_claim",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_user_login_user_id",
-                schema: "public",
+                schema: "user",
                 table: "user_login",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_user_planner_settings_default_apply_template_id",
-                schema: "public",
+                schema: "planning",
                 table: "user_planner_settings",
                 column: "default_apply_template_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_user_planner_settings_user_id",
-                schema: "public",
+                schema: "planning",
                 table: "user_planner_settings",
                 column: "user_id",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_user_role_claim_role_id",
-                schema: "public",
+                schema: "user",
                 table: "user_role_claim",
                 column: "role_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_user_routine_settings_user_id",
+                schema: "routines",
+                table: "user_routine_settings",
+                column: "user_id",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "ix_web_extension_activity_entry_user_id",
-                schema: "public",
+                schema: "tracking",
                 table: "web_extension_activity_entry",
                 column: "user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_web_extension_activity_entry_user_id_window_start",
-                schema: "public",
+                schema: "tracking",
                 table: "web_extension_activity_entry",
                 columns: new[] { "user_id", "window_start" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_web_extension_activity_entry_user_id_window_start_domain_re",
-                schema: "public",
+                schema: "tracking",
                 table: "web_extension_activity_entry",
                 columns: new[] { "user_id", "window_start", "domain", "record_date" },
                 unique: true);
@@ -2970,23 +3052,23 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
         {
             migrationBuilder.DropTable(
                 name: "activity_backlog_profile",
-                schema: "public");
+                schema: "activity_profiles");
 
             migrationBuilder.DropTable(
                 name: "activity_bucket_list_profile",
-                schema: "public");
+                schema: "activity_profiles");
 
             migrationBuilder.DropTable(
                 name: "activity_history",
-                schema: "public");
+                schema: "history");
 
             migrationBuilder.DropTable(
                 name: "activity_project_profile",
-                schema: "public");
+                schema: "activity_profiles");
 
             migrationBuilder.DropTable(
                 name: "android_session_data",
-                schema: "public");
+                schema: "tracking");
 
             migrationBuilder.DropTable(
                 name: "business_audit_log",
@@ -2994,27 +3076,27 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "desktop_activity_entry",
-                schema: "public");
+                schema: "tracking");
 
             migrationBuilder.DropTable(
                 name: "leisure_suggestion_record",
-                schema: "public");
+                schema: "activity_profiles");
 
             migrationBuilder.DropTable(
                 name: "memory_anchor",
-                schema: "public");
+                schema: "activity_profiles");
 
             migrationBuilder.DropTable(
                 name: "notification",
-                schema: "public");
+                schema: "notifications");
 
             migrationBuilder.DropTable(
                 name: "notification_preference",
-                schema: "public");
+                schema: "notifications");
 
             migrationBuilder.DropTable(
                 name: "notification_quiet_hours",
-                schema: "public");
+                schema: "notifications");
 
             migrationBuilder.DropTable(
                 name: "pomodoro_timer_preset",
@@ -3022,47 +3104,47 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "push_subscription",
-                schema: "public");
+                schema: "notifications");
 
             migrationBuilder.DropTable(
                 name: "refresh_token",
-                schema: "public");
+                schema: "user");
 
             migrationBuilder.DropTable(
                 name: "reminder",
-                schema: "public");
+                schema: "planning");
 
             migrationBuilder.DropTable(
                 name: "reminder_dispatch",
-                schema: "public");
+                schema: "reminders");
 
             migrationBuilder.DropTable(
                 name: "reminder_kind_preference",
-                schema: "public");
+                schema: "reminders");
 
             migrationBuilder.DropTable(
                 name: "reminder_lead_offset",
-                schema: "public");
+                schema: "reminders");
 
             migrationBuilder.DropTable(
                 name: "reminder_recipient",
-                schema: "public");
+                schema: "reminders");
 
             migrationBuilder.DropTable(
                 name: "repeating_planner_task",
-                schema: "public");
+                schema: "planning");
 
             migrationBuilder.DropTable(
                 name: "routine_period_completions",
-                schema: "public");
+                schema: "routines");
 
             migrationBuilder.DropTable(
                 name: "scheduled_job_run",
-                schema: "public");
+                schema: "scheduler");
 
             migrationBuilder.DropTable(
                 name: "template_planner_task",
-                schema: "public");
+                schema: "planning");
 
             migrationBuilder.DropTable(
                 name: "timer_preset",
@@ -3070,127 +3152,131 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "tracker_android_mapping_by_pattern",
-                schema: "public");
+                schema: "tracking");
 
             migrationBuilder.DropTable(
                 name: "tracker_desktop_mapping_by_pattern",
-                schema: "public");
+                schema: "tracking");
 
             migrationBuilder.DropTable(
                 name: "user__role",
-                schema: "public");
+                schema: "user");
 
             migrationBuilder.DropTable(
                 name: "user_claim",
-                schema: "public");
+                schema: "user");
 
             migrationBuilder.DropTable(
                 name: "user_login",
-                schema: "public");
+                schema: "user");
 
             migrationBuilder.DropTable(
                 name: "user_planner_settings",
-                schema: "public");
+                schema: "planning");
 
             migrationBuilder.DropTable(
                 name: "user_role_claim",
-                schema: "public");
+                schema: "user");
+
+            migrationBuilder.DropTable(
+                name: "user_routine_settings",
+                schema: "routines");
 
             migrationBuilder.DropTable(
                 name: "user_token",
-                schema: "public");
+                schema: "user");
 
             migrationBuilder.DropTable(
                 name: "web_extension_activity_entry",
-                schema: "public");
+                schema: "tracking");
 
             migrationBuilder.DropTable(
                 name: "activity_expected_cost_tier",
-                schema: "public");
+                schema: "activity_profiles");
 
             migrationBuilder.DropTable(
                 name: "activity_location_type",
-                schema: "public");
+                schema: "activity_profiles");
 
             migrationBuilder.DropTable(
                 name: "activity_weather_dependency",
-                schema: "public");
+                schema: "activity_profiles");
 
             migrationBuilder.DropTable(
                 name: "activity_experience_type",
-                schema: "public");
+                schema: "activity_profiles");
 
             migrationBuilder.DropTable(
                 name: "routine_todo_list",
-                schema: "public");
+                schema: "routines");
 
             migrationBuilder.DropTable(
                 name: "planner_task",
-                schema: "public");
+                schema: "planning");
 
             migrationBuilder.DropTable(
                 name: "reminder_occurrence_action",
-                schema: "public");
+                schema: "reminders");
 
             migrationBuilder.DropTable(
                 name: "scheduled_job",
-                schema: "public");
+                schema: "scheduler");
 
             migrationBuilder.DropTable(
                 name: "task_planner_day_template",
-                schema: "public");
+                schema: "planning");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles",
-                schema: "public");
+                schema: "user");
 
             migrationBuilder.DropTable(
                 name: "routine_time_period",
-                schema: "public");
+                schema: "routines");
 
             migrationBuilder.DropTable(
                 name: "calendar",
-                schema: "public");
+                schema: "planning");
 
             migrationBuilder.DropTable(
                 name: "task_importance",
-                schema: "public");
+                schema: "planning");
 
             migrationBuilder.DropTable(
                 name: "todo_list_item",
-                schema: "public");
+                schema: "todo");
 
             migrationBuilder.DropTable(
                 name: "reminder_definition",
-                schema: "public");
+                schema: "reminders");
 
             migrationBuilder.DropTable(
                 name: "activity",
-                schema: "public");
+                schema: "activity");
 
             migrationBuilder.DropTable(
                 name: "task_priority",
-                schema: "public");
+                schema: "todo");
 
             migrationBuilder.DropTable(
                 name: "todo_list",
-                schema: "public");
+                schema: "todo");
 
             migrationBuilder.DropTable(
                 name: "activity_category",
-                schema: "public");
+                schema: "activity");
 
             migrationBuilder.DropTable(
                 name: "activity_role",
-                schema: "public");
+                schema: "activity");
 
             migrationBuilder.DropTable(
                 name: "todo_list_category",
-                schema: "public");
+                schema: "todo");
 
             migrationBuilder.DropTable(
                 name: "user",
-                schema: "public");
+                schema: "user");
         }
     }
 }

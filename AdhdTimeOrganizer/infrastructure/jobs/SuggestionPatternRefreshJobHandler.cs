@@ -48,8 +48,14 @@ public class SuggestionPatternRefreshJobHandler(
                 // viewName always comes from the fixed ViewNames table above, never from external input, so
                 // there is no injection risk despite building the statement text ourselves - REFRESH
                 // MATERIALIZED VIEW CONCURRENTLY takes a bare identifier, not a bindable parameter.
+                //
+                // Schema-qualified, and from the model rather than a literal: the views live in the
+                // Planning module's schema, and an unqualified name only resolved while every table was
+                // in `public`. Worth qualifying carefully because this particular failure is invisible -
+                // the catch below logs and swallows, so a wrong name here just means suggestions quietly
+                // stop updating.
 #pragma warning disable EF1002, EF1003
-                await db.ExecuteSqlRawAsync("REFRESH MATERIALIZED VIEW CONCURRENTLY " + viewName, ct);
+                await db.ExecuteSqlRawAsync("REFRESH MATERIALIZED VIEW CONCURRENTLY " + QualifiedViewName(viewName), ct);
 #pragma warning restore EF1002, EF1003
                 logger.LogInformation(
                     "Refreshed suggestion pattern view {ViewName} in {ElapsedMs}ms", viewName, stopwatch.ElapsedMilliseconds);
@@ -67,5 +73,19 @@ public class SuggestionPatternRefreshJobHandler(
                     "Failed to refresh suggestion pattern view {ViewName} after {ElapsedMs}ms", viewName, stopwatch.ElapsedMilliseconds);
             }
         }
+    }
+
+    /// <summary>
+    /// The view's schema-qualified name, taken from the entity that maps it with <c>ToView</c>, so
+    /// that the schema this refreshes in cannot drift from the one EF reads from.
+    /// </summary>
+    private string QualifiedViewName(string viewName)
+    {
+        var schema = dbContext.Model.GetEntityTypes()
+                         .FirstOrDefault(e => e.GetViewName() == viewName)
+                         ?.GetViewSchema()
+                     ?? dbContext.Model.GetDefaultSchema();
+
+        return schema is null ? viewName : $"{schema}.{viewName}";
     }
 }

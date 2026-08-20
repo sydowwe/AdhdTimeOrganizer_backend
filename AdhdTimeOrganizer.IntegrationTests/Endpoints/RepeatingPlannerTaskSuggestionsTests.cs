@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.application.dto.response.suggestion;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
@@ -211,8 +212,9 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     {
         await using var db = CreateDbContext();
 #pragma warning disable EF1002
-        await db.Database.ExecuteSqlRawAsync("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_planner_task_pattern", CancellationToken);
-        await db.Database.ExecuteSqlRawAsync("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_activity_history_pattern", CancellationToken);
+        // Schema-qualified: the views belong to the Planning slice and are created in its schema.
+        await db.Database.ExecuteSqlRawAsync($"REFRESH MATERIALIZED VIEW CONCURRENTLY {ModuleSchemas.Planning}.mv_planner_task_pattern", CancellationToken);
+        await db.Database.ExecuteSqlRawAsync($"REFRESH MATERIALIZED VIEW CONCURRENTLY {ModuleSchemas.Planning}.mv_activity_history_pattern", CancellationToken);
 #pragma warning restore EF1002
     }
 

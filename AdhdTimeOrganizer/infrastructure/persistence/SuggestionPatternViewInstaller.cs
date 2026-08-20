@@ -54,7 +54,7 @@ public static class SuggestionPatternViewInstaller
                 var viewName = ViewNameOf(resource);
 
                 var exists = await db.Database
-                    .SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", $"public.{viewName}")
+                    .SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", QualifiedName(db, viewName))
                     .SingleAsync(ct);
 
                 if (exists)
@@ -73,6 +73,31 @@ public static class SuggestionPatternViewInstaller
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_unlock({AdvisoryLockKey})", ct);
             await db.Database.CloseConnectionAsync();
         }
+    }
+
+    /// <summary>
+    /// The view's schema-qualified name, taken from the entity that maps it with <c>ToView</c>.
+    /// </summary>
+    /// <remarks>
+    /// Read off the model rather than written down here, so the existence probe and the mapping
+    /// cannot disagree: if EF reads the view from <c>planning</c>, this looks for it in
+    /// <c>planning</c>. It used to say <c>public</c> outright, which stopped being true the moment
+    /// each module got its own schema — and the failure is nasty rather than obvious. A probe against
+    /// the wrong schema never finds the view, so the installer runs <c>CREATE MATERIALIZED VIEW</c>
+    /// again on every single boot and dies on a duplicate-object error, holding the advisory lock.
+    /// <para>
+    /// A script with no entity mapping it falls back to the model's default schema. That is the old
+    /// behaviour and the only guess available — nothing in the script's name says where it lives.
+    /// </para>
+    /// </remarks>
+    private static string QualifiedName(AppDbContext db, string viewName)
+    {
+        var schema = db.Model.GetEntityTypes()
+                         .FirstOrDefault(e => e.GetViewName() == viewName)
+                         ?.GetViewSchema()
+                     ?? db.Model.GetDefaultSchema();
+
+        return schema is null ? viewName : $"{schema}.{viewName}";
     }
 
     // "AdhdTimeOrganizer.infrastructure.persistence.sqlScripts.mv_x_pattern.sql" -> "mv_x_pattern"

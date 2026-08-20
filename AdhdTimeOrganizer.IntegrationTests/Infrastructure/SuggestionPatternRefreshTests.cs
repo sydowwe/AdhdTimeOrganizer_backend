@@ -53,6 +53,15 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
         [SuggestionPatternView.TemplateSuggestion] = "mv_template_suggestion_pattern"
     };
 
+    /// <summary>
+    /// The views belong to the Planning slice and live in its schema, so raw SQL naming them has to
+    /// qualify them — an unqualified name only resolved back when every relation was in <c>public</c>.
+    /// <see cref="ViewNames"/> itself stays bare: it is the view's identity, and
+    /// <see cref="EveryDeclaredView_ExistsAfterInstallation"/> compares it against script filenames,
+    /// which carry no schema either.
+    /// </summary>
+    private static string Qualified(SuggestionPatternView view) => $"{ModuleSchemas.Planning}.{ViewNames[view]}";
+
     // ---- helpers ------------------------------------------------------------------------------------
 
     private async Task<(IServiceProvider Services, AppDbContext Db)> NewHostScopeAsync(IServiceScope scope)
@@ -96,7 +105,7 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
     }
 
     private static async Task DropViewAsync(DbContext db, SuggestionPatternView view, CancellationToken ct) =>
-        await db.Database.ExecuteSqlRawAsync($"DROP MATERIALIZED VIEW {ViewNames[view]}", ct);
+        await db.Database.ExecuteSqlRawAsync($"DROP MATERIALIZED VIEW {Qualified(view)}", ct);
 
     // Goes through the real installer rather than re-reading the script here: it already skips views that
     // still exist, so restoring one dropped view is exactly "install whatever is missing".
@@ -107,7 +116,7 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
     }
 
     private static async Task<int> ViewRowCountAsync(DbContext db, SuggestionPatternView view, CancellationToken ct) =>
-        await db.Database.SqlQueryRaw<int>($"SELECT COUNT(*)::int AS \"Value\" FROM {ViewNames[view]}").SingleAsync(ct);
+        await db.Database.SqlQueryRaw<int>($"SELECT COUNT(*)::int AS \"Value\" FROM {Qualified(view)}").SingleAsync(ct);
 
     // ---- flag correctness: only the touched view's queue entry is marked --------------------------
 
@@ -305,8 +314,8 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
     {
         await using var db = CreateDbContext();
         var hasUniqueIndex = await db.Database.SqlQueryRaw<bool>(
-                "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND tablename = {0} AND indexdef ILIKE 'CREATE UNIQUE INDEX%') AS \"Value\"",
-                ViewNames[view])
+                "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = {1} AND tablename = {0} AND indexdef ILIKE 'CREATE UNIQUE INDEX%') AS \"Value\"",
+                ViewNames[view], ModuleSchemas.Planning)
             .SingleAsync(CancellationToken);
 
         hasUniqueIndex.Should().BeTrue(
@@ -337,7 +346,7 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
         foreach (var viewName in scriptViewNames)
         {
             var exists = await db.Database
-                .SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", $"public.{viewName}")
+                .SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", $"{ModuleSchemas.Planning}.{viewName}")
                 .SingleAsync(CancellationToken);
 
             exists.Should().BeTrue($"the fixture runs the real SuggestionPatternViewInstaller, so {viewName} must exist in the test schema");

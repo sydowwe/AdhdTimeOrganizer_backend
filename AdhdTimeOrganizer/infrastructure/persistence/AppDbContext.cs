@@ -181,6 +181,24 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     }
 
     /// <summary>
+    /// Registers the per-module schema sweep. Every table configured anywhere above is mapped to the
+    /// default schema; <see cref="SchemaPerModuleConvention"/> moves each module's into its own, from
+    /// the map in <see cref="ModuleSchemas"/>.
+    /// <para>
+    /// It is a convention and not a line at the end of <see cref="OnModelCreating"/> deliberately —
+    /// see the type's remarks. The short version: the model is only trustworthy once EF has finalized
+    /// it, and this way no future reordering of the <c>ApplyConfigurationsFromAssembly</c> calls above
+    /// can change which schema a table lands in.
+    /// </para>
+    /// </summary>
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+
+        configurationBuilder.Conventions.Add(_ => new SchemaPerModuleConvention(ModuleSchemas.Resolve));
+    }
+
+    /// <summary>
     /// Relationships whose two ends live in slice projects that do not reference one another. The host
     /// is the only place both types are in scope, and it owns the schema anyway, so the FK is declared
     /// here rather than forcing a project reference purely to name the principal.
