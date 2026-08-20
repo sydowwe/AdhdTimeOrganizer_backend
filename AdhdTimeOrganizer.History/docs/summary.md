@@ -1,7 +1,7 @@
 # AdhdTimeOrganizer.History — Agent Summary
 
 **Purpose:** The activity-history slice. Owns the `ActivityHistory` entity, its CRUD/read endpoints,
-the paginated grid, and the six dashboard endpoints (three `HistoryDetail*`, three `HistorySummary*`).
+the paginated grid, and the seven dashboard endpoints (three `HistoryDetail*`, four `HistorySummary*`).
 
 **Third project of the portal split**, after `AdhdTimeOrganizer.Core` and
 `AdhdTimeOrganizer.TodoLists`. Plan: `review/portal/slicePrompts/00-README.md`.

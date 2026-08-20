@@ -56,7 +56,7 @@ exists any more — they were removed so Core stops pointing into the slices. Qu
 | `/activity-history/gird` | POST | `query/GetFilteredTableActivityHistoryEndpoint` |
 | `/activity-history/aggregate-by-activity` | POST | `query/AggregateByActivityActivityHistoryEndpoint` |
 | `/activity-history/dashboard/detail/{pie-chart,stacked-bars,summary-cards}` | POST | `query/dashboard/detail/*` |
-| `/activity-history/dashboard/summary/{pie-chart,stacked-bars,summary-cards}` | POST | `query/dashboard/summary/*` |
+| `/activity-history/dashboard/summary/{pie-chart,stacked-bars,summary-cards,time-of-day}` | POST | `query/dashboard/summary/*` |
 
 ⚠ **`gird` is not a typo to fix.** It is the shipped path (`EndpointPath => "gird"`) and the SPA calls
 it that way.
@@ -91,6 +91,26 @@ response is well-formed and its numbers add up.
 
 `/activity-history/dashboard/calendar` (`CalendarActivityEndpoint`) is **host-side**, not here — it
 reads the `Calendar` entity, which belongs to Planning.
+
+### `summary/time-of-day` is not group-shaped
+
+It folds the range into **24 hour-of-day buckets** and carries no group at all, so nothing above
+applies to it. It exists because no other response can answer *when in the day* this user's time sits:
+stacked-bars tiles the range sequentially in `windowMinutes`-wide buckets and clips every day to a
+picked `windowStartTime`/`windowEndTime`, so folding it by hour reads the chart controls rather than
+the history; pie-chart and summary-cards carry no time dimension; `filter` takes a single date.
+Its request is therefore a bare `DateRangeDto` — no `groupBy`, no `topN`, no window.
+
+Three things about it are contract, not implementation detail, and each fails as a plausible number
+rather than an error (`HistoryTimeOfDayDashboardTests` pins all three on values):
+
+- `hours` is **always 24 entries in order 0…23**, zeros included — the client indexes it.
+- The fold is in `User.Timezone`. A UTC fold shifts every user's answer by their offset.
+- A record spanning an hour boundary is **split by elapsed time** across the hours it covers and
+  counted in `entries` once per hour it touches — so `sum(entries)` is not the record count, while
+  `sum(totalSeconds)` **is** the period total and equals `summary/pie-chart`'s `totals.totalSeconds`
+  for the same range. That equality is why rows are selected by `StartTimestamp` and distributed
+  whole: a record starting inside the range contributes its tail even past the range's last midnight.
 
 ## Invariants
 

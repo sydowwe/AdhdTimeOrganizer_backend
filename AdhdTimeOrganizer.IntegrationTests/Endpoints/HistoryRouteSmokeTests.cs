@@ -60,10 +60,10 @@ public class HistoryRouteSmokeTests(AppDbContextFixture fixture) : PostgresTestB
     }
 
     /// <summary>
-    /// The grid and the six dashboards are POSTs, so they need their own cases — a GET against them
+    /// The grid and the seven dashboards are POSTs, so they need their own cases — a GET against them
     /// would 405, which is "not 404" for the wrong reason. Asserting on OK rather than "not 404"
     /// avoids that trap entirely. The dashboards sit two folders deep and are the likeliest routes to
-    /// be lost in a folder-driven move, so all six are listed.
+    /// be lost in a folder-driven move, so all seven are listed.
     /// </summary>
     [Theory]
     [InlineData("/api/activity-history/dashboard/detail/pie-chart")]
@@ -72,6 +72,7 @@ public class HistoryRouteSmokeTests(AppDbContextFixture fixture) : PostgresTestB
     [InlineData("/api/activity-history/dashboard/summary/pie-chart")]
     [InlineData("/api/activity-history/dashboard/summary/stacked-bars")]
     [InlineData("/api/activity-history/dashboard/summary/summary-cards")]
+    [InlineData("/api/activity-history/dashboard/summary/time-of-day")]
     public async Task HistoryDashboardRoutes_AreRegistered(string route)
     {
         var response = await CreateUserRoleClient()
