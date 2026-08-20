@@ -2,7 +2,7 @@
 
 **Purpose:** The activity-tracking slice. Owns the three raw ingest ledgers (desktop, browser
 extension, android), the two pattern-mapping lookups that resolve a tracked window to an `Activity`,
-the twelve tracking dashboards, and the retention purge over the ledgers.
+the fifteen tracking dashboards, and the retention purge over the ledgers.
 
 **Fifth and last project of the portal split**, after `Core`, `TodoLists`, `Routines`, `History` and
 `Planning`. Plan: `review/portal/slicePrompts/00-README.md`.
@@ -17,7 +17,7 @@ Owns:
   `infrastructure/persistence/configuration/activityHistory/` folder. **The folder name lied** — they
   were always Tracking's, and they moved with their entities. Do not assign files to projects by
   directory here.
-- **29 endpoints** under `application/endpoint/activityTracking/` — desktop ingest + dashboards,
+- **32 endpoints** under `application/endpoint/activityTracking/` — desktop ingest + dashboards,
   web-extension ingest + dashboards, android sync + dashboards, and the two pattern-mapping settings
   grids with their CRUD.
 - **The five endpoint groups** (`application/endpointGroups/`). The whole folder moved: every group in
@@ -106,6 +106,12 @@ would only make the agent re-send the window. That makes a break here silent;
    totals inflated by every night the user's window excludes. On a narrowed working-day window that is
    most of the number on the page. `TrackingDashboardDateRangeTests` is the guard and asserts on the
    numbers; the rule itself lives on `domain/helper/DailyWindowSet.cs`.
+
+7. **A fragmentation measure computed across the night between two days' windows** — a block stitched
+   through hours the user excluded, or that overnight interval reported as the longest break. A flat
+   pool of the span's sessions produces both, silently and with a well-formed 200. Every measure but
+   the median is therefore computed inside one day's window and rolled up; `TrackingFocusMetricsTests`
+   is the guard and the rule lives on `domain/helper/FocusMetricsCalculator.cs`.
 
 `TrackingRouteSmokeTests` covers 1, 4 and 5; `CoreRouteSmokeTests`' seeder-duplication test already
 covers 2 over every registered seeder; `ExtensionActivityTrackingTests` covers 3 and the end-to-end

@@ -74,6 +74,9 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     [InlineData("/api/activity-tracking/android/stacked-bars")]
     [InlineData("/api/activity-tracking/android/summary-cards")]
     [InlineData("/api/activity-tracking/android/timeline")]
+    [InlineData("/api/activity-tracking/desktop/focus-metrics")]
+    [InlineData("/api/activity-tracking/web-extension/focus-metrics")]
+    [InlineData("/api/activity-tracking/android/focus-metrics")]
     public async Task TrackingDashboardRoutes_AreRegistered(string route)
     {
         var response = await CreateUserRoleClient()

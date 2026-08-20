@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
@@ -11,10 +12,6 @@ namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.deskt
 public class DesktopTimelineEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones)
     : Endpoint<BaseTimelineRequest, DesktopTimelineResponse>
 {
-    private const int ContextWindowRadius = 2;
-    private const int ContextSwitchThresholdMinutes = 2;
-    private const int MinDetailSeconds = 60;
-
     public override void Configure()
     {
         Post("/activity-tracking/desktop/timeline");
@@ -45,8 +42,28 @@ public class DesktopTimelineEndpoint(DbContext dbContext, IUserTimeZoneResolver 
             .ThenBy(x => x.ProcessName)
             .ToListAsync(ct);
 
-        var (primarySessions, detailSessions) = BuildTimeline(rawData, r => r.ActiveSeconds);
-        var backgroundSessions = BuildBackgroundTimeline(rawData);
+        // Keyed on the process name, labelled with the product name. The session algorithm itself is
+        // shared with the web-extension timeline and the three focus-metrics dashboards -- see
+        // TimelineSegmentBuilder for why it is not transcribed per source any more.
+        var (primary, detail) = TimelineSegmentBuilder.Build(
+            rawData.Select(r => new ActivityMinute(r.WindowStart, r.ProcessName, r.ProductName, r.ActiveSeconds)));
+
+        // The background lane names each process by the first non-empty product name seen anywhere in
+        // its rows, rather than by whichever row happened to open the run -- a process whose first
+        // background minute carries a blank product name is still that product for the whole day.
+        var backgroundLabels = rawData
+            .GroupBy(r => r.ProcessName, StringComparer.Ordinal)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(r => r.ProductName).FirstOrDefault(p => !string.IsNullOrEmpty(p)) ?? g.Key,
+                StringComparer.Ordinal);
+
+        var background = TimelineSegmentBuilder.BuildBackground(rawData.Select(r =>
+            new ActivityMinute(r.WindowStart, r.ProcessName, backgroundLabels[r.ProcessName], r.BackgroundSeconds)));
+
+        var primarySessions = primary.Select(ToSession).ToList();
+        var detailSessions = detail.Select(ToSession).ToList();
+        var backgroundSessions = background.Select(ToSession).ToList();
 
         if (req.MinSeconds.HasValue && req.MinSeconds > 0)
         {
@@ -72,277 +89,14 @@ public class DesktopTimelineEndpoint(DbContext dbContext, IUserTimeZoneResolver 
         await Send.ResponseAsync(response, cancellation: ct);
     }
 
-    private static (List<DesktopTimelineSession> primary, List<DesktopTimelineSession> detail) BuildTimeline(
-        List<DesktopActivityEntry> rawData, Func<DesktopActivityEntry, int> secondsSelector)
+    private static DesktopTimelineSession ToSession(TimelineSegment segment) => new()
     {
-        var minuteMap = rawData
-            .GroupBy(r => r.WindowStart)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Where(r => secondsSelector(r) > 0).ToList());
-
-        var sortedMinutes = minuteMap
-            .Where(kv => kv.Value.Count > 0)
-            .Select(kv => kv.Key)
-            .OrderBy(k => k)
-            .ToList();
-
-        var primaryMinutes = new List<MinuteEntry>();
-        var secondaryMinutes = new List<MinuteEntry>();
-
-        for (var i = 0; i < sortedMinutes.Count; i++)
-        {
-            var currentMinute = sortedMinutes[i];
-            var currentRecords = minuteMap[currentMinute];
-
-            var contextScores = new Dictionary<string, int>();
-
-            for (var offset = -ContextWindowRadius; offset <= ContextWindowRadius; offset++)
-            {
-                var idx = i + offset;
-                if (idx < 0 || idx >= sortedMinutes.Count)
-                    continue;
-
-                var neighborMinute = sortedMinutes[idx];
-
-                if (Math.Abs((neighborMinute - currentMinute).TotalMinutes) > ContextWindowRadius)
-                    continue;
-
-                foreach (var record in minuteMap[neighborMinute])
-                {
-                    contextScores.TryAdd(record.ProcessName, 0);
-                    contextScores[record.ProcessName] += secondsSelector(record);
-                }
-            }
-
-            var ordered = currentRecords
-                .OrderByDescending(r => contextScores.GetValueOrDefault(r.ProcessName, 0))
-                .ThenByDescending(r => secondsSelector(r))
-                .ToList();
-
-            var primary = ordered[0];
-            primaryMinutes.Add(new MinuteEntry(
-                currentMinute, primary.ProcessName, primary.ProductName, secondsSelector(primary)));
-
-            foreach (var other in ordered.Skip(1))
-                secondaryMinutes.Add(new MinuteEntry(
-                    other.WindowStart, other.ProcessName, other.ProductName, secondsSelector(other)));
-        }
-
-        var primarySessions = BuildSessionsFromMinutes(primaryMinutes);
-
-        var absorbedSwitches = AbsorbContextSwitches(primarySessions, ContextSwitchThresholdMinutes);
-
-        var detailSessions = BuildSessionsFromMinutes(secondaryMinutes);
-        detailSessions.AddRange(absorbedSwitches);
-        detailSessions = MergeAdjacentSessions(detailSessions);
-        detailSessions = detailSessions.Where(s => s.TotalSeconds >= MinDetailSeconds).ToList();
-
-        return (primarySessions, detailSessions);
-    }
-
-    private static List<DesktopTimelineSession> BuildSessionsFromMinutes(List<MinuteEntry> minutes)
-    {
-        var sessions = new List<DesktopTimelineSession>();
-        DesktopTimelineSession? current = null;
-
-        foreach (var min in minutes.OrderBy(m => m.WindowStart).ThenBy(m => m.ProcessName))
-        {
-            var windowEnd = min.WindowStart.AddMinutes(1);
-
-            if (current != null && current.ProcessName == min.ProcessName && min.WindowStart == current.EndedAt)
-            {
-                current.EndedAt = windowEnd;
-                current.DurationSeconds = (int)(current.EndedAt - current.StartedAt).TotalSeconds;
-                current.TotalSeconds += min.Seconds;
-            }
-            else
-            {
-                if (current != null)
-                    sessions.Add(current);
-
-                current = new DesktopTimelineSession
-                {
-                    Id = 0,
-                    ProcessName = min.ProcessName,
-                    ProductName = min.ProductName,
-                    StartedAt = min.WindowStart,
-                    EndedAt = windowEnd,
-                    DurationSeconds = 60,
-                    TotalSeconds = min.Seconds
-                };
-            }
-        }
-
-        if (current != null)
-            sessions.Add(current);
-
-        return sessions;
-    }
-
-    private static List<DesktopTimelineSession> AbsorbContextSwitches(
-        List<DesktopTimelineSession> sessions, int thresholdMinutes)
-    {
-        var absorbed = new List<DesktopTimelineSession>();
-        bool merged;
-
-        do
-        {
-            merged = false;
-            for (var i = 0; i < sessions.Count; i++)
-            {
-                for (var j = i + 1; j < Math.Min(i + 4, sessions.Count); j++)
-                {
-                    if (sessions[j].ProcessName != sessions[i].ProcessName)
-                        continue;
-
-                    var gapDuration = 0;
-                    for (var k = i + 1; k < j; k++)
-                        gapDuration += sessions[k].DurationSeconds;
-
-                    if (gapDuration > thresholdMinutes * 60)
-                        continue;
-
-                    for (var k = i + 1; k < j; k++)
-                        absorbed.Add(sessions[k]);
-
-                    sessions[i] = sessions[i] with
-                    {
-                        EndedAt = sessions[j].EndedAt,
-                        DurationSeconds = (int)(sessions[j].EndedAt - sessions[i].StartedAt).TotalSeconds,
-                        TotalSeconds = sessions[i].TotalSeconds + sessions[j].TotalSeconds
-                    };
-
-                    sessions.RemoveRange(i + 1, j - i);
-                    merged = true;
-                    break;
-                }
-
-                if (merged)
-                    break;
-            }
-        } while (merged);
-
-        return absorbed;
-    }
-
-    private static List<DesktopTimelineSession> MergeAdjacentSessions(List<DesktopTimelineSession> sessions)
-    {
-        if (sessions.Count == 0)
-            return sessions;
-
-        sessions = sessions.OrderBy(s => s.StartedAt).ThenBy(s => s.ProcessName).ToList();
-        var result = new List<DesktopTimelineSession> { sessions[0] };
-
-        for (var i = 1; i < sessions.Count; i++)
-        {
-            var last = result[^1];
-            var current = sessions[i];
-
-            if (last.ProcessName == current.ProcessName && current.StartedAt <= last.EndedAt)
-            {
-                var newEnd = current.EndedAt > last.EndedAt ? current.EndedAt : last.EndedAt;
-                result[^1] = last with
-                {
-                    EndedAt = newEnd,
-                    DurationSeconds = (int)(newEnd - last.StartedAt).TotalSeconds,
-                    TotalSeconds = last.TotalSeconds + current.TotalSeconds
-                };
-            }
-            else
-            {
-                result.Add(current);
-            }
-        }
-
-        return result;
-    }
-
-    private static List<DesktopTimelineSession> BuildBackgroundTimeline(List<DesktopActivityEntry> rawData)
-    {
-        var sessions = new List<DesktopTimelineSession>();
-
-        var byProcess = rawData
-            .Where(r => r.BackgroundSeconds > 0)
-            .GroupBy(r => r.ProcessName);
-
-        foreach (var processGroup in byProcess)
-        {
-            var processSessions = new List<DesktopTimelineSession>();
-            DesktopTimelineSession? current = null;
-
-            var productName = processGroup
-                .Where(x => !string.IsNullOrEmpty(x.ProductName))
-                .Select(x => x.ProductName)
-                .FirstOrDefault() ?? processGroup.Key;
-
-            foreach (var record in processGroup.OrderBy(r => r.WindowStart))
-            {
-                var windowEnd = record.WindowStart.AddMinutes(1);
-
-                if (current != null && record.WindowStart == current.EndedAt)
-                {
-                    current.EndedAt = windowEnd;
-                    current.DurationSeconds = (int)(current.EndedAt - current.StartedAt).TotalSeconds;
-                    current.TotalSeconds += record.BackgroundSeconds;
-                }
-                else
-                {
-                    if (current != null)
-                        processSessions.Add(current);
-
-                    current = new DesktopTimelineSession
-                    {
-                        Id = 0,
-                        ProcessName = processGroup.Key,
-                        ProductName = productName,
-                        StartedAt = record.WindowStart,
-                        EndedAt = windowEnd,
-                        DurationSeconds = 60,
-                        TotalSeconds = record.BackgroundSeconds
-                    };
-                }
-            }
-
-            if (current != null)
-                processSessions.Add(current);
-
-            sessions.AddRange(BridgeGaps(processSessions));
-        }
-
-        return sessions
-            .Where(s => s.TotalSeconds >= MinDetailSeconds)
-            .OrderBy(s => s.StartedAt)
-            .ThenBy(s => s.ProcessName)
-            .ToList();
-    }
-
-    private static List<DesktopTimelineSession> BridgeGaps(List<DesktopTimelineSession> sessions)
-    {
-        if (sessions.Count <= 1)
-            return sessions;
-
-        var result = new List<DesktopTimelineSession> { sessions[0] };
-
-        for (var i = 1; i < sessions.Count; i++)
-        {
-            var last = result[^1];
-            var current = sessions[i];
-            var gapMinutes = (current.StartedAt - last.EndedAt).TotalMinutes;
-
-            if (gapMinutes <= ContextSwitchThresholdMinutes)
-                result[^1] = last with
-                {
-                    EndedAt = current.EndedAt,
-                    DurationSeconds = (int)(current.EndedAt - last.StartedAt).TotalSeconds,
-                    TotalSeconds = last.TotalSeconds + current.TotalSeconds
-                };
-            else
-                result.Add(current);
-        }
-
-        return result;
-    }
-
-    private record MinuteEntry(DateTime WindowStart, string ProcessName, string? ProductName, int Seconds);
+        Id = 0,
+        ProcessName = segment.Key,
+        ProductName = segment.Label,
+        StartedAt = segment.StartedAt,
+        EndedAt = segment.EndedAt,
+        DurationSeconds = segment.DurationSeconds,
+        TotalSeconds = segment.TotalSeconds
+    };
 }

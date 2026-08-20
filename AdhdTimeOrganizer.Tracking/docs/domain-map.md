@@ -30,15 +30,15 @@ often only the tail. Check the group before assuming a path.
 | Area | Route prefix | Endpoints |
 |---|---|---|
 | Desktop ingest | `/activity-tracking/desktop` | `DesktopActivityHeartbeatEndpoint` (`/heartbeat`) — ⚠ ingest only, see `summary.md` |
-| Desktop dashboards | `/activity-tracking/desktop` | pie-chart, stacked-bars, summary-cards, timeline, process-details, distinct-processes, `gird` |
+| Desktop dashboards | `/activity-tracking/desktop` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, process-details, distinct-processes, `gird` |
 | Desktop mappings | `/activity-tracking/desktop/settings` | create / update / delete / `gird`, plus `fetch-categories-and-roles-by-pattern` |
 | Web-extension ingest | `/activity-tracking/web-extension` | `WebExtensionDataHeartbeatEndpoint` (`/heartbeat`) |
-| Web-extension dashboards | `/activity-tracking/web-extension` | pie-chart, stacked-bars, summary-cards, timeline, domain-details |
+| Web-extension dashboards | `/activity-tracking/web-extension` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, domain-details |
 | Android ingest | `/activity-tracking/android` | `AndroidSyncEndpoint` (`/sync`) |
-| Android dashboards | `/activity-tracking/android` | pie-chart, stacked-bars, summary-cards, timeline, `gird` |
+| Android dashboards | `/activity-tracking/android` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, `gird` |
 | Android mappings | `/activity-tracking/android/settings` | create / update / delete / `gird` |
 
-**Request shape (all twelve dashboards):** `DateRangeAndTimeRangeDto`
+**Request shape (all fifteen dashboards):** `DateRangeAndTimeRangeDto`
 (`application/dto/request/DateRangeAndTimeRangeDto.cs`) — an inclusive `dateFrom`/`dateTo` day span
 plus `from`/`to`, which are a **time-of-day window repeated on each day of the span**, not the ends of
 the range. It resolves through `domain/helper/DailyWindowSet.cs`, which also lays out the stacked-bars
@@ -47,6 +47,25 @@ silently inflated totals — `TrackingDashboardDateRangeTests` is the guard, and
 numbers. The two timelines take the span members for uniformity and reject anything but a single day.
 The two details endpoints take an instant envelope plus the optional
 `windowStartMinutes`/`windowEndMinutes` pair that carries the same daily window across.
+
+**The three `focus-metrics` dashboards** (`application/endpoint/BaseFocusMetricsEndpoint.cs`) add
+`baseline` (nullable — no comparison at all is a request the client makes deliberately) and
+`focusGapSeconds`, the block-tolerance the client owns and sends. They are the only dashboards
+besides the timelines that need *sessions* rather than sums, and the only ones that accept a span
+while doing so. Two rules are load-bearing and neither is visible in a 200:
+
+- **Sessions are built one day-window at a time**, so a block cannot span two days and the excluded
+  night is not a gap candidate. `FocusMetricsCalculator` documents every definition; they are contract,
+  not implementation choices.
+- **The baseline scales the same way `summary-cards`' does** — mean day over the lookback × the span's
+  `DayCount` for the count, per-day means for the maxima, unscaled for the median. The two sit on one
+  screen and must not disagree about what "compared to last 7 days" means.
+
+**Session building lives in `domain/helper/TimelineSegmentBuilder.cs`, in one copy.** The web-extension
+and desktop timelines each used to carry their own transcription of it; the focus-metrics dashboards
+have to report on *the same* primary sessions the timeline draws, and a drifted second copy would make
+the strip disagree with the chart above it while both endpoints' tests passed. Android needs none of
+it — its ledger already stores real sessions.
 
 **Auth:** the three ingest endpoints carry `[AllowExtensionClients]` **and**
 `Policies(PortalAuthorizationPolicies.ActivityTracking)`. Everything else is an ordinary web endpoint
@@ -94,6 +113,8 @@ Renaming one renames none of the others.
 | File | Covers |
 |---|---|
 | `AdhdTimeOrganizer.IntegrationTests/Endpoints/TrackingRouteSmokeTests.cs` | routing, the combined query filter (behaviourally), the partition annotations, purge-job registration |
+| `.../Endpoints/TrackingDashboardDateRangeTests.cs` | the day-span / time-of-day-window semantic across the dashboards, asserted on the numbers |
+| `.../Endpoints/TrackingFocusMetricsTests.cs` | the four fragmentation measures — switch counting, block tolerance, interior-only gaps, median-not-mean, and the day-bounded range rule |
 | `.../Endpoints/ExtensionActivityTrackingTests.cs` | extension-client auth on ingest, and the end-to-end attribution + completion path |
 | `.../Endpoints/ActivityTimeAutomationTests.cs` | the completion branch matrix, including the exclusivity rule |
 | `.../Endpoints/TrackerPatternMappingActivityFkTests.cs` | both mapping FKs are N:1 (two patterns, one activity) and `Cascade` (deleting the activity destroys the rule) |

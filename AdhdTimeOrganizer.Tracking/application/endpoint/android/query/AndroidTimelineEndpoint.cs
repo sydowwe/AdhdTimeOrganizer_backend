@@ -40,10 +40,6 @@ public class AndroidTimelineEndpoint(DbContext db, IUserTimeZoneResolver timeZon
             .OrderBy(x => x.SessionStartUtc)
             .ToListAsync(ct);
 
-        var totalSecondsByLabel = rawSessions
-            .GroupBy(x => x.AppLabel)
-            .ToDictionary(g => g.Key, g => g.Sum(x => x.DurationSeconds));
-
         var sessions = rawSessions
             .Select(s => new AndroidTimelineSession
             {
@@ -52,7 +48,10 @@ public class AndroidTimelineEndpoint(DbContext db, IUserTimeZoneResolver timeZon
                 StartedAt = s.SessionStartUtc,
                 EndedAt = s.SessionEndUtc,
                 DurationSeconds = s.DurationSeconds,
-                TotalSeconds = totalSecondsByLabel[s.AppLabel]
+                // Equal to DurationSeconds, and that is the honest answer rather than a placeholder:
+                // an android session is foreground time end to end, so there is no idle remainder to
+                // subtract the way there is for a desktop or browser minute. See the DTO.
+                TotalSeconds = s.DurationSeconds
             })
             .ToList();
 
