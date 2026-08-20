@@ -42,12 +42,15 @@ public class CalendarActivityEndpoint(DbContext db, ICalendarDayLookup calendarD
             var totalSeconds = dayHistories.Sum(ah => (long)ah.Length.TotalSeconds);
             var sessionCount = dayHistories.Count;
 
+            // Grouped by role id, not by the ActivityRole instance: two roles are the same group only when
+            // they are the same row, and the frontend needs that id to key the day's roles by.
             var topRoles = dayHistories
-                .GroupBy(ah => ah.Activity.Role)
+                .GroupBy(ah => ah.Activity.RoleId)
                 .Select(g => new CalendarTopRoleItem
                 {
-                    RoleName = g.Key.Name,
-                    Color = g.Key.Color ?? "",
+                    RoleId = g.Key,
+                    RoleName = g.First().Activity.Role.Name,
+                    Color = g.First().Activity.Role.Color ?? "",
                     TotalSeconds = g.Sum(ah => (long)ah.Length.TotalSeconds)
                 })
                 .OrderByDescending(r => r.TotalSeconds)

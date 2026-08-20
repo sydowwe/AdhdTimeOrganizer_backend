@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
-using AdhdTimeOrganizer.History.application.dto.@enum;
+using AdhdTimeOrganizer.History.application.dashboard;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.summary;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
@@ -35,11 +35,10 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResol
 
         // Step 1: Top N groups in current period
         var topGroups = currentRecords
-            .GroupBy(ah => ResolveGroupKey(ah, req.GroupBy))
+            .GroupBy(ah => ah.ResolveGroupKey(req.GroupBy))
             .Select(g => new
             {
-                g.Key.Name,
-                g.Key.Color,
+                g.Key,
                 TotalSeconds = g.Sum(ah => (long)ah.Length.TotalSeconds),
                 Records = g.ToList()
             })
@@ -69,8 +68,10 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResol
         // Step 3: Build cards
         var cards = topGroups.Select(g =>
         {
+            // Matched on the whole key, whose identity is the entity id — so a group renamed between the
+            // baseline period and this one still finds its own past, instead of reading as IsNew.
             var baselineTotal = baselineRecords
-                .Where(ah => ResolveGroupKey(ah, req.GroupBy) == (g.Name, g.Color))
+                .Where(ah => ah.ResolveGroupKey(req.GroupBy).Id == g.Key.Id)
                 .Sum(ah => (long)ah.Length.TotalSeconds);
 
             var baselineDailyAvg = baselineDays > 0 ? baselineTotal / baselineDays : 0;
@@ -84,8 +85,9 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResol
 
             return new HistorySummaryCard
             {
-                Name = g.Name,
-                Color = g.Color,
+                GroupId = g.Key.Id,
+                Name = g.Key.Name,
+                Color = g.Key.Color,
                 TotalSeconds = g.TotalSeconds,
                 AverageSeconds = baselineDailyAvg,
                 PercentChange = percentChange,
@@ -177,18 +179,5 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResol
             default:
                 return 7;
         }
-    }
-
-    private static (string Name, string? Color) ResolveGroupKey(ActivityHistory ah, HistoryGroupBy groupBy)
-    {
-        return groupBy switch
-        {
-            HistoryGroupBy.Activity => (ah.Activity.Name, null),
-            HistoryGroupBy.Role => (ah.Activity.Role.Name, ah.Activity.Role.Color),
-            HistoryGroupBy.Category => ah.Activity.Category != null
-                ? (ah.Activity.Category.Name, ah.Activity.Category.Color)
-                : ("Uncategorized", null),
-            _ => (ah.Activity.Name, null)
-        };
     }
 }

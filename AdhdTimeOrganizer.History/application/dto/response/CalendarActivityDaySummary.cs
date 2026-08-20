@@ -20,6 +20,9 @@ public record CalendarActivityDaySummary
 
 public record CalendarTopRoleItem
 {
+    /// <summary>The role this row aggregates. Never null — every activity has a required role.</summary>
+    public long RoleId { get; init; }
+
     public string RoleName { get; init; } = null!;
     public string Color { get; init; } = null!;
     public long TotalSeconds { get; init; }

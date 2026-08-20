@@ -61,12 +61,33 @@ exists any more — they were removed so Core stops pointing into the slices. Qu
 ⚠ **`gird` is not a typo to fix.** It is the shipped path (`EndpointPath => "gird"`) and the SPA calls
 it that way.
 
-⚠ **`aggregate-by-activity` exists because the pie chart groups by activity *name*.**
-`HistoryPieChartItem` carries no `activityId`, and activity names are not unique, so a caller holding
-an id (a rendered to-do item) cannot map a slice back to it. Do not "consolidate" the two: the
-aggregate is keyed by id, spans all history with no date range, and **omits** ids with no logged rows
-rather than returning zeros — which is what lets the caller divide by `entryCount` unguarded. Its
-`(UserId, ActivityId)` predicate is served by the unique index's leading two columns; no new index.
+⚠ **`aggregate-by-activity` is still not the pie chart, now that the pie chart is id-keyed too.**
+It once existed because `HistoryPieChartItem` carried nothing but a display name; every group-shaped
+dashboard response now carries a `groupId` beside its `name` (see *Group identity* below). The
+aggregate stays separate for the reasons that have nothing to do with keying: it spans all history
+with no date range, and it **omits** ids with no logged rows rather than returning zeros — which is
+what lets the caller divide by `entryCount` unguarded. Its `(UserId, ActivityId)` predicate is served
+by the unique index's leading two columns; no new index.
+
+### Group identity
+
+Every group-shaped dashboard response identifies its group by the **id of the entity it was grouped
+by** — `groupId` on `HistoryPieChartItem` / `HistorySummaryCard` / `HistoryGroupItem`, `roleId` on
+`CalendarTopRoleItem` — resolved in one place, `application/dashboard/HistoryGrouping.cs`. `name` is
+unchanged and is still the only thing rendered.
+
+`groupId` is **nullable**, and null on exactly two rows, both synthetic: the `Uncategorized` bucket
+(`groupBy: Category`, activities with no category) and the pie chart's `_other` roll-up. `roleId`
+is never null — a role is required on every activity.
+
+These endpoints group by that id, not by `(Name, Color)` as they used to. The old key did not
+actually collide, but only because `Activity`, `ActivityRole` and `ActivityCategory` each carry an
+unfiltered unique index on `(UserId, Name)` and every dashboard is user-scoped — a constraint the
+endpoints neither state nor can see, and one archiving has a standing reason to want relaxed. What
+the id fixes today is identity across a rename (`percentChange` / `isNew`, and any client holding an
+earlier response) and telling a real group named `_other` apart from the roll-up.
+`HistoryDashboardGroupIdentityTests` pins all of it, on rows rather than routes: a name-keyed
+response is well-formed and its numbers add up.
 
 `/activity-history/dashboard/calendar` (`CalendarActivityEndpoint`) is **host-side**, not here — it
 reads the `Calendar` entity, which belongs to Planning.

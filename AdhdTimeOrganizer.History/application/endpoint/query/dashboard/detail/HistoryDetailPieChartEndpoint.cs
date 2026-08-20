@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
-using AdhdTimeOrganizer.History.application.dto.@enum;
+using AdhdTimeOrganizer.History.application.dashboard;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.detail;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
@@ -31,9 +31,10 @@ public class HistoryDetailPieChartEndpoint(DbContext db, IUserTimeZoneResolver t
             .ToListAsync(ct);
 
         var allGroups = records
-            .GroupBy(ah => ResolveGroupKey(ah, req.GroupBy))
+            .GroupBy(ah => ah.ResolveGroupKey(req.GroupBy))
             .Select(g => new HistoryPieChartItem
             {
+                GroupId = g.Key.Id,
                 Name = g.Key.Name,
                 TotalSeconds = g.Sum(ah => ah.Length.TotalSeconds),
                 Color = g.Key.Color,
@@ -73,6 +74,8 @@ public class HistoryDetailPieChartEndpoint(DbContext db, IUserTimeZoneResolver t
             if (remainingItems.Count > 0)
                 items.Add(new HistoryPieChartItem
                 {
+                    // A roll-up of many groups, so it is no single entity: null id, keyed by name.
+                    GroupId = null,
                     Name = "_other",
                     TotalSeconds = remainingItems.Sum(i => i.TotalSeconds),
                     Color = "#999",
@@ -97,18 +100,5 @@ public class HistoryDetailPieChartEndpoint(DbContext db, IUserTimeZoneResolver t
         };
 
         await Send.ResponseAsync(response, cancellation: ct);
-    }
-
-    private static (string Name, string? Color) ResolveGroupKey(ActivityHistory ah, HistoryGroupBy groupBy)
-    {
-        return groupBy switch
-        {
-            HistoryGroupBy.Activity => (ah.Activity.Name, null),
-            HistoryGroupBy.Role => (ah.Activity.Role.Name, ah.Activity.Role.Color),
-            HistoryGroupBy.Category => ah.Activity.Category != null
-                ? (ah.Activity.Category.Name, ah.Activity.Category.Color)
-                : ("Uncategorized", null),
-            _ => (ah.Activity.Name, null)
-        };
     }
 }
