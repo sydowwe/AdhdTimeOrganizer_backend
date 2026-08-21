@@ -1,7 +1,8 @@
 # AdhdTimeOrganizer.History — Agent Summary
 
 **Purpose:** The activity-history slice. Owns the `ActivityHistory` entity, its CRUD/read endpoints,
-the paginated grid, and the seven dashboard endpoints (three `HistoryDetail*`, four `HistorySummary*`).
+the paginated grid, the seven dashboard endpoints (three `HistoryDetail*`, four `HistorySummary*`), and
+the timer-boundary alarms.
 
 **Third project of the portal split**, after `AdhdTimeOrganizer.Core` and
 `AdhdTimeOrganizer.TodoLists`. Plan: `review/portal/slicePrompts/00-README.md`.
@@ -50,6 +51,55 @@ Two rules, both load-bearing:
 
 Unlike `IActivityMembershipSource` this is resolved as a **single** service, deliberately: a missing
 registration throws at endpoint activation rather than silently dropping every attribution write.
+
+## Timer-boundary alarms
+
+`TimerBoundaryAlarm` + `TimerBoundaryAlarmService` + `TimerBoundaryAlarmJobHandler` +
+`TimerBoundaryAlarmRegistrar`, and two endpoints under `/activity-history/timer-alarm/`.
+
+**The problem:** `runningTimerStore` fired the end-of-timer alarm from a `setTimeout` in the tab, and a
+`setTimeout` cannot fire in a tab that has been closed — so closing the lid on a 25-minute focus phase meant
+nothing rang. The client now posts the whole cycle's boundaries when the user presses **Start** (a 4-period,
+2-cycle pomodoro is 15 of them, batched: rescheduling per phase would need the live tab whose absence is the
+bug), and the server rings them.
+
+**This is not timer state and must not become it.** The countdown stays client-side, the server is never
+authoritative for `endsAt`, there is no heartbeat and no polling. Nothing reads these rows to reconstruct a
+session — the on-screen countdown has to be client-side anyway, and the store's reconstruction is exact
+precisely because it compares one device's clock against itself.
+
+Things that are load-bearing and not obvious:
+
+- **Scheduler, not Reminders — deliberately.** Reminders has no per-reminder trigger by design; everything
+  fires from one sweep whose cadence (`ReminderScanOptions.CadenceMinutes`, default **5**) is documented as
+  the firing-precision floor. Ample for "probation ends in 30 days", useless for a pomodoro.
+  `ScheduleSpec.RunOnceAt` is a real trigger on the exact instant. The cost is one live trigger per
+  boundary — the thing Reminders refuses to do — which is fine here and would not be at thousands of
+  concurrent timers. Reminders' register endpoint is Admin/Root-only diagnostic surface besides; users get
+  this slice's own endpoint, the same split `Planning.ReminderRegistrationService` makes.
+- **`TimerBoundaryAlarmRegistrar` is not optional.** The Quartz job store is in-memory (deliberate, see
+  `SchedulerQuartzConfig`), so a restart loses *every* trigger and there is no generic reconciliation. Each
+  owner re-pushes on boot. Drop this hosted service and nothing breaks at build time, nothing throws, and
+  every alarm registered before a deploy silently never fires. Re-registration is safe unconditionally: the
+  job key is derived from the row id (reschedules in place) and the run-log dedup, which survives the
+  restart, recognises an already-fired instant.
+- **`dueAt` is an absolute instant, scheduled verbatim.** It was computed from the client's own clock;
+  re-deriving it from a duration against the server clock puts the two clocks' skew into the alarm.
+- **The table self-drains** — deleted on fire, on cancel, and by the registrar's stale sweep — which is why
+  it has no retention job and no `FiredAt` column. Rows live minutes. That is also why `ActivityId` is a
+  plain column with no FK: an orphan degrades to a name-less body and is gone within the hour.
+- **`payload.Tag` is not decoration.** The still-open tab shows its own notification under the same tag and
+  the push replaces it in place instead of stacking a second one. It is derived from the boundary instant so
+  the client rebuilds it with no round trip. Never set `renotify` — the replacement has to be silent.
+- **Cancel is a no-op on an unknown session, never a 404.** A partially-registered set is the normal outcome
+  of a tab dying mid-flight. The residual failure — a tab killed between Stop and the cancel landing, firing
+  an alarm for a session already over — is **accepted**, not mitigated; suppressing it would need the session
+  mirrored into IndexedDB for the service worker to read, a second source of truth for a rare, mild,
+  self-explaining notification.
+
+`NotificationType.TimerBoundary` and `TimerBoundaryPayload` live in `Sydowwe.Framework.Contracts` (the
+renderer that reads them is in the Notification module, which cannot see a slice), and the kind is listed in
+`QuietHoursExemptTypes`.
 
 ## Dependency seams
 
@@ -115,7 +165,12 @@ error, no exception, the filter just stops narrowing.
   in `Program.cs` (miss → routes 404), `ModuleAssemblies` in `ModuleServiceExtensions` (miss → the
   seeder is registered by the AppDomain sweep instead; being in *both* registers it twice),
   `ApplyHostConfigurations` in `AppDbContext` (miss → the table drops out of the model), and the
-  `.sln`.
+  `.sln`. All four are assembly-anchored and already cover everything added here — but a **fifth** now
+  applies to the timer alarms specifically: `services.AddHostedService<TimerBoundaryAlarmRegistrar>()` in
+  `Program.cs`, which nothing scans for (miss → alarms stop surviving a restart, silently).
+- **A new user-scoped entity in this slice must be classified in `UserDataExportAndDeletionTests.KnownGaps`
+  or exported**, and its table added to `ModuleSchemaTests`' `history` list. Both fail loudly, which is the
+  point — the export one is a GDPR Art. 15 decision the test refuses to let anyone skip.
 
 ## Navigation
 

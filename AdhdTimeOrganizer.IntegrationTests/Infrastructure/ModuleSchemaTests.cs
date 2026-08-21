@@ -50,7 +50,7 @@ public class ModuleSchemaTests(AppDbContextFixture fixture) : PostgresTestBase(f
         ],
         [ModuleSchemas.Activity] = ["activity", "activity_category", "activity_role"],
         [ModuleSchemas.TodoLists] = ["todo_list", "todo_list_item", "todo_list_category", "task_priority"],
-        [ModuleSchemas.History] = ["activity_history"],
+        [ModuleSchemas.History] = ["activity_history", "timer_boundary_alarm"],
         [ModuleSchemas.Planning] =
         [
             "calendar", "planner_task", "repeating_planner_task", "template_planner_task",

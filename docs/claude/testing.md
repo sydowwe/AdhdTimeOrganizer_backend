@@ -73,6 +73,17 @@ worth copying the shape of:
   validators by exact request type: a request type without its own concrete validator is silently
   unvalidated, which a one-route test cannot see. Both edges of the span cap are asserted, since a cap
   that rejects its own boundary looks identical to a correct one from the server side.
+- `TimerBoundaryAlarmTests` — the one-shot end-of-timer alarm, end to end. Three things here fail with no
+  error at all: the handler is resolved by **string key** (so the test looks it up out of
+  `IEnumerable<IScheduledJobHandler>` by `Key`, exactly as the dispatcher does), the trigger lives in
+  Quartz's **RAM job store** (so `TimerBoundaryAlarmRegistrar` must re-push every pending row on boot — delete
+  it and every alarm registered before a deploy silently never fires), and the push document's four keys are
+  read **positionally** by `sw-push.js`. That last one is asserted on the parsed JSON that reaches
+  `IWebPushSender`, via a capturing fake, because nesting `tag`/`url` under `data` does not throw — it
+  delivers a push titled with the app name and an empty body, which looks like it worked. Also pins that
+  `tag` is derived from the boundary instant (the client rebuilds it to suppress the double alarm), that an
+  untagged kind gets **no** `tag` key rather than a null one, and that `TimerBoundary` is exempt from
+  quiet-hours deferral while an ordinary kind in the same window is still deferred.
 - `ModuleWiringTests` — the whole composition root.
 - `PerUserDefaultMatcherTests` — no DB needed.
 - `ActivityRoleSystemKeyTests` — the three app-referenced activity roles resolve by `SystemKey` after the

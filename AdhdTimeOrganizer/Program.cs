@@ -43,6 +43,7 @@ using Sydowwe.Framework.infrastructure.extService.user.auth;
 using Sydowwe.Framework.infrastructure.persistence;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
 using Sydowwe.Framework.infrastructure.security;
+using AdhdTimeOrganizer.History.infrastructure.scheduling;
 using Sydowwe.Notifications.domain.entity;
 using Sydowwe.Notifications.infrastructure.realtime;
 using Sydowwe.Notifications.infrastructure.scheduling;
@@ -316,6 +317,11 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     services.AddHostedService<RoutinesScheduledJobsRegistrar>();
     services.AddHostedService<TrackingScheduledJobsRegistrar>();
     services.AddHostedService<PortalScheduledJobsRegistrar>();
+
+    // Same contract as the registrars above, but re-pushing per-row one-shot triggers rather than a fixed
+    // set of recurring jobs: every pending timer-boundary alarm, because the RAM job store lost them all.
+    // Without this, an alarm registered before a deploy silently never fires — no error, no log line.
+    services.AddHostedService<TimerBoundaryAlarmRegistrar>();
 
     // Caching
     services.AddDistributedMemoryCache();

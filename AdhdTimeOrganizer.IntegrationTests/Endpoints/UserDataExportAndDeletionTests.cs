@@ -433,6 +433,13 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
     /// self-contained: the <c>Activity*</c> family, <c>TodoListCategory</c>, <c>TaskPriority</c>,
     /// <c>TaskImportance</c>, <c>RoutineTimePeriod</c>, <c>UserPlannerSettings</c>,
     /// <c>UserRoutineSettings</c>, <c>PlannerSuggestionFromDayTemplate</c>.</item>
+    /// <item>Transient scheduling state with no portability value: <c>TimerBoundaryAlarm</c>. A row is a
+    /// pending "push a notification at this instant" for a timer that is running <i>right now</i> — it is
+    /// deleted when the alarm fires, when the session is cancelled, and when the boot registrar finds it
+    /// stale, so a row's whole life is minutes. It is not the user's record of anything (the recorded time
+    /// lands in <c>ActivityHistory</c>, which <b>is</b> exported), and an export of it would describe a
+    /// countdown that had already finished by the time the file was downloaded. Erasure is covered
+    /// regardless: the table cascades on user deletion.</item>
     /// </list>
     /// </summary>
     private static readonly string[] KnownGaps =
@@ -458,6 +465,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         "TaskImportance",
         "TaskPriority",
         "TemplatePlannerTask",
+        "TimerBoundaryAlarm",
         "TimerPreset",
         "TodoListCategory",
         "TrackerAndroidMappingByPattern",

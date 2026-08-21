@@ -1200,6 +1200,89 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.ToTable("activity_history", "history");
                 });
 
+            modelBuilder.Entity("AdhdTimeOrganizer.History.domain.model.entity.timerAlarm.TimerBoundaryAlarm", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("activity_id");
+
+                    b.Property<DateTime>("BoundaryAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("boundary_at");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int?>("CycleIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("cycle_index");
+
+                    b.Property<int?>("CycleTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("cycle_total");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Phase")
+                        .HasColumnType("integer")
+                        .HasColumnName("phase");
+
+                    b.Property<int?>("PhaseIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("phase_index");
+
+                    b.Property<int?>("PhaseTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("phase_total");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("url");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_timer_boundary_alarm");
+
+                    b.HasIndex("BoundaryAt")
+                        .HasDatabaseName("ix_timer_boundary_alarm_boundary_at");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_timer_boundary_alarm_user_id");
+
+                    b.HasIndex("UserId", "SessionId")
+                        .HasDatabaseName("ix_timer_boundary_alarm_user_id_session_id");
+
+                    b.ToTable("timer_boundary_alarm", "history");
+                });
+
             modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.Calendar", b =>
                 {
                     b.Property<long>("Id")
@@ -4844,6 +4927,18 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasConstraintName("fk_activity_history_user_user_id");
 
                     b.Navigation("Activity");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.History.domain.model.entity.timerAlarm.TimerBoundaryAlarm", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_timer_boundary_alarm_user_user_id");
 
                     b.Navigation("User");
                 });
