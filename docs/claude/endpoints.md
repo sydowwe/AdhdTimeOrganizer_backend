@@ -173,6 +173,16 @@ See also the query-filter caching trap in `docs/claude/persistence.md`.
 - **Time-of-day values** in portal requests and responses use `TimeDto`
   (`AdhdTimeOrganizer/application/dto/dto/TimeDto.cs`) instead of `TimeOnly`. Call `.ToTimeOnly()` when
   assigning to an entity. Validated by `application/validator/TimeDtoValidator.cs`.
+- **Date ranges** in the history dashboards use `DateRangeDto`
+  (`AdhdTimeOrganizer.Core/application/dto/dto/DateRangeDto.cs`): a `Date`, a `RangeType`, and an
+  `EndDate` that **only `CustomRange` reads** — it is the range end, inclusive, capped at
+  `DateRangeDto.MaxCustomRangeDays` (366, counted inclusively) because these dashboards aggregate the
+  period's rows in memory; every other `RangeType` ignores it rather than rejecting it. `ToDateRange()` returns the user's days with both ends
+  inclusive; `ToUtcRange(timeZone)` is what turns that into the half-open instant range to query with.
+  Attach `DateRangeDto.ApplyValidationRules` from a **concrete** `Validator<TRequest>` per request type —
+  FastEndpoints resolves validators by exact request type, so an abstract or open-generic base is never
+  discovered and the request goes through unvalidated with no sign of it
+  (`AdhdTimeOrganizer.History/application/validator/HistorySummaryDateRangeValidators.cs`).
 - **Module** (`Sydowwe.Framework`-based) DTOs use `MyIntTime`
   (`framework/Sydowwe.Framework/domain/helper/MyIntTime.cs`) — `Hours` / `Minutes` / `Seconds`,
   serialized as those three fields, persisted as an `int` count of seconds via `MyIntTimeConverter`

@@ -64,6 +64,15 @@ worth copying the shape of:
   active-only (the settings table's default view depends on it) and that `usageCount` sorts in SQL —
   a count applied after projection would sort every row on `0` and return an arbitrary page in
   convincing order.
+- `HistorySummaryCustomRangeTests` — `rangeType: "CustomRange"` is `date`…`endDate` inclusive on all four
+  `summary/` endpoints. The range resolver used to fall through to `(date, date)` and a `to <= from` guard
+  widened that to two days, so a month-long request was answered for two days — a well-formed 200 the
+  client cannot tell from the truth. Rows are seeded just inside and just outside each edge, inside the
+  hour where the user's date and UTC's disagree, so a wrong-but-plausible range still fails. The 400 cases
+  — no end, an inverted one, one past `MaxCustomRangeDays` — run per route because FastEndpoints resolves
+  validators by exact request type: a request type without its own concrete validator is silently
+  unvalidated, which a one-route test cannot see. Both edges of the span cap are asserted, since a cap
+  that rejects its own boundary looks identical to a correct one from the server side.
 - `ModuleWiringTests` — the whole composition root.
 - `PerUserDefaultMatcherTests` — no DB needed.
 - `ActivityRoleSystemKeyTests` — the three app-referenced activity roles resolve by `SystemKey` after the

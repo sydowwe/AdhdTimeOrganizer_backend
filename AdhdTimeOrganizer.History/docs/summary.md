@@ -9,7 +9,10 @@ the paginated grid, and the seven dashboard endpoints (three `HistoryDetail*`, f
 ## Bounded context
 
 Owns: `ActivityHistory` + its EF configuration, 13 endpoints, the history request/response/filter
-DTOs, `ActivityHistoryValidator`, and the dev `ActivityHistorySeeder` (Order 300, inside its band —
+DTOs, `ActivityHistoryValidator`, the four `summary/` range validators
+(`HistorySummaryDateRangeValidators.cs` — one concrete class per request type, because FastEndpoints
+resolves validators by exact type and skips validation silently without one), and the dev
+`ActivityHistorySeeder` (Order 300, inside its band —
 see `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md`).
 
 Does **not** own:
