@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using Sydowwe.Framework.application.endpoint.@base.command;
@@ -23,16 +23,13 @@ public class UpdateCalendarEndpoint(DbContext dbContext)
         return Task.FromResult(true);
     }
 
+    /// <summary>
+    /// The rule itself is <see cref="CalendarDayTypeRule"/>, shared with the batched day-type endpoint, which
+    /// turns the same violation into one day's <c>succeeded: false</c> instead of a 400.
+    /// </summary>
     private void ValidateDayType(Calendar entity)
     {
-        switch (entity.DayType)
-        {
-            case DayType.Weekend when !entity.IsWeekend:
-                ThrowError($"DayType 'Weekend' is only valid on Saturday or Sunday, but date {entity.Date} is a {entity.Date.DayOfWeek}");
-                break;
-            case DayType.Workday when entity.IsWeekend:
-                ThrowError($"DayType 'Workday' is not valid on weekends, but date {entity.Date} is a {entity.Date.DayOfWeek}");
-                break;
-        }
+        if (CalendarDayTypeRule.Violation(entity, entity.DayType) is { } violation)
+            ThrowError(violation);
     }
 }

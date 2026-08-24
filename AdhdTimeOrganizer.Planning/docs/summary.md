@@ -11,8 +11,8 @@ to find a specific type.
 
 | Area | Types | Endpoints |
 |---|---|---|
-| Calendar | `Calendar` | 5 (by-date, **day-plan**, by-id, filter-sort, update) |
-| Planner tasks | `BasePlannerTask`, `PlannerTask` | 10 |
+| Calendar | `Calendar` | 8 (by-date, **day-plan**, by-id, filter-sort, update, **task-summaries**, **apply-planner-template/batch**, **day-type/batch**) |
+| Planner tasks | `BasePlannerTask`, `PlannerTask` | 11 (incl. **copy-to-days**) |
 | Repeating planner tasks | `RepeatingPlannerTask` | 6 (incl. suggestions) |
 | Template planner tasks | `TemplatePlannerTask` | 7 |
 | Day templates | `TaskPlannerDayTemplate` | 7 (incl. suggestions) |
@@ -21,7 +21,8 @@ to find a specific type.
 | Reminders | `Reminder`, `ReminderRegistrationService` | 5 |
 | Suggestion read-models | `PlannerSuggestionFromPlannerTask`, `…FromActivityHistory`, `…FromDayTemplate` | — |
 
-Plus their DTOs, 12 validators, `TaskPlannerHelper`, and five seeders (`CalendarSeeder`,
+Plus their DTOs, 16 validators, `TaskPlannerHelper`, `PlannerTemplateApplier`, `CalendarDayTypeRule`,
+and five seeders (`CalendarSeeder`,
 `TaskImportanceSeeder`, `UserPlannerSettingsSeeder` as per-user defaults; `TaskPlannerDayTemplateSeeder`
 and `TemplatePlannerTaskSeeder` as dev fixtures). Seeder `Order` values stay in the **400–499 band**
 — see `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md`.
@@ -153,6 +154,50 @@ about the day — and two copies would eventually be filled in by different code
 Guard: `Endpoints.DayPlanEndpointTests` (6 over HTTP). The status code for an unplanned day and the
 user scoping are both silent failures — a 404 there does not throw, and a lost query filter renders
 somebody else's day rather than erroring.
+
+## The four batched calendar entry points
+
+The month grid had the same problem the home page had, one dimension wider: every endpoint it needed
+was keyed on **one** calendar id, so the view fanned out over the visible days. Four routes collapse
+that, and **none of them replaces or changes the per-day route it batches** — the day view still wants
+one day at a time.
+
+| Route | Replaces | Fan-out it removes |
+|---|---|---|
+| `POST /calendar/task-summaries` | `POST /planner-task/filter` per day | up to 31 reads per navigation |
+| `POST /calendar/apply-planner-template/batch` | `POST /calendar/apply-planner-template` per day | one per selected day |
+| `POST /planner-task/copy-to-days` | `POST /planner-task` per (target day × source task) | 12 tasks onto 10 days was 120 writes |
+| `PATCH /calendar/day-type/batch` | `PUT /calendar/{id}` per day | one per selected day |
+
+Four rulings hold across all of them:
+
+| Question | Answer |
+|---|---|
+| Is a batch transactional? | **No, and deliberately.** Each day is applied and committed on its own, in request order — the per-day fan-out was not atomic either, and conflict resolution is a per-day decision against that day's own tasks. All three writes answer `200` with `results[]`, one `{calendarId, succeeded}` per requested id (`CalendarBatchResultResponse`). |
+| What happens to a day the caller does not own? | It comes back `succeeded: false`, not 403. These endpoints scope through the host's global `IEntityWithUser` filter alone, so another user's id simply does not resolve — indistinguishable from a stale id, which is the same thing to the client. |
+| May the id list repeat an id? | **No — 400.** The response promises one result per requested id *in order*; a duplicate makes that mapping ambiguous either way it is resolved. Lists are also capped (`PlannerBatchLimits`), because batching removed the browser connection limit that used to bound these. |
+| Does a copy carry the source day's execution state? | **No.** Span, lane, location, notes, activity and importance travel; `Status` resets to `NotStarted`, and actual times / skip reason / Google event id / the to-do link do not travel at all. A day copied onto next Tuesday would otherwise arrive already completed, and a copied `TodolistItemId` would point several tasks at one item and fan every done-toggle across all of them. |
+
+⚠ **The conflict resolution has exactly one implementation** — `PlannerTemplateApplier`, shared by the
+single-day and batched apply endpoints; the weekday/day-type rule likewise lives once in
+`CalendarDayTypeRule`, which `UpdateCalendarEndpoint` turns into a 400 and the batch turns into one
+day's `succeeded: false`. A second copy of either is the thing that would make "the same template
+applied the same way" quietly stop being true.
+
+⚠ **Each per-day failure clears the ChangeTracker before continuing.** A failed `SaveChanges` leaves
+that day's `Added`/`Modified`/`Deleted` entities staged, and the next day's save would re-send them —
+turning one bad day into a whole failed batch (the same trap `CalendarProvisioner` documents for its
+losing insert). The batched template apply re-reads the template afterwards, since clearing detaches it.
+
+⚠ `POST /calendar/task-summaries` answers a **reduced** shape (`PlannerTaskSummaryResponse`: id, span,
+lane, colour, activity name) and **omits days with no tasks**. Reusing `PlannerTaskResponse` would ship
+a nested activity/role/category object per task for every day in the month, which is most of what the
+route exists to stop sending.
+
+Guard: `Endpoints.CalendarBatchEndpointTests` (8 over HTTP). Every one of these is a silent failure at
+the status-code level — a batch that wrote nothing, wrote to the wrong day, or reported success for a
+day it skipped still answers `200` — so the tests assert on the resulting rows, and each batch is given
+one id belonging to another user that must come back `succeeded: false` with that user's day untouched.
 
 ## Lazy day creation
 

@@ -30,7 +30,10 @@ public static class PlanningTestSeedHelper
         return activity.Id;
     }
 
-    public static async Task<long> SeedCalendarAsync(DbContext db, DateOnly date, long userId = TestUserId, CancellationToken ct = default)
+    // dayType trails the cancellation token deliberately: several callers already pass ct positionally as the
+    // fourth argument, so a new parameter ahead of it would rebind their token to the day type.
+    public static async Task<long> SeedCalendarAsync(
+        DbContext db, DateOnly date, long userId = TestUserId, CancellationToken ct = default, DayType dayType = DayType.Workday)
     {
         var existing = await db.Set<Calendar>()
             .IgnoreQueryFilters()
@@ -42,7 +45,7 @@ public static class PlanningTestSeedHelper
         {
             UserId = userId,
             Date = date,
-            DayType = DayType.Workday,
+            DayType = dayType,
             WakeUpTime = new TimeOnly(7, 0),
             BedTime = new TimeOnly(23, 0)
         };
