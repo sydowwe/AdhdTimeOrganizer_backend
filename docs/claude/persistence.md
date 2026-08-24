@@ -212,6 +212,40 @@ here: EF 10 throws while normalizing the filter. Guard is `UserScopingQueryFilte
 the generated SQL parameterizes the id, and that two users hitting one endpoint in one process each
 see only their own rows.
 
+## Named query filters — one name per concern
+
+Every global filter in the solution is **named** (the EF 10 `HasQueryFilter(name, predicate)`
+overload), so a caller can lift one concern with `IgnoreQueryFilters([name])` instead of dropping
+every filter on the query. Names live in two constants classes and are **never** written as literals —
+EF does not check that a key handed to `IgnoreQueryFilters` matches a filter that exists, so a typo
+silently ignores nothing:
+
+| Constant | Applied to |
+|---|---|
+| `QueryFilters.UserScope` (framework) | every `IEntityWithUser`, via `ApplyUserQueryFilters` — plus `WebExtensionActivityEntry`'s hand-written user half, which reuses the name so one ignore covers it too |
+| `AppQueryFilters.ActivityArchived` (host) | `Activity` and the five dependents mirroring `!Activity.IsArchived` |
+| `AppQueryFilters.PartitionDate` (host) | `WebExtensionActivityEntry`'s `RecordDate >= CurrentPartitionDate` bound |
+| `AppQueryFilters.RoutinePeriodCompletionUserScope` (host) | `RoutinePeriodCompletion`'s hand-written scope, mirrored through its required `RoutineTimePeriod.UserId` — its own name, not `QueryFilters.UserScope`, because it walks a navigation rather than reading a real `UserId` and must be liftable without also lifting every other user filter in the model |
+
+- **Every `HasQueryFilter` call gets a name — no exceptions, including one you think is temporary or
+  entity-local.** An unnamed filter can't be selectively lifted and, worse, silently replaces any
+  filter already on that entity (see below). This applies to every future filter added to the model,
+  not just user-scoping ones.
+- **Name by concern, never by entity** — *except* when the concern's implementation differs enough
+  that lifting it together with the rest would be wrong (see `RoutinePeriodCompletionUserScope` above).
+  The default is still one name per concern, spanning principal and dependents, so a single ignore
+  lifts the concern across a join; per-entity names leave the other end filtered — a row that loads
+  with an empty include, not an error.
+- **Two concerns on one entity are two filters, not one `&&`.** That is what lets a historical export
+  drop `PartitionDate` without also dropping `UserScope`.
+- **An unnamed second `HasQueryFilter` on an entity replaces the first, silently.** `AppDbContext`
+  runs after `base.OnModelCreating`, so an unnamed archival filter on `Activity` wiped the per-user
+  filter that had just been applied and left the table readable across users. Naming both is the fix;
+  if you add a filter to a user-owned entity here, name it.
+- Guard is `NamedQueryFilterTests` — no anonymous filter survives in the model, every `IEntityWithUser`
+  carries `UserScope`, all six archival filters share one name, and lifting `ActivityArchived` reveals
+  archived rows **without** revealing another user's.
+
 ## Seeding
 
 One copy, in `framework/Sydowwe.Framework/infrastructure/persistence/seeder/`. Pick the seeder kind by

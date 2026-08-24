@@ -93,8 +93,9 @@ public class UserScopingQueryFilterTests(AppDbContextFixture fixture) : Postgres
 
     /// <summary>
     /// The other hand-written per-user filter in the solution: <c>WebExtensionActivityEntry</c> is
-    /// excluded from <c>ApplyUserQueryFilters</c> and gets a combined date + user filter written by hand
-    /// in <c>AppDbContext.OnModelCreating</c>. It reads <c>loggedUserService</c> and
+    /// excluded from <c>ApplyUserQueryFilters</c> and gets a date filter and a user filter written by
+    /// hand in <c>AppDbContext.OnModelCreating</c> — two separately named filters, both of which land
+    /// in the same generated SQL, which is what this reads. It reads <c>loggedUserService</c> and
     /// <c>CurrentPartitionDate</c> off the context (both are members of <c>AppDbContext</c>), so EF
     /// re-evaluates them per execution — this test is what says so rather than assuming it. Both halves
     /// matter: a folded user id leaks browsing history across users, and a folded partition date freezes

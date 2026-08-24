@@ -131,12 +131,18 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
 
     /// <summary>
     /// <c>WebExtensionActivityEntry</c> is listed in <c>AppDbContext.UserScopingExcludedTypes</c> and
-    /// given a hand-written filter combining the per-user check with
-    /// <c>RecordDate &gt;= CurrentPartitionDate</c>. Both halves stay host-side while the entity now
+    /// given two hand-written filters — the per-user check (named <c>QueryFilters.UserScope</c>, so it
+    /// lifts with every other entity's) and <c>RecordDate &gt;= CurrentPartitionDate</c> (named
+    /// <c>AppQueryFilters.PartitionDate</c>). Both halves stay host-side while the entity now
     /// lives in the slice, so nothing about this arrangement is enforced by the compiler: drop the
     /// entity from the exclusion list and it silently gets the generic user-only filter instead,
     /// losing the partition-date bound; drop the hand-written filter and it loses user scoping
     /// entirely, which leaks every user's browsing history to any signed-in caller.
+    /// <para>
+    /// This asserts the two predicates exist at all. <c>NamedQueryFilterTests</c> asserts the other
+    /// half of the arrangement — that they are two separately named filters rather than one &amp;&amp;-ed
+    /// predicate, so a historical export can drop the date bound without dropping user scoping too.
+    /// </para>
     /// <para>
     /// The two halves are checked differently, and not by choice. Fixture-built contexts are
     /// constructed straight off a <c>DbContextOptionsBuilder</c>, so they have no application service
@@ -147,7 +153,7 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     /// </para>
     /// </summary>
     [Fact]
-    public async Task WebExtensionActivityEntry_KeepsItsCombinedQueryFilter()
+    public async Task WebExtensionActivityEntry_KeepsBothOfItsQueryFilters()
     {
         const long otherUserId = FakeLoggedUserService.TestUserId + 9_000;
 
@@ -186,7 +192,7 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
 
         visible.Should().Contain("mine-recent.test");
         visible.Should().NotContain("mine-ancient.test",
-            "the RecordDate >= CurrentPartitionDate half of the combined filter must survive");
+            "the RecordDate >= CurrentPartitionDate filter must survive");
 
         using var scope = Fixture.UnauthenticatedFactory.Services.CreateScope();
         var hostModel = scope.ServiceProvider.GetRequiredService<AppDbContext>().Model;

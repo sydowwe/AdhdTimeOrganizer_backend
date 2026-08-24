@@ -261,20 +261,65 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         // the per-user query filters all come from BaseDbContext, in that order.
         base.OnModelCreating(modelBuilder);
 
-        // WebExtensionActivityEntry needs both the partition date filter and the user filter, so it
-        // is excluded from the automatic one above and gets the combined filter here. The user half
-        // must respect UserScopingOptions.Enabled the same way ApplyUserQueryFilters does for every
-        // other IEntityWithUser, or this entity stays filtered when a deployment turns scoping off.
+        // WebExtensionActivityEntry needs both the partition date filter and the user filter, so it is
+        // excluded from the automatic one above and gets both halves here — as two NAMED filters, not
+        // one &&-ed predicate, so a historical export can drop the date bound without also dropping
+        // user scoping. The user half carries the Framework's QueryFilters.UserScope name so that an
+        // IgnoreQueryFilters([QueryFilters.UserScope]) covering every other IEntityWithUser covers this
+        // entity too; naming it anything else would leave exactly this table still scoped.
+        // The user half must respect UserScopingOptions.Enabled the same way ApplyUserQueryFilters does
+        // for every other IEntityWithUser, or this entity stays filtered when a deployment turns
+        // scoping off. Both halves read their state off members of *this context* (CurrentPartitionDate,
+        // the captured loggedUserService field) — the shape EF re-evaluates per execution instead of
+        // folding into the cached SQL. Do not rewrite either to close over a service resolved here.
         var appServices = options.FindExtension<CoreOptionsExtension>()?.ApplicationServiceProvider;
         var scopingEnabled = appServices?.GetService<IOptions<UserScopingOptions>>()?.Value?.Enabled ?? false;
 
+        modelBuilder.Entity<WebExtensionActivityEntry>()
+            .HasQueryFilter(AppQueryFilters.PartitionDate, x => x.RecordDate >= CurrentPartitionDate);
+
         if (scopingEnabled && loggedUserService != null)
             modelBuilder.Entity<WebExtensionActivityEntry>()
-                .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate &&
-                                     (!loggedUserService.IsAuthenticated || x.UserId == loggedUserService.GetUserId));
-        else
-            modelBuilder.Entity<WebExtensionActivityEntry>()
-                .HasQueryFilter(x => x.RecordDate >= CurrentPartitionDate);
+                .HasQueryFilter(QueryFilters.UserScope,
+                    x => !loggedUserService.IsAuthenticated || x.UserId == loggedUserService.GetUserId);
+
+        // Archival, on the principal and mirrored onto every dependent that must vanish with it. All
+        // six share AppQueryFilters.ActivityArchived so one IgnoreQueryFilters call lifts the concern
+        // across a join — an activity and its profiles have to reappear together or the profile loads
+        // with a null-object activity.
+        //
+        // Naming this filter is also what lets Activity keep BOTH filters. Applied unnamed, this call
+        // ran after base.OnModelCreating and REPLACED the per-user filter ApplyUserQueryFilters had
+        // just put on Activity (it is an IEntityWithUser), silently leaving the table unscoped. Named,
+        // the two coexist. If you add another filter to a user-owned entity here, name it.
+        modelBuilder.Entity<Activity>()
+            .HasQueryFilter(AppQueryFilters.ActivityArchived, a => !a.IsArchived);
+
+        modelBuilder.Entity<ActivityBacklogProfile>()
+            .HasQueryFilter(AppQueryFilters.ActivityArchived, p => !p.Activity.IsArchived);
+
+        modelBuilder.Entity<ActivityBucketListProfile>()
+            .HasQueryFilter(AppQueryFilters.ActivityArchived, p => !p.Activity.IsArchived);
+
+        modelBuilder.Entity<ActivityProjectProfile>()
+            .HasQueryFilter(AppQueryFilters.ActivityArchived, p => !p.Activity.IsArchived);
+
+        modelBuilder.Entity<PlannerSuggestionFromActivityHistory>()
+            .HasQueryFilter(AppQueryFilters.ActivityArchived, p => !p.Activity.IsArchived);
+
+        modelBuilder.Entity<PlannerSuggestionFromPlannerTask>()
+            .HasQueryFilter(AppQueryFilters.ActivityArchived, p => !p.Activity.IsArchived);
+
+        // RoutinePeriodCompletion has no UserId of its own — BaseEntity, not BaseEntityWithUser — so it
+        // never goes through ApplyUserQueryFilters above and needs its own scope filter mirrored through
+        // its required RoutineTimePeriod. Named AppQueryFilters.RoutinePeriodCompletionUserScope rather
+        // than the shared QueryFilters.UserScope — see that constant's remarks — so it can be lifted on
+        // its own without also lifting every other user filter in the model. ScopeUserId is read off
+        // this context, not off loggedUserService, for the same per-execution-parameter reason
+        // documented on ApplyScopeFilter.
+        if (scopingEnabled)
+            modelBuilder.Entity<RoutinePeriodCompletion>()
+                .HasQueryFilter(AppQueryFilters.RoutinePeriodCompletionUserScope, c => ScopeUserId == null || c.RoutineTimePeriod.UserId == ScopeUserId);
 
         OnAppModelCreatingPartial(modelBuilder);
     }

@@ -84,6 +84,10 @@ The portal has been fully split into vertical slices; **the split is finished**.
   non-`IEntityWithUser` entities have no safety net and must scope by hand. A query filter must read
   the user id off the DbContext (`ScopeUserId`), never off a captured service — see
   [persistence.md](docs/claude/persistence.md#user-scoping-query-filters).
+- **Every `HasQueryFilter` call must be named** (the EF 10 `HasQueryFilter(name, predicate)` overload),
+  no exceptions — an unnamed one can't be selectively lifted with `IgnoreQueryFilters` and silently
+  replaces any filter already on that entity instead of coexisting with it. See
+  [persistence.md](docs/claude/persistence.md#named-query-filters--one-name-per-concern).
 - **Time-of-day** is `TimeDto` in portal DTOs, `MyIntTime` in module DTOs. Don't mix them.
 - **Seeders**: pick the kind by owner (app-wide / per-user) × purpose (production / dev fixture); only
   dev seeders truncate. Read `AdhdTimeOrganizer.Core/.../seeder/SeederOrderBands.md` before adding one

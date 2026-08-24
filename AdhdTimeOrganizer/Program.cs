@@ -38,6 +38,12 @@ using Serilog.Events;
 using Sydowwe.Framework.application.middleware;
 using Sydowwe.Framework.config;
 using Sydowwe.Framework.domain.auth;
+using Sydowwe.Framework.domain.extServiceContract.user;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.domain.serviceContract;
+using Sydowwe.Framework.infrastructure.extService;
+using Sydowwe.Framework.infrastructure.extService.user;
+using Sydowwe.Framework.infrastructure.extService.user.auth;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.extService.user.auth;
 using Sydowwe.Framework.infrastructure.persistence;
@@ -178,7 +184,6 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     // HTTP context accessor
     services.AddHttpContextAccessor();
 
-    // Interceptors
     services.AddSingleton<ISuggestionPatternRefreshQueue, SuggestionPatternRefreshQueue>();
     services.AddScoped<SuggestionPatternRefreshInterceptor>();
 
@@ -209,6 +214,14 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     // Dependency injection
     services.AddDependencyInjection();
     services.AddModuleServices(configuration);
+
+    // Email senders. Registered explicitly here because the framework assembly is excluded from the
+    // Scrutor marker scan, so neither the base sender nor the generic user sender is picked up despite
+    // their lifetime markers. Without these, IEmailSenderService resolution fails at first use
+    // (notification dispatch), and IUserEmailSenderService<TUser> would fail the same way on the first
+    // confirmation / password-reset flow.
+    services.AddSingleton<IEmailSenderService, EmailSenderService>();
+    services.AddSingleton(typeof(IUserEmailSenderService<>), typeof(UserEmailSenderService<>));
 
     // Identity services
 
