@@ -84,7 +84,24 @@ worth copying the shape of:
   `tag` is derived from the boundary instant (the client rebuilds it to suppress the double alarm), that an
   untagged kind gets **no** `tag` key rather than a null one, and that `TimerBoundary` is exempt from
   quiet-hours deferral while an ordinary kind in the same window is still deferred.
-- `ModuleWiringTests` — the whole composition root.
+- `QuietHoursUserZoneAndLateDeliveryTests` — whose clock a quiet window is read in, and whether a delivery
+  admits it is late. The zone bug was invisible twice over: the window was evaluated in `Application:Timezone`
+  while the client rendered the same two ints with no zone at all, and a suite whose only user is on UTC
+  agrees with either reading. So the test gives **two** users the **same** minutes in **different** zones at
+  one instant (UTC+12 via `Etc/GMT-12`, fixed-offset so no DST transition can drift it) and asserts exactly
+  one defers — under the old single-zone reading both outcomes are identical whichever way it falls, so the
+  test is unpassable by coincidence. `DeferredUntil`'s **value** is pinned separately from the defer/don't
+  decision: getting the first right and the second wrong withholds the push correctly and then releases it
+  twelve hours off, which no `!= null` assertion catches. The IANA normalization is pinned because
+  `TimeZoneInfo.Id` is `"Central Europe Standard Time"` on the Windows box this is developed on and only the
+  IANA form is a string a browser accepts — an un-normalized response passes every server-side check and
+  breaks in the client, on one OS. The late marker is asserted in **both** directions every time (a threshold
+  fails asymmetrically: marking everything is noise the user learns to ignore, marking nothing is the original
+  bug) and on the parsed push JSON, since `originallyDueAt` lives in the nested `data` object precisely so the
+  service worker keeps rendering `title`/`body` verbatim.
+- `ModuleWiringTests` — the whole composition root. Includes `IUserTimeZoneReader`, which is generic over the
+  host's user type and so invisible to every marker scan: forget the host's closing registration and quiet
+  hours fall back to UTC for everyone, throwing nothing and logging nothing.
 - `PerUserDefaultMatcherTests` — no DB needed.
 - `ActivityRoleSystemKeyTests` — the three app-referenced activity roles resolve by `SystemKey` after the
   user renames them, and stay undeletable. The lookup they replaced was by display name, so a rename

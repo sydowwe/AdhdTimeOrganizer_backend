@@ -10,6 +10,7 @@ using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Notifications.application;
 using Sydowwe.Notifications.domain.entity;
 using Sydowwe.Notifications.infrastructure;
@@ -124,6 +125,13 @@ public static class ModuleServiceExtensions
         services.AddScoped<INotificationService, NotificationService<User>>();
         services.AddScoped<IDeferredNotificationDispatcher>(sp =>
             (NotificationService<User>)sp.GetRequiredService<INotificationService>());
+
+        // Same story, same trap: generic over the host's user type (Timezone lives on BaseUser), so no marker
+        // scan can see it. Quiet hours are evaluated in each recipient's OWN zone and this is where that zone
+        // comes from — miss this line and QuietHoursReader silently falls back to UTC for everybody, which is
+        // not an error anywhere, just a window enforced an hour or two off the one the settings page shows.
+        // ModuleWiringTests pins it.
+        services.AddScoped<IUserTimeZoneReader, UserTimeZoneReader<User>>();
 
         // The only INotificationPayloadEnricher in the solution, and it carries no lifetime marker (it is
         // meant as the host-supplied default). Swap for a real enricher if payloads ever need overlays.

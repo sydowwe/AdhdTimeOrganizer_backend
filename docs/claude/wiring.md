@@ -16,9 +16,9 @@ touching anything below, because **none of these break the build**.
   resolutions still work (last wins), but every `IEnumerable<T>` doubles — two `ReminderScanJobHandler`s
   means the dispatch scan runs twice per fire, two of each seeder means every seeder runs twice.
   Nothing throws or logs.
-- **Generic-over-`TUser` services can't be scanned** — `NotificationService<User>` and
-  `IDeferredNotificationDispatcher` are closed by hand in `AddModuleServices`, same as the framework
-  user services in `AddDependencyInjection`.
+- **Generic-over-`TUser` services can't be scanned** — `NotificationService<User>`,
+  `IDeferredNotificationDispatcher` and `UserTimeZoneReader<User>` are closed by hand in
+  `AddModuleServices`, same as the framework user services in `AddDependencyInjection`.
 - **Module services take a plain `DbContext`** (that's how they stay host-agnostic), so
   `AddModuleServices` aliases `DbContext` → `AppDbContext`. Without it ~34 of them fail to activate.
 - **FastEndpoints discovery is an explicit assembly list** in `Program.cs`. A module missing from it is
@@ -41,6 +41,12 @@ touching anything below, because **none of these break the build**.
 - **`IQuietHoursReader` must resolve to Notifications' `QuietHoursReader`.** Reminders ships
   `NoQuietHoursReader` for hosts without Notifications; it carries no lifetime marker on purpose,
   because an auto-registered no-op would silently disable quiet hours everywhere.
+- **`IUserTimeZoneReader` must be registered, and it is the one nothing else will tell you about.** Quiet
+  hours are evaluated in each recipient's own `User.Timezone`, read through this seam; because it is generic
+  over the host's user type no scan can see it, and its absence throws nothing — every window just falls back
+  to UTC and is enforced an hour or two off the one the settings page displays. `ModuleWiringTests`
+  (`UserTimeZoneReader_IsRegisteredClosedOverTheHostsUserType`) and
+  `QuietHoursUserZoneAndLateDeliveryTests` are the guards.
 - **Account deletion fans out over `ISubjectDataEraser`** (`DeleteUserAccountEndpoint.BeforeDeleteAsync`).
   The host FKs cascade only `notification` / `notification_preference` / `push_subscription`; every
   other user-keyed module table is deliberately FK-free and would outlive the account. Erasers mutate

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.scheduling;
@@ -16,6 +17,7 @@ using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.Contracts.reminders;
 using Sydowwe.Framework.Contracts.scheduling;
+using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Notifications.application;
 using Sydowwe.Notifications.application.dto;
@@ -107,6 +109,23 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
     }
 
     /// <summary>
+    /// The zone quiet hours are read in comes off the recipient's user row through this seam. It is generic
+    /// over the host's user type (<c>Timezone</c> lives on <c>BaseUser</c>), so the blanket marker scans cannot
+    /// see it and the host must close it by hand — and forgetting that line is invisible: the reader's absence
+    /// would surface as every window silently falling back to UTC, which throws nothing and logs nothing. The
+    /// concrete type is asserted, not just resolvability, so a host-side stub cannot quietly take its place.
+    /// </summary>
+    [Fact]
+    public void UserTimeZoneReader_IsRegisteredClosedOverTheHostsUserType()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+
+        var reader = scope.ServiceProvider.GetRequiredService<IUserTimeZoneReader>();
+
+        Assert.IsType<UserTimeZoneReader<User>>(reader);
+    }
+
+    /// <summary>
     /// Both modules' job handlers are discoverable by key. The Scheduler dispatcher matches
     /// <c>RecurringJobRegistration.HandlerKey</c> against these at fire time, so a handler missing from DI is
     /// a job that fires into nothing.
@@ -185,6 +204,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
 
         AssertRegisteredOnce<INotificationService>(sp);
         AssertRegisteredOnce<IQuietHoursReader>(sp);
+        AssertRegisteredOnce<IUserTimeZoneReader>(sp);
         AssertRegisteredOnce<IReminderRegistry>(sp);
         AssertRegisteredOnce<IScheduler>(sp);
         AssertRegisteredOnce<ICronEvaluator>(sp);

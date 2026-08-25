@@ -3717,6 +3717,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnName("modified_timestamp")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTimeOffset?>("OriginallyDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("originally_due_at");
+
                     b.Property<string>("PayloadJson")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -4171,10 +4175,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ChannelHint")
-                        .HasColumnType("text")
-                        .HasColumnName("channel_hint");
 
                     b.Property<DateTime>("CreatedTimestamp")
                         .ValueGeneratedOnAdd()
