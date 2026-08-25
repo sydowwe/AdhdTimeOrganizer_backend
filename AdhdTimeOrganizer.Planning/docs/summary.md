@@ -12,7 +12,7 @@ to find a specific type.
 | Area | Types | Endpoints |
 |---|---|---|
 | Calendar | `Calendar` | 8 (by-date, **day-plan**, by-id, filter-sort, update, **task-summaries**, **apply-planner-template/batch**, **day-type/batch**) |
-| Planner tasks | `BasePlannerTask`, `PlannerTask` | 11 (incl. **copy-to-days**) |
+| Planner tasks | `BasePlannerTask`, `PlannerTask` | 12 (incl. **copy-to-days**, **plan-vs-actual-trend**) |
 | Repeating planner tasks | `RepeatingPlannerTask` | 6 (incl. suggestions) |
 | Template planner tasks | `TemplatePlannerTask` | 7 |
 | Day templates | `TaskPlannerDayTemplate` | 7 (incl. suggestions) |
@@ -198,6 +198,54 @@ Guard: `Endpoints.CalendarBatchEndpointTests` (8 over HTTP). Every one of these 
 the status-code level — a batch that wrote nothing, wrote to the wrong day, or reported success for a
 day it skipped still answers `200` — so the tests assert on the resulting rows, and each batch is given
 one id belonging to another user that must come back `succeeded: false` with that user's day untouched.
+
+## The plan-vs-actual trend
+
+`POST /planner-task/plan-vs-actual-trend` — six numbers describing how the user's planned time compared
+with their logged time over an inclusive date range. **Derived, never stored**, like the streak: no
+entity, no column, no migration, recomputed from `planner_task` rows on every read, so editing a task
+weeks back moves the trend with no repair path to write.
+
+The *single-day* version of this needs no server at all — the day view already holds
+`ActualStartTime`/`ActualEndTime` beside `StartTime`/`EndTime` for the day on screen. The trend cannot
+be answered that way: `planner-task/filter` takes one calendar id, so thirty days of it is thirty
+requests, the same fan-out the four batched entry points above exist to remove. Nor can the history
+dashboards answer it — they aggregate `ActivityHistory` (free-standing tracking), which has no plan to
+drift from.
+
+| Type | File |
+|---|---|
+| `PlanVsActualTrendService` | `domain/service/PlanVsActualTrendService.cs` — the arithmetic and the rules, no SQL |
+| `GetPlanVsActualTrendPlannerTaskEndpoint` | `application/endpoint/plannerTask/query/` — the eligibility predicate and the day boundary, no rules |
+| `PlanVsActualTrendRequest` / `PlanVsActualTrendResponse` | `application/dto/{request,response}/taskPlanner/` |
+
+The rulings:
+
+| Question | Answer |
+|---|---|
+| Which tasks count? | Not `IsBackground`, not `Cancelled`, on a day in the range that is **over**. Optional tasks *do* count — unlike the streak, this describes estimation, and an optional task was still estimated. |
+| When is a day "over"? | **Strictly before the user's own today**, however late in the day the request arrives. Today's untouched tasks have not been missed, they have not come around yet — and every one of them would land in `neverHappenedCount` and drag a thirty-day trend with it. This is stricter than the single-day block, which shows for the viewed day once it is mostly done; over a range, losing one day costs nothing. |
+| Does a skip count as a task that never happened? | **No.** `Cancelled` leaves the population entirely and is not counted anywhere — the same call the streak makes, and the two must not diverge. |
+| Do the two sums cover the same tasks? | **No, and this is the trap.** `plannedMinutes` spans every counted task, including ones that never happened; `actualMinutes` spans only the ones that are `Completed` **and** carry both actual times. `actual / planned` alone therefore understates the person's pace whenever `neverHappenedCount` is non-zero — which is why that count is in the response rather than left to be inferred. |
+| A `Completed` task with no actual times? | Counted, its plan summed, **no** actual minutes, and **not** a "never happened" — it is unmeasurable, and inferring the missing end from the plan would fabricate exactly the zero drift the number exists to measure. |
+| Nothing eligible? | `200` with six zeroes, never a 404. `taskCount: 0` is the client's signal to render nothing, and a failure status would make that a special case. A range entirely in the future is well-formed and answers this way. |
+| Midnight? | Every span and every comparison wraps. A 23:00–00:30 task is 90 minutes; a task planned for 23:50 and started at 00:10 is twenty minutes late, not twenty-three hours early (the near reading wins — see `DriftMinutes`). |
+
+⚠ **The endpoint owns the eligibility predicate and the service owns the arithmetic — keep the split**,
+for the same reason `PlannerStreakReader` and `PlannerStreakService` are split: a second place deciding
+what an eligible task is, is how the two ends of the feature start disagreeing about the same numbers.
+
+⚠ **The range is the only thing bounding the scan**, so it is capped at `PlannerBatchLimits.MaxSummaryRangeDays`
+and a backwards one is a 400 — the same two rules `CalendarTaskSummariesValidator` applies, sharing the
+same ceiling.
+
+⚠ **`UserId` is filtered by hand here**, not left to the host's global `IEntityWithUser` filter. The
+slice compiles against a plain `DbContext` and cannot see that filter; the id is already in hand for the
+timezone, and the predicate rides the index the scan already uses.
+
+Guards: `Services.PlanVsActualTrendServiceTests` (16 rule cases, no DB) and
+`Endpoints.PlanVsActualTrendTests` (8 over HTTP — the eligibility predicate, the today exclusion, the
+user scoping, and the empty answer, none of which fail with a status code).
 
 ## Lazy day creation
 

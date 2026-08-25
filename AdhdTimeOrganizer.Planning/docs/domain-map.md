@@ -92,6 +92,26 @@ are what they are.
 Guards: `Services.PlannerStreakServiceTests` (17 rule tests, no DB) and
 `Endpoints.PlannerStreakTests` (8 over HTTP, including the un-tick round-trip).
 
+## Plan-vs-actual trend
+
+Also derived, never stored, and split the same way — rules in one pure function, the query that feeds
+it in the endpoint.
+
+| Type | File |
+|---|---|
+| `PlanVsActualTrendService` | `domain/service/PlanVsActualTrendService.cs` — `Aggregate` over rows; `SpanMinutes` / `DriftMinutes` handle midnight |
+| `GetPlanVsActualTrendPlannerTaskEndpoint` | `application/endpoint/plannerTask/query/` — the eligibility predicate + the day boundary |
+| `PlanVsActualTrendRequest` | `application/dto/request/taskPlanner/PlanVsActualTrendRequest.cs` |
+| `PlanVsActualTrendResponse` | `application/dto/response/taskPlanner/PlanVsActualTrendResponse.cs` |
+| `PlanVsActualTrendValidator` | `application/validator/PlanVsActualTrendValidator.cs` — shares `PlannerBatchLimits.MaxSummaryRangeDays` |
+
+Route: `POST /planner-task/plan-vs-actual-trend`. See
+[`summary.md`](summary.md#the-plan-vs-actual-trend) for the rules and why they are what they are — in
+particular that `plannedMinutes` and `actualMinutes` do **not** cover the same tasks.
+
+Guards: `Services.PlanVsActualTrendServiceTests` (16 rule cases, no DB) and
+`Endpoints.PlanVsActualTrendTests` (8 over HTTP).
+
 ## Endpoints
 
 Lazy day creation — a task may name its day by `Date` instead of `CalendarId`, and the calendar row is

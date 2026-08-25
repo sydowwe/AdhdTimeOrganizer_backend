@@ -17,6 +17,9 @@ public static class PlannerBatchLimits
     /// <summary>Most days one batched write may name.</summary>
     public const int MaxCalendarIds = 366;
 
-    /// <summary>Most days one task-summary read may span, counted inclusively.</summary>
+    /// <summary>
+    /// Most days one batched range read may span, counted inclusively — the task summaries a month grid draws
+    /// and the plan-vs-actual trend, which are bounded by the same thing and so share the same ceiling.
+    /// </summary>
     public const int MaxSummaryRangeDays = 366;
 }
