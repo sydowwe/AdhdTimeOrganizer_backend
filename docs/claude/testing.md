@@ -99,6 +99,22 @@ worth copying the shape of:
   fails asymmetrically: marking everything is noise the user learns to ignore, marking nothing is the original
   bug) and on the parsed push JSON, since `originallyDueAt` lives in the nested `data` object precisely so the
   service worker keeps rendering `title`/`body` verbatim.
+- `NotificationSubjectProjectionTests` — `NotificationDto.Subject`, the `{kind, id}` reference that lets a
+  click reach the entity a notification is about instead of the list its type lives in (backend ask B2). The
+  field is optional by design, so a resolver that stops resolving still returns a valid 200 bell list that has
+  merely gone back to being a dead end — absence is therefore asserted only where absence is the answer (a
+  digest is N occurrences; `DeadlineApproaching` carries a composed title and no id), presence everywhere
+  else, and always in pairs. Two things beyond that fail invisibly. The subject must be read off
+  `Notification.PayloadJson` and **not** the `INotificationPayloadEnricher`-enriched copy the same handler
+  builds to render title/body: reading the overlay renders identically and quietly carries display names to
+  the network boundary, voiding the payload PII contract — so a fake enricher rewrites an id as well as adding
+  a name, and the test asks which document won. And the SignalR/bell and Web Push deliveries of one event are
+  rendered by different code paths that used to disagree about click-through by construction, so the push
+  document is parsed from a capturing `IWebPushSender` to pin that `subject` sits in the nested `data` object
+  and that no top-level `url` appeared — the top-level `url` is a route the *producer* supplied (only
+  `TimerBoundary` does), never one the notifications module invented. The kind vocabulary's wire spelling is
+  pinned too: it is append-only, and a rename unlinks every already-persisted notification of that kind in
+  every consuming app with no error anywhere.
 - `ModuleWiringTests` — the whole composition root. Includes `IUserTimeZoneReader`, which is generic over the
   host's user type and so invisible to every marker scan: forget the host's closing registration and quiet
   hours fall back to UTC for everyone, throwing nothing and logging nothing.
