@@ -39,7 +39,10 @@ The portal has been fully split into vertical slices; **the split is finished**.
   `MemoryAnchor`.
 - `AdhdTimeOrganizer.IntegrationTests` — stays in the parent; it pins *this host's* composition.
 - `framework/` — a **git submodule** holding `Sydowwe.Framework`, `.Contracts`, `.Testing` and the
-  opt-in `Sydowwe.Notifications` / `.Reminders` / `.Scheduler` / `.Scheduler.Xlsx` modules.
+  opt-in `Sydowwe.Notifications` / `.Reminders` / `.Scheduler` / `.Scheduler.Xlsx` modules. An opt-in
+  module may ship a companion `<Module>.Testing` package of abstract test bases for the rules it owns
+  (`Sydowwe.Notifications.Testing` today) — kept out of `Sydowwe.Framework.Testing` so a host that does
+  not use the module never references it. Neither testing package is runnable on its own.
 
 **Rules that hold everywhere:**
 

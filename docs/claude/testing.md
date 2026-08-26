@@ -32,6 +32,14 @@ which is a foreign copy). Quick reference:
   `BaseBatchDeleteEndpointTests`, `BaseToggleIsHiddenEndpointTests`). Use them — they ship the auth
   matrix + 404 paths. Add endpoint-specific scenarios (validation, business rules, IDOR) in the
   concrete subclass.
+- **An opt-in module ships its own test bases in a companion package**, not in
+  `Sydowwe.Framework.Testing` — folding them in would drag the module into the test project of every
+  host that ships without it. Today that is
+  `framework/Sydowwe.Notifications.Testing/baseTests/BaseNotificationItemStateTests`, closed here by a
+  ten-line `NotificationItemStateTests`. If you write a guard for behaviour the **module** owns rather
+  than behaviour this host's composition owns, put it there so the other app on the submodule inherits
+  it; if it is about this host's wiring, it belongs in `AdhdTimeOrganizer.IntegrationTests` directly.
+  Both kinds still *run* only from here — a module is a library with no host to boot.
 
 ## Things that only a behavioural test catches
 
@@ -115,6 +123,23 @@ worth copying the shape of:
   `TimerBoundary` does), never one the notifications module invented. The kind vocabulary's wire spelling is
   pinned too: it is append-only, and a rename unlinks every already-persisted notification of that kind in
   every consuming app with no error anywhere.
+- `BaseNotificationItemStateTests` (in `Sydowwe.Notifications.Testing`, closed here by
+  `NotificationItemStateTests`, which supplies only a second user) — which states a notification can be in and
+  which transitions a user may drive (backend ask B3). These are **module** rules, so they live with the
+  module and every host inheriting it gets the guard. Three silent failures. **Unread is a pair of writes** — the flag and the stamp — and
+  clearing only the flag returns the same 204 while leaving a row that reads as unread everywhere a client can
+  see, carrying a `ReadAt` no reader distinguishes; both columns are asserted on the stored row. **Un-reading
+  moves the row from the purge job's 90-day read window to its 365-day outer one**, because the job keys on
+  `IsRead` and never on `ReadAt` — that was a decision, and it only stays one if a test says so, since a
+  future "tidy up: purge by `ReadAt`" reads as equivalent and silently deletes rows the user marked
+  unfinished. So three same-aged rows (read, never-read, read-then-un-read) go through the **real** handler
+  out of `IEnumerable<IScheduledJobHandler>` and exactly one is collected. And the batch dismiss **ignores**
+  ids that are not the caller's rather than 404-ing the batch: the gap between "ignored" and "deleted someone
+  else's row" is one `Where` clause and both answer 200 with a plausible count, so the stranger's row is
+  asserted to survive rather than merely to be reported as skipped. The per-request cap is asserted at **both**
+  edges — a cap that rejects its own boundary is indistinguishable from a correct one otherwise — and it needs
+  its own test at all because FastEndpoints resolves validators by exact request type, so a request type
+  without a concrete validator is silently unvalidated and the ceiling is a comment.
 - `ModuleWiringTests` — the whole composition root. Includes `IUserTimeZoneReader`, which is generic over the
   host's user type and so invisible to every marker scan: forget the host's closing registration and quiet
   hours fall back to UTC for everyone, throwing nothing and logging nothing.
