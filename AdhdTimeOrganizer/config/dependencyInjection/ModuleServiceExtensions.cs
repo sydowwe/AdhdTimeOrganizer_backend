@@ -155,6 +155,8 @@ public static class ModuleServiceExtensions
     /// </summary>
     private static void AddModuleOptions(IServiceCollection services, IConfiguration configuration)
     {
+        AddNotificationCatalog(services);
+
         services.Configure<PushNotificationOptions>(configuration.GetSection(PushNotificationOptions.SectionName));
         services.Configure<EmailNotificationOptions>(configuration.GetSection(EmailNotificationOptions.SectionName));
         services.Configure<ReminderRetentionOptions>(configuration.GetSection(ReminderRetentionOptions.SectionName));
@@ -164,4 +166,46 @@ public static class ModuleServiceExtensions
         services.Configure<SchedulerRetentionOptions>(configuration.GetSection(SchedulerRetentionOptions.SectionName));
     }
 
+    /// <summary>
+    /// The notification kinds <b>this</b> portal can raise — the ten of <see cref="NotificationType"/>'s
+    /// nineteen that some producer here actually calls <c>NotifyAsync</c> with.
+    /// <para>
+    /// Declared in code rather than bound from configuration on purpose: which events an app produces is a
+    /// property of its code, not of a deployment's settings, and an appsettings typo would silently drop a
+    /// row from the settings screen. The nine kinds left out belong to the HR/inventory product that shares
+    /// <c>Sydowwe.Framework.Contracts</c> — there is no inventory and no leave here, so a preference row for
+    /// <c>StockLow</c> asks the user a question this portal can never act on, in an enum name no Slovak
+    /// locale here translates.
+    /// </para>
+    /// <para>
+    /// <b>Keep this list next to the producer when you add a kind.</b> Nothing fails if you forget: the kind
+    /// still dispatches, it simply loses its row on <c>/nastavenia/pripomienky</c> and becomes unmutable
+    /// through the UI. <c>NotificationCatalogTests</c> is what turns that into a red test — it asserts the
+    /// catalog covers every kind the renderer names and every quiet-hours-exempt kind.
+    /// </para>
+    /// </summary>
+    private static void AddNotificationCatalog(IServiceCollection services) =>
+        services.Configure<NotificationCatalogOptions>(o => o.SupportedTypes =
+        [
+            // Reminders module: the generic kind any producer can register a reminder under, its batched
+            // digest, and the user's own self-set nudge.
+            NotificationType.DeadlineApproaching,
+            NotificationType.ReminderDigest,
+            NotificationType.PersonalReminder,
+
+            // Routines slice (RoutinePeriodNotificationService).
+            NotificationType.RoutinePeriodEndingSoon,
+            NotificationType.RoutinePeriodEnded,
+            NotificationType.RoutineStreakGraceExpiring,
+
+            // Scheduler module: the failure notifier and the overdue sweep.
+            NotificationType.ScheduledJobFailed,
+            NotificationType.ScheduledJobOverdue,
+
+            // History slice: TimerBoundaryAlarmJobHandler, on every pomodoro boundary.
+            NotificationType.TimerBoundary,
+
+            // Raised on demand by SendTestNotificationEndpoint, so the user can silence it like any other.
+            NotificationType.Test
+        ]);
 }

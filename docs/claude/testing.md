@@ -72,6 +72,14 @@ worth copying the shape of:
   active-only (the settings table's default view depends on it) and that `usageCount` sorts in SQL —
   a count applied after projection would sort every row on `0` and return an arbitrary page in
   convincing order.
+- `NotificationCatalogTests` — the settings screen's row set. `NotificationType` is a framework contract
+  shared with another product, so the preference matrix has to be filtered to what *this* host raises
+  (`NotificationCatalogOptions`, declared in `ModuleServiceExtensions`) — and every way that filtering can
+  go wrong returns a perfectly valid 200: an unregistered catalog silently republishes all nineteen enum
+  members, and a stale one drops a kind's row while the kind keeps dispatching. So the base class asserts
+  set equality **both ways** against a second copy of the list, checks the registration actually happened,
+  and pins that a write for an uncatalogued kind is refused *and leaves no row*. The rules live in
+  `BaseNotificationCatalogTests` (the module's testing package); only the list is this host's.
 - `HistorySummaryCustomRangeTests` — `rangeType: "CustomRange"` is `date`…`endDate` inclusive on all four
   `summary/` endpoints. The range resolver used to fall through to `(date, date)` and a `to <= from` guard
   widened that to two days, so a month-long request was answered for two days — a well-formed 200 the

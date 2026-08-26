@@ -257,6 +257,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
     [InlineData("GET", "/api/notification/unread-count")]
     [InlineData("POST", "/api/notification/read-all")]
     [InlineData("GET", "/api/notification-preference/mine")]
+    [InlineData("GET", "/api/notification-preference/channels")]
     [InlineData("GET", "/api/notification-quiet-hours")]
     [InlineData("GET", "/api/push-subscription/vapid-public-key")]
     // Reminders

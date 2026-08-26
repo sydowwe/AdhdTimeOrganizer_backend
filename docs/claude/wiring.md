@@ -47,6 +47,14 @@ touching anything below, because **none of these break the build**.
   to UTC and is enforced an hour or two off the one the settings page displays. `ModuleWiringTests`
   (`UserTimeZoneReader_IsRegisteredClosedOverTheHostsUserType`) and
   `QuietHoursUserZoneAndLateDeliveryTests` are the guards.
+- **This host declares which notification kinds it raises** — `AddNotificationCatalog` in
+  `ModuleServiceExtensions` fills `NotificationCatalogOptions.SupportedTypes` with the ten members of
+  `NotificationType` some producer here actually calls `NotifyAsync` with. That is what
+  `GET /notification-preference/mine` publishes; the other nine belong to the HR/inventory app that shares
+  `Sydowwe.Framework.Contracts`. **Add a kind to that list whenever you add a producer** — an empty catalog
+  means "the whole enum" (so a host that never opts in is unaffected), which also means a *stale* one fails
+  silently: the kind still dispatches, it just loses its row on the settings screen. `NotificationCatalogTests`
+  is the guard, and it keeps a second copy of the list on purpose.
 - **Account deletion fans out over `ISubjectDataEraser`** (`DeleteUserAccountEndpoint.BeforeDeleteAsync`).
   The host FKs cascade only `notification` / `notification_preference` / `push_subscription`; every
   other user-keyed module table is deliberately FK-free and would outlive the account. Erasers mutate
