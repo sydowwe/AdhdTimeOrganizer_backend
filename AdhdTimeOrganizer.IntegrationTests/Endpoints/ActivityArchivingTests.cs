@@ -77,14 +77,14 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
         await using var db = CreateDbContext();
         var activityId = await SeedActivityAsync(db, "Round Trip");
 
-        var archive = await CreateClient().PatchAsJsonAsync($"api/activity/{activityId}/archived", new { IsArchived = true }, JsonOpts);
+        var archive = await CreateClient().PatchAsJsonAsync($"api/activity/{activityId}/archived", new { IsArchived = true }, JsonOpts, TestContext.Current.CancellationToken);
         archive.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using (var assertDb = CreateDbContext())
             (await assertDb.Set<Activity>().IgnoreQueryFilters().FirstAsync(a => a.Id == activityId, CancellationToken))
                 .IsArchived.Should().BeTrue();
 
-        var restore = await CreateClient().PatchAsJsonAsync($"api/activity/{activityId}/archived", new { IsArchived = false }, JsonOpts);
+        var restore = await CreateClient().PatchAsJsonAsync($"api/activity/{activityId}/archived", new { IsArchived = false }, JsonOpts, TestContext.Current.CancellationToken);
         restore.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using var finalDb = CreateDbContext();
@@ -102,7 +102,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
         await using var db = CreateDbContext();
         var activityId = await SeedActivityAsync(db, "Idempotent", isArchived: true);
 
-        var response = await CreateClient().PatchAsJsonAsync($"api/activity/{activityId}/archived", new { IsArchived = true }, JsonOpts);
+        var response = await CreateClient().PatchAsJsonAsync($"api/activity/{activityId}/archived", new { IsArchived = true }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent, "re-archiving must not 409");
     }
@@ -110,7 +110,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
     [Fact]
     public async Task Archive_UnknownId_Returns404()
     {
-        var response = await CreateClient().PatchAsJsonAsync("api/activity/987654321/archived", new { IsArchived = true }, JsonOpts);
+        var response = await CreateClient().PatchAsJsonAsync("api/activity/987654321/archived", new { IsArchived = true }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -132,7 +132,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
         db.Set<Activity>().Add(foreign);
         await db.SaveChangesAsync(CancellationToken);
 
-        var response = await CreateClient().PatchAsJsonAsync($"api/activity/{foreign.Id}/archived", new { IsArchived = true }, JsonOpts);
+        var response = await CreateClient().PatchAsJsonAsync($"api/activity/{foreign.Id}/archived", new { IsArchived = true }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -154,7 +154,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
         var roleId = (await db.Set<Activity>().FirstAsync(a => a.Id == activityId, CancellationToken)).RoleId;
 
         var response = await CreateClient().PutAsJsonAsync($"api/activity/{activityId}",
-            new { Name = "Edited While Archived", IsUnavoidable = true, RoleId = roleId }, JsonOpts);
+            new { Name = "Edited While Archived", IsUnavoidable = true, RoleId = roleId }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.IsSuccessStatusCode.Should().BeTrue();
 
@@ -326,7 +326,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
         });
         await db.SaveChangesAsync(CancellationToken);
 
-        var archive = await CreateClient().PatchAsJsonAsync($"api/activity/{activityId}/archived", new { IsArchived = true }, JsonOpts);
+        var archive = await CreateClient().PatchAsJsonAsync($"api/activity/{activityId}/archived", new { IsArchived = true }, JsonOpts, TestContext.Current.CancellationToken);
         archive.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using var assertDb = CreateDbContext();
@@ -426,7 +426,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
             SortBy = new[] { new { Key = "usageCount", IsDesc = true } },
             UseFilter = false,
             Filter = (object?)null
-        }, JsonOpts);
+        }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, "the column is declared sortable, so this must not 400");
 

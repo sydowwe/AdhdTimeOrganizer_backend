@@ -38,7 +38,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
         var response = await ExtensionLoginAsync(email);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var result = await response.Content.ReadFromJsonAsync<ExtensionLoginResponse>();
+        var result = await response.Content.ReadFromJsonAsync<ExtensionLoginResponse>( TestContext.Current.CancellationToken);
         result.Should().NotBeNull();
         result!.AccessToken.Should().NotBeNullOrEmpty();
         result.RefreshToken.Should().NotBeNullOrEmpty();
@@ -88,7 +88,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
             }
         };
 
-        var response = await extensionClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request);
+        var response = await extensionClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -111,7 +111,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
             Sessions = new List<AndroidSessionItemDto>()
         };
 
-        var response = await extensionClient.PostAsJsonAsync("activity-tracking/android/sync", request);
+        var response = await extensionClient.PostAsJsonAsync("activity-tracking/android/sync", request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -133,7 +133,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
             Entries = new List<DesktopActivityEntryDto>()
         };
 
-        var response = await extensionClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request);
+        var response = await extensionClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -151,7 +151,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
             Entries = new List<DesktopActivityEntryDto>()
         };
 
-        var response = await webClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request);
+        var response = await webClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -168,7 +168,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
         extensionClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
 
         // user/sessions uses the fallback policy which blocks extension clients via ExtensionClientRequirement
-        var response = await extensionClient.GetAsync("user/sessions");
+        var response = await extensionClient.GetAsync("user/sessions", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -283,7 +283,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
                         ActiveMonitor = 0
                     }
                 ]
-            });
+            }, TestContext.Current.CancellationToken);
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
         }

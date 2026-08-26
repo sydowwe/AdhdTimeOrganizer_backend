@@ -28,23 +28,23 @@ public class RoutineGroupedReadAndMoveItemTests(AppDbContextFixture fixture) : P
         long periodAId, periodBId;
         await using (var db = CreateDbContext())
         {
-            periodAId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "grouped-period-a", lengthInDays: 30, resetAnchorDay: 0);
-            periodBId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "grouped-period-b", lengthInDays: 45, resetAnchorDay: 0);
+            periodAId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "grouped-period-a", lengthInDays: 30, resetAnchorDay: 0, ct: TestContext.Current.CancellationToken);
+            periodBId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "grouped-period-b", lengthInDays: 45, resetAnchorDay: 0, ct: TestContext.Current.CancellationToken);
 
-            var activityA1 = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-a1");
-            var activityA2 = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-a2");
-            var activityB1 = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-b1");
+            var activityA1 = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-a1", ct: TestContext.Current.CancellationToken);
+            var activityA2 = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-a2", ct: TestContext.Current.CancellationToken);
+            var activityB1 = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-b1", ct: TestContext.Current.CancellationToken);
 
-            await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityA1, periodAId);
-            await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityA2, periodAId);
-            await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityB1, periodBId);
+            await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityA1, periodAId, ct: TestContext.Current.CancellationToken);
+            await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityA2, periodAId, ct: TestContext.Current.CancellationToken);
+            await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityB1, periodBId, ct: TestContext.Current.CancellationToken);
 
             // A different user's period+item must never appear in this user's grouped response.
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
             var otherPeriodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(
-                db, ReminderSeedHelper.OtherUserId, text: "grouped-period-theirs", lengthInDays: 30, resetAnchorDay: 0);
-            var otherActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-theirs", ReminderSeedHelper.OtherUserId);
-            await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, otherActivityId, otherPeriodId, ReminderSeedHelper.OtherUserId);
+                db, ReminderSeedHelper.OtherUserId, text: "grouped-period-theirs", lengthInDays: 30, resetAnchorDay: 0, ct: TestContext.Current.CancellationToken);
+            var otherActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-theirs", ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
+            await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, otherActivityId, otherPeriodId, ReminderSeedHelper.OtherUserId, ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().GetAsync("api/routine-todo-list/grouped-by-time-period", CancellationToken);
@@ -72,14 +72,14 @@ public class RoutineGroupedReadAndMoveItemTests(AppDbContextFixture fixture) : P
             // ResetAnchorDay = 0 ("rolling"): next reset is exactly LastResetAt + LengthInDays, so seeding
             // LastResetAt far enough in the past guarantees the period has elapsed by "now".
             periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(
-                db, text: "grouped-reset-period", lengthInDays: 7, resetAnchorDay: 0, streakThreshold: 50);
+                db, text: "grouped-reset-period", lengthInDays: 7, resetAnchorDay: 0, streakThreshold: 50, ct: TestContext.Current.CancellationToken);
 
             var period = await db.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == periodId, CancellationToken);
             period.LastResetAt = DateTime.UtcNow.AddDays(-30);
             await db.SaveChangesAsync(CancellationToken);
 
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-reset-activity");
-            itemId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, periodId, isDone: true);
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-reset-activity", ct: TestContext.Current.CancellationToken);
+            itemId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, periodId, isDone: true, ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().GetAsync("api/routine-todo-list/grouped-by-time-period", CancellationToken);
@@ -113,15 +113,15 @@ public class RoutineGroupedReadAndMoveItemTests(AppDbContextFixture fixture) : P
         long itemToMoveId, destinationListId;
         await using (var db = CreateDbContext())
         {
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "move-collide-activity");
-            var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 700, text: "move-collide-priority");
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "move-collide-activity", ct: TestContext.Current.CancellationToken);
+            var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 700, text: "move-collide-priority", ct: TestContext.Current.CancellationToken);
 
-            var sourceListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "move-collide-source");
-            destinationListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "move-collide-dest");
+            var sourceListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "move-collide-source", ct: TestContext.Current.CancellationToken);
+            destinationListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "move-collide-dest", ct: TestContext.Current.CancellationToken);
 
-            itemToMoveId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, sourceListId);
+            itemToMoveId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, sourceListId, ct: TestContext.Current.CancellationToken);
             // Same ActivityId already sitting in the destination list -- (UserId, ActivityId, TodoListId) collides.
-            await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, destinationListId);
+            await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, destinationListId, ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PatchAsJsonAsync(
@@ -148,17 +148,17 @@ public class RoutineGroupedReadAndMoveItemTests(AppDbContextFixture fixture) : P
         long itemId, myOriginalListId;
         await using (var db = CreateDbContext())
         {
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "move-idor-activity");
-            var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 701, text: "move-idor-priority");
-            myOriginalListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "move-idor-mine");
-            itemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, myOriginalListId);
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "move-idor-activity", ct: TestContext.Current.CancellationToken);
+            var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 701, text: "move-idor-priority", ct: TestContext.Current.CancellationToken);
+            myOriginalListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "move-idor-mine", ct: TestContext.Current.CancellationToken);
+            itemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, myOriginalListId, ct: TestContext.Current.CancellationToken);
         }
 
         long theirListId;
         await using (var db = CreateDbContext())
         {
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-            theirListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, ReminderSeedHelper.OtherUserId, "move-idor-theirs");
+            theirListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, ReminderSeedHelper.OtherUserId, "move-idor-theirs", ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PatchAsJsonAsync(

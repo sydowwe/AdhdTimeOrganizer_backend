@@ -530,10 +530,10 @@ public class ChangeDisplayOrderTodoListItemIdorTests(AppDbContextFixture fixture
         long myItemId, myPriorityId, myListId;
         await using (var db = CreateDbContext())
         {
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "reorder-mine");
-            myPriorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 200);
-            myListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "reorder-mine-list");
-            myItemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, myPriorityId, myListId);
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "reorder-mine", ct: TestContext.Current.CancellationToken);
+            myPriorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 200, ct: TestContext.Current.CancellationToken);
+            myListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "reorder-mine-list", ct: TestContext.Current.CancellationToken);
+            myItemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, myPriorityId, myListId, ct: TestContext.Current.CancellationToken);
         }
 
         long otherUserId = ReminderSeedHelper.OtherUserId;
@@ -541,10 +541,10 @@ public class ChangeDisplayOrderTodoListItemIdorTests(AppDbContextFixture fixture
         await using (var db = CreateDbContext())
         {
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-            var theirActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "reorder-theirs", otherUserId);
-            var theirPriorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 201, otherUserId);
-            var theirListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, otherUserId, "reorder-theirs-list");
-            theirItemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, theirActivityId, theirPriorityId, theirListId, otherUserId);
+            var theirActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "reorder-theirs", otherUserId, TestContext.Current.CancellationToken);
+            var theirPriorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 201, otherUserId, ct: TestContext.Current.CancellationToken);
+            var theirListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, otherUserId, "reorder-theirs-list", ct: TestContext.Current.CancellationToken);
+            theirItemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, theirActivityId, theirPriorityId, theirListId, otherUserId, ct: TestContext.Current.CancellationToken);
         }
 
         // As the default test user (not otherUserId), try to move myItemId to precede user A's item.

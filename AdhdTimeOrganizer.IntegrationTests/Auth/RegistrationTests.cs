@@ -35,16 +35,16 @@ public class RegistrationTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         const string email = "brand-new-user@example.com";
         using var client = CreateCookieClient();
 
-        var response = await client.PostAsJsonAsync("auth/register", BuildPayload(email));
+        var response = await client.PostAsJsonAsync("auth/register", BuildPayload(email), TestContext.Current.CancellationToken);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync( TestContext.Current.CancellationToken));
 
         await using var db = fixture.CreateDbContext();
-        var user = await db.Users.SingleOrDefaultAsync(u => u.Email == email);
+        var user = await db.Users.SingleOrDefaultAsync(u => u.Email == email, TestContext.Current.CancellationToken);
         user.Should().NotBeNull();
 
-        var roleIds = await db.UserRoles.Where(ur => ur.UserId == user!.Id).Select(ur => ur.RoleId).ToListAsync();
-        var roleNames = await db.Roles.Where(r => roleIds.Contains(r.Id)).Select(r => r.Name).ToListAsync();
+        var roleIds = await db.UserRoles.Where(ur => ur.UserId == user!.Id).Select(ur => ur.RoleId).ToListAsync( TestContext.Current.CancellationToken);
+        var roleNames = await db.Roles.Where(r => roleIds.Contains(r.Id)).Select(r => r.Name).ToListAsync( TestContext.Current.CancellationToken);
         roleNames.Should().Contain(PortalRoleCatalog.User);
     }
 
@@ -53,7 +53,7 @@ public class RegistrationTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
     {
         using var client = CreateCookieClient();
 
-        var response = await client.PostAsJsonAsync("auth/register", BuildPayload(TestEmail));
+        var response = await client.PostAsJsonAsync("auth/register", BuildPayload(TestEmail), TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }

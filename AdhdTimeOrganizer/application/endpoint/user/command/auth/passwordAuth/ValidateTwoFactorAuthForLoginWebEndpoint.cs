@@ -11,10 +11,9 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
 /// session cookies. The base's defaults are exactly this, so only the throttling key is set here.
 /// </summary>
 public class ValidateTwoFactorAuthForLoginWebEndpoint(
-    UserManager<User> userManager,
     ITwoFactorAuthService<User> twoFactorAuthService,
     IJwtService<User> jwtService,
     IAuditService auditService)
-    : BaseValidateTwoFactorAuthForLoginEndpoint<User>(userManager, twoFactorAuthService, jwtService, auditService)
+    : BaseValidateTwoFactorAuthForLoginEndpoint<User>(twoFactorAuthService, jwtService, auditService)
 {
 }

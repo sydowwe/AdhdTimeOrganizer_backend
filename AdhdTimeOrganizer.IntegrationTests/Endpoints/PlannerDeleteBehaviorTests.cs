@@ -46,9 +46,9 @@ public class PlannerDeleteBehaviorTests(AppDbContextFixture fixture) : PostgresT
         // this test isn't actually exercising the database-level Restrict constraint it claims to.
         await using (var seedDb = CreateDbContext())
         {
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(seedDb, "delete-calendar-restrict");
-            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(seedDb, new DateOnly(2027, 6, 1));
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(seedDb, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0));
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(seedDb, "delete-calendar-restrict", ct: TestContext.Current.CancellationToken);
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(seedDb, new DateOnly(2027, 6, 1), ct: TestContext.Current.CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(seedDb, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: TestContext.Current.CancellationToken);
         }
 
         await using var db = CreateDbContext();
@@ -70,7 +70,7 @@ public class PlannerDeleteBehaviorTests(AppDbContextFixture fixture) : PostgresT
     public async Task DeletingAnEmptyCalendar_Succeeds()
     {
         await using var db = CreateDbContext();
-        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 2));
+        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 2), ct: TestContext.Current.CancellationToken);
 
         var calendar = await db.Set<Calendar>().SingleAsync(c => c.Id == calendarId, CancellationToken);
         db.Set<Calendar>().Remove(calendar);
@@ -84,9 +84,9 @@ public class PlannerDeleteBehaviorTests(AppDbContextFixture fixture) : PostgresT
     public async Task DeletingActivityReferencedByTask_Cascades_NotRestricted()
     {
         await using var db = CreateDbContext();
-        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "delete-activity-cascades");
-        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 3));
-        var taskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0));
+        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "delete-activity-cascades", ct: TestContext.Current.CancellationToken);
+        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 3), ct: TestContext.Current.CancellationToken);
+        var taskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: TestContext.Current.CancellationToken);
 
         var activity = await db.Set<Activity>().SingleAsync(a => a.Id == activityId, CancellationToken);
         db.Set<Activity>().Remove(activity);
@@ -103,11 +103,11 @@ public class PlannerDeleteBehaviorTests(AppDbContextFixture fixture) : PostgresT
     public async Task DeletingTaskImportance_SetNullsTheReference()
     {
         await using var db = CreateDbContext();
-        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "delete-importance-setnull");
-        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 4));
-        var importanceId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(db, 5);
+        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "delete-importance-setnull", ct: TestContext.Current.CancellationToken);
+        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 4), ct: TestContext.Current.CancellationToken);
+        var importanceId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(db, 5, ct: TestContext.Current.CancellationToken);
         var taskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
-            db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), importanceId: importanceId);
+            db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), importanceId: importanceId, ct: TestContext.Current.CancellationToken);
 
         var importance = await db.Set<TaskImportance>().SingleAsync(t => t.Id == importanceId, CancellationToken);
         db.Set<TaskImportance>().Remove(importance);
@@ -122,9 +122,9 @@ public class PlannerDeleteBehaviorTests(AppDbContextFixture fixture) : PostgresT
     public async Task DeletingPlannerTask_CascadesItsReminders()
     {
         await using var db = CreateDbContext();
-        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "delete-task-cascades-reminder");
-        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 5));
-        var taskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0));
+        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "delete-task-cascades-reminder", ct: TestContext.Current.CancellationToken);
+        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 5), ct: TestContext.Current.CancellationToken);
+        var taskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: TestContext.Current.CancellationToken);
 
         var reminder = await AdhdTimeOrganizer.IntegrationTests.Reminders.ReminderSeedHelper
             .SeedReminderAsync(db, PlanningTestSeedHelper.TestUserId, DateTime.UtcNow.AddHours(2), plannerTaskId: taskId, ct: CancellationToken);

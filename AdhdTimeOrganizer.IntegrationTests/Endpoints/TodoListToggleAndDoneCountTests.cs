@@ -212,9 +212,9 @@ public class TodoListToggleAndDoneCountTests(AppDbContextFixture fixture) : Post
         long activityId, priorityId, listId;
         await using (var seedDb = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(seedDb, "cq19-activity");
-            priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(seedDb, 901, text: "cq19-priority");
-            listId = await TodoListTestSeedHelper.SeedTodoListAsync(seedDb, name: "cq19-list");
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(seedDb, "cq19-activity", ct: TestContext.Current.CancellationToken);
+            priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(seedDb, 901, text: "cq19-priority", ct: TestContext.Current.CancellationToken);
+            listId = await TodoListTestSeedHelper.SeedTodoListAsync(seedDb, name: "cq19-list", ct: TestContext.Current.CancellationToken);
         }
 
         await using var db = CreateDbContext();

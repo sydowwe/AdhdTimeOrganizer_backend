@@ -35,8 +35,8 @@ public class TaskImportanceReorderTests(AppDbContextFixture fixture) : PostgresT
         long lowId, highId;
         await using (var db = CreateDbContext())
         {
-            lowId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(db, 1, text: "Low");
-            highId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(db, 2, text: "High");
+            lowId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(db, 1, text: "Low", ct: TestContext.Current.CancellationToken);
+            highId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(db, 2, text: "High", ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PutAsJsonAsync($"api/task-importance/{lowId}", new
@@ -62,8 +62,8 @@ public class TaskImportanceReorderTests(AppDbContextFixture fixture) : PostgresT
         long lowId, highId;
         await using (var seedDb = CreateDbContext())
         {
-            lowId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, 1, text: "Low");
-            highId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, 2, text: "High");
+            lowId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, 1, text: "Low", ct: TestContext.Current.CancellationToken);
+            highId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, 2, text: "High", ct: TestContext.Current.CancellationToken);
         }
 
         var client = CreateClient();
@@ -91,9 +91,9 @@ public class TaskImportanceReorderTests(AppDbContextFixture fixture) : PostgresT
         long optionalId, aId, bId;
         await using (var seedDb = CreateDbContext())
         {
-            optionalId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, TaskImportance.OptionalMarkerValue, text: "Optional");
-            aId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, 1, text: "A");
-            bId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, 2, text: "B");
+            optionalId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, TaskImportance.OptionalMarkerValue, text: "Optional", ct: TestContext.Current.CancellationToken);
+            aId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, 1, text: "A", ct: TestContext.Current.CancellationToken);
+            bId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(seedDb, 2, text: "B", ct: TestContext.Current.CancellationToken);
         }
 
         var client = CreateClient();

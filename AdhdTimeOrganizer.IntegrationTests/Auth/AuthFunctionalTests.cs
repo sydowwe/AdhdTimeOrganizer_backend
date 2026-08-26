@@ -50,16 +50,16 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
             };
             user.PasswordHash = new PasswordHasher<User>().HashPassword(user, password);
             db.Users.Add(user);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync( TestContext.Current.CancellationToken);
             userId = user.Id;
 
             // Without a role the minted JWT authenticates but 403s on every endpoint, because the
             // global configurator in Program.cs puts Roles("User","Admin","Root") on anything that
             // doesn't set its own.
             var roleId = await db.Roles.Where(r => r.Name == PortalRoleCatalog.User)
-                .Select(r => r.Id).FirstAsync();
+                .Select(r => r.Id).FirstAsync( TestContext.Current.CancellationToken);
             db.UserRoles.Add(new IdentityUserRole<long> { UserId = userId, RoleId = roleId });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync( TestContext.Current.CancellationToken);
         }
 
         using var cookieClient = CreateCookieClient();
@@ -69,17 +69,17 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
         // fixture's fake user is not the one this test created.
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            (await db.RefreshTokens.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsRevoked))
+            (await db.RefreshTokens.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
                 .Should().BeTrue("login must create a refresh token owned by the user who logged in");
         }
 
         var changePayload = new { Password = password, NewPassword = newPassword };
-        (await cookieClient.PatchAsJsonAsync("user/password", changePayload))
+        (await cookieClient.PatchAsJsonAsync("user/password", changePayload, TestContext.Current.CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            (await db.RefreshTokens.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsRevoked))
+            (await db.RefreshTokens.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
                 .Should().BeFalse("all refresh tokens must be revoked after password change");
         }
     }
@@ -118,7 +118,7 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
             };
             user.PasswordHash = new PasswordHasher<User>().HashPassword(user, password);
             db.Users.Add(user);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync( TestContext.Current.CancellationToken);
             userId = user.Id;
         }
 
@@ -128,19 +128,19 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
         using var loginRequest = new HttpRequestMessage(HttpMethod.Post, "auth/login");
         loginRequest.Headers.Add("X-Client-Id", Guid.NewGuid().ToString());
         loginRequest.Content = JsonContent.Create(loginPayload);
-        var loginResponse = await cookieClient.SendAsync(loginRequest);
+        var loginResponse = await cookieClient.SendAsync(loginRequest, TestContext.Current.CancellationToken);
 
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>( TestContext.Current.CancellationToken);
         login!.RequiresTwoFactor.Should().BeTrue();
         login.RequiresTwoFactorSetup.Should().BeTrue("the account has no authenticator key yet");
 
         // The partial-auth cookie rides along in the client's container — the setup call carries no
         // other credential.
-        var setupResponse = await cookieClient.PostAsync("auth/login/2fa/setup", null);
+        var setupResponse = await cookieClient.PostAsync("auth/login/2fa/setup", null, TestContext.Current.CancellationToken);
         setupResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var setup = await setupResponse.Content.ReadFromJsonAsync<TwoFactorAuthResponse>();
+        var setup = await setupResponse.Content.ReadFromJsonAsync<TwoFactorAuthResponse>( TestContext.Current.CancellationToken);
         setup!.TwoFactorEnabled.Should().BeTrue();
         setup.QrCode.Should().NotBeNullOrEmpty();
         setup.RecoveryCodes.Should().NotBeNullOrEmpty("first-time setup issues the initial recovery codes");
@@ -165,16 +165,16 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
         var userId = FakeLoggedUserService.TestUserId;
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked))
+            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
                 .Should().BeTrue("login must create a refresh token");
         }
 
-        var response = await cookieClient.PostAsync("auth/logout", null);
+        var response = await cookieClient.PostAsync("auth/logout", null, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked))
+            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
                 .Should().BeFalse("logout must revoke the refresh token in the DB");
         }
     }
@@ -208,13 +208,13 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
         request.Headers.Add("Cookie",
             $"{AuthCookies.AuthTokenName}={expiredAccessToken}; {AuthCookies.RefreshTokenName}={refreshToken}");
 
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.NoContent,
             "an expired access token must not stop a logout — that would strand the refresh token");
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked))
+            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
                 .Should().BeFalse("logout must revoke the refresh token even when the access token is expired");
         }
     }
@@ -251,12 +251,12 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
             await svc.GenerateRefreshTokenAsync(userId, AuthMethodEnum.Password, false, "unknown");
         }
 
-        var response = await cookieClient.PostAsync("auth/logout-all", null);
+        var response = await cookieClient.PostAsync("auth/logout-all", null, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked))
+            (await db.RefreshTokens.AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
                 .Should().BeFalse("logout-all must revoke every active refresh token");
         }
     }

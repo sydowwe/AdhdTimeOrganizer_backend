@@ -175,10 +175,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdB) = await SeedBacklogProfileAsync(db, userIdB, "B's backlog activity");
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().PostAsJsonAsync("api/activity-backlog-profile/grid", GridBody(), JsonOpts);
+        var response = await factoryB.CreateClient().PostAsJsonAsync("api/activity-backlog-profile/grid", GridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts);
+        var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken);
         body!.Items.Select(i => i.GetProperty("id").GetInt64()).Should().Contain(profileIdB);
         body.Items.Select(i => i.GetProperty("id").GetInt64()).Should().NotContain(profileIdA);
     }
@@ -191,7 +191,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdA) = await SeedBacklogProfileAsync(db, FakeLoggedUserService.TestUserId);
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().GetAsync($"api/activity-backlog-profile/{profileIdA}");
+        var response = await factoryB.CreateClient().GetAsync($"api/activity-backlog-profile/{profileIdA}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -217,10 +217,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             DurationMinutes = 999,
             IsRepeatable = true
         };
-        var updateResponse = await clientB.PutAsJsonAsync($"api/activity-backlog-profile/{profileIdA}", updatePayload, JsonOpts);
+        var updateResponse = await clientB.PutAsJsonAsync($"api/activity-backlog-profile/{profileIdA}", updatePayload, JsonOpts, TestContext.Current.CancellationToken);
         updateResponse.IsSuccessStatusCode.Should().BeFalse();
 
-        var deleteResponse = await clientB.DeleteAsync($"api/activity-backlog-profile/{profileIdA}");
+        var deleteResponse = await clientB.DeleteAsync($"api/activity-backlog-profile/{profileIdA}", TestContext.Current.CancellationToken);
         deleteResponse.IsSuccessStatusCode.Should().BeFalse();
 
         await using var assertDb = CreateDbContext();
@@ -238,10 +238,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdB) = await SeedBacklogProfileAsync(db, userIdB);
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().GetAsync("api/activity-backlog-profile/all-options");
+        var response = await factoryB.CreateClient().GetAsync("api/activity-backlog-profile/all-options", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOpts);
+        var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOpts, TestContext.Current.CancellationToken);
         items!.Select(i => i.GetProperty("id").GetInt64()).Should().Contain(profileIdB);
         items.Select(i => i.GetProperty("id").GetInt64()).Should().NotContain(profileIdA);
     }
@@ -267,7 +267,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             IsRepeatable = false
         };
 
-        var response = await CreateClient().PostAsJsonAsync("api/activity-backlog-profile", payload, JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-backlog-profile", payload, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest, "the create validator rejects a second profile of the same kind, not a raw 500 from the unique index");
     }
@@ -283,10 +283,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdB) = await SeedBucketListProfileAsync(db, userIdB, "B's bucket activity");
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile/grid", GridBody(), JsonOpts);
+        var response = await factoryB.CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile/grid", GridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts);
+        var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken);
         body!.Items.Select(i => i.GetProperty("id").GetInt64()).Should().Contain(profileIdB);
         body.Items.Select(i => i.GetProperty("id").GetInt64()).Should().NotContain(profileIdA);
     }
@@ -299,7 +299,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdA) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId);
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().GetAsync($"api/activity-bucket-list-profile/{profileIdA}");
+        var response = await factoryB.CreateClient().GetAsync($"api/activity-bucket-list-profile/{profileIdA}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -322,10 +322,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             RequiresTravel = true,
             InspirationSource = "Hijacked"
         };
-        var updateResponse = await clientB.PutAsJsonAsync($"api/activity-bucket-list-profile/{profileIdA}", updatePayload, JsonOpts);
+        var updateResponse = await clientB.PutAsJsonAsync($"api/activity-bucket-list-profile/{profileIdA}", updatePayload, JsonOpts, TestContext.Current.CancellationToken);
         updateResponse.IsSuccessStatusCode.Should().BeFalse();
 
-        var deleteResponse = await clientB.DeleteAsync($"api/activity-bucket-list-profile/{profileIdA}");
+        var deleteResponse = await clientB.DeleteAsync($"api/activity-bucket-list-profile/{profileIdA}", TestContext.Current.CancellationToken);
         deleteResponse.IsSuccessStatusCode.Should().BeFalse();
 
         await using var assertDb = CreateDbContext();
@@ -350,7 +350,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             InspirationSource = "Another source"
         };
 
-        var response = await CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile", payload, JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile", payload, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -366,10 +366,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdB) = await SeedProjectProfileAsync(db, userIdB, "B's project activity");
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().PostAsJsonAsync("api/activity-project-profile/grid", GridBody(), JsonOpts);
+        var response = await factoryB.CreateClient().PostAsJsonAsync("api/activity-project-profile/grid", GridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts);
+        var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken);
         body!.Items.Select(i => i.GetProperty("id").GetInt64()).Should().Contain(profileIdB);
         body.Items.Select(i => i.GetProperty("id").GetInt64()).Should().NotContain(profileIdA);
     }
@@ -382,7 +382,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (_, profileIdA) = await SeedProjectProfileAsync(db, FakeLoggedUserService.TestUserId);
 
         await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().GetAsync($"api/activity-project-profile/{profileIdA}");
+        var response = await factoryB.CreateClient().GetAsync($"api/activity-project-profile/{profileIdA}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -408,10 +408,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             RequiredTools = Array.Empty<string>(),
             ReadinessStatus = "ReadyToStart"
         };
-        var updateResponse = await clientB.PutAsJsonAsync($"api/activity-project-profile/{profileIdA}", updatePayload, JsonOpts);
+        var updateResponse = await clientB.PutAsJsonAsync($"api/activity-project-profile/{profileIdA}", updatePayload, JsonOpts, TestContext.Current.CancellationToken);
         updateResponse.IsSuccessStatusCode.Should().BeFalse();
 
-        var deleteResponse = await clientB.DeleteAsync($"api/activity-project-profile/{profileIdA}");
+        var deleteResponse = await clientB.DeleteAsync($"api/activity-project-profile/{profileIdA}", TestContext.Current.CancellationToken);
         deleteResponse.IsSuccessStatusCode.Should().BeFalse();
 
         await using var assertDb = CreateDbContext();
@@ -429,7 +429,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var response = await CreateClient().PatchAsJsonAsync(
             $"api/activity-project-profile/{profileId}/status",
             new { ReadinessStatus = "ReadyToStart" },
-            JsonOpts);
+            JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
@@ -452,7 +452,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var response = await factoryB.CreateClient().PatchAsJsonAsync(
             $"api/activity-project-profile/{profileIdA}/status",
             new { ReadinessStatus = "ReadyToStart" },
-            JsonOpts);
+            JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -479,7 +479,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
             ReadinessStatus = "Planning"
         };
 
-        var response = await CreateClient().PostAsJsonAsync("api/activity-project-profile", payload, JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-project-profile", payload, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -500,10 +500,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         await SeedMemoryAnchorAsync(db, FakeLoggedUserService.TestUserId, doneActivityId, 2025, 6);
         var latestAnchorId = await SeedMemoryAnchorAsync(db, FakeLoggedUserService.TestUserId, doneActivityId, 2026, 2);
 
-        var response = await CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile/grid", GridBody(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile/grid", GridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = (await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts))!;
+        var body = (await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!;
 
         var done = ItemWithId(body, doneProfileId);
         done.GetProperty("isAnchored").GetBoolean().Should().BeTrue();
@@ -530,10 +530,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var response = await CreateClient().PostAsJsonAsync(
             "api/activity-bucket-list-profile/grid",
             FilteredGridBody(new { isAnchored }, itemsPerPage: 1),
-            JsonOpts);
+            JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = (await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts))!;
+        var body = (await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!;
         body.ItemsCount.Should().Be(expectedCount);
 
         if (isAnchored == true)
@@ -555,21 +555,21 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var ascending = await client.PostAsJsonAsync(
             "api/activity-bucket-list-profile/grid",
             FilteredGridBody(new { }, [new { key = "isAnchored", isDesc = false }]),
-            JsonOpts);
+            JsonOpts, TestContext.Current.CancellationToken);
 
         // isAnchored is computed in the projection, not stored -- if it were overlaid after the query the
         // sort would silently run on `false` for every row and this would pass by accident half the time.
         ascending.StatusCode.Should().Be(HttpStatusCode.OK);
-        IdsOf((await ascending.Content.ReadFromJsonAsync<GridResponse>(JsonOpts))!)
+        IdsOf((await ascending.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!)
             .Should().Equal([todoProfileId, doneProfileId], "ascending puts the entries still to do first");
 
         var descending = await client.PostAsJsonAsync(
             "api/activity-bucket-list-profile/grid",
             FilteredGridBody(new { }, [new { key = "isAnchored", isDesc = true }]),
-            JsonOpts);
+            JsonOpts, TestContext.Current.CancellationToken);
 
         descending.StatusCode.Should().Be(HttpStatusCode.OK);
-        IdsOf((await descending.Content.ReadFromJsonAsync<GridResponse>(JsonOpts))!)
+        IdsOf((await descending.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!)
             .Should().Equal(doneProfileId, todoProfileId);
     }
 
@@ -584,10 +584,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var onceAnchorId = await SeedMemoryAnchorAsync(db, FakeLoggedUserService.TestUserId, onceActivityId, 2026, 3);
         await SeedMemoryAnchorAsync(db, FakeLoggedUserService.TestUserId, repeatActivityId, 2026, 3);
 
-        var response = await CreateClient().PostAsJsonAsync("api/activity-backlog-profile/grid", GridBody(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-backlog-profile/grid", GridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = (await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts))!;
+        var body = (await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!;
 
         var once = ItemWithId(body, onceProfileId);
         once.GetProperty("isAnchored").GetBoolean().Should().BeTrue();
@@ -615,16 +615,16 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var denominator = await client.PostAsJsonAsync(
             "api/activity-backlog-profile/grid",
             FilteredGridBody(new { isOneTime = true }, itemsPerPage: 1),
-            JsonOpts);
+            JsonOpts, TestContext.Current.CancellationToken);
         denominator.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await denominator.Content.ReadFromJsonAsync<GridResponse>(JsonOpts))!.ItemsCount.Should().Be(2);
+        (await denominator.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!.ItemsCount.Should().Be(2);
 
         var numerator = await client.PostAsJsonAsync(
             "api/activity-backlog-profile/grid",
             FilteredGridBody(new { isOneTime = true, isAnchored = true }, itemsPerPage: 1),
-            JsonOpts);
+            JsonOpts, TestContext.Current.CancellationToken);
         numerator.StatusCode.Should().Be(HttpStatusCode.OK);
-        var numeratorBody = (await numerator.Content.ReadFromJsonAsync<GridResponse>(JsonOpts))!;
+        var numeratorBody = (await numerator.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!;
         numeratorBody.ItemsCount.Should().Be(1);
         IdsOf(numeratorBody).Should().Equal(doneProfileId);
 
@@ -632,9 +632,9 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var notYet = await client.PostAsJsonAsync(
             "api/activity-backlog-profile/grid",
             FilteredGridBody(new { isAnchored = false }),
-            JsonOpts);
+            JsonOpts, TestContext.Current.CancellationToken);
         notYet.StatusCode.Should().Be(HttpStatusCode.OK);
-        var notYetBody = (await notYet.Content.ReadFromJsonAsync<GridResponse>(JsonOpts))!;
+        var notYetBody = (await notYet.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!;
         IdsOf(notYetBody).Should().Contain(todoProfileId).And.NotContain(doneProfileId);
         notYetBody.ItemsCount.Should().Be(2, "the repeatable entry reports isAnchored: false and must be counted as such");
     }
@@ -650,10 +650,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         // exactly what must NOT be the only thing standing between B's row and A's completion column.
         await SeedMemoryAnchorAsync(db, userIdB, activityIdA, 2026, 2);
 
-        var response = await CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile/grid", GridBody(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile/grid", GridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = (await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts))!;
+        var body = (await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!;
         var item = ItemWithId(body, profileIdA);
         item.GetProperty("isAnchored").GetBoolean().Should().BeFalse("the anchor subquery is scoped to the caller");
         MemoryAnchorIdOf(item).Should().BeNull();
@@ -666,10 +666,10 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var (activityId, profileId) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId, "Skydiving");
         var anchorId = await SeedMemoryAnchorAsync(db, FakeLoggedUserService.TestUserId, activityId, 2026, 2);
 
-        var response = await CreateClient().GetAsync($"api/activity-bucket-list-profile/{profileId}");
+        var response = await CreateClient().GetAsync($"api/activity-bucket-list-profile/{profileId}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var item = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOpts);
+        var item = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOpts, TestContext.Current.CancellationToken);
         item.GetProperty("isAnchored").GetBoolean()
             .Should().BeTrue("GetById projects in memory and cannot reach the anchors -- it must overlay them, not answer false");
         item.GetProperty("memoryAnchorId").GetInt64().Should().Be(anchorId);
@@ -699,7 +699,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
                 break;
         }
 
-        var deleteResponse = await CreateClient().DeleteAsync($"api/activity/{activityId}");
+        var deleteResponse = await CreateClient().DeleteAsync($"api/activity/{activityId}", TestContext.Current.CancellationToken);
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using var assertDb = CreateDbContext();

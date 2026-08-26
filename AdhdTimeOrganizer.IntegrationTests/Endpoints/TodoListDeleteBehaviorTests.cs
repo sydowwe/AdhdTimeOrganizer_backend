@@ -23,9 +23,9 @@ public class TodoListDeleteBehaviorTests(AppDbContextFixture fixture) : Postgres
         long periodId, itemId;
         await using (var db = CreateDbContext())
         {
-            periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "restrict-period");
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "restrict-period-activity");
-            itemId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, periodId);
+            periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "restrict-period", ct: TestContext.Current.CancellationToken);
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "restrict-period-activity", ct: TestContext.Current.CancellationToken);
+            itemId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, periodId, ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().DeleteAsync($"api/routine-time-period/{periodId}", CancellationToken);
@@ -43,10 +43,10 @@ public class TodoListDeleteBehaviorTests(AppDbContextFixture fixture) : Postgres
         long priorityId, itemId;
         await using (var db = CreateDbContext())
         {
-            priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 700, text: "restrict-priority");
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "restrict-priority-activity");
-            var listId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "restrict-priority-list");
-            itemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, listId);
+            priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 700, text: "restrict-priority", ct: TestContext.Current.CancellationToken);
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "restrict-priority-activity", ct: TestContext.Current.CancellationToken);
+            var listId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "restrict-priority-list", ct: TestContext.Current.CancellationToken);
+            itemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, listId, ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().DeleteAsync($"api/task-priority/{priorityId}", CancellationToken);
@@ -64,8 +64,8 @@ public class TodoListDeleteBehaviorTests(AppDbContextFixture fixture) : Postgres
         long categoryId, listId;
         await using (var db = CreateDbContext())
         {
-            categoryId = await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "setnull-category");
-            listId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "setnull-list", categoryId: categoryId);
+            categoryId = await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "setnull-category", ct: TestContext.Current.CancellationToken);
+            listId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "setnull-list", categoryId: categoryId, ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().DeleteAsync($"api/todo-list-category/{categoryId}", CancellationToken);

@@ -195,7 +195,7 @@ public class ActivityHistoryFilterTests(AppDbContextFixture fixture) : BaseFilte
         var otherUserId = await Seed.SecondUserAsync(Fixture, $"history-filter-{Guid.NewGuid():N}@test.com");
         await Seed.HistoryAsync(db, otherUserId, "Foreign Filter History");
 
-        var response = await CreateClient().PostAsJsonAsync(EndpointUrl, EmptyFilterPayload(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync(EndpointUrl, EmptyFilterPayload(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOpts, CancellationToken);
@@ -232,7 +232,7 @@ public class ActivityHistoryGetFilteredTableTests(AppDbContextFixture fixture) :
         var otherUserId = await Seed.SecondUserAsync(Fixture, $"history-gird-{Guid.NewGuid():N}@test.com");
         await Seed.HistoryAsync(db, otherUserId, "Foreign Grid History");
 
-        var response = await CreateClient().PostAsJsonAsync("api/activity-history/gird", GridBody(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync("api/activity-history/gird", GridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var groups = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOpts, CancellationToken);

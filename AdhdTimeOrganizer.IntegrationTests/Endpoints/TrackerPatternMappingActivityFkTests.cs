@@ -122,7 +122,7 @@ public class TrackerPatternMappingActivityFkTests(AppDbContextFixture fixture) :
         var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "Mapped Activity", ct: CancellationToken);
         var mappingId = await AddDesktopMappingAsync(db, activityId, "doomed");
 
-        var response = await CreateClient().DeleteAsync($"api/activity/{activityId}");
+        var response = await CreateClient().DeleteAsync($"api/activity/{activityId}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent,
             "the FK is Cascade, not NO ACTION — a pattern rule must not make an activity undeletable");
@@ -140,7 +140,7 @@ public class TrackerPatternMappingActivityFkTests(AppDbContextFixture fixture) :
         var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "Mapped Android Activity", ct: CancellationToken);
         var mappingId = await AddAndroidMappingAsync(db, activityId, "com.doomed.app");
 
-        var response = await CreateClient().DeleteAsync($"api/activity/{activityId}");
+        var response = await CreateClient().DeleteAsync($"api/activity/{activityId}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 

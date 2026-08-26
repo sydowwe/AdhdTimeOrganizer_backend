@@ -15,12 +15,14 @@ namespace AdhdTimeOrganizer.Core.application.endpoint.activity.role.command;
 public class DeleteActivityRoleEndpoint(DbContext dbContext)
     : BaseDeleteEndpoint<ActivityRole>(dbContext)
 {
+    private readonly DbContext _dbContext = dbContext;
+
     public override async Task HandleAsync(CancellationToken ct)
     {
         // Deliberately a separate read rather than the AuthorizeAsync hook: this is not an ownership
         // failure, and a bare 403 would tell the client nothing it can put in front of the user.
         var id = Route<long>("id");
-        var systemKey = await dbContext.Set<ActivityRole>()
+        var systemKey = await _dbContext.Set<ActivityRole>()
             .AsNoTracking()
             .Where(r => r.Id == id)
             .Select(r => r.SystemKey)

@@ -17,12 +17,13 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.extension;
 /// as a token pair instead of being written to cookies an extension can't use.
 /// </summary>
 public class ValidateTwoFactorAuthForLoginExtensionEndpoint(
-    UserManager<User> userManager,
     ITwoFactorAuthService<User> twoFactorAuthService,
     IJwtService<User> jwtService,
     IAuditService auditService)
-    : BaseValidateTwoFactorAuthForLoginEndpoint<User>(userManager, twoFactorAuthService, jwtService, auditService)
+    : BaseValidateTwoFactorAuthForLoginEndpoint<User>(twoFactorAuthService, jwtService, auditService)
 {
+    private readonly IJwtService<User> _jwtService = jwtService;
+
     public override void Configure()
     {
         // Only the route genuinely differs — this is the token-based sibling of /auth/login/2fa.
@@ -38,7 +39,7 @@ public class ValidateTwoFactorAuthForLoginExtensionEndpoint(
 
     protected override async Task OnAuthenticatedAsync(User user, TwoFactorAuthLoginRequest request, CancellationToken ct)
     {
-        var (accessToken, refreshToken) = await jwtService.GenerateTokensForExtensionAsync(AuthMethodEnum.Password, user);
+        var (accessToken, refreshToken) = await _jwtService.GenerateTokensForExtensionAsync(AuthMethodEnum.Password, user);
 
         await HttpContext.Response.SendAsync(new ExtensionLoginResponse
         {

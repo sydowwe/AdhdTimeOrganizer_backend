@@ -11,6 +11,8 @@ public class GetByIdActivityEndpoint(
     IActivityReferenceService referenceService)
     : BaseGetByIdEndpoint<Activity, ActivityResponse>(dbContext)
 {
+    private readonly DbContext _dbContext = dbContext;
+
     // Scoped by AppDbContext's global IEntityWithUser query filter, so a foreign row never projects.
     protected override Task<bool> AuthorizeAsync(ActivityResponse entity, CancellationToken ct) => Task.FromResult(true);
 
@@ -25,7 +27,7 @@ public class GetByIdActivityEndpoint(
     /// </remarks>
     protected override async Task<ActivityResponse> PostProcessAsync(ActivityResponse entity, CancellationToken ct)
     {
-        var counts = await referenceService.CountByActivityAsync(dbContext, [entity.Id], ct);
+        var counts = await referenceService.CountByActivityAsync(_dbContext, [entity.Id], ct);
         var usageCount = counts.GetValueOrDefault(entity.Id);
 
         return entity with { UsageCount = usageCount, CanDelete = usageCount == 0 };

@@ -164,9 +164,9 @@ public class TodoListStepsCrudTests(AppDbContextFixture fixture) : PostgresTestB
         long itemId;
         await using (var db = CreateDbContext())
         {
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "routine-step-create");
-            var periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "routine-step-create-period");
-            itemId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, periodId);
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "routine-step-create", ct: TestContext.Current.CancellationToken);
+            var periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "routine-step-create-period", ct: TestContext.Current.CancellationToken);
+            itemId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, periodId, ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PostAsJsonAsync($"api/routine-todo-list/{itemId}/steps", new

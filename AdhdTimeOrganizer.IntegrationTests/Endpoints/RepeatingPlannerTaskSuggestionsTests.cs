@@ -41,8 +41,8 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         long calendarTargetId;
         await using (var db = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-two-occurrences");
-            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target);
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-two-occurrences", ct: TestContext.Current.CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: TestContext.Current.CancellationToken);
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 1);
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 2);
         }
@@ -62,8 +62,8 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         long calendarTargetId;
         await using (var db = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-three-occurrences");
-            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target);
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-three-occurrences", ct: TestContext.Current.CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: TestContext.Current.CancellationToken);
             // mv_planner_task_pattern averages hours and minutes SEPARATELY (AVG(EXTRACT(HOUR)), AVG(EXTRACT
             // (MINUTE)), each truncated to int), not as one combined elapsed-time average -- same hour across
             // all three occurrences isolates the minute-averaging behaviour cleanly: (0+10+20)/3 = 10.
@@ -93,8 +93,8 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         long calendarTargetId;
         await using (var db = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-cancelled-excluded");
-            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target);
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-cancelled-excluded", ct: TestContext.Current.CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: TestContext.Current.CancellationToken);
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 1);
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 2);
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 3, status: PlannerTaskStatus.Cancelled);
@@ -115,14 +115,14 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         long calendarTargetId;
         await using (var db = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-tier1-suppresses-tier2");
-            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target);
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-tier1-suppresses-tier2", ct: TestContext.Current.CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: TestContext.Current.CancellationToken);
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 1);
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 2);
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 3);
             await PlanningTestSeedHelper.SeedRepeatingPlannerTaskAsync(
                 db, activityId, recurrenceType: RecurrenceType.DayOfWeek,
-                start: new TimeOnly(9, 0), end: new TimeOnly(10, 0));
+                start: new TimeOnly(9, 0), end: new TimeOnly(10, 0), ct: TestContext.Current.CancellationToken);
         }
 
         await RefreshSuggestionViewsAsync();
@@ -148,8 +148,8 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         long calendarTargetId;
         await using (var db = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-tier2-suppresses-tier3");
-            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target);
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-tier2-suppresses-tier3", ct: TestContext.Current.CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: TestContext.Current.CancellationToken);
 
             // Tier 2: 3 PlannerTask occurrences on the target's weekday.
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 1);

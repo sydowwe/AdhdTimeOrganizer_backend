@@ -177,7 +177,7 @@ public class TrackerDesktopMappingCreateTests(AppDbContextFixture fixture) : Bas
     [Fact]
     public async Task Create_StampsCallersUserId_NotTheDtosZero()
     {
-        var response = await CreateClient().PostAsJsonAsync(EndpointUrl, Seed.DesktopCreatePayload(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync(EndpointUrl, Seed.DesktopCreatePayload(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var id = await response.Content.ReadFromJsonAsync<long>(CancellationToken);
@@ -223,7 +223,7 @@ public class TrackerDesktopMappingUpdateTests(AppDbContextFixture fixture) : Bas
         var before = await beforeDb.Set<TrackerDesktopMappingByPattern>().IgnoreQueryFilters().AsNoTracking()
             .FirstAsync(m => m.Id == foreignId, CancellationToken);
 
-        var response = await CreateClient().PutAsJsonAsync($"{Seed.DesktopUrl}/{foreignId}", Seed.DesktopUpdatePayload(), JsonOpts);
+        var response = await CreateClient().PutAsJsonAsync($"{Seed.DesktopUrl}/{foreignId}", Seed.DesktopUpdatePayload(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -259,7 +259,7 @@ public class TrackerDesktopMappingDeleteTests(AppDbContextFixture fixture) : Bas
         await using var db = CreateDbContext();
         var foreignId = await Seed.DesktopMappingAsync(db, otherUserId, "foreign-delete-idor");
 
-        var response = await CreateClient().DeleteAsync($"{Seed.DesktopUrl}/{foreignId}");
+        var response = await CreateClient().DeleteAsync($"{Seed.DesktopUrl}/{foreignId}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -284,7 +284,7 @@ public class TrackerAndroidMappingCreateTests(AppDbContextFixture fixture) : Bas
     [Fact]
     public async Task Create_StampsCallersUserId_NotTheDtosZero()
     {
-        var response = await CreateClient().PostAsJsonAsync(EndpointUrl, Seed.AndroidCreatePayload(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync(EndpointUrl, Seed.AndroidCreatePayload(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var id = await response.Content.ReadFromJsonAsync<long>(CancellationToken);
@@ -326,7 +326,7 @@ public class TrackerAndroidMappingUpdateTests(AppDbContextFixture fixture) : Bas
         var before = await beforeDb.Set<TrackerAndroidMappingByPattern>().IgnoreQueryFilters().AsNoTracking()
             .FirstAsync(m => m.Id == foreignId, CancellationToken);
 
-        var response = await CreateClient().PutAsJsonAsync($"{Seed.AndroidUrl}/{foreignId}", Seed.AndroidUpdatePayload(), JsonOpts);
+        var response = await CreateClient().PutAsJsonAsync($"{Seed.AndroidUrl}/{foreignId}", Seed.AndroidUpdatePayload(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -363,7 +363,7 @@ public class TrackerAndroidMappingDeleteTests(AppDbContextFixture fixture) : Bas
         await using var db = CreateDbContext();
         var foreignId = await Seed.AndroidMappingAsync(db, otherUserId, "foreign-delete-idor");
 
-        var response = await CreateClient().DeleteAsync($"{Seed.AndroidUrl}/{foreignId}");
+        var response = await CreateClient().DeleteAsync($"{Seed.AndroidUrl}/{foreignId}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -398,7 +398,7 @@ public class TrackerDesktopMappingGridTests(AppDbContextFixture fixture) : Postg
         await using var db = CreateDbContext();
         var id = await Seed.DesktopMappingAsync(db, FakeLoggedUserService.TestUserId, "grid");
 
-        var response = await CreateClient().PostAsJsonAsync($"{Seed.DesktopUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync($"{Seed.DesktopUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, CancellationToken);
@@ -414,7 +414,7 @@ public class TrackerDesktopMappingGridTests(AppDbContextFixture fixture) : Postg
         var otherUserId = await Seed.SecondUserAsync(Fixture, $"desktop-mapping-grid-{Guid.NewGuid():N}@test.com");
         var foreignId = await Seed.DesktopMappingAsync(db, otherUserId, "grid-foreign");
 
-        var response = await CreateClient().PostAsJsonAsync($"{Seed.DesktopUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync($"{Seed.DesktopUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, CancellationToken);
@@ -428,7 +428,7 @@ public class TrackerDesktopMappingGridTests(AppDbContextFixture fixture) : Postg
     public async Task Grid_Unauthenticated_Returns401()
     {
         var response = await CreateUnauthenticatedClient()
-            .PostAsJsonAsync($"{Seed.DesktopUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts);
+            .PostAsJsonAsync($"{Seed.DesktopUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -445,7 +445,7 @@ public class TrackerAndroidMappingGridTests(AppDbContextFixture fixture) : Postg
         await using var db = CreateDbContext();
         var id = await Seed.AndroidMappingAsync(db, FakeLoggedUserService.TestUserId, "grid");
 
-        var response = await CreateClient().PostAsJsonAsync($"{Seed.AndroidUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync($"{Seed.AndroidUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, CancellationToken);
@@ -461,7 +461,7 @@ public class TrackerAndroidMappingGridTests(AppDbContextFixture fixture) : Postg
         var otherUserId = await Seed.SecondUserAsync(Fixture, $"android-mapping-grid-{Guid.NewGuid():N}@test.com");
         var foreignId = await Seed.AndroidMappingAsync(db, otherUserId, "grid-foreign");
 
-        var response = await CreateClient().PostAsJsonAsync($"{Seed.AndroidUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync($"{Seed.AndroidUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, CancellationToken);
@@ -475,7 +475,7 @@ public class TrackerAndroidMappingGridTests(AppDbContextFixture fixture) : Postg
     public async Task Grid_Unauthenticated_Returns401()
     {
         var response = await CreateUnauthenticatedClient()
-            .PostAsJsonAsync($"{Seed.AndroidUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts);
+            .PostAsJsonAsync($"{Seed.AndroidUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

@@ -41,7 +41,7 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         var stored = await db.RefreshTokens
             .Where(r => r.UserId == UserId && r.StayLoggedIn)
             .OrderByDescending(r => r.CreatedTimestamp)
-            .FirstAsync();
+            .FirstAsync( TestContext.Current.CancellationToken);
         stored.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddDays(30), TimeSpan.FromMinutes(5));
     }
 
@@ -58,7 +58,7 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         var stored = await db.RefreshTokens
             .Where(r => r.UserId == UserId && !r.StayLoggedIn && !r.IsExtensionClient)
             .OrderByDescending(r => r.CreatedTimestamp)
-            .FirstAsync();
+            .FirstAsync( TestContext.Current.CancellationToken);
         stored.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddDays(1), TimeSpan.FromMinutes(5));
     }
 
@@ -110,7 +110,7 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         userId.Should().BeNull();
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        var anyActive = await db.RefreshTokens.AnyAsync(r => r.UserId == UserId && !r.IsRevoked);
+        var anyActive = await db.RefreshTokens.AnyAsync(r => r.UserId == UserId && !r.IsRevoked, TestContext.Current.CancellationToken);
         anyActive.Should().BeFalse();
     }
 
@@ -127,7 +127,7 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         var stored = await db.RefreshTokens
             .Where(r => r.UserId == UserId && r.IsRevoked)
             .OrderByDescending(r => r.CreatedTimestamp)
-            .FirstAsync();
+            .FirstAsync( TestContext.Current.CancellationToken);
         stored.IsRevoked.Should().BeTrue();
         stored.RevokedAt.Should().NotBeNull();
         stored.RevokedByIp.Should().Be("127.0.0.1");
@@ -145,7 +145,7 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         }
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        var anyActive = await db.RefreshTokens.AnyAsync(r => r.UserId == UserId && !r.IsRevoked);
+        var anyActive = await db.RefreshTokens.AnyAsync(r => r.UserId == UserId && !r.IsRevoked, TestContext.Current.CancellationToken);
         anyActive.Should().BeFalse();
     }
 
@@ -169,11 +169,11 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         var rotated = await db.RefreshTokens
             .Where(r => r.UserId == UserId && r.IsRevoked)
             .OrderByDescending(r => r.CreatedTimestamp)
-            .FirstAsync();
+            .FirstAsync( TestContext.Current.CancellationToken);
         // The replacement link is what lets ValidateRefreshTokenAsync tell a benign concurrent
         // refresh apart from a genuine token-reuse attack.
         rotated.ReplacedByTokenHash.Should().NotBeNull();
-        (await db.RefreshTokens.CountAsync(r => r.UserId == UserId && !r.IsRevoked)).Should().Be(1);
+        (await db.RefreshTokens.CountAsync(r => r.UserId == UserId && !r.IsRevoked, TestContext.Current.CancellationToken)).Should().Be(1);
     }
 
     [Fact]

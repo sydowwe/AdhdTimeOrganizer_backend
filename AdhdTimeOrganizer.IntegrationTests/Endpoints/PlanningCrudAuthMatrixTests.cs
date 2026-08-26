@@ -565,10 +565,10 @@ public class BatchDeleteTemplatePlannerTaskEndpointTests(AppDbContextFixture fix
     {
         await using var db = CreateDbContext();
         await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-        var templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, ReminderSeedHelper.OtherUserId);
-        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "template-task-batchdelete-theirs", ReminderSeedHelper.OtherUserId);
+        var templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, ReminderSeedHelper.OtherUserId, ct: TestContext.Current.CancellationToken);
+        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "template-task-batchdelete-theirs", ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
         var theirId = await PlanningTestSeedHelper.SeedTemplatePlannerTaskAsync(
-            db, templateId, activityId, new TimeOnly(9, 0), new TimeOnly(10, 0), ReminderSeedHelper.OtherUserId);
+            db, templateId, activityId, new TimeOnly(9, 0), new TimeOnly(10, 0), ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
 
         var response = await CreateClient().PostAsJsonAsync(EndpointUrl, new { ids = new[] { theirId } }, JsonOpts, CancellationToken);
 

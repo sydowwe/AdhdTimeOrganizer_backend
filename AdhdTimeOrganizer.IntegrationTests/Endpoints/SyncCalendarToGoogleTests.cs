@@ -44,9 +44,9 @@ public class SyncCalendarToGoogleTests(AppDbContextFixture fixture) : PostgresTe
         long calendarId;
         await using (var db = CreateDbContext())
         {
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "google-sync-not-connected");
-            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 1));
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0));
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "google-sync-not-connected", ct: TestContext.Current.CancellationToken);
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 1), ct: TestContext.Current.CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: TestContext.Current.CancellationToken);
 
             // The test user has no GoogleCalendarRefreshToken -- default/unset from AppDbContextFixture's seed.
             var user = await db.Set<User>().SingleAsync(u => u.Id == PlanningTestSeedHelper.TestUserId, CancellationToken);
@@ -74,7 +74,7 @@ public class SyncCalendarToGoogleTests(AppDbContextFixture fixture) : PostgresTe
         await using (var db = CreateDbContext())
         {
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-            theirCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 2), ReminderSeedHelper.OtherUserId);
+            theirCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 2), ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
 
             // The requesting user (TestUserId) must be "connected" here, or the not-connected 400 check would
             // short-circuit before the calendar lookup ever runs and this wouldn't be testing the IDOR path.
@@ -112,7 +112,7 @@ public class SyncCalendarToGoogleTests(AppDbContextFixture fixture) : PostgresTe
         long calendarId;
         await using (var db = CreateDbContext())
         {
-            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 3));
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 3), ct: TestContext.Current.CancellationToken);
 
             var user = await db.Set<User>().SingleAsync(u => u.Id == PlanningTestSeedHelper.TestUserId, CancellationToken);
             user.GoogleCalendarRefreshToken = "fake-refresh-token";

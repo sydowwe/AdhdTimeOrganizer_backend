@@ -16,7 +16,7 @@ public class TimerPresetValidationTests(AppDbContextFixture fixture) : PostgresT
     public async Task CreateTimerPreset_InvalidDuration_Returns400(int duration)
     {
         var request = new { Duration = duration };
-        var response = await CreateClient().PostAsJsonAsync("api/timer-preset", request);
+        var response = await CreateClient().PostAsJsonAsync("api/timer-preset", request, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -34,7 +34,7 @@ public class TimerPresetValidationTests(AppDbContextFixture fixture) : PostgresT
             FocusPeriodInCycleCount = 4,
             NumberOfCycles = 1
         };
-        var response = await CreateClient().PostAsJsonAsync("api/pomodoro-timer-preset", request);
+        var response = await CreateClient().PostAsJsonAsync("api/pomodoro-timer-preset", request, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -50,7 +50,7 @@ public class TimerPresetValidationTests(AppDbContextFixture fixture) : PostgresT
             FocusPeriodInCycleCount = 4,
             NumberOfCycles = 1
         };
-        var response = await CreateClient().PostAsJsonAsync("api/pomodoro-timer-preset", request);
+        var response = await CreateClient().PostAsJsonAsync("api/pomodoro-timer-preset", request, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }

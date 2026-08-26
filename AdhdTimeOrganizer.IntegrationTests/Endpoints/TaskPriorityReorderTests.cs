@@ -31,8 +31,8 @@ public class TaskPriorityReorderTests(AppDbContextFixture fixture) : PostgresTes
         long lowId, highId;
         await using (var db = CreateDbContext())
         {
-            lowId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 1, text: "Low");
-            highId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 2, text: "High");
+            lowId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 1, text: "Low", ct: TestContext.Current.CancellationToken);
+            highId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 2, text: "High", ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PutAsJsonAsync($"api/task-priority/{lowId}", new
@@ -58,8 +58,8 @@ public class TaskPriorityReorderTests(AppDbContextFixture fixture) : PostgresTes
         long lowId, highId;
         await using (var seedDb = CreateDbContext())
         {
-            lowId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(seedDb, 1, text: "Low");
-            highId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(seedDb, 2, text: "High");
+            lowId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(seedDb, 1, text: "Low", ct: TestContext.Current.CancellationToken);
+            highId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(seedDb, 2, text: "High", ct: TestContext.Current.CancellationToken);
         }
 
         var client = CreateClient();

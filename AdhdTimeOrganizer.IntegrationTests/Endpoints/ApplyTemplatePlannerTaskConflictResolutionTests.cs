@@ -39,8 +39,8 @@ public class ApplyTemplatePlannerTaskConflictResolutionTests(AppDbContextFixture
 
         await using (var db = CreateDbContext())
         {
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(10, 0), new TimeOnly(11, 0)); // E1
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(14, 0), new TimeOnly(16, 0)); // E2
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(10, 0), new TimeOnly(11, 0), ct: TestContext.Current.CancellationToken); // E1
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(14, 0), new TimeOnly(16, 0), ct: TestContext.Current.CancellationToken); // E2
         }
 
         var response = await ApplyAsync(calendarId, template.Id, "Ignore",
@@ -78,9 +78,9 @@ public class ApplyTemplatePlannerTaskConflictResolutionTests(AppDbContextFixture
         long removedWithReminderId;
         await using (var db = CreateDbContext())
         {
-            removedWithReminderId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0)); // fully overlapped
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(15, 0), new TimeOnly(16, 0)); // partially overlapped
-            survivorId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(20, 0), new TimeOnly(21, 0)); // untouched
+            removedWithReminderId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: TestContext.Current.CancellationToken); // fully overlapped
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(15, 0), new TimeOnly(16, 0), ct: TestContext.Current.CancellationToken); // partially overlapped
+            survivorId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(20, 0), new TimeOnly(21, 0), ct: TestContext.Current.CancellationToken); // untouched
         }
 
         // A reminder on a task Overwrite is about to delete — its module-side registration must be cancelled.
@@ -128,9 +128,9 @@ public class ApplyTemplatePlannerTaskConflictResolutionTests(AppDbContextFixture
 
         await using (var db = CreateDbContext())
         {
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(10, 0), new TimeOnly(11, 0)); // E1: blocker in the middle
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(14, 0), new TimeOnly(15, 0)); // E2: fully contains a new task
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(18, 0), new TimeOnly(19, 0)); // E3: overlapped at both ends by two different new tasks
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(10, 0), new TimeOnly(11, 0), ct: TestContext.Current.CancellationToken); // E1: blocker in the middle
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(14, 0), new TimeOnly(15, 0), ct: TestContext.Current.CancellationToken); // E2: fully contains a new task
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(18, 0), new TimeOnly(19, 0), ct: TestContext.Current.CancellationToken); // E3: overlapped at both ends by two different new tasks
         }
 
         var response = await ApplyAsync(calendarId, template.Id, "MergeIgnore",
@@ -174,9 +174,9 @@ public class ApplyTemplatePlannerTaskConflictResolutionTests(AppDbContextFixture
         long middleBlockedId, fullyContainedId, untouchedId;
         await using (var db = CreateDbContext())
         {
-            middleBlockedId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(12, 0));  // E1: long, blocker lands in the middle
-            fullyContainedId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(14, 15), new TimeOnly(14, 45)); // E2: fully inside a new task
-            untouchedId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(22, 0), new TimeOnly(23, 0));       // E3: no overlap
+            middleBlockedId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(12, 0), ct: TestContext.Current.CancellationToken);  // E1: long, blocker lands in the middle
+            fullyContainedId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(14, 15), new TimeOnly(14, 45), ct: TestContext.Current.CancellationToken); // E2: fully inside a new task
+            untouchedId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(22, 0), new TimeOnly(23, 0), ct: TestContext.Current.CancellationToken);       // E3: no overlap
         }
 
         var reminderOnMiddleBlocked = await CreateTaskReminderAsync(middleBlockedId);

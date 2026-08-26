@@ -44,8 +44,6 @@ using Sydowwe.Framework.domain.serviceContract;
 using Sydowwe.Framework.infrastructure.extService;
 using Sydowwe.Framework.infrastructure.extService.user;
 using Sydowwe.Framework.infrastructure.extService.user.auth;
-using Sydowwe.Framework.domain.helper;
-using Sydowwe.Framework.infrastructure.extService.user.auth;
 using Sydowwe.Framework.infrastructure.persistence;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
 using Sydowwe.Framework.infrastructure.security;

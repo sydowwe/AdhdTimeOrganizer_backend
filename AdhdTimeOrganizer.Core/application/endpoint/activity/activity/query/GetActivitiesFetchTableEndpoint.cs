@@ -20,6 +20,8 @@ public class GridActivityEndpoint(
     /// </summary>
     private bool _filterSent;
 
+    private readonly DbContext _dbContext = dbContext;
+
     public override Task HandleAsync(BaseFilterSortPaginateRequest<ActivityFilterRequest> req, CancellationToken ct)
     {
         _filterSent = req is { UseFilter: true, Filter: not null };
@@ -58,7 +60,7 @@ public class GridActivityEndpoint(
     /// </remarks>
     protected override Func<IQueryable<Activity>, IQueryable<ActivityResponse>> Projection => query =>
     {
-        var referencingIds = referenceService.ReferencingActivityIds(dbContext);
+        var referencingIds = referenceService.ReferencingActivityIds(_dbContext);
 
         return query.Select(e => new ActivityResponse
         {

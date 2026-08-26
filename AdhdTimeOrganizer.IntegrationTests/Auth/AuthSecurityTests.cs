@@ -29,7 +29,7 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         request.Content = JsonContent.Create(payload);
 
         using var client = CreateCookieClient();
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -43,7 +43,7 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         request.Content = JsonContent.Create(payload);
 
         using var client = CreateCookieClient();
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -56,7 +56,7 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
     public async Task TwoFaSetup_WithoutPendingCookie_Returns401()
     {
         using var client = CreateCookieClient();
-        var response = await client.PostAsync("auth/login/2fa/setup", null);
+        var response = await client.PostAsync("auth/login/2fa/setup", null, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -80,7 +80,7 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
             };
             user.PasswordHash = new PasswordHasher<User>().HashPassword(user, password);
             db.Users.Add(user);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync( TestContext.Current.CancellationToken);
         }
 
         var payload = new { Email = email, Password = password, StayLoggedIn = false, RecaptchaToken = "test", Timezone = "UTC" };
@@ -89,10 +89,10 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         request.Content = JsonContent.Create(payload);
 
         using var client = CreateCookieClient();
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        var body = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync( TestContext.Current.CancellationToken);
         body.Should().NotContain("Email not confirmed");
         body.Should().Contain("Invalid email or password");
     }
@@ -107,10 +107,10 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         {
             Token = "fakeToken",
             UserId = 999999999
-        });
+        }, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var body = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync( TestContext.Current.CancellationToken);
         body.Should().Contain("Invalid or expired confirmation link");
         body.Should().NotContain("User not found");
     }
@@ -123,7 +123,7 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         request.Content = JsonContent.Create(new { Email = "nonexistent@example.com" });
 
         using var client = CreateCookieClient();
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -154,13 +154,13 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         // First request — token consumed (2FA disabled → TOTP passes → tokens issued)
         using var req1 = new HttpRequestMessage(HttpMethod.Post, "auth/login/2fa/extension");
         req1.Content = JsonContent.Create(payload);
-        var res1 = await client.SendAsync(req1);
+        var res1 = await client.SendAsync(req1, TestContext.Current.CancellationToken);
         res1.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Second request with the same token must be rejected as replayed
         using var req2 = new HttpRequestMessage(HttpMethod.Post, "auth/login/2fa/extension");
         req2.Content = JsonContent.Create(payload);
-        var res2 = await client.SendAsync(req2);
+        var res2 = await client.SendAsync(req2, TestContext.Current.CancellationToken);
         res2.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -191,7 +191,7 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
             };
             user.PasswordHash = new PasswordHasher<User>().HashPassword(user, "Test@1234!");
             db.Users.Add(user);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync( TestContext.Current.CancellationToken);
             lockedUserId = user.Id;
         }
 
@@ -211,10 +211,10 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         request.Content = JsonContent.Create(payload);
 
         using var client = CreateCookieClient();
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        var body = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync( TestContext.Current.CancellationToken);
         body.Should().Contain("locked");
     }
 
@@ -234,13 +234,13 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         await using (var seedCheck = (AppDbContext)Fixture.CreateDbContext())
         {
             (await seedCheck.RefreshTokens.IgnoreQueryFilters()
-                .AnyAsync(r => r.UserId == userId && !r.IsRevoked))
+                .AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
                 .Should().BeTrue("login must have issued a refresh token");
         }
 
         // Attempt to use the same refresh token twice in parallel
-        var task1 = client.PostAsync("auth/refresh", null);
-        var task2 = client.PostAsync("auth/refresh", null);
+        var task1 = client.PostAsync("auth/refresh", null, TestContext.Current.CancellationToken);
+        var task2 = client.PostAsync("auth/refresh", null, TestContext.Current.CancellationToken);
 
         await Task.WhenAll(task1, task2);
 
@@ -254,7 +254,7 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
 
         // Verify the user is not locked out of normal operations (refresh should work with new token)
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        var user = await db.Users.FindAsync(userId);
+        var user = await db.Users.FindAsync([userId], TestContext.Current.CancellationToken);
         user.Should().NotBeNull();
         user!.LockoutEnd.Should().BeNull("user should not be permanently locked out for token reuse");
     }
@@ -270,7 +270,7 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         request.Content = JsonContent.Create(payload);
 
         using var client = CreateCookieClient();
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -285,7 +285,7 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         request.Content = JsonContent.Create(payload);
 
         using var client = CreateCookieClient();
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         // FastEndpoints returns 400 for model-binding failures on required fields
         ((int)response.StatusCode).Should().BeOneOf(400, 422);

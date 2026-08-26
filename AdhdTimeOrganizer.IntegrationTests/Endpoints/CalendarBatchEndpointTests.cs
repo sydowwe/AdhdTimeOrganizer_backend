@@ -52,23 +52,23 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
 
         await using (var db = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "Deep work");
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "Deep work", ct: TestContext.Current.CancellationToken);
 
-            dayWithTwo = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 5));
-            dayWithOne = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 6));
-            emptyDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 7));
-            outsideRange = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 20));
+            dayWithTwo = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 5), ct: TestContext.Current.CancellationToken);
+            dayWithOne = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 6), ct: TestContext.Current.CancellationToken);
+            emptyDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 7), ct: TestContext.Current.CancellationToken);
+            outsideRange = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 20), ct: TestContext.Current.CancellationToken);
 
             // Seeded out of chronological order — the endpoint must order, not the insert.
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, dayWithTwo, new TimeOnly(14, 0), new TimeOnly(15, 30));
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, dayWithTwo, new TimeOnly(14, 0), new TimeOnly(15, 30), ct: TestContext.Current.CancellationToken);
             await SeedBackgroundTaskAsync(db, activityId, dayWithTwo, new TimeOnly(9, 0), new TimeOnly(10, 30));
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, dayWithOne, new TimeOnly(8, 0), new TimeOnly(8, 45));
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, outsideRange, new TimeOnly(9, 0), new TimeOnly(10, 0));
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, dayWithOne, new TimeOnly(8, 0), new TimeOnly(8, 45), ct: TestContext.Current.CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, outsideRange, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: TestContext.Current.CancellationToken);
 
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-            var theirActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "theirs", ReminderSeedHelper.OtherUserId);
-            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 6), ReminderSeedHelper.OtherUserId);
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, theirActivityId, theirDay, new TimeOnly(11, 0), new TimeOnly(12, 0), ReminderSeedHelper.OtherUserId);
+            var theirActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "theirs", ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
+            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 6), ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, theirActivityId, theirDay, new TimeOnly(11, 0), new TimeOnly(12, 0), ReminderSeedHelper.OtherUserId, ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PostAsJsonAsync("api/calendar/task-summaries", new
@@ -120,15 +120,15 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
 
         await using (var db = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "batch-apply");
-            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db);
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "batch-apply", ct: TestContext.Current.CancellationToken);
+            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, ct: TestContext.Current.CancellationToken);
 
-            emptyDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 5, 3));
-            dayWithConflict = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 5, 4));
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, dayWithConflict, new TimeOnly(9, 30), new TimeOnly(10, 30));
+            emptyDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 5, 3), ct: TestContext.Current.CancellationToken);
+            dayWithConflict = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 5, 4), ct: TestContext.Current.CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, dayWithConflict, new TimeOnly(9, 30), new TimeOnly(10, 30), ct: TestContext.Current.CancellationToken);
 
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 5, 5), ReminderSeedHelper.OtherUserId);
+            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 5, 5), ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PostAsJsonAsync("api/calendar/apply-planner-template/batch", new
@@ -190,9 +190,9 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
         long activityId, calendarId, templateId;
         await using (var db = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "batch-apply-dupe");
-            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db);
-            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 5, 6));
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "batch-apply-dupe", ct: TestContext.Current.CancellationToken);
+            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, ct: TestContext.Current.CancellationToken);
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 5, 6), ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PostAsJsonAsync("api/calendar/apply-planner-template/batch", new
@@ -233,12 +233,12 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
 
         await using (var db = CreateDbContext())
         {
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "copy-source");
-            var importanceId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(db, 3);
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "copy-source", ct: TestContext.Current.CancellationToken);
+            var importanceId = await PlanningTestSeedHelper.SeedTaskImportanceAsync(db, 3, ct: TestContext.Current.CancellationToken);
 
-            sourceDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 7));
-            firstTarget = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 8));
-            secondTarget = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 9));
+            sourceDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 7), ct: TestContext.Current.CancellationToken);
+            firstTarget = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 8), ct: TestContext.Current.CancellationToken);
+            secondTarget = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 9), ct: TestContext.Current.CancellationToken);
 
             completedTaskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
                 db, activityId, sourceDay, new TimeOnly(9, 0), new TimeOnly(10, 0),
@@ -251,10 +251,10 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
             completed.Location = "Office";
             await db.SaveChangesAsync(CancellationToken);
 
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, sourceDay, new TimeOnly(14, 0), new TimeOnly(15, 0));
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, sourceDay, new TimeOnly(14, 0), new TimeOnly(15, 0), ct: TestContext.Current.CancellationToken);
 
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 10), ReminderSeedHelper.OtherUserId);
+            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 10), ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PostAsJsonAsync("api/planner-task/copy-to-days", new
@@ -308,11 +308,11 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
         await using (var db = CreateDbContext())
         {
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-            var theirActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "their-source", ReminderSeedHelper.OtherUserId);
-            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 11), ReminderSeedHelper.OtherUserId);
-            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, theirActivityId, theirDay, new TimeOnly(9, 0), new TimeOnly(10, 0), ReminderSeedHelper.OtherUserId);
+            var theirActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "their-source", ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
+            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 11), ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, theirActivityId, theirDay, new TimeOnly(9, 0), new TimeOnly(10, 0), ReminderSeedHelper.OtherUserId, ct: TestContext.Current.CancellationToken);
 
-            myDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 12));
+            myDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 12), ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PostAsJsonAsync("api/planner-task/copy-to-days", new
@@ -340,8 +340,8 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
 
         await using (var db = CreateDbContext())
         {
-            firstDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 5));
-            secondDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 6));
+            firstDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 5), ct: TestContext.Current.CancellationToken);
+            secondDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 6), ct: TestContext.Current.CancellationToken);
 
             var first = await db.Set<Calendar>().SingleAsync(c => c.Id == firstDay, CancellationToken);
             first.Label = "Office";
@@ -349,7 +349,7 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
             await db.SaveChangesAsync(CancellationToken);
 
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 7), ReminderSeedHelper.OtherUserId);
+            theirDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 7), ReminderSeedHelper.OtherUserId, TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PatchAsJsonAsync("api/calendar/day-type/batch", new

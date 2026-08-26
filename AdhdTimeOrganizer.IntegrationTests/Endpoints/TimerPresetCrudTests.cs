@@ -110,11 +110,11 @@ public class TimerPresetCrudTests(AppDbContextFixture fixture) : PostgresTestBas
         var activityId = await Seed.ActivityAsync(db, userId, "Deep Work");
 
         var client = CreateClient();
-        var createResponse = await client.PostAsJsonAsync("api/timer-preset", new { Duration = 45, ActivityId = activityId });
+        var createResponse = await client.PostAsJsonAsync("api/timer-preset", new { Duration = 45, ActivityId = activityId }, TestContext.Current.CancellationToken);
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var id = await createResponse.Content.ReadFromJsonAsync<long>(cancellationToken: CancellationToken);
 
-        var getResponse = await client.GetAsync($"api/timer-preset/{id}");
+        var getResponse = await client.GetAsync($"api/timer-preset/{id}", TestContext.Current.CancellationToken);
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await getResponse.Content.ReadFromJsonAsync<TimerPresetResponse>(cancellationToken: CancellationToken);
 
@@ -134,7 +134,7 @@ public class TimerPresetCrudTests(AppDbContextFixture fixture) : PostgresTestBas
         var activityId = await Seed.ActivityAsync(db, userId, "Original Activity");
         var id = await Seed.TimerPresetAsync(db, userId, duration: 25, activityId: activityId);
 
-        var response = await CreateClient().PutAsJsonAsync($"api/timer-preset/{id}", new { Duration = 60, ActivityId = (long?)null });
+        var response = await CreateClient().PutAsJsonAsync($"api/timer-preset/{id}", new { Duration = 60, ActivityId = (long?)null }, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         await using var assertDb = CreateDbContext();
@@ -151,7 +151,7 @@ public class TimerPresetCrudTests(AppDbContextFixture fixture) : PostgresTestBas
         var activityId = await Seed.ActivityAsync(db, userId, "Activity With TimerPreset");
         var presetId = await Seed.TimerPresetAsync(db, userId, activityId: activityId);
 
-        var response = await CreateClient().DeleteAsync($"api/activity/{activityId}");
+        var response = await CreateClient().DeleteAsync($"api/activity/{activityId}", TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.NoContent, "the FK is Cascade, not Restrict, so the delete must succeed");
 
         await using var assertDb = CreateDbContext();
@@ -170,7 +170,7 @@ public class TimerPresetCrudTests(AppDbContextFixture fixture) : PostgresTestBas
         var otherUserId = await Seed.SecondUserAsync(Fixture, $"timerpreset-getall-{Guid.NewGuid():N}@test.com");
         var foreignId = await Seed.TimerPresetAsync(db, otherUserId, duration: 99);
 
-        var response = await CreateClient().GetAsync("api/timer-preset");
+        var response = await CreateClient().GetAsync("api/timer-preset", TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(cancellationToken: CancellationToken);
 
@@ -206,11 +206,11 @@ public class PomodoroTimerPresetCrudTests(AppDbContextFixture fixture) : Postgre
             NumberOfCycles = 1,
             FocusActivityId = focusActivityId,
             RestActivityId = restActivityId
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var id = await createResponse.Content.ReadFromJsonAsync<long>(cancellationToken: CancellationToken);
 
-        var getResponse = await client.GetAsync($"api/pomodoro-timer-preset/{id}");
+        var getResponse = await client.GetAsync($"api/pomodoro-timer-preset/{id}", TestContext.Current.CancellationToken);
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await getResponse.Content.ReadFromJsonAsync<PomodoroTimerPresetResponse>(cancellationToken: CancellationToken);
 
@@ -246,7 +246,7 @@ public class PomodoroTimerPresetCrudTests(AppDbContextFixture fixture) : Postgre
             NumberOfCycles = 2,
             FocusActivityId = (long?)null,
             RestActivityId = (long?)null
-        });
+        }, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         await using var assertDb = CreateDbContext();
@@ -269,7 +269,7 @@ public class PomodoroTimerPresetCrudTests(AppDbContextFixture fixture) : Postgre
         var restActivityId = await Seed.ActivityAsync(db, userId, "Rest Activity With Pomodoro");
         var presetId = await Seed.PomodoroTimerPresetAsync(db, userId, focusActivityId: focusActivityId, restActivityId: restActivityId);
 
-        var response = await CreateClient().DeleteAsync($"api/activity/{focusActivityId}");
+        var response = await CreateClient().DeleteAsync($"api/activity/{focusActivityId}", TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.NoContent, "the FK is Cascade, not Restrict, so the delete must succeed");
 
         await using var assertDb = CreateDbContext();
@@ -288,7 +288,7 @@ public class PomodoroTimerPresetCrudTests(AppDbContextFixture fixture) : Postgre
         var otherUserId = await Seed.SecondUserAsync(Fixture, $"pomodoro-getall-{Guid.NewGuid():N}@test.com");
         var foreignId = await Seed.PomodoroTimerPresetAsync(db, otherUserId, "Foreign Pomodoro");
 
-        var response = await CreateClient().GetAsync("api/pomodoro-timer-preset");
+        var response = await CreateClient().GetAsync("api/pomodoro-timer-preset", TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(cancellationToken: CancellationToken);
 

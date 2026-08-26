@@ -9,6 +9,7 @@ using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
@@ -265,7 +266,8 @@ public class PlannerStreakTests(AppDbContextFixture fixture) : PostgresTestBase(
         {
             UserId = UserId,
             Text = "Optional",
-            Importance = TaskImportance.OptionalMarkerValue
+            Importance = TaskImportance.OptionalMarkerValue,
+            Color = ColorPalette.Stone,
         };
         db.Set<TaskImportance>().Add(importance);
         await db.SaveChangesAsync(CancellationToken);

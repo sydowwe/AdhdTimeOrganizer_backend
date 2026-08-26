@@ -10,6 +10,7 @@ namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.bucketList.que
 public class GridActivityBucketListProfileEndpoint(DbContext dbContext)
     : BaseGridEndpoint<ActivityBucketListProfile, ActivityBucketListProfileResponse, ActivityBucketListProfileFilterRequest>(dbContext)
 {
+    private readonly DbContext _dbContext = dbContext;
     public override string EndpointPath => "grid";
 
     /// <summary>
@@ -17,7 +18,7 @@ public class GridActivityBucketListProfileEndpoint(DbContext dbContext)
     /// global query filter, but this subquery decides a field the client treats as "done", and it is one
     /// line to stop depending on a filter configured in another project.
     /// </summary>
-    private IQueryable<MemoryAnchor> ScopedAnchors() => dbContext.Set<MemoryAnchor>().Where(m => m.UserId == User.GetId());
+    private IQueryable<MemoryAnchor> ScopedAnchors() => _dbContext.Set<MemoryAnchor>().Where(m => m.UserId == User.GetId());
 
     /// <summary>
     /// Overridden so IsAnchored / MemoryAnchorId are computed in SQL rather than overlaid afterwards: the

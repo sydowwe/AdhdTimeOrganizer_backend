@@ -9,6 +9,7 @@ using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Notifications.application;
@@ -97,6 +98,7 @@ public static class ModuleServiceExtensions
         // host-agnostic. AddDbContext<AppDbContext> only registers the concrete type, so without this alias
         // every single one of them fails to activate.
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
         // The Notifications module pushes live updates through NotificationHub.
         services.AddSignalR();

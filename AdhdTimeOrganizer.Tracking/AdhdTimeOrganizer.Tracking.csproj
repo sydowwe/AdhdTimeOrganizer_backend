@@ -37,7 +37,7 @@
          than its core. Sydowwe.Framework brings in FastEndpoints but not this, so it is named here.
          Version pinned to the host's. -->
     <ItemGroup>
-        <PackageReference Include="FastEndpoints.Swagger" Version="8.1.0"/>
+        <PackageReference Include="FastEndpoints.Swagger" Version="8.3.0" />
     </ItemGroup>
 
     <!-- Core only. This slice was the one the plan expected to need three outbound references — the

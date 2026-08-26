@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.Contracts.scheduling;
@@ -74,6 +75,14 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
     private static readonly KeyValuePair<string, string?>[] PushOn =
     [
         new($"{EmailNotificationOptions.SectionName}:Enabled", "false"),
+        new($"{PushNotificationOptions.SectionName}:VapidSubject", "mailto:test@example.com"),
+        new($"{PushNotificationOptions.SectionName}:VapidPublicKey", "test-public-key"),
+        new($"{PushNotificationOptions.SectionName}:VapidPrivateKey", "test-private-key")
+    ];
+
+    private static readonly KeyValuePair<string, string?>[] PushAndEmailOn =
+    [
+        new($"{EmailNotificationOptions.SectionName}:Enabled", "true"),
         new($"{PushNotificationOptions.SectionName}:VapidSubject", "mailto:test@example.com"),
         new($"{PushNotificationOptions.SectionName}:VapidPublicKey", "test-public-key"),
         new($"{PushNotificationOptions.SectionName}:VapidPrivateKey", "test-private-key")
@@ -338,6 +347,66 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
                 "a two-minute hold is not late, and a marker on it is noise that trains the user to ignore the real ones");
     }
 
+    [Fact(DisplayName = "An overnight quiet-hours deferral crosses spring-forward and delivers both background channels once")]
+    public async Task QuietHoursDeferral_CrossesSpringForward_AndFlushesWebPushAndEmail()
+    {
+        var sentAt = new DateTimeOffset(2026, 3, 28, 22, 30, 0, TimeSpan.Zero);
+        var push = new CapturingWebPushSender();
+        var email = new CapturingEmailSender();
+
+        await using (var seed = CreateDbContext())
+        {
+            var user = await seed.Set<User>().IgnoreQueryFilters().SingleAsync(u => u.Id == TestUserId, CancellationToken);
+            user.Timezone = Bratislava;
+            seed.AddRange(
+                new NotificationQuietHours { UserId = TestUserId, StartMinute = 22 * 60, EndMinute = 6 * 60 },
+                new NotificationPreference { UserId = TestUserId, Type = NotificationType.Test, Channel = NotificationChannel.Email, Enabled = true },
+                new PushSubscription
+                {
+                    UserId = TestUserId,
+                    Endpoint = $"https://push.example.test/dst-{TestUserId}",
+                    P256dh = "test-p256dh",
+                    Auth = "test-auth"
+                });
+            await seed.SaveChangesAsync(CancellationToken);
+        }
+
+        await using var factory = CreateFactory(
+            TestRoles.AdminAndUser,
+            configureServices: services =>
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton<TimeProvider>(new FixedTimeProvider(sentAt));
+                services.AddSingleton<IWebPushSender>(push);
+                services.AddSingleton<INotificationEmailSender>(email);
+            },
+            configOverrides: PushAndEmailOn);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<INotificationService>().NotifyAsync(
+                NotificationRecipients.User(TestUserId), new TestNotificationPayload("spring-forward"), CancellationToken);
+
+        Notification deferred;
+        await using (var db = CreateDbContext())
+        {
+            deferred = await db.Set<Notification>().SingleAsync(CancellationToken);
+            deferred.DeferredUntil.Should().Be(new DateTimeOffset(2026, 3, 29, 4, 0, 0, TimeSpan.Zero),
+                "06:00 in Bratislava follows the skipped 02:00 hour, so its UTC instant is 04:00 rather than 05:00");
+        }
+        push.Payloads.Should().BeEmpty("quiet hours withhold Web Push until the wall-clock window ends");
+        email.Messages.Should().BeEmpty("quiet hours withhold email until the wall-clock window ends");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+            await ResolveFlushHandler(scope.ServiceProvider).FlushDeferredAsync(deferred.DeferredUntil!.Value, CancellationToken);
+
+        push.Payloads.Should().ContainSingle();
+        email.Messages.Should().ContainSingle().Which.Email.Should().Be(FakeLoggedUserService.TestUserEmail);
+
+        await using var verify = CreateDbContext();
+        (await verify.Set<Notification>().SingleAsync(n => n.Id == deferred.Id, CancellationToken)).DeferredUntil.Should().BeNull(
+            "the delivery was released, so the next fifteen-minute sweep must not send it a second time");
+    }
+
     // ---- helpers ----------------------------------------------------------------------------------
 
     /// <summary>
@@ -421,5 +490,21 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
             Payloads.Add(payloadJson);
             return Task.FromResult(false);
         }
+    }
+
+    private sealed class CapturingEmailSender : INotificationEmailSender
+    {
+        public ConcurrentBag<(string Email, string Subject, string HtmlBody)> Messages { get; } = [];
+
+        public Task SendAsync(string email, string subject, string htmlBody, CancellationToken ct = default)
+        {
+            Messages.Add((email, subject, htmlBody));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }

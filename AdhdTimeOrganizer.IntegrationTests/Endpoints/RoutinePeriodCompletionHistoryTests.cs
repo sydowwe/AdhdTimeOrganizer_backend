@@ -28,7 +28,7 @@ public class RoutinePeriodCompletionHistoryTests(AppDbContextFixture fixture) : 
         long periodId;
         await using (var db = CreateDbContext())
         {
-            periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "history-cap-period", historyDepth: historyDepth);
+            periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "history-cap-period", historyDepth: historyDepth, ct: TestContext.Current.CancellationToken);
 
             // Five completions, each period one week after the last -- more than HistoryDepth.
             var start = new DateOnly(2026, 1, 1);
@@ -36,7 +36,7 @@ public class RoutinePeriodCompletionHistoryTests(AppDbContextFixture fixture) : 
             {
                 var periodStart = start.AddDays(i * 7);
                 await TodoListTestSeedHelper.SeedRoutinePeriodCompletionAsync(
-                    db, periodId, periodStart, periodStart.AddDays(7), completedCount: i, totalCount: 5);
+                    db, periodId, periodStart, periodStart.AddDays(7), completedCount: i, totalCount: 5, TestContext.Current.CancellationToken);
             }
         }
 
@@ -59,9 +59,9 @@ public class RoutinePeriodCompletionHistoryTests(AppDbContextFixture fixture) : 
         {
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
             otherPeriodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(
-                db, ReminderSeedHelper.OtherUserId, text: "history-idor-period");
+                db, ReminderSeedHelper.OtherUserId, text: "history-idor-period", ct: TestContext.Current.CancellationToken);
             await TodoListTestSeedHelper.SeedRoutinePeriodCompletionAsync(
-                db, otherPeriodId, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 8));
+                db, otherPeriodId, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 8), ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().GetAsync($"api/routine-time-period/{otherPeriodId}/completion-history", CancellationToken);

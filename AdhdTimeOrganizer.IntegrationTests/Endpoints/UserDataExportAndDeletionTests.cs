@@ -528,7 +528,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         using var client = CreateRawClient();
         using var request = DeleteRequest("irrelevant");
 
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -542,13 +542,13 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         await LoginAsync(cookieClient, email, Password);
 
         using var request = DeleteRequest("WrongPassword!1");
-        var response = await cookieClient.SendAsync(request);
+        var response = await cookieClient.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
             "an already-authenticated session must not be enough to delete the account -- the current password must be re-proven");
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == userId)).Should().BeTrue();
+        (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == userId, TestContext.Current.CancellationToken)).Should().BeTrue();
     }
 
     /// <summary>
@@ -567,22 +567,22 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            var user = await db.Users.IgnoreQueryFilters().FirstAsync(u => u.Id == userId);
+            var user = await db.Users.IgnoreQueryFilters().FirstAsync(u => u.Id == userId, TestContext.Current.CancellationToken);
             user.TwoFactorEnabled = true;
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync( TestContext.Current.CancellationToken);
         }
 
         using var noTokenRequest = DeleteRequest(Password);
-        (await cookieClient.SendAsync(noTokenRequest)).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+        (await cookieClient.SendAsync(noTokenRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
             "a correct password alone must not delete a 2FA-protected account");
 
         using var badTokenRequest = DeleteRequest(Password, "000000");
-        (await cookieClient.SendAsync(badTokenRequest)).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+        (await cookieClient.SendAsync(badTokenRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
             "a wrong TOTP must be rejected the same way a wrong password is");
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == userId))
+            (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == userId, TestContext.Current.CancellationToken))
                 .Should().BeTrue("neither rejected attempt may have deleted anything");
         }
     }
@@ -602,16 +602,16 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         }
 
         using var request = DeleteRequest(Password);
-        var response = await cookieClient.SendAsync(request);
+        var response = await cookieClient.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == userId))
+            (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == userId, TestContext.Current.CancellationToken))
                 .Should().BeFalse("the user row itself must be gone -- this is a hard delete, not a soft one");
 
-            (await db.TodoLists.IgnoreQueryFilters().AnyAsync(l => l.Id == todoListId))
+            (await db.TodoLists.IgnoreQueryFilters().AnyAsync(l => l.Id == todoListId, TestContext.Current.CancellationToken))
                 .Should().BeFalse("IEntityWithUser rows cascade off the User FK (DeleteBehavior.Cascade) -- an orphaned todo list here would be a missed cascade");
         }
     }
@@ -637,7 +637,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         await LoginAsync(cookieClient, email, Password);
 
         using var request = DeleteRequest(Password);
-        (await cookieClient.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await cookieClient.SendAsync(request, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
@@ -698,7 +698,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         }
 
         using var request = DeleteRequest(Password);
-        (await cookieClient.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await cookieClient.SendAsync(request, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
@@ -717,17 +717,17 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            (await db.RefreshTokens.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsRevoked))
+            (await db.RefreshTokens.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
                 .Should().BeTrue("login must create a live refresh token");
         }
 
         using var request = DeleteRequest(Password);
-        (await cookieClient.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await cookieClient.SendAsync(request, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
             // The row itself cascades away with the user, so "no live token remains" is what "revoked" means here.
-            (await db.RefreshTokens.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsRevoked))
+            (await db.RefreshTokens.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
                 .Should().BeFalse("no refresh token for the deleted account may remain usable");
         }
     }
@@ -757,16 +757,16 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
 
         using var deleteRequest = DeleteRequest(Password);
         deleteRequest.Headers.Add("Cookie", sessionCookies);
-        (await client.SendAsync(deleteRequest)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await client.SendAsync(deleteRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         using var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "auth/refresh");
         refreshRequest.Headers.Add("Cookie", sessionCookies);
-        (await client.SendAsync(refreshRequest)).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+        (await client.SendAsync(refreshRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
             "the refresh token died with the account, so the session cannot be extended");
 
         using var probeRequest = new HttpRequestMessage(HttpMethod.Get, "timer-preset");
         probeRequest.Headers.Add("Cookie", sessionCookies);
-        var probeResponse = await client.SendAsync(probeRequest);
+        var probeResponse = await client.SendAsync(probeRequest, TestContext.Current.CancellationToken);
         probeResponse.StatusCode.Should().Be(HttpStatusCode.OK,
             "documented residual: the stateless access token is not revalidated against the user table, so it "
             + "outlives the account until it expires -- see this test's remarks");
@@ -808,7 +808,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         await LoginAsync(cookieClient, email, Password);
 
         using var deleteRequest = DeleteRequest(Password);
-        (await cookieClient.SendAsync(deleteRequest)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await cookieClient.SendAsync(deleteRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         using var registerClient = CreateCookieClient();
         var registerPayload = new
@@ -836,11 +836,11 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         await LoginAsync(cookieClient, callerEmail, Password);
 
         using var request = DeleteRequest(Password);
-        (await cookieClient.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await cookieClient.SendAsync(request, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == callerId)).Should().BeFalse();
-        (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == otherUserId))
+        (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == callerId, TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == otherUserId, TestContext.Current.CancellationToken))
             .Should().BeTrue("deletion must never reach an account other than the caller's own -- the endpoint takes no id, only the verified session");
     }
 }

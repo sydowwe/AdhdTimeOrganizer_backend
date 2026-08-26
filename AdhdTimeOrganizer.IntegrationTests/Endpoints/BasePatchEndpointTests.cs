@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
@@ -34,7 +35,7 @@ public class TemplatePlannerTaskChangeSpanEndpointTests(AppDbContextFixture fixt
         ctx.Activities.Add(activity);
         await ctx.SaveChangesAsync();
 
-        var importance = new TaskImportance { Text = "Required", Importance = 5, UserId = userId };
+        var importance = new TaskImportance { Text = "Required", Importance = 5, UserId = userId, Color = ColorPalette.Red };
         ctx.TaskImportances.Add(importance);
         await ctx.SaveChangesAsync();
 

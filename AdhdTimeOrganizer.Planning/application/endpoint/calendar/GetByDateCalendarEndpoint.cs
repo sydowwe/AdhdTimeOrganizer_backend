@@ -1,15 +1,15 @@
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
-using FastEndpoints;
 using Sydowwe.Framework.application.endpoint.@base.read;
 using Sydowwe.Framework.application.extensions;
 
-namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.calendar;
+namespace AdhdTimeOrganizer.Planning.application.endpoint.calendar;
 
 public class GetByDateCalendarEndpoint(DbContext dbContext, IPlannerStreakReader streakReader)
     : BaseGetByFieldEndpoint<Calendar, CalendarResponse>(dbContext)
 {
+    private readonly DbContext _dbContext = dbContext;
     protected override string FieldName => nameof(Calendar.Date);
 
     public override async Task HandleAsync(CancellationToken ct)
@@ -26,7 +26,7 @@ public class GetByDateCalendarEndpoint(DbContext dbContext, IPlannerStreakReader
         // first. It cannot come out of CalendarResponse.Projection — that runs per row, and a streak is a walk
         // across days.
         var day = await CalendarResponse
-            .Projection(FilterByField(dbContext.Set<Calendar>().AsNoTracking(), value))
+            .Projection(FilterByField(_dbContext.Set<Calendar>().AsNoTracking(), value))
             .FirstOrDefaultAsync(ct);
 
         if (day is null)

@@ -70,9 +70,9 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         await manager.SeedAllAsync();
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        (await db.Users.AnyAsync(u => u.UserName == email)).Should().BeFalse(
+        (await db.Users.AnyAsync(u => u.UserName == email, TestContext.Current.CancellationToken)).Should().BeFalse(
             "a failed CreateAsync must not leave a partially seeded admin");
-        (await db.UserRoles.AnyAsync(ur => ur.UserId == 0)).Should().BeFalse(
+        (await db.UserRoles.AnyAsync(ur => ur.UserId == 0, TestContext.Current.CancellationToken)).Should().BeFalse(
             "the code must not proceed to AddToRoleAsync with the unsaved user's default Id");
 
         logs.Messages.Should().Contain(m => m.Contains("Failed to create root admin user"));
@@ -91,7 +91,7 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         }
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        var admin = await db.Users.SingleAsync(u => u.UserName == email);
+        var admin = await db.Users.SingleAsync(u => u.UserName == email, TestContext.Current.CancellationToken);
         admin.Locale = AvailableLocales.En;
         admin.HasExtensionAccess = false;
         await db.SaveChangesAsync(CancellationToken);
@@ -108,12 +108,12 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         logs.Messages.Should().Contain(m => m.Contains("Failed to reset root admin password during override"));
 
         await using var afterDb = (AppDbContext)Fixture.CreateDbContext();
-        var reloaded = await afterDb.Users.SingleAsync(u => u.Id == adminId);
+        var reloaded = await afterDb.Users.SingleAsync(u => u.Id == adminId, TestContext.Current.CancellationToken);
         reloaded.Locale.Should().Be(AvailableLocales.Sk, "UpdateAsync ran and succeeded independently of the failed password reset");
         reloaded.HasExtensionAccess.Should().BeTrue();
 
-        var rootRoleId = await afterDb.Roles.Where(r => r.Name == PortalRoleCatalog.Root).Select(r => r.Id).SingleAsync();
-        (await afterDb.UserRoles.AnyAsync(ur => ur.UserId == adminId && ur.RoleId == rootRoleId)).Should().BeTrue(
+        var rootRoleId = await afterDb.Roles.Where(r => r.Name == PortalRoleCatalog.Root).Select(r => r.Id).SingleAsync( TestContext.Current.CancellationToken);
+        (await afterDb.UserRoles.AnyAsync(ur => ur.UserId == adminId && ur.RoleId == rootRoleId, TestContext.Current.CancellationToken)).Should().BeTrue(
             "a failed password reset on override must not disturb the existing role assignment");
     }
 
@@ -130,19 +130,19 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
 
         await manager.SeedAllAsync();
         await using var db1 = (AppDbContext)Fixture.CreateDbContext();
-        var adminId = await db1.Users.Where(u => u.UserName == email).Select(u => u.Id).SingleAsync();
-        var defaultsCountAfterFirst = await db1.Set<TaskPriority>().CountAsync(p => p.UserId == adminId);
+        var adminId = await db1.Users.Where(u => u.UserName == email).Select(u => u.Id).SingleAsync( TestContext.Current.CancellationToken);
+        var defaultsCountAfterFirst = await db1.Set<TaskPriority>().CountAsync(p => p.UserId == adminId, TestContext.Current.CancellationToken);
         defaultsCountAfterFirst.Should().BeGreaterThan(0);
 
         await manager.SeedAllAsync();
 
         await using var db2 = (AppDbContext)Fixture.CreateDbContext();
-        (await db2.Users.CountAsync(u => u.UserName == email)).Should().Be(1);
+        (await db2.Users.CountAsync(u => u.UserName == email, TestContext.Current.CancellationToken)).Should().Be(1);
 
-        var rootRoleId = await db2.Roles.Where(r => r.Name == PortalRoleCatalog.Root).Select(r => r.Id).SingleAsync();
-        (await db2.UserRoles.CountAsync(ur => ur.UserId == adminId && ur.RoleId == rootRoleId)).Should().Be(1);
+        var rootRoleId = await db2.Roles.Where(r => r.Name == PortalRoleCatalog.Root).Select(r => r.Id).SingleAsync( TestContext.Current.CancellationToken);
+        (await db2.UserRoles.CountAsync(ur => ur.UserId == adminId && ur.RoleId == rootRoleId, TestContext.Current.CancellationToken)).Should().Be(1);
 
-        (await db2.Set<TaskPriority>().CountAsync(p => p.UserId == adminId)).Should().Be(defaultsCountAfterFirst,
+        (await db2.Set<TaskPriority>().CountAsync(p => p.UserId == adminId, TestContext.Current.CancellationToken)).Should().Be(defaultsCountAfterFirst,
             "the second run must hit the existingAdmin/no-override branch and never re-run CreateDefaultsAsync");
     }
 
@@ -161,7 +161,7 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         }
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        var admin = await db.Users.SingleAsync(u => u.UserName == email);
+        var admin = await db.Users.SingleAsync(u => u.UserName == email, TestContext.Current.CancellationToken);
         var adminId = admin.Id;
         admin.Locale = AvailableLocales.En;
         admin.HasExtensionAccess = false;
@@ -175,13 +175,13 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         }
 
         await using var afterDb = (AppDbContext)Fixture.CreateDbContext();
-        var reloaded = await afterDb.Users.SingleAsync(u => u.UserName == email);
+        var reloaded = await afterDb.Users.SingleAsync(u => u.UserName == email, TestContext.Current.CancellationToken);
         reloaded.Id.Should().Be(adminId, "override must update in place, never delete-and-reinsert");
         reloaded.Locale.Should().Be(AvailableLocales.Sk);
         reloaded.HasExtensionAccess.Should().BeTrue();
 
-        var rootRoleId = await afterDb.Roles.Where(r => r.Name == PortalRoleCatalog.Root).Select(r => r.Id).SingleAsync();
-        (await afterDb.UserRoles.AnyAsync(ur => ur.UserId == adminId && ur.RoleId == rootRoleId)).Should().BeTrue(
+        var rootRoleId = await afterDb.Roles.Where(r => r.Name == PortalRoleCatalog.Root).Select(r => r.Id).SingleAsync( TestContext.Current.CancellationToken);
+        (await afterDb.UserRoles.AnyAsync(ur => ur.UserId == adminId && ur.RoleId == rootRoleId, TestContext.Current.CancellationToken)).Should().BeTrue(
             "this is the regression CLAUDE.md's truncation warning exists for");
 
         using var checkScope = Scope();
@@ -222,8 +222,8 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         await manager.SeedAllAsync(overrideData: true);
 
         await using var afterDb = (AppDbContext)Fixture.CreateDbContext();
-        (await afterDb.Users.AnyAsync(u => u.Id == otherUserId)).Should().BeTrue();
-        var row = await afterDb.Set<TaskPriority>().SingleAsync(p => p.UserId == otherUserId && p.Priority == 99);
+        (await afterDb.Users.AnyAsync(u => u.Id == otherUserId, TestContext.Current.CancellationToken)).Should().BeTrue();
+        var row = await afterDb.Set<TaskPriority>().SingleAsync(p => p.UserId == otherUserId && p.Priority == 99, TestContext.Current.CancellationToken);
         row.Text.Should().Be(distinctiveText);
     }
 
@@ -240,12 +240,12 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         await manager.SeedAllAsync();
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        var adminId = await db.Users.Where(u => u.UserName == email).Select(u => u.Id).SingleAsync();
+        var adminId = await db.Users.Where(u => u.UserName == email).Select(u => u.Id).SingleAsync( TestContext.Current.CancellationToken);
         var assignedRoleNames = await (
             from ur in db.UserRoles
             join r in db.Roles on ur.RoleId equals r.Id
             where ur.UserId == adminId
-            select r.Name).ToListAsync();
+            select r.Name).ToListAsync( TestContext.Current.CancellationToken);
 
         assignedRoleNames.Should().Contain(PortalRoleCatalog.Root);
     }
@@ -266,7 +266,7 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         await manager.SeedAllAsync();
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        (await db.Users.AnyAsync(u => u.UserName == email)).Should().BeFalse();
+        (await db.Users.AnyAsync(u => u.UserName == email, TestContext.Current.CancellationToken)).Should().BeFalse();
         logs.Messages.Should().Contain(m => m.Contains("Failed to seed user database"),
             "Helper.GetEnvVar throwing inside the try block must surface as a logged failure, not a silent no-op");
     }
@@ -337,7 +337,7 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         await manager.SeedAllAsync();
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        var admin = await db.Users.SingleAsync(u => u.UserName == email);
+        var admin = await db.Users.SingleAsync(u => u.UserName == email, TestContext.Current.CancellationToken);
         admin.EmailConfirmed.Should().BeTrue("this is the expected shape for a system-seeded account, not a general confirmation bypass");
     }
 

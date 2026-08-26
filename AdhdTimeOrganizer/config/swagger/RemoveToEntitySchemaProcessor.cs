@@ -59,7 +59,7 @@ public sealed class RemoveToEntitySchemaProcessor : ISchemaProcessor
 
     public void Process(SchemaProcessorContext context)
     {
-        if (!typeof(ICreateRequest).IsAssignableFrom(context.Type))
+        if (!typeof(ICreateRequest).IsAssignableFrom(context.ContextualType))
             return;
 
         // The property can sit either on the schema itself or, when the DTO inherits, on the allOf part

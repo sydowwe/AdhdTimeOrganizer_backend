@@ -25,7 +25,7 @@ public class RoutineTimePeriodUniqueIndexTests(AppDbContextFixture fixture) : Po
     public async Task Create_DuplicateText_Returns409()
     {
         await using (var db = CreateDbContext())
-            await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "Daily-ish", lengthInDays: 3);
+            await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "Daily-ish", lengthInDays: 3, ct: TestContext.Current.CancellationToken);
 
         var response = await CreateClient().PostAsJsonAsync("api/routine-time-period", new
         {
@@ -46,7 +46,7 @@ public class RoutineTimePeriodUniqueIndexTests(AppDbContextFixture fixture) : Po
     public async Task Create_DuplicateLengthInDays_DifferentText_Returns409()
     {
         await using (var db = CreateDbContext())
-            await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "Fortnightly", lengthInDays: 14);
+            await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "Fortnightly", lengthInDays: 14, ct: TestContext.Current.CancellationToken);
 
         var response = await CreateClient().PostAsJsonAsync("api/routine-time-period", new
         {
@@ -70,7 +70,7 @@ public class RoutineTimePeriodUniqueIndexTests(AppDbContextFixture fixture) : Po
         await using (var db = CreateDbContext())
         {
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
-            await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, otherUserId, text: "Shared-Name", lengthInDays: 21);
+            await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, otherUserId, text: "Shared-Name", lengthInDays: 21, ct: TestContext.Current.CancellationToken);
         }
 
         var response = await CreateClient().PostAsJsonAsync("api/routine-time-period", new

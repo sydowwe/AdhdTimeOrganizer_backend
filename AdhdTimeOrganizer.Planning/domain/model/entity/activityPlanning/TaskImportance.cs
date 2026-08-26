@@ -12,7 +12,7 @@ public class TaskImportance : BaseEntityWithUser, IBaseTextColorIconEntity
     public const int CriticalMarkerValue = 999;
 
     public required string Text { get; set; }
-    public string? Color { get; set; }
+    public required string Color { get; set; }
     public string? Icon { get; set; }
 
     public required int Importance { get; set; }

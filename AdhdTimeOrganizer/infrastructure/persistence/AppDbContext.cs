@@ -37,6 +37,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence;
 public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILoggedUserService loggedUserService, ILogger<AppDbContext> logger)
     : BaseDbContext<User>(options, loggedUserService, logger)
 {
+    private readonly ILoggedUserService _loggedUserService = loggedUserService;
     public DateOnly CurrentPartitionDate => DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-2);
 
     public DbSet<Activity> Activities { get; set; }
@@ -278,10 +279,10 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
         modelBuilder.Entity<WebExtensionActivityEntry>()
             .HasQueryFilter(AppQueryFilters.PartitionDate, x => x.RecordDate >= CurrentPartitionDate);
 
-        if (scopingEnabled && loggedUserService != null)
+        if (scopingEnabled && _loggedUserService != null)
             modelBuilder.Entity<WebExtensionActivityEntry>()
                 .HasQueryFilter(QueryFilters.UserScope,
-                    x => !loggedUserService.IsAuthenticated || x.UserId == loggedUserService.GetUserId);
+                    x => !_loggedUserService.IsAuthenticated || x.UserId == _loggedUserService.GetUserId);
 
         // Archival, on the principal and mirrored onto every dependent that must vanish with it. All
         // six share AppQueryFilters.ActivityArchived so one IgnoreQueryFilters call lifts the concern

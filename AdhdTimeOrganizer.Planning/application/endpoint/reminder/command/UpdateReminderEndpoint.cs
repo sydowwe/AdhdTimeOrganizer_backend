@@ -11,6 +11,8 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.reminder.command;
 public class UpdateReminderEndpoint(DbContext dbContext, IReminderRegistrationService reminders)
     : BaseUpdateEndpoint<Reminder, ReminderRequest>(dbContext)
 {
+    private readonly DbContext _dbContext = dbContext;
+
     public override void Configure()
     {
         base.Configure();
@@ -30,7 +32,7 @@ public class UpdateReminderEndpoint(DbContext dbContext, IReminderRegistrationSe
         if (req.PlannerTaskId is not { } plannerTaskId)
             return true;
 
-        if (!await dbContext.Set<PlannerTask>().AnyAsync(t => t.Id == plannerTaskId, ct))
+        if (!await _dbContext.Set<PlannerTask>().AnyAsync(t => t.Id == plannerTaskId, ct))
         {
             AddError(r => r.PlannerTaskId, "Planner task not found.");
             await Send.ErrorsAsync(404, ct);

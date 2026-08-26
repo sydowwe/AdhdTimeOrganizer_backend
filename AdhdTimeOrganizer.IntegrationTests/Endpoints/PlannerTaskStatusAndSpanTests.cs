@@ -116,8 +116,8 @@ public class PlannerTaskStatusAndSpanTests(AppDbContextFixture fixture) : Postgr
     public async Task CreatingAnOvernightTask_IsAcceptedWithNegativeDuration()
     {
         await using var db = CreateDbContext();
-        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "overnight-cq14");
-        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 1));
+        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "overnight-cq14", ct: TestContext.Current.CancellationToken);
+        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 4, 1), ct: TestContext.Current.CancellationToken);
 
         var response = await CreateClient().PostAsJsonAsync("api/planner-task", new
         {

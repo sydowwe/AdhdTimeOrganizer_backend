@@ -374,7 +374,7 @@ public class ActivityCategoryBatchDeleteTests(AppDbContextFixture fixture) : Bas
         await using var db = CreateDbContext();
         var foreignId = await Seed.CategoryAsync(db, otherUserId, "Foreign BatchDelete Category");
 
-        var response = await CreateClient().PostAsJsonAsync(EndpointUrl, new { ids = new[] { foreignId } }, JsonOpts);
+        var response = await CreateClient().PostAsJsonAsync(EndpointUrl, new { ids = new[] { foreignId } }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -805,10 +805,10 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
         var roleId = await Seed.RoleAsync(db, FakeLoggedUserService.TestUserId, $"Dup Role {Guid.NewGuid():N}");
         var payload = new { Name = "Duplicate Activity", IsUnavoidable = false, RoleId = roleId };
 
-        var first = await CreateClient().PostAsJsonAsync("api/activity", payload, JsonOpts);
+        var first = await CreateClient().PostAsJsonAsync("api/activity", payload, JsonOpts, TestContext.Current.CancellationToken);
         first.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var second = await CreateClient().PostAsJsonAsync("api/activity", payload, JsonOpts);
+        var second = await CreateClient().PostAsJsonAsync("api/activity", payload, JsonOpts, TestContext.Current.CancellationToken);
 
         second.StatusCode.Should().Be(HttpStatusCode.Conflict, "a (UserId, Name) unique violation must map to 409, not a raw 500");
     }
@@ -824,7 +824,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
 
         await using var factoryB = CreateFactory(["User"], otherUserId);
         var response = await factoryB.CreateClient()
-            .PostAsJsonAsync("api/activity", new { Name = "Shared Name Activity", IsUnavoidable = false, RoleId = otherRoleId }, JsonOpts);
+            .PostAsJsonAsync("api/activity", new { Name = "Shared Name Activity", IsUnavoidable = false, RoleId = otherRoleId }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created, "the unique index is per-user, so a different user may reuse the name");
     }
@@ -833,10 +833,10 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
     public async Task ActivityRole_DuplicateNameSameUser_Returns409()
     {
         var payload = new { Name = "Duplicate Role", Color = "#abcdef" };
-        var first = await CreateClient().PostAsJsonAsync("api/activity-role", payload, JsonOpts);
+        var first = await CreateClient().PostAsJsonAsync("api/activity-role", payload, JsonOpts, TestContext.Current.CancellationToken);
         first.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var second = await CreateClient().PostAsJsonAsync("api/activity-role", payload, JsonOpts);
+        var second = await CreateClient().PostAsJsonAsync("api/activity-role", payload, JsonOpts, TestContext.Current.CancellationToken);
 
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
@@ -850,7 +850,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
 
         await using var factoryB = CreateFactory(["User"], otherUserId);
         var response = await factoryB.CreateClient()
-            .PostAsJsonAsync("api/activity-role", new { Name = "Shared Name Role", Color = "#123456" }, JsonOpts);
+            .PostAsJsonAsync("api/activity-role", new { Name = "Shared Name Role", Color = "#123456" }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
@@ -859,10 +859,10 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
     public async Task ActivityCategory_DuplicateNameSameUser_Returns409()
     {
         var payload = new { Name = "Duplicate Category", Color = "#abcdef" };
-        var first = await CreateClient().PostAsJsonAsync("api/activity-category", payload, JsonOpts);
+        var first = await CreateClient().PostAsJsonAsync("api/activity-category", payload, JsonOpts, TestContext.Current.CancellationToken);
         first.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var second = await CreateClient().PostAsJsonAsync("api/activity-category", payload, JsonOpts);
+        var second = await CreateClient().PostAsJsonAsync("api/activity-category", payload, JsonOpts, TestContext.Current.CancellationToken);
 
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
@@ -876,7 +876,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
 
         await using var factoryB = CreateFactory(["User"], otherUserId);
         var response = await factoryB.CreateClient()
-            .PostAsJsonAsync("api/activity-category", new { Name = "Shared Name Category", Color = "#123456" }, JsonOpts);
+            .PostAsJsonAsync("api/activity-category", new { Name = "Shared Name Category", Color = "#123456" }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
@@ -887,7 +887,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
     public async Task Create_WithoutRole_Returns400()
     {
         var response = await CreateClient()
-            .PostAsJsonAsync("api/activity", new { Name = "Roleless Activity", IsUnavoidable = false, RoleId = 0L }, JsonOpts);
+            .PostAsJsonAsync("api/activity", new { Name = "Roleless Activity", IsUnavoidable = false, RoleId = 0L }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest, "ActivityValidator requires RoleId to be non-empty");
     }
@@ -931,7 +931,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
         await db.SaveChangesAsync(CancellationToken);
         var taskId = task.Id;
 
-        var response = await CreateClient().DeleteAsync($"api/activity/{activityId}");
+        var response = await CreateClient().DeleteAsync($"api/activity/{activityId}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent, "the FK is Cascade, not Restrict, so the delete must succeed");
 
@@ -977,7 +977,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
         await db.SaveChangesAsync(CancellationToken);
 
         var response = await CreateClient()
-            .PostAsJsonAsync($"api/activity/{sourceId}/clone", new { Name = "Cloned Activity", Text = (string?)null, CategoryId = (long?)null }, JsonOpts);
+            .PostAsJsonAsync($"api/activity/{sourceId}/clone", new { Name = "Cloned Activity", Text = (string?)null, CategoryId = (long?)null }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var cloneId = await response.Content.ReadFromJsonAsync<long>(CancellationToken);
@@ -1007,7 +1007,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
         var activityId = await Seed.ActivityAsync(db, userId, "Same Name Activity");
 
         var response = await CreateClient()
-            .PostAsJsonAsync($"api/activity/{activityId}/clone", new { Name = "Same Name Activity", Text = (string?)null, CategoryId = (long?)null }, JsonOpts);
+            .PostAsJsonAsync($"api/activity/{activityId}/clone", new { Name = "Same Name Activity", Text = (string?)null, CategoryId = (long?)null }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var cloneId = await response.Content.ReadFromJsonAsync<long>(CancellationToken);
@@ -1025,7 +1025,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
         var foreignId = await Seed.ActivityAsync(db, otherUserId, "Foreign Clone Source");
 
         var response = await CreateClient()
-            .PostAsJsonAsync($"api/activity/{foreignId}/clone", new { Name = "Stolen Clone", Text = (string?)null, CategoryId = (long?)null }, JsonOpts);
+            .PostAsJsonAsync($"api/activity/{foreignId}/clone", new { Name = "Stolen Clone", Text = (string?)null, CategoryId = (long?)null }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -1044,7 +1044,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
         await db.SaveChangesAsync(CancellationToken);
 
         var response = await CreateClient()
-            .PutAsJsonAsync($"api/activity/{activity.Id}/quick-edit", new { Name = "Edited Name", Text = "New text", CategoryId = categoryId }, JsonOpts);
+            .PutAsJsonAsync($"api/activity/{activity.Id}/quick-edit", new { Name = "Edited Name", Text = "New text", CategoryId = categoryId }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
@@ -1065,7 +1065,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
         var foreignId = await Seed.ActivityAsync(db, otherUserId, "Foreign QuickEdit Target");
 
         var response = await CreateClient()
-            .PutAsJsonAsync($"api/activity/{foreignId}/quick-edit", new { Name = "Hijacked", Text = (string?)null, CategoryId = (long?)null }, JsonOpts);
+            .PutAsJsonAsync($"api/activity/{foreignId}/quick-edit", new { Name = "Hijacked", Text = (string?)null, CategoryId = (long?)null }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -1098,15 +1098,15 @@ public class ActivityExtensionClientDenialTests(AppDbContextFixture fixture) : A
         using var loginRequest = new HttpRequestMessage(HttpMethod.Post, "auth/extension/login");
         loginRequest.Headers.Add("X-Forwarded-For", Guid.NewGuid().ToString());
         loginRequest.Content = JsonContent.Create(new { Email = email, Password });
-        var loginResponse = await loginClient.SendAsync(loginRequest);
+        var loginResponse = await loginClient.SendAsync(loginRequest, TestContext.Current.CancellationToken);
         loginResponse.EnsureSuccessStatusCode();
-        var tokens = await loginResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var tokens = await loginResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>( TestContext.Current.CancellationToken);
         var accessToken = tokens.GetProperty("accessToken").GetString();
 
         using var extensionClient = CreateCookieClient();
         extensionClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var response = await extensionClient.GetAsync("activity");
+        var response = await extensionClient.GetAsync("activity", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden, "DenyExtensionClients is attached to every endpoint that doesn't carry [AllowExtensionClients]");
     }
