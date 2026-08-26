@@ -1,0 +1,6 @@
+[mcp_servers.ableton]
+command = "uvx"
+args = ["ableton-mcp"]
+
+[mcp_servers.ableton.env]
+ABLETON_MCP_DISABLE_TELEMETRY = "true"
