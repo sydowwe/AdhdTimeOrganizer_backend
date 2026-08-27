@@ -76,7 +76,6 @@ public static class SerilogConfig
                     schemaName: "command",
                     needAutoCreateTable: true,
                     needAutoCreateSchema: true,
-                    failureCallback: e => Log.Error(e.Message),
                     appConfiguration: configuration,
                     // no PiiRedactor wiring exists on this pipeline (CLAUDE.md), so bound how long
                     // whatever properties land in the JSONB column persist

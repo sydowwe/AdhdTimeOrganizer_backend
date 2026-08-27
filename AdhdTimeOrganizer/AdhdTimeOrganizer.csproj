@@ -21,8 +21,10 @@
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
         <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
-        <!-- Pinned above the 2.0.0 that Microsoft.AspNetCore.OpenApi drags in (GHSA-v5pm-xwqc-g5wc). -->
-        <PackageReference Include="Microsoft.OpenApi" Version="3.10.2" />
+        <!-- Pinned above the 2.0.0 that Microsoft.AspNetCore.OpenApi drags in (GHSA-v5pm-xwqc-g5wc), and
+             below the 3.0.0 that Microsoft.AspNetCore.OpenApi 10.0.11 requires (NU1608) - 3.x removed the
+             settable IOpenApiMediaType.Example the source generator writes to. -->
+        <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
             <PrivateAssets>all</PrivateAssets>
