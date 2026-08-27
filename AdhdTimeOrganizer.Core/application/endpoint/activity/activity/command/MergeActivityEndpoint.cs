@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.domain.helper;
@@ -80,7 +81,7 @@ public class MergeActivityEndpoint(
         // Loaded through AppDbContext's global IEntityWithUser filter, so an id belonging to another
         // account simply does not come back. That makes the cross-user case a 404 rather than a 403 —
         // deliberately, so the response never confirms that a foreign id is real.
-        var survivor = await dbContext.Set<Activity>().FirstOrDefaultAsync(a => a.Id == req.SurvivorId, ct);
+        var survivor = await dbContext.Set<Activity>().IgnoreQueryFilters([AppQueryFilters.ActivityArchived]).FirstOrDefaultAsync(a => a.Id == req.SurvivorId, ct);
         if (survivor == null)
         {
             await Send.NotFoundAsync(ct);

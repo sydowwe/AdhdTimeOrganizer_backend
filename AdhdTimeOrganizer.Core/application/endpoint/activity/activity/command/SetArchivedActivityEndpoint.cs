@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.application.dto.request.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.domain.helper;
@@ -53,9 +54,15 @@ public class SetArchivedActivityEndpoint(DbContext dbContext) : Endpoint<SetActi
     {
         try
         {
-            // FindAsync goes through AppDbContext's global IEntityWithUser filter, so another user's id
-            // is simply not found — 404, never 403. Existence must not be confirmable across accounts.
-            var entity = await dbContext.Set<Activity>().FindAsync([Route<long>("id")], ct);
+            // Lifts AppQueryFilters.ActivityArchived and nothing else: this is the one endpoint that has
+            // to reach an already-archived row — both to restore it and to answer 204 for a repeat
+            // archive — and FindAsync cannot lift a filter, so it is a keyed FirstOrDefault instead.
+            // The per-user filter deliberately stays on, so another user's id is simply not found — 404,
+            // never 403. Existence must not be confirmable across accounts.
+            var id = Route<long>("id");
+            var entity = await dbContext.Set<Activity>()
+                .IgnoreQueryFilters([AppQueryFilters.ActivityArchived])
+                .FirstOrDefaultAsync(a => a.Id == id, ct);
             if (entity == null)
             {
                 await Send.NotFoundAsync(ct);

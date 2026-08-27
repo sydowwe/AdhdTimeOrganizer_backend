@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.timer;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -151,7 +152,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
     {
         await using var db = CreateDbContext();
         var activityId = await SeedActivityAsync(db, "Edited While Archived", isArchived: true);
-        var roleId = (await db.Set<Activity>().FirstAsync(a => a.Id == activityId, CancellationToken)).RoleId;
+        var roleId = (await db.Set<Activity>().IgnoreQueryFilters([AppQueryFilters.ActivityArchived]).FirstAsync(a => a.Id == activityId, CancellationToken)).RoleId;
 
         var response = await CreateClient().PutAsJsonAsync($"api/activity/{activityId}",
             new { Name = "Edited While Archived", IsUnavoidable = true, RoleId = roleId }, JsonOpts, TestContext.Current.CancellationToken);
@@ -332,6 +333,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
         await using var assertDb = CreateDbContext();
         var stillThere = await assertDb.Set<ActivityHistory>()
             .Include(h => h.Activity)
+            .IgnoreQueryFilters([AppQueryFilters.ActivityArchived])
             .Where(h => h.ActivityId == activityId)
             .ToListAsync(CancellationToken);
 

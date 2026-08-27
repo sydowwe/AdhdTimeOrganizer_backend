@@ -13,6 +13,7 @@ using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using AdhdTimeOrganizer.Core.domain.model.entity.@base;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.Testing;
@@ -378,7 +379,7 @@ public class ActivityMergeTests(AppDbContextFixture fixture) : PostgresTestBase(
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         await using var assertDb = CreateDbContext();
-        var survivor = await assertDb.Set<Activity>().FirstAsync(a => a.Id == survivorId, CancellationToken);
+        var survivor = await assertDb.Set<Activity>().IgnoreQueryFilters([AppQueryFilters.ActivityArchived]).FirstAsync(a => a.Id == survivorId, CancellationToken);
 
         survivor.IsArchived.Should().BeTrue("merging is not a reason to un-retire the target");
         (await assertDb.Set<TimerPreset>().AnyAsync(p => p.ActivityId == survivorId, CancellationToken)).Should().BeTrue();

@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.read;
 
@@ -15,6 +16,12 @@ public class GetByIdActivityEndpoint(
 
     // Scoped by AppDbContext's global IEntityWithUser query filter, so a foreign row never projects.
     protected override Task<bool> AuthorizeAsync(ActivityResponse entity, CancellationToken ct) => Task.FromResult(true);
+
+    /// <summary>
+    /// The archival filter only — an archived activity must still be fetchable by id, which is what lets
+    /// the edit form and the merge dialog open one. The per-user filter stays on.
+    /// </summary>
+    protected override string[] IgnoredQueryFilters => [AppQueryFilters.ActivityArchived];
 
     /// <summary>
     /// Fills in <c>usageCount</c> / <c>canDelete</c>, which the static projection cannot reach.

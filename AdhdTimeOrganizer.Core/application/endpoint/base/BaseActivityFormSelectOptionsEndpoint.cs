@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.response.generic;
@@ -56,9 +57,12 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(DbContext d
         var userId = User.GetId();
         var includeArchived = Query<bool?>(IncludeArchivedQueryParam, isRequired: false) ?? false;
 
+        // Exclusion is the global AppQueryFilters.ActivityArchived filter's job, not a Where here — a
+        // hand-written predicate would leave the filter still applied on the opt-in path, so
+        // ?includeArchived=true would answer an empty list instead of the archived rows it asked for.
         var query = GetBaseQuery(userId);
-        if (!includeArchived)
-            query = query.Where(a => !a.IsArchived);
+        if (includeArchived)
+            query = query.IgnoreQueryFilters([AppQueryFilters.ActivityArchived]);
 
         var activities = await query
             .Include(a => a.Category)

@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.application.dto.filter;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.request.@base.table;
 using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
@@ -80,6 +81,9 @@ public class GridActivityEndpoint(
     {
         // Tri-state on purpose: false = active only, true = archived only, null = both. Null is the only
         // way to see an archived row next to an active one, which the merge dialog's All view needs.
+        if (filter.IsArchived != false)
+            query = query.IgnoreQueryFilters([AppQueryFilters.ActivityArchived]);
+
         if (filter.IsArchived.HasValue)
             query = query.Where(a => a.IsArchived == filter.IsArchived.Value);
 
