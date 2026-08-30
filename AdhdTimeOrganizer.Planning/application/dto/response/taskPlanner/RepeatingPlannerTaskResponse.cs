@@ -52,8 +52,7 @@ public record RepeatingPlannerTaskResponse : IdResponse, IProjectionResponse<Rep
                         Name = t.Activity.Category.Name,
                         Text = t.Activity.Category.Text,
                         Color = t.Activity.Category.Color,
-                        Icon = t.Activity.Category.Icon,
-                        Role = null
+                        Icon = t.Activity.Category.Icon
                     }
                     : null
             },

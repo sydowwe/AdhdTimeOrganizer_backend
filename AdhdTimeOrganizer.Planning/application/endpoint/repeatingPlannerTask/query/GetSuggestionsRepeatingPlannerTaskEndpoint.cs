@@ -215,8 +215,7 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
                     Name = activity.Category.Name,
                     Text = activity.Category.Text,
                     Color = activity.Category.Color,
-                    Icon = activity.Category.Icon,
-                    Role = null
+                    Icon = activity.Category.Icon
                 }
                 : null
         };

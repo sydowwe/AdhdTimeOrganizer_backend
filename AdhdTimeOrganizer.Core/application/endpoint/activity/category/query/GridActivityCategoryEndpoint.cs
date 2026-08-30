@@ -1,15 +1,29 @@
 using AdhdTimeOrganizer.Core.application.dto.filter;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using Humanizer;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.request.generic;
 using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
 
 namespace AdhdTimeOrganizer.Core.application.endpoint.activity.category.query;
 
 public class GridActivityCategoryEndpoint(
     DbContext dbContext)
-    : BaseGridEndpoint<ActivityCategory, ActivityCategoryResponse, CategoryFilterRequest>(dbContext)
+    : BaseGridEndpoint<ActivityCategory, ActivityCategoryGridResponse, CategoryFilterRequest>(dbContext)
 {
+    /// <summary>
+    /// The grid shows <c>role</c>, but that column is a client-side <c>string.Join</c> and cannot appear in
+    /// an <c>ORDER BY</c> — sorting on it throws an untranslatable-LINQ 500. Redirect the key onto the
+    /// aggregate proxy, which orders by the same leading role name. See
+    /// <see cref="ActivityCategoryGridResponse.RoleSortKey"/>.
+    /// </summary>
+    protected override SortByRequest[] PreprocessSortBy(SortByRequest[] sortBy) =>
+        sortBy.Select(s => s.Key.Pascalize() == nameof(ActivityCategoryGridResponse.Role)
+                ? s with { Key = nameof(ActivityCategoryGridResponse.RoleSortKey) }
+                : s)
+            .ToArray();
+
     protected override IQueryable<ActivityCategory> ApplyCustomFiltering(IQueryable<ActivityCategory> query, CategoryFilterRequest filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Name))
