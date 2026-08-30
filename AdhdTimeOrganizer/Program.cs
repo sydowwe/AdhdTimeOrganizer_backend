@@ -504,6 +504,13 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
     // Stamp the client-IP header from the (now-resolved) RemoteIpAddress so Throttle() keys are
     // non-spoofable. Must stay directly after UseForwardedHeaders — see TrustedIpMiddleware.
     app.UseTrustedClientIpHeader();
+
+    // Wraps everything below: an unhandled exception becomes a 500 carrying an error id, never exception
+    // text. Without it the response body is the developer exception page's stack trace in Development and
+    // empty in Production — and a client that renders server error messages (the reminder register's bulk
+    // action report does) will put whichever of those on screen. See UnhandledExceptionMiddleware.
+    app.UseUnhandledExceptionHandler();
+
     app.UseHttpsRedirection();
 
     // Swallow client-disconnect cancellations — not a server error

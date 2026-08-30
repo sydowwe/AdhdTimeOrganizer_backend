@@ -18,7 +18,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("public")
-                .HasAnnotation("ProductVersion", "10.0.8")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -1628,6 +1628,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
 
                     b.Property<string>("Color")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("color");
 
@@ -4097,6 +4098,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dispatched_at");
 
+                    b.Property<string>("FailureDetail")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("failure_detail");
+
                     b.Property<DateTime>("ModifiedTimestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -4620,6 +4626,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_scheduled_job_run");
+
+                    b.HasIndex("CorrelationId")
+                        .HasDatabaseName("ix_scheduled_job_run_correlation_id");
 
                     b.HasIndex("ReplaysRunId")
                         .HasDatabaseName("ix_scheduled_job_run_replays_run_id");

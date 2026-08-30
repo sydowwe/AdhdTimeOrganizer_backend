@@ -155,3 +155,21 @@ worth copying the shape of:
 - `ActivityRoleSystemKeyTests` — the three app-referenced activity roles resolve by `SystemKey` after the
   user renames them, and stay undeletable. The lookup they replaced was by display name, so a rename
   404'd it and quick-create died in four dialogs with nothing thrown and nothing logged.
+- `SchedulerJobSignalsTests` — the scheduler dashboard's `isOrphaned` / `isOverdue`. Neither is reachable from
+  the entity (one needs the DI handler set, the other a clock), so both are overlaid **after** the projection
+  and both are non-nullable: a surface that skips the overlay does not omit the field, it answers `false` —
+  a confident wrong answer, which is how the job-detail page came to report "On schedule" about a job five
+  hours late that the `onlyOverdue` filter had picked out one request earlier. So the overdue flag is asserted
+  on the same row the filter returns, and both margin edges are pinned (a row inside the 60s display margin
+  must **not** flag, or every healthy job blinks overdue on each fire). The by-id surface is asserted
+  separately from the grids because `BaseGetByIdEndpoint` has no projection hook, so its overlay lives
+  somewhere else and can drift alone — and it is the one the detail page gates Trigger-now on, where a false
+  offers an action whose 409 the server can already predict.
+- `SchedulerAttentionDetailTests` — the reason string on the health lists. A missing `detail` deserializes to
+  null and renders as nothing, and a *useless* one (restating the `nextRunAt` the client already draws) is
+  indistinguishable from a useful one to any test that only checks the field is present. So each sentence is
+  asserted on what it must actually carry: the error off the run log, the missing **handler** key (not the job
+  key the row already shows), and — the load-bearing one — whether an overdue job has a run in flight.
+  `RunningSince` is on no response DTO, so "stuck" vs "merely slow", which is the difference between paging
+  someone and waiting, is a distinction no client can make for itself. Also pins the replay preconditions on
+  the run-detail read against the 409 `ReplayJobRunEndpoint` documents.
