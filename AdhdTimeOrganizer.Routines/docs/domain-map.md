@@ -1,6 +1,9 @@
 # AdhdTimeOrganizer.Routines — Domain Map
 
-Navigation index. Open only what you need; `summary.md` is the orientation.
+Model, rules and the navigation index. `summary.md` is the orientation; open only what you need.
+
+> **Paths below are folder paths.** The namespaces still carry a `todoList` segment the folders no
+> longer have — trust the path column, not the namespace.
 
 ## Model
 
@@ -8,6 +11,7 @@ Navigation index. Open only what you need; `summary.md` is the orientation.
 erDiagram
     User ||--o{ RoutineTimePeriod : owns
     User ||--o{ RoutineTodoList : owns
+    User ||--|| UserRoutineSettings : "has at most one"
 
     RoutineTimePeriod ||--o{ RoutineTodoList : groups
     RoutineTimePeriod ||--o{ RoutinePeriodCompletion : "history of"
@@ -18,139 +22,179 @@ erDiagram
 `User` and `Activity` are Core's; `BaseTodoListItem` and `TodoListStep` are TodoLists'. None of them
 carries an inverse collection back into this slice.
 
-Not shown, because it is **not in this project**: `PlannerTask` (Planning, still host-side) has no
-navigation to `RoutineTodoList` — the completion fan-out is entirely event-based, through Core's
-`RoutineTodoListIsDoneChangedEvent`.
+Not shown, because it is **not in this project**: `PlannerTask` (Planning) has no navigation to
+`RoutineTodoList` — the completion fan-out is entirely event-based, through Core's
+`RoutineTodoListIsDoneChangedEvent`, handled host-side.
 
-## Entities — `domain/model/entity/todoList/`
+## Entities — `domain/model/entity/`
 
 | Type | Notes |
 |---|---|
-| `RoutineTimePeriod` | `BaseEntityWithUser` + `IEntityWithIsHidden` + `IBaseTextColorEntity`. `LengthInDays` / `ResetAnchorDay` drive `RoutineResetService.ComputeNextReset`. Two unique indexes: `(UserId, Text)` and `(UserId, LengthInDays)`. Carries `Streak` / `BestStreak` / `StreakGraceUntil`, the freeze budget (`FreezeBudget` / `FreezesRemaining` / `FreezeBudgetResetsAt`) and the two notification idempotency marks `EndingSoonNotifiedFor` / `GraceNotifiedFor`. |
-| `RoutineTodoList` | Derives from TodoLists' `BaseTodoListItem` — the one real outbound edge (see `summary.md`). Adds `TimePeriodId`, its own `Streak` / `BestStreak` / `LastCompletedAt`, and `SuggestedDays` / `SuggestedDayOfMonth`. |
-| `UserRoutineSettings` | `BaseEntityWithUser`, one row per user (`IsOneWithOneUser`, unique on `UserId`). Holds `RoutineReviewDismissedForWeekStart` — the week-start the user last dismissed the weekly "fresh start" review card for. **Stored, never interpreted:** which week that *is* depends on the caller's `FirstDayOfWeek` and device time zone, so no job and no query here compares it against "now". The row exists so the dismissal follows the user to a second device; before B5 it lived in one browser's `localStorage`. |
+| `RoutineTimePeriod` | `BaseEntityWithUser` + `IEntityWithIsHidden` + `IBaseTextColorEntity`. `LengthInDays` / `ResetAnchorDay` drive `RoutineResetService.ComputeNextReset`. Two unique indexes: `(UserId, Text)` and `(UserId, LengthInDays)`. Carries `Streak` / `BestStreak` / `StreakThreshold` / `StreakGraceDays` / `StreakGraceUntil`, `HistoryDepth`, the freeze budget (`FreezeBudget` / `FreezesRemaining` / `FreezeBudgetResetsAt`), the opt-in `ReminderLeadDays`, and the two notification idempotency marks `EndingSoonNotifiedFor` / `GraceNotifiedFor`. |
+| `RoutineTodoList` | Derives from TodoLists' `BaseTodoListItem` — the one real outbound edge (see `summary.md`). Adds `TimePeriodId`, `LastResetDate`, its own `Streak` / `BestStreak` / `LastCompletedAt`, and the scheduling hints `SuggestedDays` / `SuggestedDayOfMonth`. |
 | `RoutinePeriodCompletion` | Plain `BaseEntity` (no `UserId` — scoped transitively through `TimePeriodId`). One row per elapsed period: `PeriodStart` / `PeriodEnd` / `CompletedCount` / `TotalCount`, plus `IsFrozen` / `FrozenAt` (paired by a CHECK). Unique on `(TimePeriodId, PeriodStart)`. |
+| `UserRoutineSettings` | `BaseEntityWithUser`, at most one row per user (`IsOneWithOneUser`, unique on `UserId`). Holds `RoutineReviewDismissedForWeekStart` — the week-start the user last dismissed the weekly "fresh start" review card for. **Stored, never interpreted:** which week that *is* depends on the caller's `FirstDayOfWeek` and device time zone, so no job and no query here compares it against "now". The row exists so the dismissal follows the user to a second device. |
 
-## Domain logic — `domain/service/RoutineResetService.cs`
+## Enums — `domain/model/enum/`
 
-Static, no DI. Pure functions over the three entities:
-
-| Method | Called from |
-|---|---|
-| `ComputeNextReset` | Everything below; also the `RoutineTimePeriodResponse.NextResetAt` projection. |
-| `CheckGrace` | Every read/write site, before `TryReset` — breaks a lapsed streak grace window. |
-| `TryReset(period, item, now)` | Single-item overload — the step-toggle endpoint. Does **not** advance `LastResetAt` or write a completion row; that only happens through the list overload. |
-| `TryReset(period, items, now)` | List overload — the nightly job, the grouped read, and the bulk toggle-is-done endpoint. Advances the streak, writes `RoutinePeriodCompletion`, clears `EndingSoonNotifiedFor`. |
-| `EvaluateEndingSoon` / `ShouldWarnGraceExpiring` | The nudge job only. |
-| `UpdateItemStreak` | After any toggle that completes an item. |
-
-## Domain logic — `domain/service/RoutineStreakFreezeService.cs`
-
-Static and pure, same shape as `RoutineResetService`: mutates what it is handed, persists nothing, so a
-freeze shares the transaction that read the period.
-
-| Method | Called from |
-|---|---|
-| `RefreshFreezeBudget` | The grouped read, the nightly reset job, and `Apply`. **Nothing else refills the budget** — there is no job. |
-| `Apply` | `SpendStreakFreezeRoutineTimePeriodEndpoint` only. Returns a `StreakFreezeRejection`; anything but `None` means nothing was written. |
-| `RecomputeStreak` | `Apply`. Walks the **complete** history oldest-first — a trimmed list under-counts the run. |
-| `IsSuccess` / `NextBudgetReset` | The two above, and the tests. |
-
-The window is a calendar month; a frozen period carries the run without extending it; `Streak` /
-`BestStreak` are only ever raised. See `summary.md` for why each of those is the way it is.
-
-**Known-open findings, deliberately not fixed here** (see `summary.md`): grace-expiry streak breaks
-can be dropped by the reset job under some orderings; the two `TryReset` overloads disagree on streak
-scoring; a failed notification can abort the nudge sweep's idempotency markers mid-sweep.
-
-## Notifications — `application/service/routine/`, `domain/serviceContract/`
-
-`IRoutinePeriodNotificationService` / `RoutinePeriodNotificationService` map three routine events
-onto `Sydowwe.Framework.Contracts.notification` payloads (`RoutinePeriodEndedPayload`,
-`RoutinePeriodEndingSoonPayload`, `RoutineStreakGraceExpiringPayload`). Every method is best-effort —
-catches and logs, never throws — because a notification failure must never roll back a reset that
-already committed.
-
-## Configuration — `infrastructure/persistence/`
-
-| File | Covers |
-|---|---|
-| `configuration/todoList/RoutineTimePeriodConfiguration.cs` | Nine `CHECK` constraints (anchor-day range, length range, non-negative streaks, threshold/grace/history-depth/reminder-lead ranges, and the two freeze ones — budget `0..MaxFreezeBudget`, remaining `0..budget`) plus the two unique indexes. |
-| `configuration/todoList/RoutineToDoListConfiguration.cs` | `BaseTodoListConfigure()` (from TodoLists) + `IsManyWithOneUser()` / `IsManyWithOneActivity()` (from Core) + the `SuggestedDays` array conversion. |
-| `configuration/todoList/RoutinePeriodCompletionConfiguration.cs` | Cascade FK to `RoutineTimePeriod`; unique on `(TimePeriodId, PeriodStart)`; a `CHECK` pairing `IsFrozen` with `FrozenAt`. |
-| `configuration/todoList/UserRoutineSettingsConfiguration.cs` | `BaseEntityConfigure()` + `IsOneWithOneUser<UserRoutineSettings>()` — the unique `user_id` index is what makes "one settings row per user" a constraint rather than a convention. |
-| `extensions/RoutineTodoListExtensions.cs` | The `DbSet<RoutineTodoList>` overload of `GetNextDisplayOrder` grouped by `TimePeriodId`. The generic version stays in TodoLists' `TodoListExtensions` — naming `RoutineTodoList` there would have inverted the one-way edge. |
-
-## HTTP surface — `application/endpoint/todoList/`
-
-| Area | Count | Path |
+| Type | Members | Note |
 |---|---|---|
-| `RoutineTimePeriod` CRUD + toggle-is-hidden + select-options + completion-history + streak-freeze | 9 | `routineTimePeriod/` |
-| `RoutineTodoList` CRUD + grouped-by-period + toggle-is-done + change-display-order | 9 | `routineTodoList/command`, `routineTodoList/query` |
-| `RoutineTodoList` step create/update/delete | 3 | `routineTodoList/steps/` |
-| Per-user routine settings — `GET`/`PUT /routine/settings` | 2 | `routineSettings/` |
+| `StreakOutcome` | `Extended` · `OnGrace` · `Broken` · `NotEvaluated` | What a reset did to the streak. Deliberately a portal enum, **not** Contracts' `RoutineStreakOutcome` — that one is a persisted notification payload contract (old rows deserialize against it); this one is free to follow the streak rules. `RoutinePeriodNotificationService` maps between them. |
+| `StreakFreezeRejection` | `None` · `NoBudget` · `AlreadyFrozen` · `NotAMiss` | Why `Apply` refused. These are domain rules, not request validation — whether a period counts as missed depends on its own `StreakThreshold`, and affordability on a lazily-refilled budget. Neither is knowable from the request body. |
 
-⚠ `GetRoutineSettingsEndpoint` does **not** create a row on read, unlike Planning's
-`GetPlannerSettingsEndpoint`. Every field defaults to null, so a read-created row would hold nothing,
-and this is the most common read in the module. The row is created by the `PUT`.
+## Business rules
 
-⚠ `SpendStreakFreezeRoutineTimePeriodEndpoint` lives under `routineTimePeriod/command/` but routes to
-**`POST /routine-todo-list/time-period/{timePeriodId}/streak-freeze`**, not under `/routine-time-period`
-like its neighbours. That is the frontend contract, and the SPA is already shipping against it behind
-its `freezesRemaining === null` gate — don't "correct" the path to match the folder. It returns the
-whole `RoutineTimePeriodResponse`, the same shape `grouped-by-time-period` serves, built through the
-shared `RoutineTimePeriodResponse.From(...)` so the two cannot drift.
+**Reset and streak scoring.** When `now` passes `ComputeNextReset(period)`, the list overload of
+`TryReset` scores the period: `CompletedCount / TotalCount` against `StreakThreshold` (a percentage).
+Met → `Extended`, streak increments. Missed with `StreakGraceDays > 0` → `OnGrace`, streak held and
+`StreakGraceUntil` opened. Missed with no grace → `Broken`, streak zeroed. **No items at all →
+`NotEvaluated`**, streak untouched: completion says nothing about a routine with nothing in it. Either
+way a `RoutinePeriodCompletion` row is written and the items un-tick.
 
-`RoutineToggleIsDoneTodoListEndpoint` and `ToggleStepIsDoneRoutineTodoListEndpoint` subclass
-TodoLists' `BaseToggleIsDoneTodoListEndpoint<TEntity>` / `BaseToggleStepIsDoneEndpoint<TEntity>`;
-`ChangeDisplayOrderRoutineTodoListEndpoint` subclasses `BaseChangeDisplayOrderTodoListEndpoint<TEntity>`;
-the three step endpoints subclass the `steps/Base*StepEndpoint<TParent>` family. All four bases live
-in TodoLists — that inheritance is the `Routines → TodoLists` edge.
+**Grace.** `CheckGrace` must run before `TryReset` on *every* access — a lapsed window breaks the
+streak, and if only the reset job checked it, a streak would survive indefinitely as long as nobody's
+period rolled over.
 
-DTOs sit under `application/dto/` (`request/todoList`, `response/todoList`, two filters); validators
-under `application/validator/` — three of them, two with a DB-backed cross-field rule
-(`SuggestedDays`/`SuggestedDayOfMonth` must match the target period's `LengthInDays` bucket).
+**Freezes.** Budget refills to `FreezeBudget` at midnight UTC on the first of the next calendar month,
+**lazily** — whoever reads or spends it calls `RefreshFreezeBudget` first; there is no job.
+`FreezeBudget` is capped by a CHECK at `RoutineStreakFreezeService.MaxFreezeBudget`, because a budget
+as large as the history depth would make the streak meaningless; `0` disables freezes for a period
+without hiding the feature. Spending one marks the covered completion row `IsFrozen` and re-walks the
+whole history: a frozen period is *skipped*, so the run carries across it without extending. `Streak` /
+`BestStreak` are only ever raised.
 
-## Seeding — `infrastructure/persistence/seeder/`
+**Nudges.** `ReminderLeadDays` is opt-in per period, not per user — "remind me about my weekly chores"
+and "remind me about my yearly review" are not the same decision. It gates the ending-soon nudge only;
+the end-of-period summary and the grace warning fire on their own conditions and are muted through the
+notification preference matrix instead. `EvaluateEndingSoon` returns null once `now` reaches the reset
+itself: from there the reset job owns the period, and "3 days left" racing the reset would be worse
+than silence.
 
-Band **200–299**; the contract is `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md`.
+**Time.** Everything is UTC end to end. The sweeps do no zone conversion — two identical UTC periods
+owned by users in different zones must produce identical results.
 
-- `userDefault/RoutineTimePeriodSeeder` (200) — per-user default, subclasses
-  `BasePerUserDefaultSeeder<RoutineTimePeriod>`. `Collides` checks **both** unique indexes
-  (`Text` and `LengthInDays`) — either one rejects a row.
-- `dev/RoutineTodoListSeeder` (200) — per-user dev fixture. **Only dev seeders truncate.**
+## Glossary
 
-## Jobs — `infrastructure/jobs/`
-
-Both are keyed `IScheduledJobHandler` implementations (`Sydowwe.Framework.Contracts.scheduling`), **not
-Quartz `IJob`s** — this slice references no Quartz. They are picked up by the `IScopedService` marker
-scan like any other service, and their schedules are pushed on boot by
-`infrastructure/scheduling/RoutinesScheduledJobsRegistrar` through `IScheduler`. Both take the scoped
-`DbContext` directly (the Scheduler's dispatcher opens the scope per fire) and run unauthenticated.
-`DisallowConcurrent = true` is requested on the registration — it is no longer an attribute on the class.
-
-- `RoutineTodoListResetJobHandler` (`Routines.TodoListReset`) — 02:00 daily. Sweeps every period,
-  applies `TryReset`, persists completions, notifies after commit.
-- `RoutinePeriodNudgeJobHandler` (`Routines.PeriodNudge`) — 09:00 daily (later than the reset,
-  deliberately: this one is addressed to a person, not the database). Sequential per period — see the
-  file's header comment for why `Task.WhenAll` would break the single scoped `DbContext`.
+| Term | Meaning | Code |
+|---|---|---|
+| Time period | The recurring window a routine repeats on | `RoutineTimePeriod` |
+| Anchor day | Which weekday / day-of-month the reset snaps to; `0` = rolling (no snap) | `ResetAnchorDay` |
+| Threshold | % of items that must be done for the period to count as met | `StreakThreshold` |
+| Grace | Time-based leniency: finish late, keep the run | `StreakGraceDays` / `StreakGraceUntil` |
+| Streak freeze | Budgeted leniency: skip a period outright, keep the run | `FreezeBudget` / `FreezesRemaining` |
+| Nudge | The mid-period "n of m done" notification | `EvaluateEndingSoon` / `RoutinePeriodEndingSoonPayload` |
+| Review card | The weekly "fresh start" prompt the user can dismiss | `RoutineReviewDismissedForWeekStart` |
 
 ## Invariants
 
-1. **No reference to `AdhdTimeOrganizer` (the host), and no reference to Planning.** Enforced by the
-   csproj. The completion fan-out crosses that boundary only through Core's event record, consumed
-   host-side.
-2. **`Routines → TodoLists` is the only outbound slice edge**, and it is structural (inheritance),
-   not a filter — don't try to invert it through the `IActivityMembershipSource` seam pattern; that
-   pattern is for "does this activity belong to you," not for shared base types.
-3. **Per-user scoping is the DbContext's job**, via the global filter on `IEntityWithUser` — not the
-   endpoints (`ApplyUserScoping` is a no-op virtual). Both routine entities that carry `UserId` must
-   stay `IEntityWithUser` with their FKs and cascades intact.
-4. **`RoutineTodoListActivityMembershipSource` is resolved by string key.** A rename of
-   `ActivityMembershipSourceKeys.RoutineTodoList` without updating both sides is silent — no build
-   error, the History grid's routine filter just stops narrowing.
-5. **The freeze budget is refilled by whoever reads it, not by a job.** Every path that shows or spends
-   `FreezesRemaining` calls `RoutineStreakFreezeService.RefreshFreezeBudget` first. Forgetting it is
-   silent — a stale count and a 400 on a freeze the user is entitled to.
-6. **Class names are table names.** Renaming a type here is a migration; moving it is not — this
-   extraction's migration is empty, which is the proof.
+| # | Invariant | Enforced by |
+|---|---|---|
+| 1 | No reference to the host or to Planning | csproj — build error |
+| 2 | `Routines → TodoLists` is the only outbound slice edge, and it is structural (inheritance), not a filter | csproj + convention. Don't try to invert it through the seam pattern; that pattern is for "does this activity belong to you", not shared base types |
+| 3 | Per-user scoping is the DbContext's job, via the global filter on `IEntityWithUser` — not the endpoints (`ApplyUserScoping` is a no-op virtual) | `AppDbContext` query filter. **App-enforced only** for `RoutinePeriodCompletion`, which has no `UserId` and is reachable only through its period |
+| 4 | `(UserId, Text)` and `(UserId, LengthInDays)` are each unique on a period | **DB** — two unique indexes |
+| 5 | `(TimePeriodId, PeriodStart)` is unique — one completion row per elapsed period | **DB** — unique index |
+| 6 | `IsFrozen` and `FrozenAt` are written together | **DB** — `ck_routine_period_completion_frozen_at_matches_is_frozen` |
+| 7 | Ranges: anchor day, length, non-negative streaks, threshold, grace, history depth, reminder lead, budget `0..MaxFreezeBudget`, remaining `0..budget` | **DB** — nine CHECKs on `RoutineTimePeriod`, mirrored by `RoutineTimePeriodValidator` for a 400 instead of a 500 |
+| 8 | Both seam sources are resolved by string key | **Nothing** — a rename without updating both sides is silent. `SeamWiringTests` is the only guard |
+| 9 | The freeze budget is refilled by whoever reads it, not by a job | **App-enforced by convention only** — forgetting it is silent |
+| 10 | Class names are table names | `BaseEntityConfigure`. Renaming a type is a migration; moving it is not |
+
+## Navigation index
+
+### Endpoints — `application/endpoint/`
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `GetRoutineSettingsEndpoint` | Endpoint | `GET /routine/settings`. Does **not** create a row on read (unlike Planning's equivalent) — every field defaults to null, so a read-created row would hold nothing, and this is the module's most common read | `routineSettings/GetRoutineSettingsEndpoint.cs` |
+| `UpdateRoutineSettingsEndpoint` | Endpoint | `PUT /routine/settings`. Upserts the single row — this is what creates it | `routineSettings/UpdateRoutineSettingsEndpoint.cs` |
+| `CreateRoutineTimePeriodEndpoint` | `BaseCreateEndpoint` | Create a period | `routineTimePeriod/command/CreateRoutineTimePeriodEndpoint.cs` |
+| `UpdateRoutineTimePeriodEndpoint` | `BaseUpdateEndpoint` | Update a period (an anchor/length edit re-derives the next reset, and correctly earns a fresh nudge) | `routineTimePeriod/command/UpdateRoutineTimePeriodEndpoint.cs` |
+| `DeleteRoutineTimePeriodEndpoint` | `BaseDeleteEndpoint` | Delete a period; completions cascade | `routineTimePeriod/command/DeleteRoutineTimePeriodEndpoint.cs` |
+| `ToggleIsHiddenRoutineTimePeriodEndpoint` | `BaseToggleIsHiddenEndpoint` | Hide a period — hidden periods are skipped by the nudge sweep | `routineTimePeriod/command/ToggleIsHiddenRoutineTimePeriodEndpoint.cs` |
+| `SpendStreakFreezeRoutineTimePeriodEndpoint` | Endpoint | Spend a freeze on a missed period. ⚠ Routes to **`POST /routine-todo-list/time-period/{timePeriodId}/streak-freeze`**, not under `/routine-time-period` like its folder neighbours — that is the shipped frontend contract, don't "correct" it. Returns the whole `RoutineTimePeriodResponse` via the shared `From(...)`, so it can't drift from the grouped read | `routineTimePeriod/command/SpendStreakFreezeRoutineTimePeriodEndpoint.cs` |
+| `GetAllRoutineTimePeriodEndpoint` | `BaseGetAllEndpoint` | List periods | `routineTimePeriod/query/GetAllRoutineTimePeriodEndpoint.cs` |
+| `GetByIdRoutineTimePeriodEndpoint` | `BaseGetByIdEndpoint` | One period | `routineTimePeriod/query/GetByIdRoutineTimePeriodEndpoint.cs` |
+| `GetSelectOptionsRoutineTimePeriodEndpoint` | `BaseGetSelectOptionsEndpoint` | Period picker | `routineTimePeriod/query/GetSelectOptionsRoutineTimePeriodEndpoint.cs` |
+| `GetCompletionHistoryRoutineTimePeriodEndpoint` | Endpoint | `GET /routine-time-period/{id}/completion-history`. Caps to the newest `HistoryDepth` rows, then renders oldest-first | `routineTimePeriod/query/GetCompletionHistoryRoutineTimePeriodEndpoint.cs` |
+| `CreateRoutineTodoListEndpoint` | `BaseCreateEndpoint` | Create a routine item (+ its steps) | `routineTodoList/command/CreateRoutineTodoListEndpoint.cs` |
+| `UpdateRoutineTodoListEndpoint` | `BaseUpdateEndpoint` | Update a routine item | `routineTodoList/command/UpdateRoutineTodoListEndpoint.cs` |
+| `DeleteRoutineTodoListEndpoint` | `BaseDeleteEndpoint` | Delete a routine item | `routineTodoList/command/DeleteRoutineTodoListEndpoint.cs` |
+| `RoutineToggleIsDoneTodoListEndpoint` | `BaseToggleIsDoneTodoListEndpoint` | Tick/untick; runs the list `TryReset` path and updates the item streak | `routineTodoList/command/RoutineToggleIsDoneTodoListEndpoint.cs` |
+| `ToggleStepIsDoneRoutineTodoListEndpoint` | `BaseToggleStepIsDoneEndpoint` | Tick a step; uses the **single-item** `TryReset` (no streak scoring — see `summary.md`) | `routineTodoList/command/ToggleStepIsDoneRoutineTodoListEndpoint.cs` |
+| `ChangeDisplayOrderRoutineTodoListEndpoint` | `BaseChangeDisplayOrderTodoListEndpoint` | Reorder within a period (`GroupFilterExpression => TimePeriodId`) | `routineTodoList/command/ChangeDisplayOrderRoutineTodoListEndpoint.cs` |
+| `GetAllGroupedRoutineTodoListEndpoint` | Endpoint | `GET /routine-todo-list/grouped-by-time-period` — the main screen. **Reset-on-read**: refreshes the freeze budget, checks grace and applies `TryReset` before projecting | `routineTodoList/query/GetAllGroupedRoutineTodoListEndpoint.cs` |
+| `GetAllRoutineTodoListEndpoint` · `GetByIdRoutineTodoListEndpoint` | `BaseGetAll` / `BaseGetById` | Flat reads | `routineTodoList/query/` |
+| `CreateStepRoutineTodoListEndpoint` · `UpdateStepRoutineTodoListEndpoint` · `DeleteStepRoutineTodoListEndpoint` | `Base*StepEndpoint<RoutineTodoList>` | Step CRUD, all three from TodoLists' base family | `routineTodoList/steps/` |
+
+### Domain services — `domain/service/`
+
+Both are static and pure: they mutate what they are handed and persist nothing, so the work shares the
+transaction that read the period.
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `RoutineResetService.ComputeNextReset` | Static fn | Next reset instant from length + anchor. Also feeds `RoutineTimePeriodResponse.NextResetAt` | `RoutineResetService.cs` |
+| `RoutineResetService.CheckGrace` | Static fn | Breaks a lapsed streak grace window. Call before `TryReset` on **every** read/write site | `RoutineResetService.cs` |
+| `RoutineResetService.TryReset(period, item, now)` | Static fn | Single-item overload — step toggle only. Does **not** advance `LastResetAt`, write a completion, or score the streak | `RoutineResetService.cs` |
+| `RoutineResetService.TryReset(period, items, now)` | Static fn | List overload — the reset job, the grouped read, the bulk toggle. Advances the streak, returns the `RoutinePeriodCompletion` + `StreakOutcome`, clears `EndingSoonNotifiedFor` | `RoutineResetService.cs` |
+| `RoutineResetService.EvaluateEndingSoon` / `ShouldWarnGraceExpiring` | Static fn | The two nudge conditions — nudge job only | `RoutineResetService.cs` |
+| `RoutineResetService.UpdateItemStreak` | Static fn | Item-level streak after a completing toggle | `RoutineResetService.cs` |
+| `RoutineStreakFreezeService.RefreshFreezeBudget` | Static fn | Lazy monthly refill. **Nothing else refills the budget** — there is no job | `RoutineStreakFreezeService.cs` |
+| `RoutineStreakFreezeService.Apply` | Static fn | Spend a freeze; returns `StreakFreezeRejection` — anything but `None` means nothing was written | `RoutineStreakFreezeService.cs` |
+| `RoutineStreakFreezeService.RecomputeStreak` | Static fn | Walks the **complete** history oldest-first — a trimmed list under-counts the run | `RoutineStreakFreezeService.cs` |
+| `RoutineStreakFreezeService.IsSuccess` / `NextBudgetReset` | Static fn | Threshold test and the next window boundary | `RoutineStreakFreezeService.cs` |
+
+### Notifications — `application/service/`, `domain/serviceContract/`
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `IRoutinePeriodNotificationService` | Contract | The three routine notifications. `NotifyEndingSoonAsync` returns `bool` — **that return is the idempotency marker's gate**: the caller marks only when something actually went out | `domain/serviceContract/IRoutinePeriodNotificationService.cs` |
+| `RoutinePeriodNotificationService` | Service | Maps the three events onto `Sydowwe.Framework.Contracts.notification` payloads (`RoutinePeriodEndedPayload`, `RoutinePeriodEndingSoonPayload`, `RoutineStreakGraceExpiringPayload`). Every method is best-effort — catches and logs, never throws — because a notification failure must never roll back a reset that already committed. Does not consult preferences; the Notifications module owns that | `application/service/RoutinePeriodNotificationService.cs` |
+
+### Jobs and scheduling — `infrastructure/jobs/`, `infrastructure/scheduling/`
+
+Both handlers are keyed `IScheduledJobHandler` implementations
+(`Sydowwe.Framework.Contracts.scheduling`), **not Quartz `IJob`s** — this slice references no Quartz.
+They are picked up by the `IScopedService` marker scan like any other service, take the scoped
+`DbContext` directly (the dispatcher opens a scope per fire) and run unauthenticated.
+`DisallowConcurrent = true` is requested on the *registration*, not as a class attribute.
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `RoutineTodoListResetJobHandler` | Job (`Routines.TodoListReset`) | 02:00 UTC daily. Sweeps every period: `CheckGrace` → `RefreshFreezeBudget` → `TryReset`; persists completions, then notifies **after** the commit | `infrastructure/jobs/RoutineTodoListResetJobHandler.cs` |
+| `RoutinePeriodNudgeJobHandler` | Job (`Routines.PeriodNudge`) | 09:00 UTC daily — deliberately not alongside the reset, because this one is addressed to a person. Skips hidden periods. Sequential per period, and each period's failure is caught so it can't lose earlier markers or skip later periods | `infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
+| `RoutinesScheduledJobsRegistrar` | `IHostedService` | Pushes both schedules through `IScheduler` on **every** boot (idempotent upsert by `JobKey`; the Scheduler's RAM job store drops triggers on restart). Registers each independently so one bad cadence can't keep the other off the schedule, and swallows failures so a scheduling problem never blocks startup | `infrastructure/scheduling/RoutinesScheduledJobsRegistrar.cs` |
+
+### Seams — `application/seam/`
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `RoutineTodoListActivityMembershipSource` | `IActivityMembershipSource` | "This activity is on a routine to-do list", faceted by `TimePeriodId`. Applies no user scoping — the query is composed into the caller's | `RoutineTodoListActivityMembershipSource.cs` |
+| `RoutineTodoListActivityReferenceSource` | `IActivityReferenceSource` | Exposes and repoints `RoutineTodoList.ActivityId` for activity merge/delete. Streaks carry across a merge untouched | `RoutineTodoListActivityReferenceSource.cs` |
+
+### Persistence — `infrastructure/persistence/`
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `RoutineTimePeriodConfiguration` | EF config | Nine CHECK constraints (anchor-day range, length range, non-negative streaks, threshold/grace/history-depth/reminder-lead ranges, and the two freeze ones) plus the two unique indexes | `configuration/RoutineTimePeriodConfiguration.cs` |
+| `RoutineToDoListConfiguration` | EF config | `BaseTodoListConfigure()` (TodoLists) + `IsManyWithOneUser()` / `IsManyWithOneActivity()` (Core) + the `SuggestedDays` array conversion | `configuration/RoutineToDoListConfiguration.cs` |
+| `RoutinePeriodCompletionConfiguration` | EF config | Cascade FK to `RoutineTimePeriod`; unique `(TimePeriodId, PeriodStart)`; the `IsFrozen`/`FrozenAt` pairing CHECK | `configuration/RoutinePeriodCompletionConfiguration.cs` |
+| `UserRoutineSettingsConfiguration` | EF config | `BaseEntityConfigure()` + `IsOneWithOneUser<UserRoutineSettings>()` — the unique `user_id` index is what makes "one row per user" a constraint rather than a convention | `configuration/UserRoutineSettingsConfiguration.cs` |
+| `RoutineTodoListExtensions` | Extensions | The `DbSet<RoutineTodoList>` overload of `GetNextDisplayOrder`, grouped by `TimePeriodId`. The generic version stays in TodoLists — naming `RoutineTodoList` there would have inverted the one-way edge | `extensions/RoutineTodoListExtensions.cs` |
+| `RoutineTimePeriodSeeder` | Seeder (200, per-user default) | Subclasses `BasePerUserDefaultSeeder<RoutineTimePeriod>`. `Collides` checks **both** unique indexes — either rejects a row | `seeder/userDefault/RoutineTimePeriodSeeder.cs` |
+| `RoutineTodoListSeeder` | Seeder (200, per-user dev) | Dev fixture. **Only dev seeders truncate.** | `seeder/dev/RoutineTodoListSeeder.cs` |
+
+### DTOs and validators — `application/dto/`, `application/validator/`
+
+Requests in `dto/request/`, responses in `dto/response/`, two filters in `dto/filter/`. Mapping lives
+on the DTOs (`ICreateRequest` / `IUpdateRequest` / `IProjectionResponse`), not a mapper generic.
+`PeriodCompletionRecord` sits with them rather than in the host, because both its consumers
+(`GetCompletionHistoryRoutineTimePeriodEndpoint`, `RoutineTimePeriodResponse`) are here.
+
+Five validators. `RoutineTimePeriodValidator` mirrors the DB CHECKs so a bad range is a 400 rather
+than a 500. The two to-do list validators each carry a DB-backed cross-field rule — `SuggestedDays` /
+`SuggestedDayOfMonth` must match the target period's `LengthInDays` bucket, which means a query, which
+is why it is a `CustomAsync` rule and not a `RuleFor` chain. `SpendStreakFreezeValidator` only checks
+that `PeriodStart` parses (a full ISO instant is accepted, not just a date); every real freeze rule is
+a domain rule in `StreakFreezeRejection`.
