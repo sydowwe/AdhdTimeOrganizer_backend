@@ -88,13 +88,13 @@ instead of inheriting it (its `Configure` is not virtual) so it can add the `Cod
 
 ## Endpoints — `application/endpoint/`
 
-56 total, in six families. None of them declare an endpoint group; the lookup and anchor routes come
+57 total, in six families. None of them declare an endpoint group; the lookup and anchor routes come
 from `BaseGridEndpoint`'s `EntityName.Kebaberize()` convention rather than a literal string, so
 renaming one of those entities moves its route.
 
 | Folder | Count | Routes |
 |---|---|---|
-| `backlog/` | 7 | `/api/activity-backlog-profile*` — explicit routes |
+| `backlog/` | 8 | `/api/activity-backlog-profile*` — explicit routes. The only profile family with a `GetAll`, and it uses the **plain** `Projection`, so its rows always say "not done" |
 | `bucketList/` | 7 | `/api/activity-bucket-list-profile*` — explicit routes |
 | `project/` | 8 | `/api/activity-project-profile*` — explicit routes, incl. the status-only `PATCH .../{id}/status` |
 | `memoryAnchor/` | 7 | `/api/memory-anchor/*` — derived |
@@ -128,8 +128,9 @@ the draw is ranked in memory, so there is no single queryable projection to hang
 
 ## Validators — `application/validator/`
 
-10: create + update for each of the three profiles and for `MemoryAnchor`, plus one per leisure
-endpoint (`LeisureSuggestionDrawValidator` rejects an unknown energy token rather than defaulting it,
+11: create + update for each of the three profiles and for `MemoryAnchor`,
+`PatchActivityProjectProfileStatusValidator` (an `IsInEnum` guard on the status-only patch), plus one
+per leisure endpoint (`LeisureSuggestionDrawValidator` rejects an unknown energy token rather than defaulting it,
 and `RecordLeisureSuggestionSeenValidator` rejects a malformed key — a *well-formed* key naming a
 deleted activity is the ordinary case and the endpoint drops it silently). The four **create**
 validators are the ones that were rewritten to use `db.Set<T>()` subqueries instead of `Activity`
@@ -148,14 +149,9 @@ seeders around `Activity` at 40. See `SeederOrderBands.md` in Core before changi
 
 ## Tests
 
-- `AdhdTimeOrganizer.IntegrationTests/Endpoints/ActivityProfilesRouteSmokeTests.cs` — route
-  registration per family, seeder single-registration, and the Core-must-not-reference-this assertion.
-- `AdhdTimeOrganizer.IntegrationTests/Services/LeisureDrawRankerTests.cs` — the ranking rule, no
-  database: what is excluded rather than penalised, that a seed reproduces a draw, that the draw does
-  not depend on row order, and that the source caps never cost the user a card.
-- `AdhdTimeOrganizer.IntegrationTests/Endpoints/LeisureSuggestionTests.cs` — the two routes end to end:
-  card shape, the two empty-state counts, ownership on both, the upsert, the 90-day sweep, the cascade,
-  and that rejecting a draw actually changes the next one at the same seed.
-- `AdhdTimeOrganizer.IntegrationTests/Endpoints/ActivityProfileGridTests.cs` — the user-scoping guard
-  on the three profile grids. This is the one that matters most: it is the only thing standing between
-  a deleted `ApplyUserScoping` override and every user's profiles leaking.
+All of them live in `AdhdTimeOrganizer.IntegrationTests` — this project has no test project of its
+own. `ActivityProfileGridTests` is the one that matters most: it is the only thing standing between a
+deleted `ApplyUserScoping` override and every user's profiles leaking.
+
+**`testing.md` is the map** — which file covers what, the bespoke helpers and doubles, the guard table
+and the known gaps.

@@ -15,7 +15,7 @@ alike.
 
 ## Bounded context
 
-Owns: the nine entities and their EF configurations, 56 endpoints (22 profile, 24 lookup, 7 memory
+Owns: the nine entities and their EF configurations, 57 endpoints (23 profile, 24 lookup, 7 memory
 anchor, 3 leisure), their DTOs, 11 validators, 4 filter requests, 6 slice-only enums
 (`EnergyLevel`, `EffortType`, `DifficultyLevel`, `ReadinessStatus`, `LeisureSuggestionSource`,
 `LeisureSuggestionOutcome`), 4 per-user default seeders and 8 dev seeders.
@@ -134,7 +134,7 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   a lookup while a profile still referenced it.
 
 - **Registering with the host is four places, none of which break the build.** FastEndpoints
-  `o.Assemblies` in `Program.cs` (missing → all 55 routes 404);
+  `o.Assemblies` in `Program.cs` (missing → all 57 routes 404);
   `ModuleServiceExtensions.ModuleAssemblies` (missing → the 12 seeders register *twice*, since the
   `AppDomain` sweep then also sees them: the dev ones truncate and reseed twice, the per-user defaults
   double-insert); `AppDbContext.ApplyHostConfigurations` (missing → all eight tables vanish from the
@@ -142,6 +142,8 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   emits eight DROP TABLEs); and the solution file. `ActivityProfilesRouteSmokeTests` pins the first
   two.
 
-## Navigation
+## Deeper reference
 
-`docs/domain-map.md` is the index: what lives where, and which invariants are load-bearing.
+- `domain-map.md` — the index: what lives where, and which invariants are load-bearing
+- `testing.md` — test strategy, the guards that pin the silent failures above, and the known gaps
+- `README.md` — the business intro and the module-specific setup (schema, `LeisureWeather` config)
