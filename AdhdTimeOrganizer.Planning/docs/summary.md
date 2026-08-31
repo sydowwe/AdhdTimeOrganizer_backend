@@ -1,348 +1,183 @@
-# AdhdTimeOrganizer.Planning — summary
+# AdhdTimeOrganizer.Planning — Agent Summary
+
+**Purpose:** planning a day — the `Calendar` row, the four planner-task shapes that hang off it
+(one-off, repeating, template line, suggestion), day templates and the four ways of applying one,
+per-user task importance and planner settings — **and** reminders, which are part of this slice
+rather than a project of their own.
+
+## Bounded context
+
+Owns: `Calendar`, `BasePlannerTask` and its three concrete shapes (`PlannerTask`,
+`RepeatingPlannerTask`, `TemplatePlannerTask`), `TaskPlannerDayTemplate`, `TaskImportance`,
+`UserPlannerSettings`, `Reminder`, the three `PlannerSuggestionFrom*` read-models, their EF
+configurations, ~58 endpoints, their DTOs and 14 validator files, the four domain services
+(`PlannerStreakService`, `PlanVsActualTrendService`, `CalendarDayFactory`, `HolidayCalendar`), the
+three application services (`CalendarProvisioner`, `PlannerStreakReader`,
+`ReminderRegistrationService`), the two Core seam implementations, the two cross-slice event
+handlers, and five seeders.
+
+Tables live in the **`planning`** schema (`ModuleSchemas.cs`, keyed on this assembly).
+
+Does **not** own — and must never reference: `AppDbContext`, `Program.cs`, the migrations, the DI
+wiring, the **Google Calendar integration** (host-side, carries `Google.Apis.Auth`), the
+**suggestion-pattern materialized views** themselves (SQL, installer, refresh interceptor and job are
+host-side; only the three entity mappings live here), `PlannerTaskSeeder` (host-side, because it
+links a seeded planner task to a seeded `TodoListItem`), and `TaskPriority` (that went to TodoLists,
+despite its configuration having lived in the Planning folder — `TaskImportance` is ours).
+
+## Dependency seams
+
+- **References:** `AdhdTimeOrganizer.Core`, `Sydowwe.Framework`, `Sydowwe.Framework.Contracts`. No
+  host reference and **zero outbound slice edges** — see the comment in the csproj.
+- **Referenced by:** `AdhdTimeOrganizer` (the host), for the Google Calendar services that read
+  `Calendar`, the GDPR export, and the cross-slice relationship declaration below.
+- **`Planning → TodoLists` does not exist, deliberately.** `PlannerTask.TodolistItemId` is a real FK
+  to `todo_list_item` with `ON DELETE SET NULL` and keeps that behaviour, but it is **id-only with no
+  navigation property** — the navigation was the only thing forcing a project reference, and nothing
+  ever read it. The relationship is declared host-side in
+  `AppDbContext.ConfigureCrossSliceRelationships`, where both types are visible. Do not add
+  `PlannerTask.TodolistItem` back.
+- **`Planning → History` does not exist either.** `GetSuggestionsRepeatingPlannerTaskEndpoint` reads
+  `PlannerSuggestionFromActivityHistory`, an entity mapped over the `mv_activity_history_pattern`
+  materialized view — a *different* type from History's `ActivityHistory`, which this project never
+  names. The view is the seam.
+- **Two Core seams are implemented here**, both in `application/seam/`:
+  - `PlannerTaskActivityReferenceSource` (`IActivityReferenceSource`, keyed
+    `ActivityReferenceSourceKeys.PlannerTask`) exposes the `ActivityId` column to Core's
+    activity-merge/delete machinery and repoints it on merge. It covers **all three** task tables —
+    they share `BasePlannerTask` in C# but each has its own table, so each needs its own clause.
+  - `CalendarDayLookup` (`ICalendarDayLookup`, resolved by type) publishes day metadata so History's
+    calendar dashboard can join against it without referencing Planning.
+
+  The reference seam resolves **by string key**, not by type. A missing, misregistered or renamed key
+  is silent — no build error, the consumer just quietly stops finding rows.
+- **Two `IEventHandler`s live here**, in `application/eventHandler/`:
+  `RoutineTodoListIsDoneChangedEventHandler` and `TodoListItemIsDoneChangedEventHandler`. The
+  publishers are Routines and TodoLists, but every row they touch is a `PlannerTask`, so the reaction
+  belongs to the slice that owns it. Both event records are declared in Core, so neither slice
+  references the other; both handlers resolve a `DbContext` from a **fresh scope**, because the
+  publisher's scope is not guaranteed to outlive the dispatch.
+- **Reminders reach `framework/Sydowwe.Reminders` only through `Sydowwe.Framework.Contracts`**
+  (`IReminderRegistry`, `IQuietHoursReader`, the payload records), and only through
+  `ReminderRegistrationService`.
+
+## Gotchas — things that will bite you
+
+- **Everything here takes a plain `DbContext`, never `AppDbContext`.**
+  `ModuleServiceExtensions.AddModuleServices` aliases `DbContext` → `AppDbContext` at runtime (global
+  query filters and all). At the call site that means no `dbContext.PlannerTasks` — use
+  `dbContext.Set<PlannerTask>()`.
+
+- **`Microsoft.EntityFrameworkCore` is a global using** (declared in the csproj) — nearly every file
+  here names `DbContext`. Don't be surprised by files with no EF using line.
 
-The fifth vertical slice. Everything about **planning a day**: the calendar, the four planner-task
-types, day templates, task importance, per-user planner settings, the suggestion read-models — and
-**reminders**, which are part of this slice rather than a project of their own.
-
-Navigation index: [`domain-map.md`](domain-map.md). Read this file first; open the map when you need
-to find a specific type.
-
-## What is in here
-
-| Area | Types | Endpoints |
-|---|---|---|
-| Calendar | `Calendar` | 8 (by-date, **day-plan**, by-id, filter-sort, update, **task-summaries**, **apply-planner-template/batch**, **day-type/batch**) |
-| Planner tasks | `BasePlannerTask`, `PlannerTask` | 12 (incl. **copy-to-days**, **plan-vs-actual-trend**) |
-| Repeating planner tasks | `RepeatingPlannerTask` | 6 (incl. suggestions) |
-| Template planner tasks | `TemplatePlannerTask` | 7 |
-| Day templates | `TaskPlannerDayTemplate` | 7 (incl. suggestions) |
-| Task importance | `TaskImportance` | 7 |
-| Planner settings | `UserPlannerSettings` | 2 |
-| Reminders | `Reminder`, `ReminderRegistrationService` | 5 |
-| Suggestion read-models | `PlannerSuggestionFromPlannerTask`, `…FromActivityHistory`, `…FromDayTemplate` | — |
-
-Plus their DTOs, 16 validators, `TaskPlannerHelper`, `PlannerTemplateApplier`, `CalendarDayTypeRule`,
-and five seeders (`CalendarSeeder`,
-`TaskImportanceSeeder`, `UserPlannerSettingsSeeder` as per-user defaults; `TaskPlannerDayTemplateSeeder`
-and `TemplatePlannerTaskSeeder` as dev fixtures). Seeder `Order` values stay in the **400–499 band**
-— see `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md`.
-
-## Project references — Core and the framework, nothing else
-
-```
-AdhdTimeOrganizer.Planning
-  ├── AdhdTimeOrganizer.Core
-  ├── Sydowwe.Framework
-  └── Sydowwe.Framework.Contracts
-```
-
-**Zero outbound slice edges.** No reference to TodoLists, History or Routines, and none to the host.
-Two edges that the planning docs predicted turned out not to need one:
-
-### 1. `Planning → History` does not exist
-
-The pre-split analysis recorded that `GetSuggestionsRepeatingPlannerTaskEndpoint` "reads
-`ActivityHistory`", making History a prerequisite. It does not. It reads **`PlannerSuggestionFromActivityHistory`** (named
-`ActivityHistoryPattern` until the suggestion read-models were renamed), the entity mapped over the
-`mv_activity_history_pattern` materialized view — a *different* type that was never in the History
-slice and moved here with its two siblings. The materialized view is itself the decoupling: Planning
-reads a view derived from History's table without naming a single History type.
-
-The view SQL, `SuggestionPatternViewInstaller`, `SuggestionPatternRefreshInterceptor` and
-`SuggestionPatternRefreshJob` all stay **host-side**, as planned. Only the three entity classes and
-their configurations live here, because this slice is their only consumer.
-
-### 2. `Planning → TodoLists` is declared host-side instead
-
-`PlannerTask.TodolistItemId` is a real FK to `todo_list_item` with `ON DELETE SET NULL`, and it
-keeps that behaviour. What was removed is the **navigation property** `PlannerTask.TodolistItem`,
-which nothing ever read — every call site (`PatchPlannerTaskStatusEndpoint`,
-`ApplyTemplatePlannerTaskEndpoint`, `PlannerTaskResponse`, both `*IsDoneChangedEvent` handlers)
-carries the bare id and looks the item up on the TodoLists side. The navigation was the only thing
-forcing a project reference.
-
-The relationship is now declared in `AppDbContext.ConfigureCrossSliceRelationships`, where both
-entity types are visible and where the host already owns the schema. Column, nullability, delete
-behaviour and the pinned constraint name are unchanged — `dotnet ef migrations add PlanningSlice`
-produced an **empty** `Up`/`Down`.
-
-⚠ This is a *silent* seam in both directions, like `IActivityMembershipSource`: nothing fails to
-build if the host-side declaration is deleted, the FK just vanishes from the model.
-`PlanningRouteSmokeTests.PlannerTaskToTodoListItem_ForeignKey_SurvivesTheSliceSplit` is what keeps it
-honest — it asserts the FK, its column, its `SetNull`, its constraint name, and the absence of
-navigations on both ends.
-
-## Day-plan completion streak
-
-The flame chip on the home page. It replaces a localStorage counter in the SPA that could only ever
-count days *this browser* had the app open, and whose un-tick path guessed at its own inverse.
-
-**Derived, never stored.** There is no entity, no column, no migration and no repair path — the
-streak is recomputed from `planner_task` rows on every read. This is the opposite of the Routines
-slice's `Streak` / `BestStreak` columns, and the difference is not taste: a routine period *wipes its
-items* on reset, so its counter has to be the record, while planner days keep every task row forever.
-Deriving it makes un-ticking an exact inverse (there is no increment to undo), makes editing a past
-day recompute across the gap it opens, and makes drift unrepresentable.
-
-The rules, all settled against the frontend's B1 ask rather than inherited from the client:
-
-| Question | Answer |
-|---|---|
-| What makes a day count? | Every **qualifying** task is `Completed`. Qualifying = not `IsBackground`, not `IsOptional`, not `Cancelled`. |
-| Does a skip break the day? | **No.** `Cancelled` leaves the denominator entirely — the app already presents skipping as a legitimate way to close a task. |
-| Does skipping everything earn a day? | **No.** Zero denominator ⇒ the day is *empty*, not complete. |
-| Does an unplanned day break the streak? | **No** — and it does not extend it either. The number means "days I completed". |
-| Does a background-only day count? | No — it is empty, exactly like an unplanned one. |
-| Optional tasks? | Excluded, same as background. **Not in the ask** — added because `BasePlannerTask.IsOptional` already existed. |
-| Grace days? | **None.** The three rules above are already lenient; grace on top would make the number unaccountable. If one is ever wanted it goes in `Walk`, not `Evaluate`. |
-| Day boundary? | The user's own `User.Timezone`. The response returns `Today` + `Timezone` so the client can stop computing dates. |
-| Retroactive edits? | Recomputed, including across the gap. Free, given the above. |
-
-Two rules exist for the client's sake rather than the domain's, and both are load-bearing:
-
-- **Today can never break the streak, only extend it.** An unfinished today is unfinished, not
-  failed. Without this the chip reads 0 every morning and climbs back by evening.
-- **`CurrentStreak` is the value to display, already zeroed when dead.** The client owns no
-  "is it still alive" decision — that judgement depends on the skip and empty-day rules, which live
-  here.
-
-⚠ **The streak's denominator is narrower than the progress ring's.** The ring counts every
-non-background task; the streak also drops optional and cancelled ones. A day can read 4/5 on the
-ring and still be complete. Clients must read `IsTodayComplete` rather than comparing counts.
-
-⚠ **It rides on `CalendarResponse.Streak` and is null on every calendar read except
-`GetByDateCalendarEndpoint`**, which fills it in after the projection — `Projection` runs per row and
-cannot walk days. Nothing breaks if that line is dropped; the field just goes null and the chip
-sticks at zero, which is why `PlannerStreakTests` asserts it is non-null on the plan response.
-
-⚠ **`PlannerStreakReader` owns the qualifying-task predicate, `PlannerStreakService` owns the rules.**
-Keep it that way — a second place deciding what a qualifying task is, is how the server and the
-client end up disagreeing about the same number. The read is deliberately **uncapped**: a lookback
-window would turn `BestStreak` into a rolling maximum, so a record the user really set could quietly
-shrink.
-
-## The one-request day plan
-
-`GET /calendar/day-plan/{date}` (`GetDayPlanCalendarEndpoint` → `DayPlanResponse`) returns the
-calendar row, its planner tasks ordered by start time, and the streak. It exists because the home page
-could not ask for a day's tasks in one hop: `PlannerTaskFilter` is keyed on `CalendarId`, and the only
-source of that id was `by-Date`. The two calls were serialised **by contract**, and after the
-dashboard-refresh work they are paid on every stale tab-return and every five-minute poll, not once
-per navigation.
-
-Nothing about the old pair changed. The day-planner view still filters by calendar id and time window,
-which is the shape it genuinely needs; only home stops using it.
-
-Three rulings are baked into the response, and each answers a question the client had been guessing at:
-
-| Question | Answer |
-|---|---|
-| What does a date with no calendar return? | **200 with `Calendar: null`, `Tasks: []`** — never 404. `by-Date` keeps its 404; it is a lookup, this is a page load, and a rejected promise there renders a retry button over a day that is merely unplanned. |
-| Is a calendar created lazily on first task? | **Now yes** — see [below](#lazy-day-creation). It was not: `CalendarSeeder` bulk-created rows for a fixed set of years and nothing else could make one. |
-| Is the `From`/`Until` window meaningful for a whole-day read? | **No.** Home only ever passed 00:00–23:59, so this route has no window at all. |
-| Can a task belong to a date but not a calendar? | **No.** `PlannerTask.CalendarId` is non-nullable, so the calendar id is an implementation detail the client never has to hold. |
-
-⚠ **Calendar presence still does not mean "the user planned this day".** `CalendarSeeder` seeds whole
-years per user, so inside the seeded window every date has a row whether or not it was ever touched.
-A client branching on presence would show its empty state on almost no day it should, so
-`DayPlanResponse.HasPlan` (`Tasks.Count > 0`) is what an empty state reads.
-
-⚠ **The streak is hoisted to the top level here** (`DayPlanResponse.Streak`), and the copy nested on
-`Calendar.Streak` is nulled out. It has to survive a null calendar — it is a fact about the user, not
-about the day — and two copies would eventually be filled in by different code paths and disagree.
-
-Guard: `Endpoints.DayPlanEndpointTests` (6 over HTTP). The status code for an unplanned day and the
-user scoping are both silent failures — a 404 there does not throw, and a lost query filter renders
-somebody else's day rather than erroring.
-
-## The four batched calendar entry points
-
-The month grid had the same problem the home page had, one dimension wider: every endpoint it needed
-was keyed on **one** calendar id, so the view fanned out over the visible days. Four routes collapse
-that, and **none of them replaces or changes the per-day route it batches** — the day view still wants
-one day at a time.
-
-| Route | Replaces | Fan-out it removes |
-|---|---|---|
-| `POST /calendar/task-summaries` | `POST /planner-task/filter` per day | up to 31 reads per navigation |
-| `POST /calendar/apply-planner-template/batch` | `POST /calendar/apply-planner-template` per day | one per selected day |
-| `POST /planner-task/copy-to-days` | `POST /planner-task` per (target day × source task) | 12 tasks onto 10 days was 120 writes |
-| `PATCH /calendar/day-type/batch` | `PUT /calendar/{id}` per day | one per selected day |
-
-Four rulings hold across all of them:
-
-| Question | Answer |
-|---|---|
-| Is a batch transactional? | **No, and deliberately.** Each day is applied and committed on its own, in request order — the per-day fan-out was not atomic either, and conflict resolution is a per-day decision against that day's own tasks. All three writes answer `200` with `results[]`, one `{calendarId, succeeded}` per requested id (`CalendarBatchResultResponse`). |
-| What happens to a day the caller does not own? | It comes back `succeeded: false`, not 403. These endpoints scope through the host's global `IEntityWithUser` filter alone, so another user's id simply does not resolve — indistinguishable from a stale id, which is the same thing to the client. |
-| May the id list repeat an id? | **No — 400.** The response promises one result per requested id *in order*; a duplicate makes that mapping ambiguous either way it is resolved. Lists are also capped (`PlannerBatchLimits`), because batching removed the browser connection limit that used to bound these. |
-| Does a copy carry the source day's execution state? | **No.** Span, lane, location, notes, activity and importance travel; `Status` resets to `NotStarted`, and actual times / skip reason / Google event id / the to-do link do not travel at all. A day copied onto next Tuesday would otherwise arrive already completed, and a copied `TodolistItemId` would point several tasks at one item and fan every done-toggle across all of them. |
-
-⚠ **The conflict resolution has exactly one implementation** — `PlannerTemplateApplier`, shared by the
-single-day and batched apply endpoints; the weekday/day-type rule likewise lives once in
-`CalendarDayTypeRule`, which `UpdateCalendarEndpoint` turns into a 400 and the batch turns into one
-day's `succeeded: false`. A second copy of either is the thing that would make "the same template
-applied the same way" quietly stop being true.
-
-⚠ **Each per-day failure clears the ChangeTracker before continuing.** A failed `SaveChanges` leaves
-that day's `Added`/`Modified`/`Deleted` entities staged, and the next day's save would re-send them —
-turning one bad day into a whole failed batch (the same trap `CalendarProvisioner` documents for its
-losing insert). The batched template apply re-reads the template afterwards, since clearing detaches it.
-
-⚠ `POST /calendar/task-summaries` answers a **reduced** shape (`PlannerTaskSummaryResponse`: id, span,
-lane, colour, activity name) and **omits days with no tasks**. Reusing `PlannerTaskResponse` would ship
-a nested activity/role/category object per task for every day in the month, which is most of what the
-route exists to stop sending.
-
-Guard: `Endpoints.CalendarBatchEndpointTests` (8 over HTTP). Every one of these is a silent failure at
-the status-code level — a batch that wrote nothing, wrote to the wrong day, or reported success for a
-day it skipped still answers `200` — so the tests assert on the resulting rows, and each batch is given
-one id belonging to another user that must come back `succeeded: false` with that user's day untouched.
-
-## The plan-vs-actual trend
-
-`POST /planner-task/plan-vs-actual-trend` — six numbers describing how the user's planned time compared
-with their logged time over an inclusive date range. **Derived, never stored**, like the streak: no
-entity, no column, no migration, recomputed from `planner_task` rows on every read, so editing a task
-weeks back moves the trend with no repair path to write.
-
-The *single-day* version of this needs no server at all — the day view already holds
-`ActualStartTime`/`ActualEndTime` beside `StartTime`/`EndTime` for the day on screen. The trend cannot
-be answered that way: `planner-task/filter` takes one calendar id, so thirty days of it is thirty
-requests, the same fan-out the four batched entry points above exist to remove. Nor can the history
-dashboards answer it — they aggregate `ActivityHistory` (free-standing tracking), which has no plan to
-drift from.
-
-| Type | File |
-|---|---|
-| `PlanVsActualTrendService` | `domain/service/PlanVsActualTrendService.cs` — the arithmetic and the rules, no SQL |
-| `GetPlanVsActualTrendPlannerTaskEndpoint` | `application/endpoint/plannerTask/query/` — the eligibility predicate and the day boundary, no rules |
-| `PlanVsActualTrendRequest` / `PlanVsActualTrendResponse` | `application/dto/{request,response}/taskPlanner/` |
-
-The rulings:
-
-| Question | Answer |
-|---|---|
-| Which tasks count? | Not `IsBackground`, not `Cancelled`, on a day in the range that is **over**. Optional tasks *do* count — unlike the streak, this describes estimation, and an optional task was still estimated. |
-| When is a day "over"? | **Strictly before the user's own today**, however late in the day the request arrives. Today's untouched tasks have not been missed, they have not come around yet — and every one of them would land in `neverHappenedCount` and drag a thirty-day trend with it. This is stricter than the single-day block, which shows for the viewed day once it is mostly done; over a range, losing one day costs nothing. |
-| Does a skip count as a task that never happened? | **No.** `Cancelled` leaves the population entirely and is not counted anywhere — the same call the streak makes, and the two must not diverge. |
-| Do the two sums cover the same tasks? | **No, and this is the trap.** `plannedMinutes` spans every counted task, including ones that never happened; `actualMinutes` spans only the ones that are `Completed` **and** carry both actual times. `actual / planned` alone therefore understates the person's pace whenever `neverHappenedCount` is non-zero — which is why that count is in the response rather than left to be inferred. |
-| A `Completed` task with no actual times? | Counted, its plan summed, **no** actual minutes, and **not** a "never happened" — it is unmeasurable, and inferring the missing end from the plan would fabricate exactly the zero drift the number exists to measure. |
-| Nothing eligible? | `200` with six zeroes, never a 404. `taskCount: 0` is the client's signal to render nothing, and a failure status would make that a special case. A range entirely in the future is well-formed and answers this way. |
-| Midnight? | Every span and every comparison wraps. A 23:00–00:30 task is 90 minutes; a task planned for 23:50 and started at 00:10 is twenty minutes late, not twenty-three hours early (the near reading wins — see `DriftMinutes`). |
-
-⚠ **The endpoint owns the eligibility predicate and the service owns the arithmetic — keep the split**,
-for the same reason `PlannerStreakReader` and `PlannerStreakService` are split: a second place deciding
-what an eligible task is, is how the two ends of the feature start disagreeing about the same numbers.
-
-⚠ **The range is the only thing bounding the scan**, so it is capped at `PlannerBatchLimits.MaxSummaryRangeDays`
-and a backwards one is a 400 — the same two rules `CalendarTaskSummariesValidator` applies, sharing the
-same ceiling.
-
-⚠ **`UserId` is filtered by hand here**, not left to the host's global `IEntityWithUser` filter. The
-slice compiles against a plain `DbContext` and cannot see that filter; the id is already in hand for the
-timezone, and the predicate rides the index the scan already uses.
-
-Guards: `Services.PlanVsActualTrendServiceTests` (16 rule cases, no DB) and
-`Endpoints.PlanVsActualTrendTests` (8 over HTTP — the eligibility predicate, the today exclusion, the
-user scoping, and the empty answer, none of which fail with a status code).
-
-## Lazy day creation
-
-**A planner task may name its day by `Date` instead of `CalendarId`, and the calendar row is created
-if the user has none.** Exactly one of the two is required, on `PlannerTaskRequest` and on
-`ApplyTemplateToTaskPlannerRequest`; sending both is a 400 rather than a precedence rule, because the
-two can disagree and the loser is a task filed on a day nobody asked for.
-
-The defect it fixes: `CalendarSeeder` filled a hard-coded `{ 2025, 2026 }` at user setup and there is
-**no create-calendar endpoint** — only `UpdateCalendarEndpoint`. Past the last seeded year every date
-resolved to no row, so the planner rendered an ordinary empty day that silently refused every task,
-and nothing in the app could make the row it needed. No exception, no log line, an expiry date on the
-product.
-
-| Type | Role |
-|---|---|
-| `HolidayCalendar` (`domain/service/`) | The holiday tables + Computus, lifted out of `CalendarSeeder` |
-| `CalendarDayFactory` (`domain/service/`) | What an unplanned day *is* — day type, holiday name, default sleep window |
-| `ICalendarProvisioner` / `CalendarProvisioner` | Read-or-create for one (user, date) |
-
-Both creators go through `CalendarDayFactory`, and that is the point of it: a day filled in a year
-ahead and the same day created on its first task have to be the same day. The three callers of the
-provisioner are `CreatePlannerTaskEndpoint`, `UpdatePlannerTaskEndpoint` (a task dragged onto an
-unplanned day) and `ApplyTemplatePlannerTaskEndpoint` (by date; by id it still 404s, because an id
-resolving to nothing is a stale client rather than an unplanned day).
-
-⚠ **`EnsureForDateAsync` commits.** Call it *before* staging your own writes — anything already
-pending on the ambient `DbContext` goes in with the calendar. All three callers resolve up front for
-this reason, which is why the two CRUD ones do it in `BeforeMapping` and not `AfterMapping`.
-
-⚠ **It scopes by hand** (`IgnoreQueryFilters()` + explicit `UserId`), same as `CalendarSeeder` and for
-the same reason: it is told which user to act for, and filtered it would read no row and try to insert
-a duplicate onto the unique `(user_id, date)`.
-
-⚠ **`(user_id, date)` is unique, and the race is real** — a phone and a desktop starting the same
-morning's first task. The loser catches `DbUpdateException`, **detaches** its failed insert (an
-`Added` entity survives a failed `SaveChanges` and would be retried by the endpoint's own next save)
-and reads the winner's row.
-
-`CalendarSeeder`'s year list is now `{ this year, next year }`, resolved when it runs. That is
-hygiene, not the fix — it only helps users created from now on. Lazy creation is what makes an
-arbitrary future date plannable for everyone.
-
-Guard: `Endpoints.LazyCalendarCreationTests` (9 over HTTP, on dates far outside any seeded window).
-The metadata theory is the drift guard — if the seeder and the provisioner ever stop sharing
-`CalendarDayFactory`, a lazily created Christmas quietly loses its holiday name while every "does a
-row exist" assertion still passes.
-
-## Gotchas
-
-- **Slice code takes a plain `DbContext`**, never `AppDbContext`. There is no `dbContext.PlannerTasks`
-  here — it is `dbContext.Set<PlannerTask>()`. The host aliases `DbContext` → `AppDbContext` in
-  `ModuleServiceExtensions`.
-- **`TaskPriority` is not ours** — it went to TodoLists, despite its configuration having lived in the
-  Planning folder. `TaskImportance` *is* ours.
-- **Google Calendar stays host-side, deliberately.** `GoogleCalendarService`, `ConnectGoogleCalendarEndpoint`,
-  `GetGoogleCalendarAuthUrlEndpoint` and `SyncCalendarToGoogleEndpoint` remain in `AdhdTimeOrganizer`
-  and reference the `Calendar` entity here — host → slice, which is fine. Do not pull them in "to keep
-  calendar together": they carry a `Google.Apis.Auth` dependency that must not spread.
-- **`PlannerTaskSeeder` stayed host-side**, alone among the planning seeders. It is a dev fixture that
-  links a seeded planner task to a seeded `TodoListItem`, which is the one thing in the whole slice
-  that genuinely needs another slice's rows. Moving it would have re-imposed the TodoLists reference to
-  buy nothing but tidiness. Its `Order` (420) is still in Planning's band.
-- **`CalendarSeeder` does not subclass `BasePerUserDefaultSeeder`** — its key is a date range rather
-  than a row set, so it hand-rolls `SetupDefaults` / `ResetDefaults` and does its own
-  `IgnoreQueryFilters()`. Deliberate; do not normalise it. It is also **no longer the only thing that
-  creates a calendar row** — see [lazy day creation](#lazy-day-creation) — and it no longer owns the
-  holiday tables or the day defaults; those moved to `HolidayCalendar` / `CalendarDayFactory` so both
-  creators share them.
-- **The completion fan-out runs through events and must stay that way.** `PlannerTask` and
-  `TodoListItem` complete each other through `PlannerTaskIsDoneChangedEvent` /
-  `TodoListItemIsDoneChangedEvent`, whose records live in Core. The handlers stay host-side. Never
-  replace an event with a direct call — that is a second route to the same coupling the FK change just
-  removed.
 - **Two unrelated "Reminders" exist.** `framework/Sydowwe.Reminders` is an opt-in framework module in
   the git submodule with its own `ReminderDefinition`, ledgers and retention job. This slice's
-  `Reminder` talks to it **only** through `Sydowwe.Framework.Contracts` (`IReminderRegistry`,
-  `IQuietHoursReader`, the payload records). Never reference `Sydowwe.Reminders` directly, and never
-  merge the two.
-- **Keep the `Reminder` → `PlannerTask` cascade.** It is why the delete endpoints read reminder ids
-  *before* deleting the task and cancel through the registry afterwards: the module-side
-  `ReminderDefinition` is not reached by that cascade.
+  `Reminder` owns **user intent only** — title, instant, what it is attached to. Never mirror the
+  module's status / next-occurrence / dispatch history onto the portal row, never reference
+  `Sydowwe.Reminders` directly, and never merge the two.
 
-## Host wiring
+- **`Reminder.RemindAt` is a cache when the reminder is attached to a task**, recomputed from
+  `Calendar.Date` + `StartTime` on every sync. The task stays authoritative. Any write path that
+  moves a task's time or changes its status must call
+  `IReminderRegistrationService.SyncForPlannerTasksAsync`, or the reminder keeps firing at the old
+  time with nothing in the logs.
 
-Four places, none of which break the build if you miss them:
+- **The `Reminder` → `PlannerTask` cascade does not reach the module.** Deleting a task takes its
+  portal reminder rows with it by FK, but the module-side `ReminderDefinition` is not in that graph —
+  which is why every delete path reads the reminder ids *before* deleting and calls `CancelManyAsync`
+  after the commit. Same reason `PlannerTemplateApplier.StagedTaskDeletions` reads the ChangeTracker
+  before the save.
 
-1. `Program.cs` → FastEndpoints `o.Assemblies` — missing means every route 404s.
-2. `config/dependencyInjection/ModuleServiceExtensions.cs` → `ModuleAssemblies` — and **not** also in
-   the `AddDependencyInjection` sweep, which `Except`s this list.
-3. `AppDbContext.ApplyHostConfigurations` → one `ApplyConfigurationsFromAssembly` call.
-4. `AdhdTimeOrganizer.sln`.
+- **`ICalendarProvisioner.EnsureForDateAsync` commits.** Call it *before* staging your own writes —
+  anything already pending on the ambient `DbContext` goes in with the calendar. All three callers
+  resolve up front, which is why the two CRUD ones do it in `BeforeMapping` and not `AfterMapping`.
+  It also **scopes by hand** (`IgnoreQueryFilters()` + explicit `UserId`), same as `CalendarSeeder`
+  and for the same reason: it is told which user to act for, and filtered it would read no row and
+  try to insert a duplicate onto the unique `(user_id, date)`.
 
-⚠ **The host's own configuration scan is anchored on `AppDbContext`, not on a configuration class.**
-It used to say `typeof(PlannerTaskConfiguration).Assembly` — which was the host assembly until this
-extraction moved that type here, at which point the line silently became a second Planning scan and
-every remaining host configuration (three tracking entities, two tracker mappings, the module User
-FKs) fell out of the model. Nothing failed to build; the next `migrations add` produced ~500 lines of
-table renames and dropped partition keys. `AppDbContext` cannot leave the host, so the anchor cannot
-repeat it.
+- **`GetPlanVsActualTrendPlannerTaskEndpoint` filters `UserId` by hand**, not through the host's
+  global `IEntityWithUser` filter — the slice compiles against a plain `DbContext` and cannot see it,
+  and the id is already in hand for the timezone. The four batched calendar entry points do the
+  opposite and lean on the filter alone, which is why an unowned day comes back
+  `succeeded: false` rather than 403.
+
+- **Each per-day batch failure must clear the ChangeTracker before continuing.** A failed
+  `SaveChanges` leaves that day's staged entities on the tracker and the next day's save re-sends
+  them, turning one bad day into a whole failed batch. The batched template apply re-reads the
+  template afterwards, since clearing detaches it.
+
+- **The rule/query splits are load-bearing, in three places.** `PlannerStreakReader` owns the
+  qualifying-task predicate and the day boundary, `PlannerStreakService` owns the rules;
+  `GetPlanVsActualTrendPlannerTaskEndpoint` owns the eligibility predicate, `PlanVsActualTrendService`
+  owns the arithmetic; `PlannerTemplateApplier` and `CalendarDayTypeRule` each have exactly one
+  implementation behind two callers. A second place deciding any of these is how the two ends of a
+  feature start disagreeing about the same number.
+
+- **`CalendarSeeder` does not subclass `BasePerUserDefaultSeeder`** — its key is a date range rather
+  than a row set, so it hand-rolls `SetupDefaults` / `ResetDefaults` (and `ResetDefaults` is a
+  logged no-op) and does its own `IgnoreQueryFilters()`. Deliberate; do not normalise it. It fills
+  per *missing date*, not "does the year have any rows", because `(user_id, date)` is unique.
+
+- **Calendar presence does not mean "the user planned this day".** The seeder fills whole years, so
+  inside the seeded window every date has a row whether or not it was ever touched. An empty state
+  reads `DayPlanResponse.HasPlan` (`Tasks.Count > 0`), never the presence of a calendar.
+
+- **`TaskImportance.OptionalMarkerValue` (666) and `CriticalMarkerValue` (999) are read by code, not
+  just seeded.** `BasePlannerTask.IsOptional` compares against 666 exactly, and `(user_id,
+  importance)` is unique — so reordering importance levels needs a temporary value, and the sentinels
+  must survive it.
+
+- **Seeder `Order` is banded.** Planning owns **400–499**: `TaskImportanceSeeder` 400,
+  `CalendarSeeder` 410, `UserPlannerSettingsSeeder` 420 (per-user defaults); `TaskPlannerDayTemplateSeeder`
+  400, `TemplatePlannerTaskSeeder` 410 and the host-side `PlannerTaskSeeder` 420 (dev fixtures — the
+  two kinds are ordered independently). See
+  `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md` before adding one
+  anywhere in the solution.
+
+- **Class names are table names, namespaces are not.** Table/column names come from the *class* name
+  via `BaseEntityConfigure`, so moving a type between folders or namespaces is not a migration —
+  renaming one is. Note `TemplateTaskConfiguration.cs` configures `TemplatePlannerTask`; the file name
+  and the entity name have already drifted apart.
+
+- **Registering the slice with the host is four places, none of which break the build.**
+  FastEndpoints `o.Assemblies` in `Program.cs` (missing → every planner route silently 404s);
+  `ModuleServiceExtensions.ModuleAssemblies` (being in *both* that list and the
+  `AddDependencyInjection` `AppDomain` sweep doubles every `IEnumerable<T>`, so each seeder and each
+  seam registration runs/resolves twice, silently); `AppDbContext.ApplyHostConfigurations`
+  (missing → the tables vanish from the model); and the solution file.
+
+- ⚠ **The host's own configuration scan must stay anchored on `AppDbContext`.** It used to say
+  `typeof(PlannerTaskConfiguration).Assembly` — the host assembly, until this extraction moved that
+  type here, at which point the line silently became a second Planning scan and every remaining host
+  configuration fell out of the model. Nothing failed to build; the next `migrations add` produced
+  ~500 lines of table renames and dropped partition keys.
+
+## Extension playbook
+
+- **Add a planner-task field:** put it on `BasePlannerTask` only if all three shapes want it (each has
+  its own table and its own configuration, so a base field is three columns and three migrations
+  worth of surface). Then the DTO bases (`BasePlannerTaskRequest` / `BasePlannerTaskResponse`), the
+  validators, and — if it is execution state — `CopyToDaysPlannerTaskEndpoint`, which deliberately
+  does **not** carry execution state across a copy.
+- **Add a fourth task shape:** entity → configuration (`BaseEntityConfigure()` first) →
+  `ModuleSchemas` needs nothing (assembly-keyed) → **add a clause to
+  `PlannerTaskActivityReferenceSource`**, both in `ReferencingActivityIds` and `RepointAsync`.
+  Forgetting that file is a silent undercount and a merge that strands rows; nothing fails to build.
+- **Add an endpoint:** check `framework/Sydowwe.Framework/application/endpoint/base/` first — most of
+  what is here is a one-line subclass. Convention is `<Verb><Entity>Endpoint`; mapping lives on the
+  DTOs. If it writes a planner task's time or status, call `SyncForPlannerTasksAsync`; if it deletes
+  one, capture the reminder ids first.
+- **Add a conflict-resolution mode:** it goes in `PlannerTemplateApplier.Stage` and nowhere else —
+  both the single-day and the batched apply route through it, and `StagedTaskDeletions` reads the
+  ChangeTracker so a new mode's deletions are captured without threading a list through.
+- **Add a per-user default:** subclass `BasePerUserDefaultSeeder<T>`, pick an `Order` in 400–499, and
+  make `Collides` match the entity's **unique index**, not its display text.
+- **Add a user-scoped entity:** it will fail `UserDataExportAndDeletionTests` until it is listed as
+  exported or as a deliberate gap. That is the test working.
+
+## Deeper reference
+
+- `domain-map.md` — model, invariants, the derived-number rules, glossary, navigation index
+- `testing.md` — test strategy, the load-bearing guards, and the known gaps
+- `README.md` — business intro and module-specific setup
