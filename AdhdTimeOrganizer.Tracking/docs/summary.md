@@ -5,24 +5,30 @@ extension, android), the two pattern-mapping lookups that resolve a tracked wind
 the twenty-one tracking dashboards — fifteen per-source plus the six **unified** ones that merge the
 three ledgers into one picture of a day — and the retention purge over the ledgers.
 
-**Fifth and last project of the portal split**, after `Core`, `TodoLists`, `Routines`, `History` and
+**The last project of the portal split**, after `Core`, `TodoLists`, `Routines`, `History` and
 `Planning`. Plan: `review/portal/slicePrompts/00-README.md`.
+
+Tables live in the **`tracking`** schema (`ModuleSchemas.cs`, keyed on this assembly via
+`AndroidSessionData`).
 
 ## Bounded context
 
 Owns:
 
 - **Entities** — `DesktopActivityEntry`, `WebExtensionActivityEntry`, `AndroidSessionData`,
-  `TrackerDesktopMappingByPattern`, `TrackerAndroidMappingByPattern`, and their five EF
-  configurations. ⚠ Three of those configurations used to live in the host's
+  `TrackerDesktopMappingByPattern`, `TrackerAndroidMappingByPattern` (under `domain/model/entity/`,
+  with `desktop/` and `android/` subfolders), and their five EF configurations under
+  `infrastructure/persistence/configuration/`. ⚠ Three of those configurations used to live in the host's
   `infrastructure/persistence/configuration/activityHistory/` folder. **The folder name lied** — they
   were always Tracking's, and they moved with their entities. Do not assign files to projects by
   directory here.
-- **38 endpoints** under `application/endpoint/activityTracking/` — desktop ingest + dashboards,
+- **38 endpoints** under `application/endpoint/` — one folder per source (`desktop/`, `webExtension/`,
+  `android/`, `unified/`, each split `command/` + `query/`): desktop ingest + dashboards,
   web-extension ingest + dashboards, android sync + dashboards, the six unified dashboards, and the two
   pattern-mapping settings grids with their CRUD.
-- **The five endpoint groups** (`application/endpointGroups/`). The whole folder moved: every group in
-  it was a tracking group.
+- **The five endpoint groups** — all five classes in the single file
+  `application/endpointGroups/ActivityTrackingDesktopSettingsIgnoredProcessGroup.cs`, whose name has
+  outlived its contents. The whole folder moved: every group in it was a tracking group.
 - **Validators** (one per dashboard, not one per source — `StackedBarsValidator` and
   `BaseTimelineValidator` each cover all three), the tracking request/response DTOs,
   `WebExtensionDataFilterRequest`.
@@ -87,6 +93,47 @@ The handler logs and swallows its own exceptions — the ingest committed before
 would only make the agent re-send the window. That makes a break here silent;
 `ActivityTimeAutomationTests` is the guard, and it asserts on rows, not routes.
 
+## Gotchas — things that will bite you
+
+- **Everything here takes a plain `DbContext`, never `AppDbContext`.**
+  `ModuleServiceExtensions.AddModuleServices` aliases `DbContext` → `AppDbContext` at runtime (global
+  query filters and all). At the call site that means no `dbContext.DesktopActivityEntries` — use
+  `dbContext.Set<DesktopActivityEntry>()`.
+
+- **`Microsoft.EntityFrameworkCore` is a global using** (declared in the csproj) — nearly every file
+  here names `DbContext`. Don't be surprised by files with no EF using line.
+
+- **Folders and namespaces have drifted.** The namespaces still carry an `activityTracking` segment
+  (`…Tracking.domain.model.entity.activityTracking.desktop`,
+  `…Tracking.application.endpoint.activityTracking.desktop.command`) that the folder layout no longer
+  has. Go by the paths in `domain-map.md`, not by the namespace.
+
+- **`WindowStart` is the only thing set; `RecordDate` derives from it in the initializer** on both
+  partitioned ledgers, so the partition key can never diverge from the instant and misfile a row.
+  Don't add a settable `RecordDate`.
+
+- **A web-extension `WindowStart` must be minute-aligned**, and that is enforced only at the ingest
+  boundary by `WebExtensionHeartbeatValidator` (a 400). The timeline stitches windows by
+  `WindowStart == previous.EndedAt`, so an unaligned value produces gapped or overlapping segments
+  rather than an error. There is deliberately no throwing setter — EF would run it while materializing
+  rows written before the rule existed.
+
+- **`ExecutablePath` is encrypted and write-only; `WindowTitle` is deliberately not.** The title is
+  grouped, filtered (Exact/Contains/Wildcard/Regex) and sorted SQL-side, none of which survives
+  randomized encryption. Don't "finish the job" by encrypting it.
+
+- **The mapping tables carry five check constraints each** — exactly one target group set
+  (ignored / activity / role+category), `IsIgnored` never `false`, and each pattern column implying its
+  match type. Adding a target field without extending the first constraint lets a rule be saved that
+  matches nothing.
+
+- **Patterns are matched in memory, not in SQL.** The heartbeat loads a user's active mappings and runs
+  `MatchesPattern` over them per entry — the `PatternMatchType` modes have no SQL translation.
+
+- **Seeder `Order` is banded.** Tracking's `WebExtensionDataSeeder` sits at 600. See
+  `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md` before adding a seeder
+  anywhere in the solution.
+
 ## Things that fail silently
 
 1. **Missing from `o.Assemblies`** in `Program.cs` (`DisableAutoDiscovery = true`) → every tracking
@@ -135,6 +182,9 @@ type `ApplyHostConfigurations` was anchored on, silently turning the host's own 
 Planning scan; the next `migrations add` emitted ~500 lines of table renames. Tracking's entries are
 anchored on `DesktopActivityEntry`, and the host's on `typeof(AppDbContext)`.
 
-## Navigation
+## Deeper reference
 
-`docs/domain-map.md` is the index — open it before opening source files.
+- `domain-map.md` — the model, the invariants, the dashboard contracts and the **navigation index**.
+  Open it before opening source files.
+- `testing.md` — test strategy, the guards that must not be deleted, and the standing caveats
+- `README.md` — business intro and module-specific setup

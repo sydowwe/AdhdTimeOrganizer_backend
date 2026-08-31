@@ -2,19 +2,71 @@
 
 Navigation index. Read `summary.md` first; open only the rows you need.
 
+⚠ **Paths below are folders; namespaces still say `activityTracking`.** The two drifted apart during
+the split. Go by the paths.
+
+## Model
+
+```mermaid
+erDiagram
+    User ||--o{ DesktopActivityEntry : records
+    User ||--o{ WebExtensionActivityEntry : records
+    User ||--o{ AndroidSessionData : records
+    User ||--o{ TrackerDesktopMappingByPattern : authors
+    User ||--o{ TrackerAndroidMappingByPattern : authors
+    TrackerDesktopMappingByPattern }o--o| Activity : "resolves to (Cascade)"
+    TrackerDesktopMappingByPattern }o--o| ActivityRole : "or role"
+    TrackerDesktopMappingByPattern }o--o| ActivityCategory : "or category"
+    TrackerAndroidMappingByPattern }o--o| Activity : "resolves to (Cascade)"
+    TrackerAndroidMappingByPattern }o--o| ActivityRole : "or role"
+    TrackerAndroidMappingByPattern }o--o| ActivityCategory : "or category"
+```
+
+The three ledgers hold **no FK to `Activity`**: a raw entry is what was seen, and the mapping that
+interprets it is editable after the fact. Resolution happens at ingest (desktop) or at read time, never
+by storing the verdict on the entry.
+
 ## Entities
 
 | Entity | Table | Notes | Path |
 |---|---|---|---|
-| `DesktopActivityEntry` | `desktop_activity_entry` | Per-heartbeat desktop window. **RANGE-partitioned** on `RecordDate`. `ExecutablePath` is an `EncryptedColumn`. | `domain/model/entity/activityTracking/desktop/` |
-| `WebExtensionActivityEntry` | `web_extension_activity_entry` | Per-minute browser window. **RANGE-partitioned** on `RecordDate`; `RecordDate` derives from `WindowStart` in the initializer so the two cannot diverge. `WindowStart` must be minute-aligned — the timeline endpoint stitches windows by `WindowStart == previous.EndedAt`. | `domain/model/entity/activityTracking/` |
-| `AndroidSessionData` | `android_session_data` | Per-session android usage, deduplicated on sync by `(DeviceId, PackageName, StartedAt)`. | `domain/model/entity/activityTracking/` |
-| `TrackerDesktopMappingByPattern` | `tracker_desktop_mapping_by_pattern` | Pattern → `Activity`/`Role`/`Category`, or `IsIgnored`. Matched in-memory by `MatchesPattern`. **Many** patterns to one activity; `activity_id` is `Cascade`. The unique key is the pattern: `(UserId, ProcessName, ProductName, WindowTitle)`, `NULLS NOT DISTINCT`. | `domain/model/entity/activityTracking/desktop/` |
-| `TrackerAndroidMappingByPattern` | `tracker_android_mapping_by_pattern` | Android equivalent; unique on `(UserId, PackageName, AppLabel)`. | `domain/model/entity/activityTracking/android/` |
+| `DesktopActivityEntry` | `desktop_activity_entry` | Per-heartbeat desktop window. **RANGE-partitioned** on `RecordDate`. `ExecutablePath` is an `EncryptedColumn`; `WindowTitle` deliberately is not. | `domain/model/entity/desktop/` |
+| `WebExtensionActivityEntry` | `web_extension_activity_entry` | Per-minute browser window. **RANGE-partitioned** on `RecordDate`; `RecordDate` derives from `WindowStart` in the initializer so the two cannot diverge. `WindowStart` must be minute-aligned — the timeline endpoint stitches windows by `WindowStart == previous.EndedAt`. | `domain/model/entity/` |
+| `AndroidSessionData` | `android_session_data` | Per-session android usage, deduplicated on sync by the unique `(UserId, DeviceId, PackageName, SessionStartUtc)`. The only ledger storing real sessions rather than windows. | `domain/model/entity/` |
+| `TrackerDesktopMappingByPattern` | `tracker_desktop_mapping_by_pattern` | Pattern → `Activity`/`Role`/`Category`, or `IsIgnored`. Matched in-memory by `MatchesPattern`. **Many** patterns to one activity; `activity_id` is `Cascade` with a pinned constraint name. The unique key is the pattern: `(UserId, ProcessName, ProductName, WindowTitle)`, `NULLS NOT DISTINCT`. | `domain/model/entity/desktop/` |
+| `TrackerAndroidMappingByPattern` | `tracker_android_mapping_by_pattern` | Android equivalent; unique on `(UserId, PackageName, AppLabel)`. | `domain/model/entity/android/` |
+
+Two enums: `TrackerDesktopMappingTypeEnum` (`domain/model/enum/`) — the mapping's target shape, a DTO
+convenience over the check constraint below — and `BaselineType` (`application/dto/enum/`), the
+dashboards' comparison window (`Last7Days` / `Last30Days` / `SameWeekday` / `AllTime`).
+
+## Invariants
+
+- **Exactly one target group per mapping row** — `IsIgnored = true`, *or* `ActivityId`, *or*
+  `RoleId`/`CategoryId` (both allowed together). *DB-enforced*
+  (`CK_Tracker*MappingByPattern_TargetRequired`).
+- **`IsIgnored` is `true` or `NULL`, never `false`.** *DB-enforced* (`…_IsIgnoredOnlyTrue`).
+- **A pattern column implies its match type** (`process_name IS NULL OR process_name_match_type IS NOT
+  NULL`, and the same for product name / window title / package name / app label). *DB-enforced*.
+- **One pattern per user.** *DB-enforced*, unique with `NULLS NOT DISTINCT` so two NULL process names
+  count as equal.
+- **One android session per `(user, device, package, start)`.** *DB-enforced* — this is what makes the
+  sync endpoint's re-send idempotent.
+- **`RecordDate == DateOnly.FromDateTime(WindowStart)`.** *Type-enforced* — the setter is private and
+  the value derives in `WindowStart`'s initializer.
+- **A web-extension `WindowStart` is minute-aligned.** *App-enforced at the ingest boundary only*
+  (`WebExtensionHeartbeatValidator`, a 400). Not enforced by the type, on purpose: EF would run a
+  throwing setter while materializing rows written before the rule existed.
+- **Both partitioned tables have a composite PK `(Id, RecordDate)` and a non-concurrency
+  `row_version`.** *DB-enforced* — Postgres requires the partition key in the PK, and a partitioned
+  table cannot return `xmin` in a `RETURNING` clause.
+- **An attribution write and its raw entries commit together.** *App-enforced* — the sink mutates the
+  context and must not call `SaveChanges`; the heartbeat's single save is the transaction.
 
 ## EF configurations
 
-`infrastructure/persistence/configuration/activityTracking/` — all five. Three of them
+`infrastructure/persistence/configuration/` (with `desktop/` and `android/` subfolders) — all five.
+Three of them
 (`DesktopActivityEntryConfiguration`, `WebExtensionActivityEntryConfiguration`,
 `AndroidSessionDataConfiguration`) came from the host's `configuration/activityHistory/` folder, which
 never matched their domain.
@@ -22,10 +74,15 @@ never matched their domain.
 Applied by `AppDbContext.ApplyHostConfigurations` via
 `ApplyConfigurationsFromAssembly(typeof(DesktopActivityEntryConfiguration).Assembly)`.
 
-## Endpoints — `application/endpoint/activityTracking/`
+## Endpoints — `application/endpoint/`
 
-Routes come from the five groups in `application/endpointGroups/`, so the literal in `Post(...)` is
-often only the tail. Check the group before assuming a path.
+One folder per source — `desktop/`, `webExtension/`, `android/`, `unified/` — each split into
+`command/` and `query/`; the desktop dashboards sit one level deeper in `desktop/query/dashboard/`.
+
+Routes come from the five groups, all five classes in the single file
+`application/endpointGroups/ActivityTrackingDesktopSettingsIgnoredProcessGroup.cs` (the file name has
+outlived its contents), so the literal in `Post(...)` is often only the tail. Check the group before
+assuming a path.
 
 | Area | Route prefix | Endpoints |
 |---|---|---|
@@ -133,6 +190,28 @@ the same label from two sources is a device change rather than a switch.
 `Policies(PortalAuthorizationPolicies.ActivityTracking)`. Everything else is an ordinary web endpoint
 and is therefore denied to extension clients by the `Program.cs` configurator's default.
 
+## Navigation index — everything that is not an endpoint
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `DailyWindowSet` | Domain helper | Turns a day span + time-of-day window into the per-day windows every dashboard reads, and lays out the stacked-bars bands | `domain/helper/DailyWindowSet.cs` |
+| `TimelineSegmentBuilder` | Domain helper | Stitches windows into sessions — **one copy**, shared by the timelines and the focus-metrics dashboards so the strip cannot disagree with the chart | `domain/helper/TimelineSegmentBuilder.cs` |
+| `FocusMetricsCalculator` | Domain helper | The four fragmentation measures and their definitions, computed inside one day-window and rolled up | `domain/helper/FocusMetricsCalculator.cs` |
+| `TrackingSource` | Domain helper | The three sources; the enum's numeric order **is** level 2 of the overlap rule, and the wire names are spelled out | `domain/helper/unified/TrackingSource.cs` |
+| `UnifiedMinuteMerger` | Domain helper | The overlap rule, in one copy — read before touching any of the six unified endpoints | `domain/helper/unified/UnifiedMinuteMerger.cs` |
+| `UnifiedLabelResolver` | Domain helper | The single cross-source identity string, and the join it enables | `domain/helper/unified/UnifiedLabelResolver.cs` |
+| `SecondsAllocator` | Domain helper | Largest-remainder rounding, so the parts keep adding up to the total | `domain/helper/unified/SecondsAllocator.cs` |
+| `UnifiedActivityLoader` | Service | Flattens the three ledgers onto one minute grid | `application/service/unified/UnifiedActivityLoader.cs` |
+| `UnifiedLedger` | Service | The one rounded ledger every merged figure is read off | `application/service/unified/UnifiedLedger.cs` |
+| `UnifiedSpan` | Service | One request's load + merge + ledger, plus the exclusive-minute partition | `application/service/unified/UnifiedSpan.cs` |
+| `TrackerMappingActivityReferenceSource` | Seam impl | Exposes both mapping tables' `ActivityId` to Core's merge/delete machinery; backs `usageCount`/`canDelete` on the activity grid | `application/seam/TrackerMappingActivityReferenceSource.cs` |
+| `BaseFocusMetricsEndpoint<TRequest>` | Endpoint base | The four focus-metrics routes; generic over the request only because the merged one carries `sources` | `application/endpoint/BaseFocusMetricsEndpoint.cs` |
+| `DashboardDateRangeRules` | Validator helper | The shared span rules (inclusive ends, the max-span cap) every dashboard validator composes | `application/validator/DashboardDateRangeRules.cs` |
+| `BaseTimelineValidator` · `StackedBarsValidator` · `PieChartValidator` · `SummaryCards`/`FocusMetrics`/`TopDomains`/`DomainDetails` validators | Validators | **One per dashboard, not one per source** — all three sources bind the same request classes | `application/validator/` |
+| `UnifiedDashboardValidators` | Validators | The `sources` rule on top of the shared span rules: non-empty, known members only | `application/validator/unified/UnifiedDashboardValidators.cs` |
+| `DesktopActivityHeartbeatValidator` · `WebExtensionHeartbeatValidator` · `AndroidSyncValidator` | Validators | The ingest boundary — including the minute-alignment rule | `application/validator/{desktop,webExtension,android}/` |
+| `PurgeExpiredActivityTrackingEntriesJobHandler` | Scheduled job | The retention purge (see Infrastructure below) | `infrastructure/jobs/` |
+
 ## Seams (all declared in `AdhdTimeOrganizer.Core`)
 
 | File | Role |
@@ -172,14 +251,5 @@ Renaming one renames none of the others.
 
 ## Tests
 
-| File | Covers |
-|---|---|
-| `AdhdTimeOrganizer.IntegrationTests/Endpoints/TrackingRouteSmokeTests.cs` | routing, the combined query filter (behaviourally), the partition annotations, purge-job registration |
-| `.../Endpoints/TrackingDashboardDateRangeTests.cs` | the day-span / time-of-day-window semantic across the dashboards, asserted on the numbers |
-| `.../Endpoints/TrackingFocusMetricsTests.cs` | the four fragmentation measures — switch counting, block tolerance, interior-only gaps, median-not-mean, and the day-bounded range rule |
-| `.../Endpoints/TrackingDashboardItemIdentityTests.cs` | the additive `key`/`label` pair on the per-source dashboards, and its never-blank fallback |
-| `.../Endpoints/TrackingUnifiedDashboardTests.cs` | the unified overlap rule, asserted on seconds — both levels of precedence, partial displacement, a deselected source giving the time back, the cross-source label join, the device-change-is-not-a-switch rule, and the non-overlapping timeline lanes |
-| `.../Endpoints/ExtensionActivityTrackingTests.cs` | extension-client auth on ingest, and the end-to-end attribution + completion path |
-| `.../Endpoints/ActivityTimeAutomationTests.cs` | the completion branch matrix, including the exclusivity rule |
-| `.../Endpoints/TrackerPatternMappingActivityFkTests.cs` | both mapping FKs are N:1 (two patterns, one activity) and `Cascade` (deleting the activity destroys the rule) |
-| `.../Modules/ActivityForeignKeyInventoryTests.cs` | the model-level companion — freezes every activity FK in the solution and its delete behaviour |
+All of them live in `AdhdTimeOrganizer.IntegrationTests` — this slice has no test project of its own.
+The inventory, what each suite pins, and the standing caveats are in **`testing.md`**.

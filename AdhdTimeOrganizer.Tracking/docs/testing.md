@@ -1,0 +1,94 @@
+# AdhdTimeOrganizer.Tracking — Testing
+
+## How to test this slice
+
+Tracking has **no test project of its own**. Everything testing it lives in
+`AdhdTimeOrganizer.IntegrationTests`, and that is the right place: almost every rule the slice owns is
+a property of the *composed* application — the `DbContext` alias, the hand-written combined query
+filter on `WebExtensionActivityEntry`, the FastEndpoints assembly scan, the partition annotations, the
+two Core seams and the host-side completion handler. None of them are observable from a library-only
+unit test.
+
+The infrastructure comes from `Sydowwe.Framework.Testing`: `PostgresTestBase` + the `"Postgres"`
+collection over `AppDbContextFixture` (a real Postgres container), `AuthTestBase` for the extension
+token flows, and `UserRoleTestAuthHandler` for role/ownership scenarios. See the portal's
+`docs/testing.md` and `docs/claude/testing.md` for the full setup.
+
+Three bits of setup are specific to this slice:
+
+- **Two ingest tables are partitioned**, so the fixture has to create them through the partitioned
+  SQL generator. A wave of "relation does not exist" failures across tracking tests means that
+  plumbing broke, not the endpoints.
+- **The ingest endpoints need an extension-flavoured token** carrying the `ActivityTracking` role.
+  `ExtensionActivityTrackingTests` builds them; a plain web JWT is *supposed* to get a 403 here, so a
+  403 in a new test is often the test's fault, not the endpoint's.
+- **Dashboard tests need a user whose `Timezone` is not UTC.** Bands, spans and the same-weekday
+  baseline all fold in the user's clock; a UTC-seeded test cannot tell a correct fold from a missing
+  one.
+
+## Strategy
+
+**Mapping CRUD and the auth matrix go through the Framework base test classes.**
+`TrackingMappingCrudAuthMatrixTests` is one file of thin subclasses — `BaseCreateEndpointTests`,
+`BaseUpdateEndpointTests`, `BaseDeleteEndpointTests` — for both mapping tables, plus hand-written
+ownership and grid tests for the shapes the bases don't cover. A new endpoint that subclasses a
+Framework base should be tested by subclassing the matching base test rather than by hand.
+
+**The dashboards are tested on numbers, not on status codes.** This is the single most important
+thing about testing this slice. Every failure mode that matters here returns a well-formed 200
+containing a *plausible wrong number*: a span read continuously instead of as a repeated time-of-day
+window, a block stitched through an excluded night, a merged minute credited to the wrong source,
+parts that no longer add up to their total. A 200 proves nothing.
+
+Where possible, assert an **equality between two surfaces** that can only hold if the arithmetic is
+right — the unified suite's `sum(countedSeconds) == totals.totalSeconds` and
+`countedSeconds + displacedSeconds ==` that source's own per-source dashboard are the model to copy,
+because both identities are printed side by side on one screen for the user to check.
+
+**Assert on rows for anything that fails silently.** A dropped assembly 404s a route; a lost
+`[AllowExtensionClients]` 403s an agent; a missing registrar loses the purge trigger with no
+exception; a broken query filter leaks another user's browsing history. See the table below.
+
+## The guards — do not delete these
+
+| Test | Pins |
+|---|---|
+| `TrackingRouteSmokeTests.TrackingDashboardRoutes_AreRegistered` · `TrackingGridRoutes_AreRegistered` · `DesktopDistinctProcessesRoute_IsRegistered` | The slice's assembly is in FastEndpoints' `o.Assemblies` (`DisableAutoDiscovery = true`). Missing → every tracking route 404s, with no build error |
+| `TrackingRouteSmokeTests.WebExtensionActivityEntry_KeepsBothOfItsQueryFilters` | The one entity the general `IEntityWithUser` scoping rule does not cover — it is in `AppDbContext.UserScopingExcludedTypes` and carries a hand-written combined filter instead. Losing the user half leaks every user's browsing history to any signed-in caller; losing the date half unbounds the partition read |
+| `TrackingRouteSmokeTests.RetentionPurgeJob_IsRegisteredAndScheduled` | `TrackingScheduledJobsRegistrar` actually pushed the purge to the Scheduler. A missing `AddHostedService` builds fine and the GDPR purge never fires |
+| `TrackingDashboardDateRangeTests` (9 tests) | The span semantic: `from`/`to` is a **time-of-day window repeated on each day**, not the ends of the range; bands get each day's own start instant and truncate at the window edge; the baseline scales to the span; the timelines reject a span; the year cap holds at the boundary; the details endpoint carries the daily window across its instant envelope |
+| `TrackingFocusMetricsTests` (9 tests) | The four fragmentation measures and their definitions — switch counting, client-sent block tolerance, interior-only gaps, median-not-mean — and the load-bearing rule that **nothing is measured across the night between two days' windows** |
+| `TrackingUnifiedDashboardTests` (12 tests) | The overlap rule, asserted on seconds: both levels of precedence in the right order, partial (not wholesale) displacement, a deselected source getting its time **back**, the cross-source label join, device-change-is-not-a-switch, non-overlapping timeline lanes with ids unique across them, and totals on an empty result |
+| `TrackingDashboardItemIdentityTests` (2 tests) | The additive `key`/`label` pair carried by all three sources, and the never-blank fallback of `label` to `key` — the half that regresses silently |
+| `TrackingDashboardUserZoneTests` (2 tests) | Bands and the same-weekday baseline resolve on the user's clock and calendar, not UTC |
+| `TrackingAndroidTimelineTests` (2 tests) | A session's `totalSeconds` and the `minSeconds` filter read **that session's** own length, not the app's whole-day total — the drift that makes a timeline strip disagree with the chart above it |
+| `ExtensionActivityTrackingTests` (8 tests) | Extension-client auth on ingest from both directions (extension token without the tracking role → 403; web JWT against the tracking policy → 403; extension JWT against a web-only endpoint → 403), and the end-to-end mapped-heartbeat → attribution → planner-task-completion path |
+| `ActivityTimeAutomationTests` (5 tests) | The completion branch matrix behind `ActivityTimeRecordedEvent`, including `PlannerTaskMatched_TodoFallback_DoesNotRun` — the **exclusivity** rule that is the reason the automation is one host-side handler and not two subscribers |
+| `TrackerPatternMappingActivityFkTests` (4 tests) | Both mapping FKs are N:1 (two patterns may target one activity) and `Cascade` (deleting the activity destroys the rule) |
+| `TrackingMappingCrudAuthMatrixTests` | The mapping CRUD auth matrix: create stamps the *caller's* `UserId` rather than the DTO's zero, update/delete of a foreign id leaves the foreign row untouched, and the two grids exclude other users' rows |
+
+Also relevant, though owned elsewhere: `ActivityForeignKeyInventoryTests` (the model-level companion
+that freezes every activity FK in the solution and its delete behaviour), `SeamWiringTests`,
+`NamedQueryFilterTests`, `UserScopingQueryFilterTests`, `ModuleSchemaTests` (every entity here must
+resolve to the `tracking` schema), `UserDataExportAndDeletionTests` (a new user-scoped entity here
+fails it until classified — a GDPR Art. 15 decision), and `CoreRouteSmokeTests`' seeder-duplication
+test, which covers the double-registration trap over every registered seeder.
+
+## Known gaps (living list)
+
+No `[Trait("Status","KnownGap")]` tests are carried for this slice today. Four standing caveats
+rather than gaps:
+
+- **The registrar's boot behaviour is not integration-tested.**
+  `TrackingRouteSmokeTests.RetentionPurgeJob_IsRegisteredAndScheduled` asserts the job is registered
+  after a normal boot, but not that `StartAsync` re-pushes the trigger after a *restart* — the one
+  path whose failure is completely silent. Testing it needs a host restart within a fixture; if you
+  add one, assert on registered job keys, not on rows.
+- **The purge job's own deletion behaviour has no direct test.** It runs `ExecuteDeleteAsync` with
+  `IgnoreQueryFilters` on purpose, so it reaches every user's rows — which also means a wrong
+  predicate there deletes other users' data with nothing to catch it.
+- **`ExecutablePath` encryption is asserted only by the column configuration.** No test reads the
+  raw column to prove the ciphertext; if you add one, read it through raw SQL, since EF decrypts on
+  materialization.
+- **`WebExtensionDataSeeder` has no test.** It is a dev-only fixture seeder; the seeding chain itself
+  is pinned by `PerUserDefaultSeederTests` in the host.
