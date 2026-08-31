@@ -3,6 +3,14 @@
 Point-in-time snapshot, 2026-08-31. Disposable. The durable map is
 `AdhdTimeOrganizer.TodoLists/docs/domain-map.md`.
 
+**Recheck, pass 2 (2026-08-31).** No test file in the suite has changed since the first pass — the
+newest TodoLists-related test file is `ActivityMergeTests.cs` (2026-08-27), and the last commit to
+`AdhdTimeOrganizer.IntegrationTests` (`03547ed`, 2026-08-30) touched the category grid, not this slice.
+The coverage matrix and the ~62% number below are re-confirmed as-is. Also confirmed: **there is not a
+single `[Trait("Status", "KnownGap")]` anywhere in the test project**, so nothing here is
+already-pinned-as-known; every ❌ is a genuine absence. Two changes in this pass: `TEST-10`'s boundary is
+the **102nd** item, not the 101st (see the corrected `CQ-2`), and a new `TEST-14` covers `CQ-19`.
+
 ## Test infrastructure summary
 
 There is no `AdhdTimeOrganizer.TodoLists.Tests` project — every test for this slice lives in
@@ -123,8 +131,9 @@ Counts are tests that meaningfully exercise that endpoint (not incidental use as
 | `POST /task-priority/grid` | ❌ | ❌ all four filter arms | ❌ | — `TEST-7` |
 | `POST /todo-list-item` (Create) | ✅ 1 | ⚠️ steps/TotalCount only | ✅ 3 | `TodoListCrudAuthMatrixTests:237` |
 | ↳ cross-user `TodoListId` / `TaskPriorityId` | — | — | ❌ **`TEST-8`** | — |
-| ↳ `DisplayOrder` assignment | ❌ **`TEST-10`** | ❌ 101st-item boundary | — | — |
+| ↳ `DisplayOrder` assignment | ❌ **`TEST-10`** | ❌ 102nd-item boundary | — | — |
 | `PUT /todo-list-item/{id}` (Update) | ✅ 1 | ✅ pairing round-trip | ✅ 3 | `:257`, `TodoListItemPairingTests:123` |
+| ↳ step identity survives the PUT | ❌ **`TEST-14`** | — | — | — |
 | `DELETE /todo-list-item/{id}` | ✅ 1 | ✅ history `SetNull` survives | ✅ 3 | `:293`, `TodoListItemDailyRecapTests:316` |
 | `GET /todo-list-item/{id}` | ✅ 1 | ✅ pairing projected | ✅ 3 | `:318`, `TodoListItemPairingTests:85` |
 | `GET /todo-list-item` (GetAll) | ⚠️ smoke + 1 incidental | ❌ `todoListId` filter, ordering | ❌ | `TodoListItemPairingTests:85` — `TEST-4` |
@@ -179,6 +188,11 @@ number flatters the slice, because the coverage is not distributed where the ris
 - **Third is FK ownership on create.** The IDOR matrix proves you cannot *read* another user's row. It
   does not prove you cannot *point at one*, and `CreateTodoListItemEndpoint` accepts `TodoListId` and
   `TaskPriorityId` unvalidated where `MoveTodoListItemEndpoint` explicitly checks them.
+- **Fourth, added in the recheck: no test crosses two endpoints on one item.** Every file exercises one
+  route per scenario. `TodoListStepsCrudTests` drives the step routes and `TodoListItemPairingTests:123`
+  drives the PUT, but nothing does a PUT *and then* uses a step id — which is exactly why `CQ-19` (the
+  PUT regenerating every step `Guid`) is invisible to a suite this size. Sequence tests are the cheapest
+  thing missing here.
 
 ## 12. Missing tests — backlog
 
@@ -201,3 +215,4 @@ disposable — the real tests belong in `AdhdTimeOrganizer.IntegrationTests`.
 | `TEST-11` | `TodoList` / `TodoListCategory` unique `(UserId, Name)` — no 409 test on create or update | 🟡 | — | folded into `ReadSurfaceSweep.md` |
 | `TEST-12` | `DELETE /todo-list/{id}` cascades its items — asserted nowhere | 🟡 | — | folded into `ReadSurfaceSweep.md` |
 | `TEST-13` | Dev `TodoListItemSeeder` — no test; carries its own copy of the CQ-2/CQ-3 arithmetic | 🟡 | CQ-13 | folded into `GetNextDisplayOrderBoundary.md` |
+| `TEST-14` | A PUT of an item regenerates every step's `Guid`, 404-ing the three step routes afterwards | 🟠 | CQ-19, CQ-16 | [StepIdentityAcrossUpdate.md](testingPrompts/StepIdentityAcrossUpdate.md) |

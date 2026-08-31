@@ -26,9 +26,13 @@ Config (`appsettings.json:11-13`): `MaxItems: 100`, `DisplayOrderGap: 1_000_000`
 `DisplayOrderStart = MaxItems * DisplayOrderGap = 100_000_000`.
 
 **The boundary is reachable by construction.** Items descend one gap at a time from `100_000_000`, so
-after exactly **100** items in one priority group the minimum is `0`, the sentinel misfires, and item
-101 is handed `100_000_000` — colliding with item 1. `MaxItems` is precisely the count at which this
-breaks, and nothing enforces it as a cap.
+item *n* lands on `100_000_000 - (n-1) × 1_000_000`. The **101st** item lands on exactly `0` — still
+correct. The **102nd** is the broken one: the group minimum is now `0`, the sentinel misfires, and it is
+handed `100_000_000`, colliding with item 1. Nothing enforces `MaxItems` as a cap.
+
+> ⚠ Corrected in the review's second pass — the earlier text said the 101st item resets. It does not;
+> the 101st is the one that legitimately lands on `0`, and the 102nd is where the reset happens. Assert
+> against the 102nd, or use the one-row reproduction in §4, which is unaffected.
 
 ## Create `TodoListItemDisplayOrderTests.cs`
 
@@ -68,30 +72,29 @@ order.
 Create an item in priority A and one in priority B. Both must get `DisplayOrderStart` — the group filter
 is `TaskPriorityId`. Guards against someone "simplifying" the overload away.
 
-### 4. **The 101st item — `CQ-2`**
+### 4. **The item after the ladder reaches zero — `CQ-2`**
 
-The core test. Creating 100 items through HTTP is slow; seed 100 rows directly through
-`CreateDbContext()` at `100_000_000` down to `1_000_000`, then create the 101st **through the API** so
-`GetNextDisplayOrder` actually runs. (Seeding 100 items needs 100 activities; generate them in one
-`AddRange` + single `SaveChangesAsync`.)
+The core test. **Write the one-row version** — it isolates the sentinel exactly and costs one seed row:
 
-Correct behaviour: the 101st item gets `0`, and the 102nd gets `-1_000_000`. Negative orders are fine —
-the column is `bigint` and the ladder is descending by design.
+Seed a single item in a fresh priority group with `DisplayOrder = 0`, then create one **through the
+API** so `GetNextDisplayOrder` actually runs.
+
+Correct behaviour: the new item gets `-1_000_000`. Negative orders are fine — the column is `bigint`
+and the ladder is descending by design. Today it gets `100_000_000`, because `?? 0` makes "the group is
+empty" and "the lowest item sits at 0" the same signal.
 
 ```csharp
-[Fact(DisplayName = "CQ-2: the 101st item in a priority group continues the ladder instead of resetting to DisplayOrderStart")]
+[Fact(DisplayName = "CQ-2: an item created into a group whose lowest DisplayOrder is 0 continues the ladder instead of resetting to DisplayOrderStart")]
 [Trait("Status", "KnownGap")]
 ```
 
-Today the 101st gets `100_000_000`. Assert the strongest form: **every item in the group has a distinct
-`DisplayOrder`** after the 101st is created. That assertion survives any change to the arithmetic and is
-the property the user actually cares about.
+Assert the strongest form available: **every item in the group has a distinct `DisplayOrder`** after the
+create. That survives any change to the arithmetic and is the property the user actually cares about.
 
-If 101 items is too slow for the suite's budget, seed 99 rows from `2_000_000` down so the 100th lands
-on `1_000_000` and the 101st on `0` — same boundary, or better, seed a *single* item at `DisplayOrder =
-0` and create one through the API. That is the minimal reproduction: with one item at 0 in the group,
-the next item gets `DisplayOrderStart` instead of `-1_000_000`. **Prefer this version** — it is one seed
-row and it isolates the sentinel exactly.
+The full-scale version, if you want the boundary itself on record: seed 101 rows at `100_000_000` down
+to `0`, then create the 102nd through the API — it must get `-1_000_000`. (101 items need 101
+activities, because of trap 1; generate them in one `AddRange` + a single `SaveChangesAsync`.) This is
+slow and asserts nothing the one-row version doesn't, so treat it as optional.
 
 ### 5. **`CQ-3` — the `int` cast**
 
@@ -129,8 +132,9 @@ too blunt for this codebase's taste, the alternative is to make the seeder's nex
 internal method and unit-test it — but the guard is cheaper and catches the actual regression, which is
 divergence rather than wrongness.
 
-While you are there: the class is `TodoListItemSeeder` in a file named `TodoListSeeder.cs`, and
-`docs/domain-map.md:79` calls it `dev/TodoListSeeder`. See `CQ-13` and `DOC-2`.
+While you are there: the class is `TodoListItemSeeder` in a file named `TodoListSeeder.cs`.
+`docs/domain-map.md:142` now documents that mismatch rather than getting it wrong; renaming the file
+lets that clause go. See `CQ-13` and `DOC-2`.
 
 ## Related findings
 

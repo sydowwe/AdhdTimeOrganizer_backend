@@ -124,6 +124,11 @@ only writing tests, write the test asserting the *correct* behaviour, add
 `[Trait("Status", "KnownGap")]`, and put the finding ID in the `DisplayName`:
 
 ```csharp
-[Fact(DisplayName = "CQ-2: the 101st item in a priority group must not reset to DisplayOrderStart")]
+[Fact(DisplayName = "CQ-2: an item created into a group whose lowest DisplayOrder is 0 must not reset to DisplayOrderStart")]
 [Trait("Status", "KnownGap")]
 ```
+
+There is **no** `[Trait("Status", "KnownGap")]` anywhere in the test project today, so the first prompt
+to use one is establishing the convention rather than following it. That is intended — but it means the
+filter you would use to list known gaps (`dotnet test --filter Status!=KnownGap`) is not wired into any
+CI step yet. Check before you rely on it.

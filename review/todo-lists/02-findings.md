@@ -3,6 +3,29 @@
 Point-in-time snapshot, 2026-08-31. Severity: 🔴 blocker · 🟠 important · 🟡 polish.
 Every finding carries a `Doc impact:` line naming what the fixer must reconcile in the living docs.
 
+## Recheck — pass 2, 2026-08-31
+
+Every finding below was re-read against the source, not carried forward on trust.
+
+**Nothing has been fixed in code.** The slice's last code commit is `e27158d` (2026-08-19); today's
+`6079f93` touched `AdhdTimeOrganizer.TodoLists/docs/` only. So **every `SEC-`, `CQ-` and `PERF-`
+finding is confirmed at the file and line stated**, with the corrections listed here.
+
+| Change in this pass | Where |
+|---|---|
+| `DOC-1` **resolved** by `6079f93` — the settings row now reads `MaxItems` / `DisplayOrderGap` with `DisplayOrderStart` derived | `domain-map.md:53` |
+| `DOC-3` **resolved** by `6079f93` — both docs now give flat, real paths and say so explicitly | `domain-map.md:32`, `:46-54` |
+| `DOC-2` **half resolved** — the doc now names both the class and the file; the file rename is still open, and stays inside `CQ-13` | `domain-map.md:142` |
+| `DOC-4` **narrowed** — `summary.md` no longer enumerates the five writers, so only the domain map and two XML docs still do | see `DOC-4` |
+| `DOC-5` **renumbered** — the invariant it contradicts is now **3**, at `domain-map.md:154-157`, not 2 at `:84` | see `DOC-5` |
+| `CQ-2` **off-by-one corrected** — the 101st item is fine; the **102nd** is the collision | see `CQ-2` |
+| `CQ-16` **rewritten** — the original mis-stated where `Steps` is written; the defect is real but lives one file over | see `CQ-16` |
+| `CQ-19` **new** 🟠 — a PUT regenerates every step's `Guid`, invalidating the step routes | see `CQ-19` |
+| `DOC-6` **new** 🟡 — `summary.md` claims the API cannot produce `DoneCount` with a null `TotalCount`; two endpoints do | see `DOC-6` |
+| Stale doc line refs repaired throughout — `summary.md` was rewritten today, so every `summary.md:NN` in the original pass pointed at the old file | this file, `03-risks-rollout.md` |
+
+---
+
 **Previously known / not re-flagged:**
 
 - Auditing is not wired anywhere in this solution (`CLAUDE.md`). Nothing in this slice writes an audit
@@ -49,7 +72,7 @@ a value they were allowed to send.
 on either miss. `AfterMapping` already returns `bool`, so the plumbing exists — the false path is what
 it is for.
 
-`Doc impact: domain-map.md → Invariants (2 — restate as "the filter scopes reads; FK ids on write must be verified explicitly")`
+`Doc impact: domain-map.md → Invariants (3 — restate as "the filter scopes reads; FK ids on write must be verified explicitly")`
 
 ### SEC-2 🟠 `ChangePriorityTodoListItemEndpoint` writes an unverified `TaskPriorityId`
 
@@ -176,10 +199,16 @@ return lastOrder != 0 ? lastOrder - settings.DisplayOrderGap : settings.DisplayO
 
 **Failure scenario, and it is reachable by construction.** `appsettings.json:11-13` sets
 `MaxItems: 100`, `DisplayOrderGap: 1000000`, so `DisplayOrderStart` is `100_000_000` and each new item
-in a priority group sits one gap below the last. After exactly **100** items the minimum is `0`, the
-sentinel misfires, and item 101 is handed `100_000_000` — back at the very top of the group, colliding
-with item 1's original order. Every subsequent item then repeats the cycle. `MaxItems` is literally the
-number at which this breaks; nothing enforces it as a cap.
+in a priority group sits one gap below the last: item *n* lands on `100_000_000 - (n-1) × 1_000_000`.
+The **101st** item therefore lands on exactly `0` — still correct. It is the **102nd** that breaks: the
+group's minimum is now `0`, the sentinel misfires, and it is handed `100_000_000` — back at the very top
+of the group, colliding with item 1's original order. Every subsequent item repeats the cycle, so from
+there on the group's order is scrambled rather than merely dense. `MaxItems` is one off the count at
+which this breaks; nothing enforces it as a cap either way.
+
+*(Recheck note: the first pass said "after exactly 100 items … item 101". Off by one — it is item 102
+that resets. The minimal reproduction is unaffected and is the one the test prompt prefers: seed a
+single item at `DisplayOrder = 0` and create one through the API.)*
 
 **Fix.**
 
@@ -383,9 +412,10 @@ introduces them.
 
 `infrastructure/persistence/seeder/dev/TodoListSeeder.cs`. Three separate things:
 
-1. **The class is `TodoListItemSeeder`** (`:12`) in a file called `TodoListSeeder.cs`, and
-   `docs/domain-map.md:79` calls it `dev/TodoListSeeder`. Per `CLAUDE.md`, files are assigned by what
-   the type *is* — but here the type and the file disagree with each other. Rename the file.
+1. **The class is `TodoListItemSeeder`** (`:12`) in a file called `TodoListSeeder.cs`. Per `CLAUDE.md`,
+   files are assigned by what the type *is* — but here the type and the file disagree with each other.
+   Rename the file. *(Recheck: `domain-map.md:142` now documents the mismatch instead of getting it
+   wrong — see DOC-2 — so this is the only side still open. Call it `CQ-13.1` when scheduling it.)*
 2. **`:28` says "TruncateTable already removed existing data for this user".** It did not:
    `TruncateTableCascadeAsync<TodoListItem>()` (`:22`) truncates the table for *every* user. Harmless in
    dev, but the comment will mislead whoever next reads it for the per-user seeder contract.
@@ -396,7 +426,7 @@ introduces them.
 **Fix.** Rename the file; correct the comment; replace `:80-93` with three calls to
 `dbContext.Set<TodoListItem>().GetNextDisplayOrder(settings.Value, userId, priorityId, ct)`.
 
-`Doc impact: domain-map.md → Seeding (the dev seeder's class name); summary.md → Gotchas (same)`
+`Doc impact: domain-map.md → Seeding (drop the "the file is named TodoListSeeder.cs" clause once renamed)`
 
 ### CQ-14 🟡 `TaskPriorityRequest.Priority` is `short` where everything around it is `int`
 
@@ -432,22 +462,63 @@ conventions happened to agree and the call is now a guard; if it is not, that di
 
 `Doc impact: none`
 
-### CQ-16 🟡 `UpdateTodoListItemRequest.UpdateEntity` bypasses `SetDone`
+### CQ-16 🟡 The update path bypasses `SetDone`, and it is split across two files
 
-`application/dto/request/UpdateTodoListItemRequest.cs:18-20` writes `IsDone`, `DoneCount` and the
-`Steps` collection as three independent assignments.
-`BaseTodoListItem.SetDone` (`domain/model/entity/BaseTodoListItem.cs:20-27`) exists specifically to
-"snap `IsDone`, `DoneCount` … and every step's `IsDone` together, so the three representations of
-'done' can't drift apart the way they did when callers set them separately" — and this is a caller
-setting them separately. A PUT can produce `IsDone = true` with every step unticked.
+*Rewritten in the recheck.* The original text said `UpdateEntity` writes the `Steps` collection. It does
+not — `UpdateTodoListItemRequest.UpdateEntity` (`application/dto/request/UpdateTodoListItemRequest.cs:15-28`)
+never touches `Steps`. The defect is real, but the writes are split:
+
+- `UpdateEntity:18` and `:20` set `IsDone` and `DoneCount` as two independent assignments;
+- `UpdateTodoListItemEndpoint.AfterMapping` (`application/endpoint/todoListItem/command/UpdateTodoListItemEndpoint.cs:19-29`)
+  then replaces the whole `Steps` collection and separately defaults `DoneCount` to 0.
+
+So the three representations of "done" are set in two files, in three places, none of which consults
+the others. `BaseTodoListItem.SetDone` (`domain/model/entity/BaseTodoListItem.cs:20-27`) exists
+specifically to "snap `IsDone`, `DoneCount` … and every step's `IsDone` together, so the three
+representations of 'done' can't drift apart the way they did when callers set them separately" — and
+nothing on this path calls it. A PUT can produce `IsDone = true` with every step unticked, or
+`DoneCount = 3` on an item whose steps are all open. `UpdateTodoListItemValidator:22-26` bounds
+`DoneCount <= TotalCount` and nothing else.
 
 The interceptor still stamps `CompletedTimestamp` correctly (it watches only `IsDone`), so the recap is
 unaffected; the damage is confined to the item's own display.
 
-**Fix.** Have `UpdateEntity` assign the non-done fields, then call `e.SetDone(IsDone)` last, after the
-steps have been replaced.
+**Fix.** Leave `UpdateEntity` to the non-done fields, and end `AfterMapping` — after the steps have been
+replaced — with `entity.SetDone(req.IsDone)`. That is the one ordering in which the helper can do its job.
 
 `Doc impact: none`
+
+*(`CQ-19`, immediately below, is the other half of this endpoint's problem and shares its one-line fix.
+It is numbered out of sequence because it was found in the second pass; `CQ-17` and `CQ-18` follow it.)*
+
+### CQ-19 🟠 A PUT regenerates every step's `Guid`, breaking the step routes *(new in the recheck)*
+
+`application/endpoint/todoListItem/command/UpdateTodoListItemEndpoint.cs:20-26` rebuilds the collection
+with `new TodoListStep { Name = …, Order = …, Note = …, IsDone = … }` — and never assigns `Id`.
+`TodoListStep.Id` defaults to `Guid.NewGuid()` (`domain/model/entity/TodoListStep.cs:5`) and the column
+is `ValueGeneratedNever()` (`infrastructure/persistence/TodoListEntityConfigurationExtensions.cs:25`),
+so the value written is whatever the constructor minted — a **fresh id for every step, on every update**.
+The incoming `StepRequest.Id` (`application/dto/request/step/StepRequest.cs:7`) is read at `:25` only to
+carry `IsDone` across, then discarded.
+
+**Why it matters.** The step id is a public key: three routes take it in the path —
+`PATCH /todo-list-item/{itemId}/steps/{stepId}/toggle`, `PUT …/steps/{stepId}`,
+`DELETE …/steps/{stepId}`. After any PUT of the parent item, every id the client is holding is gone, and
+all three return 404 against a step that is visibly on screen. The user-visible shape is "edit the task,
+then ticking a checklist line does nothing until you reload". It also defeats the `IsDone` carry-over
+one line above it: the lookup matches on the id the client echoed back, so it works exactly once — on
+the next PUT the client is echoing ids that no longer exist and every step silently reverts to
+`IsDone = false`.
+
+Steps are `ToJson`-owned, so this is not a row churn issue; it is purely identity loss. Nothing in the
+suite pins it — `TodoListStepsCrudTests` exercises the step routes and `TodoListItemPairingTests:123`
+exercises the PUT, but no test does a PUT *and then* uses a step id.
+
+**Fix.** `Id = s.Id ?? Guid.NewGuid()`, and match `IsDone` off the same id. Better still, reconcile in
+place — update the steps that came back with an id, add the ones without, remove the ones the request
+dropped — so a step's identity survives an edit the way its parent's does.
+
+`Doc impact: domain-map.md → Entities (TodoListStep row: say the client-supplied Guid is a stable public key, since three routes take it)`
 
 ### CQ-17 🟡 Validators are attached inconsistently
 
@@ -522,69 +593,79 @@ ChangeTracker — which is safe *here*, because the rebalance touches only `Disp
 
 ## Code/doc drift
 
-### DOC-1 🟡 `TodoListSettings`' documented members do not exist
+### DOC-1 ✅ Resolved by `6079f93` — `TodoListSettings`' documented members
 
-`docs/domain-map.md:49` — "`settings/TodoListSettings.cs` | `DisplayOrderStart` / `DisplayOrderGap`."
-The record (`infrastructure/settings/TodoListSettings.cs:3-9`) has `MaxItems` and `DisplayOrderGap` as
-bound members; `DisplayOrderStart` is a *derived* `MaxItems * DisplayOrderGap`. Anyone trying to set
-`DisplayOrderStart` in `appsettings.json` gets a silently-ignored key
-(`appsettings.json:11-13` correctly sets the other two).
+The first pass found `domain-map.md:49` advertising a configurable `DisplayOrderStart`, which does not
+exist as a bound member. Today's doc commit rewrote that row: `domain-map.md:53` now reads "`MaxItems`,
+`DisplayOrderGap`; `DisplayOrderStart` is **derived** (`MaxItems * DisplayOrderGap`), not configured",
+matching `infrastructure/settings/TodoListSettings.cs:5-8` exactly. No action.
 
-**Which side is wrong:** the doc. **Fix:** `` `MaxItems` / `DisplayOrderGap`, with `DisplayOrderStart` derived from both ``.
-Worth saying explicitly, because `MaxItems` reads like a cap and is not enforced as one — it is only a
-multiplier, which is the confusion at the heart of CQ-2.
+One thing the original fix note asked for did **not** land, and is worth adding when `CQ-2` is fixed:
+`MaxItems` reads like a cap and is not enforced as one — it is only a multiplier. That confusion is the
+heart of `CQ-2`, and the row is the natural place to say so.
 
-`Doc impact: domain-map.md → Configuration table (TodoListSettings row)`
+`Doc impact: domain-map.md → Configuration table (one clause: MaxItems is a multiplier, not a cap)`
 
-### DOC-2 🟡 The dev seeder is documented under a name no type has
+### DOC-2 🟡 The dev seeder's file name — doc side fixed, code side open
 
-`docs/domain-map.md:79` names `dev/TodoListSeeder`; the class is `TodoListItemSeeder`. See CQ-13 —
-here the code is the side to change (rename the file to match the class), and the doc follows.
+The first pass found `domain-map.md:79` naming a `dev/TodoListSeeder` type that does not exist.
+`6079f93` fixed the doc the honest way: `domain-map.md:142` now names the class `TodoListItemSeeder` and
+states in bold that the file is `TodoListSeeder.cs`. `summary.md:12` likewise says "the
+`TaskPrioritySeeder` / dev `TodoListItemSeeder` pair".
 
-**Which side is wrong:** both. **Fix:** rename `TodoListSeeder.cs` → `TodoListItemSeeder.cs`, then update
-the doc to `dev/TodoListItemSeeder`.
+What remains is the code side — the file still disagrees with the class it holds. That is `CQ-13.1`;
+this finding stays open only as its doc follow-up, and shrinks to a one-line edit once the file is
+renamed.
 
-`Doc impact: domain-map.md → Seeding; summary.md → Bounded context ("the TaskPrioritySeeder / TodoListSeeder pair")`
+**Which side is wrong:** now the code only. **Fix:** rename `TodoListSeeder.cs` → `TodoListItemSeeder.cs`,
+then drop the "the file is named…" clause from the doc, which exists only to describe the mismatch.
 
-### DOC-3 🟡 The navigation index's paths are namespaces, not folders
+`Doc impact: domain-map.md → Seeding (remove the mismatch clause after the rename)`
 
-`docs/domain-map.md:28`, `:43-50` point at `domain/model/entity/todoList/`,
-`infrastructure/persistence/configuration/todoList/…`, `configuration/extensions/…`, `extensions/…`.
-On disk the entities are in `domain/model/entity/` (flat), the configurations in
-`infrastructure/persistence/configuration/` (flat), and both extension files sit directly in
-`infrastructure/persistence/`. The *namespaces* match the doc — the folders do not.
+### DOC-3 ✅ Resolved by `6079f93` — navigation-index paths
 
-That matters more than usual here, because the index's stated job is "open only what you need": a
-reader following `infrastructure/persistence/configuration/extensions/TodoListEntityConfigurationExtensions.cs`
-finds nothing. `docs/summary.md:60` has the same issue
-(`infrastructure/persistence/interceptor/` is correct; the configuration paths around it are not).
+The first pass found the index pointing at `domain/model/entity/todoList/`,
+`configuration/extensions/…` and similar — namespaces rendered as folders, so following them found
+nothing. `6079f93` rewrote both files against the real tree: `domain-map.md:32` now says outright
+"Files are flat in that folder; the namespace is …", the configuration table (`:46-54`) gives real flat
+paths, and `summary.md:104-109` calls out the namespace/folder divergence as a gotcha in its own right.
+Spot-checked every path in the table against disk — all resolve. No action.
 
-**Which side is wrong:** the doc, unless someone wants to move the files to match the namespaces (which
-would be the tidier outcome and is a no-op for the build).
+`Doc impact: none`
 
-`Doc impact: domain-map.md → Configuration table + Entities heading (paths)`
+### DOC-4 🟡 The interceptor's five documented `IsDone` writers are not the five that exist *(narrowed)*
 
-### DOC-4 🟡 The interceptor's five documented `IsDone` writers are not the five that exist
+Two copies remain, not three. `summary.md` was rewritten today and its interceptor bullet
+(`summary.md:63-72`) no longer enumerates the writers at all, which is the right call. Still listing
+them: `domain/model/entity/TodoListItem.cs:29-34` ("five-odd places … the two toggle bases, the step
+toggle, the update request and the host's `ActivityTimeRecordedEventHandler`"),
+`infrastructure/persistence/interceptor/TodoListItemCompletionInterceptor.cs:13-16` (the same five, but
+with `BaseTodoListItem.SetDone` substituted in), and `domain-map.md:167-171` (invariant 8, "five places
+that write `IsDone`", unenumerated).
 
-`domain/model/entity/TodoListItem.cs:31-33`, `infrastructure/persistence/interceptor/TodoListItemCompletionInterceptor.cs:13-16`
-and `docs/domain-map.md:93-95` all list the same five: the two toggle bases, the step toggle,
-`BaseTodoListItem.SetDone`, `UpdateTodoListItemRequest`, and the host's `ActivityTimeRecordedEventHandler`.
+The two enumerations disagree with each other, and the interceptor's is the wrong one. `SetDone` is not
+a peer of the endpoints — it is the shared helper the *host's* fan-out handlers call
+(`CompletionFanOutTests:82`), and nothing in this slice calls it: the toggle bases use `IsDoneLogic`
+(`BaseToggleIsDoneTodoListEndpoint.cs:73`), which duplicates it, and the update path sets the fields by
+hand (CQ-16). Listing it beside the endpoints implies this slice's toggles go through it, which is the
+opposite of the truth and is exactly the misreading that lets CQ-16 look harmless.
 
-`SetDone` is not a peer of the others — it is the shared helper the host's fan-out handlers call
-(`CompletionFanOutTests:82`), not an independent write site, and no endpoint in this slice calls it
-(the toggle bases use `IsDoneLogic`, which duplicates it — see CQ-16). Listing it alongside the
-endpoints implies this slice's toggles go through it, which is the opposite of the truth and is exactly
-the misreading that lets CQ-16 look harmless.
+**Which side is wrong:** the doc (two copies now). **Fix:** make both enumerations the same four
+in-slice write sites — `BaseToggleIsDoneTodoListEndpoint.IsDoneLogic`,
+`BaseToggleStepIsDoneEndpoint.ApplyStepToggle`, `UpdateTodoListItemRequest.UpdateEntity`, and the host's
+`ActivityTimeRecordedEventHandler` — and name `SetDone` separately as the helper the host's handlers use.
 
-**Which side is wrong:** the doc (three copies of it). **Fix:** list the actual write sites and mark
-`SetDone` as the helper the *host's* handlers use.
+`Doc impact: domain-map.md → Invariants (8); TodoListItem.cs + TodoListItemCompletionInterceptor.cs XML docs`
 
-`Doc impact: domain-map.md → Invariants (5); summary.md → Gotchas (the interceptor bullet); TodoListItem.cs + TodoListItemCompletionInterceptor.cs XML docs`
+### DOC-5 🟠 Invariant 3 asserts a scoping rule the slice does not follow in either direction
 
-### DOC-5 🟠 Invariant 2 asserts a scoping rule the slice does not follow in either direction
+*Renumbered in the recheck: this was invariant 2 at `domain-map.md:84` before `6079f93`; it is now
+invariant **3**, at `domain-map.md:154-157`. The finding itself is unchanged — the doc rewrite appended
+"The seams and `TodoListExtensions` deliberately pass an explicit `userId` on top of it", which
+acknowledges half of the contradiction without resolving it.*
 
-`docs/domain-map.md:84-87`: "**Per-user scoping is the DbContext's job**, via the global filter on
-`IEntityWithUser` — not the endpoints (`ApplyUserScoping` is a no-op virtual)."
+`docs/domain-map.md:154-157`: "**Per-user scoping is the DbContext's job**, via the named global filter
+on `IEntityWithUser` — not the endpoints (`ApplyUserScoping` is a no-op virtual)."
 
 The code disagrees both ways:
 
@@ -606,7 +687,40 @@ whose rows the response is built from, and **any FK id accepted on a write**, mu
 verified explicitly, because the filter can be lifted with `IgnoreQueryFilters` and does not apply to
 writes at all. Then fix SEC-4 so the exceptions list is empty.
 
-`Doc impact: domain-map.md → Invariants (2 — rewrite)`
+`Doc impact: domain-map.md → Invariants (3 — rewrite)`
+
+### DOC-6 🟡 `summary.md` says the API cannot produce `DoneCount` with a null `TotalCount`; two endpoints do *(new in the recheck)*
+
+`docs/summary.md:90-96`, on the check-constraint hole: "`CK_{Entity}_DoneCount_LessOrEqual_TotalCount`
+is `done_count IS NULL OR total_count IS NULL OR …`, so Postgres accepts `DoneCount` set with
+`TotalCount` NULL. **The API surface never produces it** (the create validator rejects the combination);
+direct EF writes can."
+
+The second sentence is false in both halves. Neither validator has a rule tying `DoneCount` to a present
+`TotalCount` — `CreateTodoListItemValidator` (`application/validator/CreateTodoListItemValidator.cs:9-50`)
+never mentions `DoneCount` at all, and `UpdateTodoListItemValidator:22-26` bounds the pair only
+`.When(x => x.DoneCount.HasValue && x.TotalCount.HasValue)`. And two ordinary endpoints write the state
+directly:
+
+- `CreateTodoListItemEndpoint.cs:29-33` — creating an item **with steps and no `TotalCount`** sets
+  `entity.DoneCount = 0` inside the `req.Steps is { Count: > 0 }` arm, before the `TotalCount` arm is
+  even considered.
+- `BaseCreateStepEndpoint.cs:43-44` — adding a step to any item does `if (parent.DoneCount is null)
+  parent.DoneCount = 0`, regardless of whether that item is step-counted.
+
+So every plain checkbox item that has ever had a step attached carries `DoneCount = 0` with
+`TotalCount = null`. The value is harmless — `IsDoneLogic` branches on `TotalCount.HasValue`, not on
+`DoneCount`, so nothing misreads it — but the doc is a load-bearing claim about what the constraint hole
+can and cannot be reached by, and `TodoListToggleAndDoneCountTests.CheckConstraint_BypassedWhenTotalCountIsNull`
+is cited right beside it as the pin. A future reader will use that sentence to decide the hole is
+theoretical.
+
+**Which side is wrong:** the doc. **Fix:** say that the API *does* produce `DoneCount = 0` with a null
+`TotalCount` (via the two sites above), that it is benign because the state machine keys off
+`TotalCount`, and that what remains unreachable is a **non-zero** `DoneCount` without a `TotalCount`. If
+that is not the intent, the fix is in the code instead: leave `DoneCount` null unless `TotalCount` is set.
+
+`Doc impact: summary.md → Gotchas (the "DoneCount is step-counted" bullet)`
 
 ---
 
@@ -623,8 +737,8 @@ writes at all. Then fix SEC-4 so the exceptions list is empty.
 - `BaseToggleIsDoneTodoListEndpoint.cs:30-35` returns 404 only when *no* requested id resolved; a batch
   with one valid and one foreign id silently succeeds on the subset.
 - `GetSelectOptionsTaskPriorityEndpoint.cs:8` and `GetSelectOptionsTodoListEndpoint.cs:7` name their
-  constructor parameter `appDbContext` — the one name `docs/summary.md:34` says never appears in this
-  project.
+  constructor parameter `appDbContext` — the one name `docs/summary.md:39-43` says never appears in this
+  project. *(Line ref repaired in the recheck; `summary.md` was rewritten by `6079f93`.)*
 - `GridTaskPriorityEndpoint.cs:15` and `FilterSortTodoListEndpoint.cs:14` use case-sensitive
   `Contains` for name search; `GetFilterSortTodoListCategoryEndpoint.cs:38` does the same. Postgres
   `LIKE` is case-sensitive, so all three name filters miss on capitalisation.
