@@ -10,8 +10,12 @@ suite asserts "a clean 400 from FluentValidation rather than a 500 from ... DB c
 It cannot tell the difference. `DbUtils.HandleException`
 (`framework/Sydowwe.Framework/infrastructure/persistence/DatabaseExceptionUtils.cs:30-31`) maps
 `PostgresErrorCodes.CheckViolation` → `ValidationError` → **400**. So a request that no validator rule
-touches still comes back 400, after a wasted database round-trip, carrying the raw Postgres message
-(`SEC-4`) instead of a field-keyed error.
+touches still comes back 400, after a wasted database round-trip, carrying the generic
+`"Validation error during HandleAsync"` instead of a field-keyed error the form can attach to an input.
+
+(The Postgres text itself is *not* leaked: `DbUtils` puts `pgEx.Message` in `Result.Error`'s third
+argument, and the endpoint bases only ever call `AddError(result.ErrorMessage!)` — the second. An
+earlier draft of this prompt claimed otherwise.)
 
 Three of the ten tests are green for exactly that wrong reason, because
 `application/validator/RoutineTimePeriodValidator.cs` has **no `HistoryDepth` rule at all** and **no
@@ -49,7 +53,8 @@ upper bound on `LengthInDays`**:
 
 The name says "UpdatesPeriod" and the body asserts `period.LastResetAt.Should().NotBeNull()`. The
 single-item `TryReset` overload **deliberately never touches `LastResetAt`** — that is its entire
-documented contract (`RoutineResetService.cs:161-169`, restated at `domain-map.md:42`), and advancing
+documented contract (`RoutineResetService.cs:161-169`, restated in `domain-map.md`'s Domain services
+table), and advancing
 it there would let the step-toggle path silently consume a reset cycle with no streak evaluation. The
 assertion passes only because the fixture constructs the period with `lastResetAt: UtcNow.AddDays(-8)`.
 It would pass if the method body were deleted.

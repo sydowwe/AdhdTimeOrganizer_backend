@@ -2,8 +2,14 @@
 
 Read `_SHARED-CONTEXT.md` first.
 
-Two unrelated bugs live on these two endpoints and neither has a test of any kind today. Write both
-groups; they share a fixture.
+Two unrelated bugs live on these two endpoints. Write both groups; they share a fixture.
+
+> **What already exists.** `Endpoints/TodoListCrudAuthMatrixTests.cs` has
+> `CreateRoutineTodoListEndpointTests`, `UpdateRoutineTodoListEndpointTests` and
+> `DeleteRoutineTodoListEndpointTests`, which cover the framework bases' generic cases: happy path,
+> another user's **entity id** (404), and the role gate. **Do not re-write any of that.** Everything
+> below is about behaviour those base cases cannot see — in particular a foreign **foreign key in the
+> body**, which is a different ownership question from a foreign row id and is the one that is broken.
 
 ## Endpoints
 
@@ -38,9 +44,10 @@ Tests:
   one and say which in the assertion message). **Then verify no row was written**: query
   `RoutineTodoList` for `TimePeriodId == otherPeriodId` through a fresh context and expect empty. The
   status code alone is not the point.
-- `Create_WithANonexistentTimePeriodId_IsRejected` — `timePeriodId: 999999999`. Today the FK would
-  reject this at the DB layer, so it may already "pass"; assert the response is a clean 400, not a
-  Postgres FK message (see `SEC-4`).
+- `Create_WithANonexistentTimePeriodId_IsRejected` — `timePeriodId: 999999999`. Today the FK rejects
+  this at the DB layer and `DbUtils` maps it to `DbForeignKeyError` → **409** (`EndpointHelper.cs:14`),
+  so it already "passes" for the wrong reason. Assert the status you want the *validator* to give
+  (400) and say in the assertion message that a 409 means the request reached the database.
 - `Update_MovingAnItemIntoAnotherUsersPeriod_IsRejected` — create a legitimate item, then `PUT` it with
   `timePeriodId` set to the other user's period. Expect rejection **and** verify through a fresh
   context that the stored row's `TimePeriodId` is unchanged.
@@ -54,13 +61,14 @@ own and threshold 100, run the reset job via `RunJobAsync` (copy from
 `RoutinePeriodCompletion.TotalCount == 1`. That pins the *consequence* rather than the input
 validation, so it keeps its value whatever shape the fix takes.
 
-## Group 2 — `SEC-2`: `PUT` flips `IsDone` without the cross-slice event (🟠)
+## Group 2 — `SEC-2`: `PUT` writes `IsDone` / `DoneCount` / `DisplayOrder` raw (🟠)
 
-`application/dto/request/UpdateRoutineTodoListRequest.cs:16` assigns `e.IsDone = IsDone` directly,
-bypassing `BaseTodoListItem.SetDone` (which reconciles `DoneCount` against the steps),
-`RoutineResetService.UpdateItemStreak`, and — critically —
+`application/dto/request/UpdateRoutineTodoListRequest.cs:16-18` assigns `e.IsDone`, `e.DoneCount` and
+`e.DisplayOrder` straight from the body, bypassing the toggle logic in
+`BaseToggleIsDoneTodoListEndpoint.IsDoneLogic` (which reconciles `DoneCount` against `TotalCount`
+**and** the steps), `RoutineResetService.UpdateItemStreak`, and — critically —
 `RoutineTodoListIsDoneChangedEvent.PublishAsync`, which is the **only** channel by which Planning's
-`PlannerTaskIsDoneChangedEventHandler` learns a routine was completed (`summary.md:28-34`).
+`PlannerTaskIsDoneChangedEventHandler` learns a routine was completed (`summary.md` → Bounded context).
 Cross-slice handlers log-and-swallow, so the desync is silent and permanent.
 
 Tests:
@@ -85,6 +93,11 @@ Decide the fix first, then write the version that matches; do not write both.
 - `Create_SetsDisplayOrderWithinItsPeriod` — `AfterMapping` calls the routine-shaped
   `GetNextDisplayOrder` grouped by `TimePeriodId` (`infrastructure/persistence/extensions/RoutineTodoListExtensions.cs`).
   Two items in two different periods should not interleave their orders.
+- `Update_MovingAnItemBetweenOwnPeriods_ReDerivesDisplayOrder` — see `CQ-15`. `DisplayOrder` is scoped
+  per period, and the `PUT` reassigns `TimePeriodId` without re-deriving it, so a moved item keeps an
+  order that means nothing in its destination. Seed two of the caller's **own** periods with two items
+  each, `PUT` one item across, and assert its order is consistent with the destination's. **Fails
+  today**; tag `KnownGap` naming `CQ-15` if the fix is deferred.
 - `Update_PreservesStepIdentity` — see `CQ-4`: `UpdateRoutineTodoListEndpoint.cs:20-27` rebuilds every
   step as a new object, so ids churn on every save. Capture the step ids before the `PUT` and assert
   they are the same afterwards. **This fails today**; tag `KnownGap` naming `CQ-4` if the fix is

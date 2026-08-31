@@ -5,8 +5,10 @@ Read this first; each prompt in this folder assumes it and does not repeat it.
 ## Where things live
 
 - **Module under test:** `AdhdTimeOrganizer.Routines` (a vertical slice). Its living docs are
-  `AdhdTimeOrganizer.Routines/docs/summary.md` and `docs/domain-map.md` — read `summary.md` before
-  writing anything. Note the docs' folder paths are stale (see `DOC-1`); trust the tree, not the doc.
+  `AdhdTimeOrganizer.Routines/docs/summary.md`, `docs/domain-map.md` and `docs/testing.md` — read
+  `summary.md` before writing anything. The docs' folder paths are **accurate** as of 2026-08-31; what
+  is stale is the *namespaces*, which still carry a `todoList` segment the folders no longer have.
+  `domain-map.md` says so at the top: trust the path column, not the namespace.
 - **Test project:** `AdhdTimeOrganizer.IntegrationTests` (the host's suite — this slice has no test
   project of its own). Routine tests live in `Routines/` (jobs, notifications, freeze) and `Endpoints/`
   (HTTP-level CRUD and constraints); pure-domain tests live in `Services/`.
@@ -63,6 +65,13 @@ read nothing off it).
 
 ## Conventions
 
+- **Check what already exists before writing.** Four shared suites cover routine routes without
+  "Routine" in the filename: `Endpoints/TodoListCrudAuthMatrixTests.cs` (create / update / delete /
+  get-by-id on **both** routine entities, with foreign-id and role cases),
+  `Endpoints/TodoListDeleteBehaviorTests.cs` (the `Restrict` FK on period delete),
+  `Endpoints/TodoListStepsCrudTests.cs` (one routine cross-check of the shared step base) and
+  `Endpoints/BaseToggleIsHiddenEndpointTests.cs` (drives the base through the routine endpoint).
+  Search by **route** (`api/routine-…`), not by filename.
 - **Assert on rows and recomputed state, not on status codes.** Almost every failure mode in this
   module is silent — CLAUDE.md's "Silent failures" section is the house rule and these suites follow
   it. A test that only checks a 200 is not worth adding here.

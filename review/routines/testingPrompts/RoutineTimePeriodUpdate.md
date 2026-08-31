@@ -72,7 +72,8 @@ request record has no such properties, so a JSON body carrying them is simply ig
   is the easier way to hit them by accident.
 - `Update_LoweringLengthInDaysBelowStreakGraceDays_Returns400` — the cross-field rule
   (`RoutineTimePeriodValidator:25-28`, `graceDays < lengthInDays`) evaluated against the *new* length.
-- IDOR: `PUT` on another user's period → 404, stored row unchanged. (Or leave it to
-  `RoutineAuthMatrix.md` — pick one, do not write it twice.)
+- IDOR is **already covered** — `Endpoints/TodoListCrudAuthMatrixTests.cs` has
+  `UpdateRoutineTimePeriodEndpointTests`, which asserts that another user's period id is a 404 with the
+  row unchanged. Do not write it again.
 - If `CQ-3` has been fixed, `historyDepth: 0` / `101` and `lengthInDays: 366` should now come back as
   field-keyed validation errors on this path too.

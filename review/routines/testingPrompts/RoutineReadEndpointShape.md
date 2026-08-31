@@ -1,16 +1,26 @@
-# TEST-6 — Read endpoints serve a malformed period (pins `CQ-5`, restores `DOC-4`)
+# TEST-6 — Read endpoints serve a malformed period (pins `CQ-5`, restores `DOC-4` / `DOC-7`)
 
 Read `_SHARED-CONTEXT.md` first.
 
-## Endpoints with zero coverage
+## Endpoints with no *shape* coverage
 
 | Endpoint | File | Base |
 |---|---|---|
 | `GET /api/routine-time-period` | `application/endpoint/routineTimePeriod/query/GetAllRoutineTimePeriodEndpoint.cs` | `BaseGetAllEndpoint` |
 | `GET /api/routine-time-period/{id}` | `.../GetByIdRoutineTimePeriodEndpoint.cs` | `BaseGetByIdEndpoint` |
-| `GET /api/routine-time-period/select-options` | `.../GetSelectOptionsRoutineTimePeriodEndpoint.cs` | `BaseGetSelectOptionsEndpoint` |
+| `GET /api/routine-time-period/all-options/` | `.../GetSelectOptionsRoutineTimePeriodEndpoint.cs` | `BaseGetSelectOptionsEndpoint` |
 | `GET /api/routine-todo-list` | `application/endpoint/routineTodoList/query/GetAllRoutineTodoListEndpoint.cs` | `BaseGetAllEndpoint` |
 | `GET /api/routine-todo-list/{id}` | `.../GetByIdRoutineTodoListEndpoint.cs` | `BaseGetByIdEndpoint` |
+
+> **Route note.** `BaseGetSelectOptionsEndpoint` declares
+> `Get($"/{entityName.Kebaberize()}/all-options/{AddedRouteParam}")` — the path is
+> **`all-options`**, not `select-options`. Check the base rather than guessing; an earlier draft of
+> this prompt had it wrong.
+
+> **Auth is already covered, shape is not.** `TodoListCrudAuthMatrixTests` has
+> `GetByIdRoutineTimePeriodEndpointTests` and `GetByIdRoutineTodoListEndpointTests`, both of which
+> already assert that another user's id is not served. Do **not** duplicate that. Everything below is
+> about what the body contains.
 
 They are one-liners over framework bases, which is why they were skipped — and it is exactly why they
 are broken.
@@ -26,17 +36,24 @@ cannot compute the two derived members. So everything served through a base gets
 - `completionHistory` = `[]`
 
 And `RoutineTodoListResponse.Projection` (`application/dto/response/RoutineToDoListResponse.cs:63-79`)
-builds its nested period by hand and **omits the three freeze fields entirely**, so they serialize as
-`freezesRemaining: 0`, `freezeBudget: 0`, `freezeBudgetResetsAt: null`.
+builds its nested period by hand and **omits four fields entirely** — `ReminderLeadDays` and all three
+freeze fields — so they serialize as `reminderLeadDays: null`, `freezesRemaining: 0`,
+`freezeBudget: 0`, `freezeBudgetResetsAt: null`.
 
-That last one is a real client bug, not cosmetics. `RoutineTimePeriodResponse:23-27` documents the
+The freeze one is a real client bug, not cosmetics. `RoutineTimePeriodResponse:23-27` documents the
 contract: freezes are "always a number once the server supports freezes — the client reads `null` as
 'this server has no freeze feature'". A hard `0` tells the SPA the user has **no freezes left** rather
 than that the feature is absent, so it renders the affordance disabled instead of hidden.
 
-It also breaks `domain-map.md`'s **invariant 5**: these endpoints display `FreezesRemaining` without
-ever calling `RoutineStreakFreezeService.RefreshFreezeBudget`, so the count can be stale as well as
-wrong.
+It also breaks two documented rules at once:
+
+- **Invariant 9** ("the freeze budget is refilled by whoever reads it, not by a job") — these endpoints
+  display `FreezesRemaining` without ever calling `RoutineStreakFreezeService.RefreshFreezeBudget`, so
+  the count can be stale as well as wrong. `summary.md` names three refreshing sites; these are a
+  fourth and a fifth that do not.
+- **The Grace rule** ("`CheckGrace` must run before `TryReset` on *every* access") — they also serve
+  `Streak` straight from the row, so a period whose grace window lapsed yesterday still reports the
+  pre-break streak until some other surface notices.
 
 ## What to write
 
@@ -59,22 +76,33 @@ Tests:
   `2` **and** that the refill was persisted (fresh `CreateDbContext()`, check the row). Copy the shape
   of `RoutineStreakFreezeTests.GroupedRead_ServesTheFreezeFields_AndRefillsAnElapsedWindow` (`:274`),
   which is the same assertion against the endpoint that gets it right — that test is your oracle.
+- `GetAll_ServesALapsedGraceWindowAsABrokenStreak` — seed `Streak = 4` and
+  `StreakGraceUntil = UtcNow.AddDays(-1)`, call `GET /api/routine-time-period`, assert the response
+  reports `streak: 0`. **Fails today** — the read never calls `CheckGrace`. Verify through a fresh
+  context that the break was persisted too, not just projected.
 - `GetTodoList_NestedPeriod_CarriesTheFreezeFields` — `GET /api/routine-todo-list`, assert the nested
-  `routineTimePeriod.freezesRemaining` is the real number, not `0`.
+  `routineTimePeriod.freezesRemaining` is the real number, not `0`, and that `reminderLeadDays` round
+  trips.
 - `SelectOptions_AreSortedByLengthInDays` — the one thing these endpoints do customise
-  (`GetSelectOptionsRoutineTimePeriodEndpoint.cs:11-14`). Seed three periods with lengths 30, 1, 7 and
-  assert the order is 1, 7, 30. Cheap and currently unpinned.
-- `GetById_ForAnotherUsersPeriod_IsNotFound` — both `GetById` endpoints override `AuthorizeAsync` to
-  return `true` and rely entirely on the global query filter, with a comment saying so
-  (`GetByIdRoutineTimePeriodEndpoint.cs:11-12`). That reliance is sanctioned by invariant 3 but is
-  asserted nowhere. Seed a period for `OtherUserId` and expect 404. Do the same for
-  `GET /api/routine-todo-list/{id}`.
+  (`GetSelectOptionsRoutineTimePeriodEndpoint.cs`, the `Sort` override). Seed three periods with
+  lengths 30, 1, 7 and assert the order is 1, 7, 30. Cheap and currently unpinned. Remember the route
+  is `/api/routine-time-period/all-options/`.
+- `ChangeDisplayOrder_ReordersWithinThePeriodOnly` — while you are here.
+  `ChangeDisplayOrderRoutineTodoListEndpoint` sets `GroupFilterExpression => e.TimePeriodId`, and the
+  existing reorder tests all target `todo-list-item`, not this route
+  (`PATCH /api/routine-todo-list/change-display-order`). Seed two periods with two items each, reorder
+  inside one, assert the other period's orders are untouched.
 
 ## Note on the fix
 
-The clean fix is to have the two `GetX` endpoints post-process through `From(period, history, now)`
-rather than the bare `Projection`. If `BaseGetAllEndpoint` does not expose a hook for that, hand-write
-them the way `GetAllGroupedRoutineTodoListEndpoint` already is — a custom endpoint is justified here
-(CLAUDE.md's rule is that custom-ness needs a reason; "the projection cannot compute two of the
-response's members" is one). Once fixed, invariant 5 in `domain-map.md` stands unchanged, which is the
-argument for fixing the code rather than amending the doc.
+Both bases expose the hook already, so no hand-written endpoint is needed:
+
+- `BaseGetAllEndpoint` — `protected virtual Task<List<TResponse>> PostProcessItemsAsync(List<TResponse> items, CancellationToken ct)`
+- `BaseGetByIdEndpoint` — `protected virtual Task<TResponse> PostProcessAsync(TResponse entity, CancellationToken ct)`
+
+Both are documented for exactly this ("override when a response field can only be computed in C#, not
+in SQL"). The wrinkle is that they receive the **response**, not the entity, so the override has to
+re-read the periods (and their history) by id before calling `From(period, history, now)` — which is
+also the natural place to run `RefreshFreezeBudget` and `CheckGrace` and save. Once fixed, invariant 9
+in `domain-map.md` stands unchanged, which is the argument for fixing the code rather than amending the
+doc.
