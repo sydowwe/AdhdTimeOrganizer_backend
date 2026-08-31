@@ -1,0 +1,86 @@
+# AdhdTimeOrganizer.Planning — Review 03: Risks & Rollout
+
+> Synthesis of [`02-findings.md`](02-findings.md) and [`01-testing.md`](01-testing.md). Ids link back;
+> nothing is restated here. Point-in-time, 2026-08-31.
+
+## 11. Risk-ranked issue list
+
+| # | Sev | Issue (one line) | ID | File |
+|---|---|---|---|---|
+| 1 | 🟠 | `MergeOverwrite` carving an overnight task deletes it and puts nothing back, silently, with a 201 | `CQ-7` | `application/helper/PlannerTemplateApplier.cs:150` |
+| 2 | 🟠 | The Routines fan-out handler never re-syncs reminders — a finished task keeps nudging | `CQ-2` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:40` |
+| 3 | 🟠 | FK ids (`ActivityId`, `ImportanceId`, `TodolistId`, `DefaultApplyTemplateId`) accepted without an ownership check; another user's activity name and role colour come back on the attacker's own day | `SEC-1` | `application/dto/request/taskPlanner/PlannerTaskRequest.cs:61` |
+| 4 | 🟠 | Concurrent `GET /planner/settings` can create two settings rows; no unique index backs the 1:1 | `SEC-3` | `application/endpoint/plannerSettings/GetPlannerSettingsEndpoint.cs:26` |
+| 5 | 🟠 | The to-do fan-out query has no `UserId` predicate; safe only while `ScopeUserId` is non-null | `SEC-2` | `application/eventHandler/TodoListItemIsDoneChangedEventHandler.cs:36` |
+| 6 | 🟠 | The Routines fan-out handler sets `Status` directly, leaving stale actual times the trend then reads | `CQ-1` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:41` |
+| 7 | 🟠 | Same handler has no try/catch — a Planning concurrency fault 500s a Routines endpoint that already committed | `CQ-3` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:25` |
+| 8 | 🟠 | Same handler overwrites `Cancelled` tasks that its sibling deliberately leaves alone | `CQ-4` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:40` |
+| 9 | 🟠 | "Today" is UTC in three write paths, the user's own zone in both read paths | `CQ-5` | `application/endpoint/plannerTask/command/PatchPlannerTaskStatusEndpoint.cs:73` |
+| 10 | 🟠 | Carved segments inherit `Status` and `TodolistItemId` but not the actual times — one done-toggle fans across every segment | `CQ-6` | `application/helper/PlannerTemplateApplier.cs:181` |
+| 11 | 🟠 | The two `RepeatingPlannerTask` CRUD endpoints never wire their validator; 80 lines of recurrence rules are dead or untested and the two are indistinguishable | `CQ-8` | `application/endpoint/repeatingPlannerTask/command/CreateRepeatingPlannerTaskEndpoint.cs:3` |
+| 12 | 🟠 | `ApplyTemplatePlannerTaskEndpoint` serves 400 for concurrency conflicts and for 500s alike, discarding the status code it computed | `CQ-9` | `application/endpoint/plannerTask/command/ApplyTemplatePlannerTaskEndpoint.cs:92` |
+| 13 | 🟠 | `domain-map.md` asserts every planner-task validator rejects `EndTime <= StartTime`; three of six do not | `DOC-1` | `docs/domain-map.md:91` |
+| 14 | 🟠 | `DayPlanResponse.HasPlan`'s doc still says calendar rows are never created lazily | `DOC-4` | `application/dto/response/taskPlanner/DayPlanResponse.cs:52` |
+| 15 | 🟡 | Both suggestion endpoints NRE on a materialized-view row whose principal was deleted since the last refresh | `CQ-13` | `application/endpoint/taskPlannerDayTemplate/query/GetSuggestionsTaskPlannerDayTemplateEndpoint.cs:58` |
+| 16 | 🟡 | Six custom endpoints omit `Roles()`; **not** an authz hole today — the host's configurator supplies the identical gate | `SEC-4` | `application/endpoint/plannerSettings/GetPlannerSettingsEndpoint.cs:11` |
+| 17 | 🟡 | Free-text `Tags` comma-joined into one column; a comma in a tag splits it, and no validator constrains the field | `CQ-11` | `infrastructure/persistence/configuration/activityPlanning/TaskPlannerDayTemplateConfiguration.cs:24` |
+| 18 | 🟡 | Eighteen lines of midnight-wrap window logic duplicated verbatim across two filter endpoints, neither tested | `CQ-12` | `application/endpoint/plannerTask/query/GetFilteredSortedPlannerTask.cs:14` |
+| 19 | 🟡 | `.Update()` on an already-tracked entity rewrites every column on every status patch | `CQ-10` | `application/endpoint/plannerTask/command/PatchPlannerTaskStatusEndpoint.cs:64` |
+| 20 | 🟡 | `testing.md` credits `CompletionFanOutTests` with a handler it never exercises | `DOC-5` | `docs/testing.md:94` |
+| 21 | 🟡 | Stale source comment names a `Holiday` day type the enum does not have | `DOC-2` | `domain/model/entity/Calendar.cs:12` |
+| 22 | 🟡 | Two delete-behaviour test names claim a doc contradiction that was resolved | `DOC-3` | `AdhdTimeOrganizer.IntegrationTests/Endpoints/PlannerDeleteBehaviorTests.cs` |
+| — | perf | `PERF-1` … `PERF-6` — see the table in file 02 § 9 | | |
+
+**The shape of the risk.** Eleven of the twenty-two entries are 🟠 and **four of them are in one
+45-line file** — `RoutineTodoListIsDoneChangedEventHandler`, the only cross-slice handler in the slice
+with zero tests (`TEST-21`). Its sibling, which has four tests, has none of the four defects. If only
+one thing is fixed from this review, fix that file; if only one test is written, write `TEST-21`.
+
+Nothing here is 🔴. There is no data-loss path that a normal user reaches without first creating an
+overnight task (which the UI does not offer), no cross-user read that is reachable without an attacker
+crafting a request by hand, and no unauthenticated surface.
+
+## 10. Migration / rollout risks
+
+| Risk | Likelihood | Mitigation |
+|---|---|---|
+| **`MIG-1`** — the unique index `SEC-3` needs (`user_planner_settings.user_id`) fails to create because duplicate rows already exist in production. The whole point of the finding is that duplicates are creatable and invisible | Medium — the race needs two concurrent first-reads per user, so few users but plausible over the life of the table | Ship in two steps. First a data migration that keeps the **lowest-id** row per user and deletes the rest (log the count; a user whose kept row is not the one they had been editing loses recent settings changes, which is unavoidable and preferable to non-deterministic reads). Then `CREATE UNIQUE INDEX CONCURRENTLY`. Verify with `SELECT user_id, count(*) … HAVING count(*) > 1` before and after |
+| **`MIG-2`** — `TaskPlannerDayTemplateSeeder.TruncateTable()` issues `TRUNCATE … RESTART IDENTITY CASCADE` (`framework/…/seeder/SeederExtensions.cs:76`). Postgres `TRUNCATE CASCADE` **truncates every referencing table outright** and does not honour `ON DELETE SET NULL`. `user_planner_settings.default_apply_template_id` references `task_planner_day_template`, so re-running the dev seeders silently wipes **every user's planner settings**, not just the templates | High in any dev/staging reset; zero in production (dev seeders do not run there) | Confirm the blast radius with `TEST-23` before changing anything. Then either exclude `UserPlannerSettings` by nulling the FK first (`UPDATE … SET default_apply_template_id = NULL`) and truncating without `CASCADE`, or accept it and re-run `UserPlannerSettingsSeeder` after. Note `UserPlannerSettingsSeeder` is a **per-user default** seeder (order 420) and does not truncate, so today nothing restores what this removes |
+| **`MIG-3`** — adding the `EndTime > StartTime` rule (the pre-existing `CQ-14`, and the root of `CQ-7`) makes existing overnight rows unsaveable through the update path, and flips `CreatingAnOvernightTask_IsAcceptedWithNegativeDuration` red | Medium — the fix is wanted, and the probe test explicitly names the assertion to flip | Survey first: `SELECT count(*) FROM planning.planner_task WHERE end_time <= start_time` across all three task tables. If the count is small, normalise (clamp `EndTime` to 23:59 and log the ids) in the same migration; the rows cannot round-trip through `PlannerTaskChangeSpanValidator` today either, so they are already stuck. Add the validator rule to all three validators at once, not just `PlannerTaskValidator` — `DOC-1` names the other two |
+| **`MIG-4`** — moving `Tags` from a comma-joined `text` to `jsonb` (`CQ-11`) needs a data migration, and any tag that was *already* split by a comma cannot be un-split | Low — cosmetic column, small table | `UPDATE … SET tags = to_jsonb(string_to_array(tags, ','))` in the migration. Accept the already-split tags as lost; there is no record of the original |
+| **`MIG-5`** — dropping the three dead indexes (`PERF-5`) | Low | `DROP INDEX CONCURRENTLY` × 3. No read path uses them; check `pg_stat_user_indexes.idx_scan` first to confirm zero scans in production before dropping |
+| **Drift risk: the slice registers with the host in four places, none of which break the build** | Standing, and already documented | `PlanningRouteSmokeTests.PlanningRoutes_AreRegistered` covers the FastEndpoints `o.Assemblies` half and `PlannerTaskToTodoListItem_ForeignKey_SurvivesTheSliceSplit` covers the cross-slice FK. `ModuleWiringTests` / `ModuleSchemaTests` / `SeamWiringTests` cover the rest. **No new drift found this pass** — the four registration points are all live |
+| **Drift risk: `SEC-4`'s six endpoints depend on `Program.cs:575-576`** | Low, but silent if it happens | Either fix `SEC-4` (two lines × six files), or add an assertion to `PlanningRouteSmokeTests` that an anonymous caller gets 401 on each of the six. The former is cheaper |
+| **No sandbox or duplicate copy of this module exists** | — | Verified: `AdhdTimeOrganizer.Planning` appears once in the solution; `AdhdTimeOrganizer/reference/mojaCore/` contains no planner code |
+
+## Audit-log gaps
+
+**`AUDIT-1` — nothing in this slice is audited, and that is a host-level fact, not a slice defect.**
+CLAUDE.md states it plainly: *"Auditing exists in Framework but is NOT wired up here. Nothing is written
+today."* So there is no interceptor for anything to bypass, and no `[AuditIgnore]` / `[NoAudit]`
+attribute is missing in the sense of causing a leak today.
+
+What this review *can* record is what will be true the day it is switched on:
+
+- **No `ExecuteUpdateAsync` / `ExecuteDeleteAsync` anywhere in the slice.** Every write goes through
+  the ChangeTracker — `PlannerTemplateApplier` uses `RemoveRange`/`AddRange`, the seam's `RepointAsync`
+  loads rows and assigns, `CalendarProvisioner` adds one entity. That is the good news, and it is worth
+  not regressing: a future bulk day-type update tempted by `ExecuteUpdateAsync`
+  (`BatchUpdateDayTypeCalendarEndpoint` is the obvious candidate, currently one save per day) would be
+  the slice's first interceptor bypass.
+- **`PlannerTemplateApplier` will produce a delete + insert pair per carved segment, not an update.**
+  `MergeOverwrite` removes an existing task and re-adds segments as new rows with new ids. An audit
+  reader reconstructing a task's history will see it end and two unrelated tasks begin. That is inherent
+  to the carving design, not a bug, but it should be written down before anyone tries to build a
+  per-task audit timeline. `CQ-6` is the related correctness question.
+- **`Reminder.Title` and `Reminder.Note` are free-text, user-authored, and would land in an audit log
+  verbatim.** They routinely contain names and phone numbers ("call the dentist", "Mum's birthday").
+  `PiiRedactor` only matches structured PII and is not wired into the Serilog pipeline here anyway, so
+  free-text will not be scrubbed. When auditing is enabled, `Reminder` needs `[AuditIgnore]` on both
+  columns — or `[NoAudit]` on the entity. Same reasoning applies to `PlannerTask.Notes`,
+  `PlannerTask.SkipReason`, `Calendar.Notes` and `Calendar.Label`.
+- **No PII reaches the logs today.** Every log statement in the slice was checked:
+  `CalendarProvisioner` logs `{UserId}` and `{Date}`; `ReminderRegistrationService` logs `{ReminderId}`
+  and `{UserId}` and never the title; the three batch endpoints log `{CalendarId}` / `{TemplateId}`;
+  the seeders log counts and `{UserId}`. This slice complies with the no-PII-at-the-call-site rule
+  cleanly — worth stating, since it is the kind of thing that decays without a check.
