@@ -18,10 +18,11 @@ see `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.m
 
 Does **not** own:
 
-- **`CalendarActivityEndpoint`** and its two DTOs. Filed under `activityHistory/` and it does read
-  history, but it reads the `Calendar` entity too — that belongs to Planning, which is not extracted
-  yet, so all three files stayed host-side at their original paths. Move them when Planning lands,
-  not before.
+- **The `Calendar` entity.** `CalendarActivityEndpoint` (`/activity-history/dashboard/calendar`) *is*
+  here now — it moved in when Planning was extracted, because the response is a history summary — but
+  it reaches the calendar through Core's **`ICalendarDayLookup`** seam rather than by naming
+  Planning's entity. Do not replace that lookup with a direct query; it is the only reason this route
+  can live beside the rest of the dashboards.
 - **The suggestion-pattern machinery** — `SuggestionPatternRefreshInterceptor`,
   `SuggestionPatternRefreshQueue`, `SuggestionPatternView`, `SuggestionPatternViewInstaller`,
   `SuggestionPatternRefreshJob`, `PlannerSuggestionFromActivityHistory` + its configuration (both
@@ -118,9 +119,9 @@ It now goes through **`IActivityMembershipSource`** (`AdhdTimeOrganizer.Core/app
 
 - Core declares the interface and the key constants (`ActivityMembershipSourceKeys`).
 - The owning slice implements it — `TodoListActivityMembershipSource` in
-  `AdhdTimeOrganizer.TodoLists`, `RoutineTodoListActivityMembershipSource` **currently host-side**
-  because `RoutineTodoList` has not been extracted yet (move it with the entity, nothing else
-  changes).
+  `AdhdTimeOrganizer.TodoLists`, `RoutineTodoListActivityMembershipSource` in
+  `AdhdTimeOrganizer.Routines` (it moved there with the entity; nothing on this side changed, which
+  is the seam working as intended).
 - History consumes `IEnumerable<IActivityMembershipSource>` and matches on `Key`.
 
 Each source returns a **composable** `IQueryable<long>` of activity ids, so `ids.Contains(...)`
@@ -172,6 +173,10 @@ error, no exception, the filter just stops narrowing.
   or exported**, and its table added to `ModuleSchemaTests`' `history` list. Both fail loudly, which is the
   point — the export one is a GDPR Art. 15 decision the test refuses to let anyone skip.
 
-## Navigation
+## Deeper reference
 
-`docs/domain-map.md` — the entity, its relationships, the endpoint inventory, and the invariants.
+- `domain-map.md` — the two entities, their indexes, the endpoint inventory, the navigation index for
+  everything that is not an endpoint, and the invariants
+- `testing.md` — test strategy and the guards that must not be deleted
+- `README.md` — human-facing intro and the four setup facts (schema, migrations, materialized views,
+  the registrar registration)

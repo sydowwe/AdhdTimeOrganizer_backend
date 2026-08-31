@@ -2,9 +2,10 @@
 
 Navigation index for the slice. Open only what you need.
 
-## Entity
+## Entities
 
-One entity, one table.
+Two entities, two tables, both in the **`history`** schema (`ModuleSchemas.History`). `ActivityHistory`
+is the ledger; `TimerBoundaryAlarm` is short-lived scheduling state that self-drains.
 
 ```
 ActivityHistory : BaseEntityWithActivity (→ BaseEntityWithUser → BaseTableEntity)
@@ -17,8 +18,8 @@ ActivityHistory : BaseEntityWithActivity (→ BaseEntityWithUser → BaseTableEn
   RoutineTodoListId long?  NULL, FK → routine_todo_list, SET NULL  (declared host-side)
 ```
 
-`domain/model/entity/activityHistory/ActivityHistory.cs` ·
-`infrastructure/persistence/configuration/activityHistory/ActivityHistoryConfiguration.cs`
+`domain/model/entity/ActivityHistory.cs` ·
+`infrastructure/persistence/configuration/ActivityHistoryConfiguration.cs`
 
 The two item columns record **which task a recording was saved from** — stamped when the user accepts
 the save-to-history prompt raised on completing a to-do item, a step (which sends its *parent item's*
@@ -43,7 +44,39 @@ that time was spent on it.
 exists any more — they were removed so Core stops pointing into the slices. Query
 `dbContext.Set<ActivityHistory>().Where(h => h.ActivityId == …)` instead.
 
-## Endpoints (14)
+### TimerBoundaryAlarm
+
+```
+TimerBoundaryAlarm : BaseEntityWithUser (→ BaseTableEntity)
+  UserId      long      NOT NULL, FK → user, cascade   (from BaseEntityWithUser)
+  SessionId   Guid      NOT NULL   client-issued; groups one timer session's boundaries
+  BoundaryAt  DateTime  NOT NULL   absolute UTC instant, scheduled verbatim
+  Phase       TimerBoundaryPhase NOT NULL
+  ActivityId  long?     NULL       plain column — no FK, no navigation, no index
+  PhaseIndex / PhaseTotal / CycleIndex / CycleTotal  int?  NULL
+  Url         string?   NULL, max 512, validated relative
+```
+
+`domain/model/entity/timerAlarm/TimerBoundaryAlarm.cs` ·
+`infrastructure/persistence/configuration/timerAlarm/TimerBoundaryAlarmConfiguration.cs`
+
+Two computed, non-mapped members carry contract weight: `JobKey` (`history.timer-boundary.{id}`,
+derived from the row id so the boot registrar reschedules in place instead of duplicating) and `Tag`
+(derived from the boundary *instant*, so the client rebuilds the identical tag with no round trip and
+the push replaces the open tab's own notification rather than stacking a second one).
+
+**Indexes** — two, both for a specific query:
+
+- `(UserId, SessionId)` — cancel-by-session, the hot path, always user-scoped.
+- `(BoundaryAt)` — the boot registrar's only query, which runs **unscoped** across all users and splits
+  on this column into "re-register" and "too stale, delete". Hence `UserId` is not the leading column.
+
+Cascade from the user, unlike `ActivityHistory`'s `SetNull` links: an alarm is scheduling state, not
+recorded time, so a deleted account's pending alarms go with it rather than surviving to fire at
+nobody. See `summary.md` → *Timer-boundary alarms* for the design constraints; the entity's own XML
+remarks carry the rest.
+
+## Endpoints (18)
 
 | Route | Verb | File |
 |---|---|---|
@@ -57,6 +90,14 @@ exists any more — they were removed so Core stops pointing into the slices. Qu
 | `/activity-history/aggregate-by-activity` | POST | `query/AggregateByActivityActivityHistoryEndpoint` |
 | `/activity-history/dashboard/detail/{pie-chart,stacked-bars,summary-cards}` | POST | `query/dashboard/detail/*` |
 | `/activity-history/dashboard/summary/{pie-chart,stacked-bars,summary-cards,time-of-day}` | POST | `query/dashboard/summary/*` |
+| `/activity-history/dashboard/calendar` | POST | `CalendarActivityEndpoint` (directly under `endpoint/`) |
+| `/activity-history/timer-alarm/schedule` | POST | `command/ScheduleTimerAlarmsEndpoint` |
+| `/activity-history/timer-alarm/cancel` | POST | `command/CancelTimerAlarmsEndpoint` |
+
+Both timer-alarm routes are POST, including cancel: it takes a session id in a body and is a **no-op
+on an unknown session, never a 404** — a partially-registered set is the normal outcome of a tab dying
+mid-flight. `schedule` is idempotent by `sessionId` and drops boundaries already in the past rather
+than firing them immediately.
 
 ⚠ **`gird` is not a typo to fix.** It is the shipped path (`EndpointPath => "gird"`) and the SPA calls
 it that way.
@@ -89,8 +130,10 @@ earlier response) and telling a real group named `_other` apart from the roll-up
 `HistoryDashboardGroupIdentityTests` pins all of it, on rows rather than routes: a name-keyed
 response is well-formed and its numbers add up.
 
-`/activity-history/dashboard/calendar` (`CalendarActivityEndpoint`) is **host-side**, not here — it
-reads the `Calendar` entity, which belongs to Planning.
+`/activity-history/dashboard/calendar` (`CalendarActivityEndpoint`) lives here, at
+`application/endpoint/CalendarActivityEndpoint.cs` — outside both `command/` and `query/`, because it
+is the one dashboard that reads another slice's entity. It gets the calendar's days through Core's
+**`ICalendarDayLookup`** seam, never by naming Planning's `Calendar`.
 
 ### `summary/time-of-day` is not group-shaped
 
@@ -112,6 +155,28 @@ rather than an error (`HistoryTimeOfDayDashboardTests` pins all three on values)
   for the same range. That equality is why rows are selected by `StartTimestamp` and distributed
   whole: a record starting inside the range contributes its tail even past the range's last midnight.
 
+## Navigation index — everything that is not an endpoint
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `HistoryGrouping` | Helper | The one place a dashboard group is resolved to `(Id, Name, Color)` — `HistoryGroupKey`. Every group-shaped response keys off this | `application/dashboard/HistoryGrouping.cs` |
+| `TimerBoundaryAlarmService` | Service | `ReplaceSessionAsync` / cancel-by-session / fire; owns the Scheduler `RunOnceAt` registration. Implements `ITimerBoundaryAlarmService` | `application/service/TimerBoundaryAlarmService.cs` |
+| `ITimerBoundaryAlarmService` | Contract | The service's port, so the endpoints and the registrar depend on the shape rather than the class | `domain/serviceContract/ITimerBoundaryAlarmService.cs` |
+| `TimerBoundaryAlarmJobHandler` | Job handler | Fires one alarm: resolves the activity name, pushes the notification, then **deletes the row** (self-drain). No-op if the row is gone | `application/job/TimerBoundaryAlarmJobHandler.cs` |
+| `TimerBoundaryAlarmRegistrar` | `IHostedService` | Re-registers every pending alarm on boot and drops stale ones. **Not optional** — the Quartz store is in-memory; see `summary.md` | `infrastructure/scheduling/TimerBoundaryAlarmRegistrar.cs` |
+| `ActivityHistoryTimeAttributionSink` | Seam impl | Core's `IActivityTimeAttributionSink`: records N seconds against an activity for Tracking. Mutates the caller's `DbContext`, **never** saves; extends a contiguous window instead of inserting | `application/seam/ActivityHistoryTimeAttributionSink.cs` |
+| `TodoListItemLoggedTimeSource` | Seam impl | Core's `ITodoListItemLoggedTimeSource` for TodoLists' daily recap. Keys on `TodoListItemId` **alone** | `application/seam/TodoListItemLoggedTimeSource.cs` |
+| `ActivityHistoryActivityReferenceSource` | Seam impl | Core's `IActivityReferenceSource`: reports/repoints this slice's references to an activity for merge and delete | `application/seam/ActivityHistoryActivityReferenceSource.cs` |
+| `ActivityHistoryValidator` | Validator | Create/update rules, incl. the mutual exclusion of `TodoListItemId` and `RoutineTodoListId` | `application/validator/ActivityHistoryValidator.cs` |
+| `HistorySummaryDateRangeValidators` | Validators | One concrete class per `summary/` request type. FastEndpoints resolves validators by **exact type** and skips validation silently without one — that is why these are four classes, not one generic | `application/validator/HistorySummaryDateRangeValidators.cs` |
+| `ActivityHistoryAggregateByActivityValidator` · `ScheduleTimerAlarmsValidator` | Validators | The aggregate request; the alarm batch (relative `Url`, boundary sanity) | `application/validator/` |
+| `ActivityHistorySeeder` | Dev seeder | Per-user dev fixture, Order **300**. Seeds 30 days of history; truncates (dev seeders only) | `infrastructure/persistence/seeder/dev/ActivityHistorySeeder.cs` |
+| `HistoryGroupBy` | Enum | The dashboard grouping dimension (activity / role / category) | `application/dto/enum/HistoryGroupBy.cs` |
+
+DTOs are not listed individually — `application/dto/` mirrors the endpoint tree
+(`request/dashboard/{detail,summary}/`, `response/dashboard/`, `filter/`), so the endpoint's file path
+tells you where its request and response live.
+
 ## Invariants
 
 **Ownership.** `ActivityHistory` is `IEntityWithUser`, so `AppDbContext.OnModelCreating` applies the
@@ -125,6 +190,18 @@ endpoint is scoped. The base endpoints' `ApplyUserScoping` is a **no-op virtual*
 must already exist or Postgres answers 42P01 — installed by `SuggestionPatternViewInstaller` at boot
 and by `AppDbContextFixture.OnSchemaCreatedAsync` in tests.
 
+**Timezone.** Every dashboard folds and bounds its range in `User.Timezone`, never UTC — the summary
+range stops at the user's midnights, and `time-of-day` folds into the user's hours. *App-enforced
+only*: nothing in the schema or the request shape stops a UTC fold, and the wrong answer is a
+plausible number rather than an error. `HistoryDashboardUserZoneTests` is the guard.
+
+**Alarm liveness.** A `TimerBoundaryAlarm` row is meaningful only while its Scheduler trigger exists,
+and the trigger does not survive a restart — `TimerBoundaryAlarmRegistrar` re-pushes it on boot.
+*Not enforced anywhere*: drop the hosted service and the rows still look correct while nothing ever
+fires. Correspondingly, the table has no retention job and no `FiredAt` column because it self-drains
+on fire, on cancel and on the registrar's stale sweep — a change that stops any of those three
+draining turns it into an unbounded table with no other symptom.
+
 ## Cross-slice edges
 
 Outbound: **Core only.**
@@ -133,7 +210,8 @@ Outbound: **Core only.**
 AdhdTimeOrganizer.History
   └── AdhdTimeOrganizer.Core          entities (Activity, User, base shims), DTO bases,
                                       shared enums, IActivityMembershipSource,
-                                      ITodoListItemLoggedTimeSource
+                                      ICalendarDayLookup, IActivityTimeAttributionSink,
+                                      IActivityReferenceSource, ITodoListItemLoggedTimeSource
 ```
 
 This slice **implements** two seams as well as consuming one: `ActivityHistoryTimeAttributionSink`
@@ -142,11 +220,16 @@ This slice **implements** two seams as well as consuming one: `ActivityHistoryTi
 second must key on `TodoListItemId` alone; matching on the activity instead would credit the same
 seconds to two items that share one. See `summary.md` → Gotchas.
 
-Inbound (host → slice, the correct direction): `SuggestionPatternRefreshInterceptor`,
-`SuggestionPatternViewInstaller`, `CalendarActivityEndpoint`, `GetUserDataExportEndpoint`,
-`DesktopActivityHeartbeatEndpoint`, and `GetSuggestionsRepeatingPlannerTaskEndpoint` (Planning, which
-reads `ActivityHistory` — that becomes a real `Planning → History` project edge when Planning is
-extracted).
+Inbound (host → slice, the correct direction) — and **only** the host: `Program.cs` (the FastEndpoints
+assembly scan and `AddHostedService<TimerBoundaryAlarmRegistrar>()`), `ModuleServiceExtensions`
+(`ModuleAssemblies`), `AppDbContext` (`ApplyHostConfigurations` and the two cross-slice FK
+declarations), `ModuleSchemas`, and `SuggestionPatternRefreshInterceptor`.
+
+No slice references this one. The two that read recorded time do it without an edge, which is the
+point: **Tracking** writes through Core's `IActivityTimeAttributionSink` (implemented here), and
+**Planning**'s `GetSuggestionsRepeatingPlannerTaskEndpoint` reads
+`PlannerSuggestionFromActivityHistory` — the keyless entity over the materialized view, which Planning
+owns. Neither names `ActivityHistory`.
 
 ### The membership seam
 
@@ -159,8 +242,7 @@ The four grid filters that used to reach into TodoLists and Routines:
 
 ```
 History  ──consumes──►  IActivityMembershipSource  ◄──implements──  TodoLists
-   (Core)                        (Core)                             (+ host, until
-                                                                     Routines exists)
+   (Core)                        (Core)                             Routines
 ```
 
 Neither side references the other. See `summary.md` → "The membership seam" before touching it, and
