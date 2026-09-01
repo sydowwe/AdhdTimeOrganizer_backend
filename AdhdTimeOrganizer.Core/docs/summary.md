@@ -128,7 +128,9 @@ than out of the host. `Activity` and `User` lost five navigation properties in t
   `<Verb><Entity>Endpoint`, mapping lives on the DTOs. Default roles are User+Admin+Root — correct for
   everything in Core. If the endpoint must reach an archived activity, override
   `IgnoredQueryFilters => [AppQueryFilters.ActivityArchived]` (see `DeleteActivityEndpoint`) rather
-  than writing a `Where`.
+  than writing a `Where`. A raw `Endpoint<>` has no such hook — use a keyed `FirstOrDefaultAsync` with
+  `IgnoreQueryFilters([…])` and declare `Roles(AllowedRoles())` by hand, as `QuickEditActivityEndpoint`,
+  `CloneActivityEndpoint` and `SetArchivedActivityEndpoint` do. `FindAsync` cannot lift a filter.
 
 - **Add a cross-slice call:** don't. Add a seam. Decide interface vs. event by *who owns the
   transaction and who owns the decision*, then follow the four steps in `application/seam/README.md`

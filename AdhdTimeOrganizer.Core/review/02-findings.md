@@ -341,7 +341,7 @@ among "the three shared ones" as though it were live.
 
 ---
 
-### `CQ-3` 🟠 The four hand-rolled activity endpoints diverge from the base-class ones on filters and on roles
+### `CQ-3` 🟠 ✅ FIXED 2026-09-01 The four hand-rolled activity endpoints diverge from the base-class ones on filters and on roles
 
 `command/QuickEditActivityEndpoint.cs:10,31` and `command/CloneActivityEndpoint.cs:10,30` are raw
 `Endpoint<>`s that load with `FindAsync`. `FindAsync` cannot lift a named query filter — which is why
@@ -378,7 +378,7 @@ override `IgnoredQueryFilters` — these two are the counter-examples.
 
 ---
 
-### `CQ-4` 🟡 `Activity.Clone()` copies the source's timestamps
+### `CQ-4` 🟡 ✅ FIXED 2026-09-01 `Activity.Clone()` copies the source's timestamps
 
 `domain/model/entity/activity/Activity.cs:56-61`. `MemberwiseClone` resets `Id` only, so the copy
 inherits `CreatedTimestamp` and `ModifiedTimestamp` from the original. Those properties are
@@ -395,7 +395,7 @@ instead of using `MemberwiseClone`.
 
 ---
 
-### `CQ-5` 🟡 `GetSelectOptionsActivityEndpoint.Filter` re-implements the global archival filter
+### `CQ-5` 🟡 ✅ FIXED 2026-09-01 `GetSelectOptionsActivityEndpoint.Filter` re-implements the global archival filter
 
 `query/GetSelectOptionsActivityEndpoint.cs:23` — `query.Where(a => !a.IsArchived)`. The
 `ActivityArchived` global filter is already applied and this endpoint never lifts it, so the predicate
@@ -409,7 +409,7 @@ path"), which makes it a bad example sitting next to its own warning.
 
 ---
 
-### `CQ-6` 🟡 Dead `.Include()` calls before a projection
+### `CQ-6` 🟡 ✅ FIXED 2026-09-01 Dead `.Include()` calls before a projection
 
 `endpoint/base/BaseActivityFormSelectOptionsEndpoint.cs:68-69` — `.Include(a => a.Category)` and
 `.Include(a => a.Role)` immediately precede a `.Select(...)` into an anonymous type. EF ignores
@@ -438,7 +438,7 @@ in `domain-map.md` that it is retained for a named caller.
 
 ---
 
-### `CQ-8` 🟡 `PomodoroTimerPresetRequest.ToEntity` sets `UserId = 0`
+### `CQ-8` 🟡 ✅ FIXED 2026-09-01 `PomodoroTimerPresetRequest.ToEntity` sets `UserId = 0`
 
 `application/dto/request/timer/PomodoroTimerPresetRequest.cs:34`, where the sibling
 `TimerPresetRequest.ToEntity:12` does not. Framework's own comment on the property calls `UserId = 0`
@@ -453,7 +453,7 @@ for, and the inconsistency between the two sibling DTOs is the kind that gets co
 
 ---
 
-### `CQ-9` 🟡 `DefaultUsersSeeder` logs Identity failures without the reasons
+### `CQ-9` 🟡 ✅ FIXED 2026-09-01 `DefaultUsersSeeder` logs Identity failures without the reasons
 
 `infrastructure/persistence/seeder/default/DefaultUsersSeeder.cs:69-72,75-77,46-52`. Four
 `logger.LogError("Failed to …")` calls, none passing `result.Errors`. When the root admin fails to
@@ -468,7 +468,7 @@ test keeps passing by construction.
 
 ---
 
-### `CQ-10` 🟡 The root admin's time zone is the server's
+### `CQ-10` 🟡 ✅ FIXED 2026-09-01 The root admin's time zone is the server's
 
 `infrastructure/persistence/seeder/default/DefaultUsersSeeder.cs:27` — `Timezone = TimeZoneInfo.Local`.
 `IUserTimeZoneResolver`'s contract goes out of its way to reject exactly this
@@ -484,7 +484,7 @@ existing "A missing user's time zone resolves to UTC" rule.
 
 ---
 
-### `CQ-11` 🟡 The dev seeders' truncate is app-wide; the comment says it is per-user
+### `CQ-11` 🟡 ✅ FIXED 2026-09-01 The dev seeders' truncate is app-wide; the comment says it is per-user
 
 `infrastructure/persistence/seeder/dev/ActivitySeeder.cs:16-19` and `:23` —
 `TruncateTableCascadeAsync<Activity>()` empties the table for **every** user, and then

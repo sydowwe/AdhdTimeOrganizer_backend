@@ -31,7 +31,6 @@ public record PomodoroTimerPresetRequest : IMyRequest<PomodoroTimerPreset>
 
     public PomodoroTimerPreset ToEntity => new()
     {
-        UserId = 0,
         Name = Name,
         FocusDuration = FocusDuration,
         ShortBreakDuration = ShortBreakDuration,

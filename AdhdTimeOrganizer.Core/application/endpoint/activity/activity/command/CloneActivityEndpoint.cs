@@ -2,17 +2,22 @@ using AdhdTimeOrganizer.Core.application.dto.request.activity;
 using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.Core.application.endpoint.activity.activity.command;
 
 public class CloneActivityEndpoint(DbContext dbContext) : Endpoint<QuickEditActivityRequest, long?>
 {
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
+
     public override void Configure()
     {
         Post("/activity/{id:long:required}/clone");
+        Roles(AllowedRoles());
         Validator<QuickEditActivityValidator>();
         Summary(s =>
         {
@@ -28,7 +33,14 @@ public class CloneActivityEndpoint(DbContext dbContext) : Endpoint<QuickEditActi
     {
         try
         {
-            var entity = await dbContext.Set<Activity>().FindAsync([Route<long>("id")], ct);
+            // Lifts AppQueryFilters.ActivityArchived and nothing else: the archive view offers this row
+            // action, and cloning reads the source rather than writing it, so archival cannot leak into
+            // the request. A keyed FirstOrDefault rather than FindAsync, which cannot lift a filter. The
+            // per-user filter stays on, so another user's id is simply not found — 404, never 403.
+            var id = Route<long>("id");
+            var entity = await dbContext.Set<Activity>()
+                .IgnoreQueryFilters([AppQueryFilters.ActivityArchived])
+                .FirstOrDefaultAsync(a => a.Id == id, ct);
             if (entity == null)
             {
                 AddError("Activity not found.");
@@ -46,6 +58,10 @@ public class CloneActivityEndpoint(DbContext dbContext) : Endpoint<QuickEditActi
             }
 
             var clonedEntity = entity.Clone();
+            // Clone() is a MemberwiseClone, so it carries the source's IsArchived. Now that an archived
+            // source is reachable, the copy has to start active — a clone the user cannot see anywhere
+            // but the archive view is not what the row action promises. Archiving it again is one call.
+            clonedEntity.IsArchived = false;
             clonedEntity.Name = clonedEntity.Name == req.Name ? $"{req.Name} (copy)" : req.Name;
             clonedEntity.Text = req.Text;
             clonedEntity.CategoryId = req.CategoryId;

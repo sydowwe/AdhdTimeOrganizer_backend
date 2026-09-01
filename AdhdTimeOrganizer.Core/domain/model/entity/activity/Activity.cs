@@ -57,6 +57,12 @@ public class Activity : BaseEntityWithUser, IBaseNameTextEntity
     {
         var cloned = (Activity)MemberwiseClone();
         cloned.Id = 0; // Reset ID for new entity
+        // MemberwiseClone copies the source's timestamps, and both are mapped properties EF always
+        // sends — HasDefaultValueSql("now()") never gets a chance to fire — so without this the copy is
+        // persisted claiming it was created whenever the original was. row_version is a shadow
+        // property and is not copied, so the concurrency token needs no reset.
+        cloned.CreatedTimestamp = DateTime.UtcNow;
+        cloned.ModifiedTimestamp = cloned.CreatedTimestamp;
         return cloned;
     }
 }

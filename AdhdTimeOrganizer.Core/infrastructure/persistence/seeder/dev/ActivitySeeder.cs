@@ -13,6 +13,12 @@ public class ActivitySeeder(
     public string SeederName => "Activity";
     public int Order => 40;
 
+    /// <summary>
+    /// Empties the table for <b>every</b> user, not just the one being re-seeded — the dev-reset flow
+    /// truncates every seeder in descending <c>Order</c> first, then re-seeds per user. Only the
+    /// re-seed is per-user. The truncate is schema-qualified from the model, so it needs no schema
+    /// prefix of its own.
+    /// </summary>
     public async Task TruncateTable()
     {
         await dbContext.TruncateTableCascadeAsync<Activity>();
@@ -20,8 +26,6 @@ public class ActivitySeeder(
 
     public async Task SeedForUser(long userId)
     {
-        // Note: TruncateTable already removed existing data for this user
-
         // Get roles and categories for this user
         var roles = await dbContext.Set<ActivityRole>()
             .Where(ar => ar.UserId == userId)

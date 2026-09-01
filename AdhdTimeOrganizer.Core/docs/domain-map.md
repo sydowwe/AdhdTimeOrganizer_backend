@@ -269,8 +269,8 @@ what keeps that from recurring.
 | `GetAllActivityEndpoint` · `GetByIdActivityEndpoint` · `GetSelectOptionsActivityEndpoint` | Endpoint | Reads; `GetById` carries `usageCount`/`canDelete` | `activity/activity/query/` |
 | `ActivityFormSelectOptionsEndpoint` | Endpoint | Activity-side form options; subclass of the shared base below | `activity/activity/query/` |
 | `CreateActivityEndpoint` · `UpdateActivityEndpoint` · `DeleteActivityEndpoint` | Endpoint | CRUD. Delete lifts `ActivityArchived` so the archive view's row action works | `activity/activity/command/` |
-| `QuickEditActivityEndpoint` | Endpoint | `PUT /activity/{id}/quick-edit` — the overwrite half of quick-create | `activity/activity/command/` |
-| `CloneActivityEndpoint` | Endpoint | `POST /activity/{id}/clone`; names the copy `"{name} (copy)"` when unchanged | `activity/activity/command/` |
+| `QuickEditActivityEndpoint` | Endpoint | `PUT /activity/{id}/quick-edit` — the overwrite half of quick-create; lifts `ActivityArchived` like `Update` | `activity/activity/command/` |
+| `CloneActivityEndpoint` | Endpoint | `POST /activity/{id}/clone`; names the copy `"{name} (copy)"` when unchanged; lifts `ActivityArchived` and the copy starts active | `activity/activity/command/` |
 | `SetArchivedActivityEndpoint` | Endpoint | `PATCH /activity/{id}/archived` — the **only** writer of `IsArchived`; idempotent 204 | `activity/activity/command/` |
 | `MergeActivityEndpoint` | Endpoint | `POST /activity/merge` — repoint-then-delete in one transaction | `activity/activity/command/` |
 | Role: `Create` · `Update` · `Delete` | Endpoint | CRUD. Delete refuses a `SystemKey` role with 409 | `activity/role/command/` |

@@ -14,6 +14,12 @@ public class ActivityRoleSeeder(
     public string SeederName => "ActivityRole";
     public int Order => 20;
 
+    /// <summary>
+    /// Empties the table for <b>every</b> user, not just the one being re-seeded — the dev-reset flow
+    /// truncates every seeder in descending <c>Order</c> first, then re-seeds per user. Only the
+    /// re-seed is per-user. The truncate is schema-qualified from the model, so it needs no schema
+    /// prefix of its own.
+    /// </summary>
     public async Task TruncateTable()
     {
         await dbContext.TruncateTableCascadeAsync<ActivityRole>();

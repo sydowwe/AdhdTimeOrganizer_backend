@@ -5,6 +5,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.response.generic;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Core.application.endpoint.@base.read;
 
@@ -38,9 +39,12 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(DbContext d
     /// </remarks>
     private const string IncludeArchivedQueryParam = "includeArchived";
 
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
+
     public override void Configure()
     {
         Get($"/{EntityRoute}/form-select-options");
+        Roles(AllowedRoles());
 
         Summary(s =>
         {
@@ -64,9 +68,9 @@ public abstract class BaseActivityFormSelectOptionsEndpoint<TEntity>(DbContext d
         if (includeArchived)
             query = query.IgnoreQueryFilters([AppQueryFilters.ActivityArchived]);
 
+        // No Include for Category/Role: EF ignores includes ahead of a projection, so the columns below
+        // come from the Select either way.
         var activities = await query
-            .Include(a => a.Category)
-            .Include(a => a.Role)
             .Select(a => new
             {
                 ActivityId = a.Id,
