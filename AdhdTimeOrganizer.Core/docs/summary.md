@@ -58,7 +58,9 @@ than out of the host. `Activity` and `User` lost five navigation properties in t
   `Activity` and mirrored onto six dependents — so an archived activity keeps rendering its name on
   the history rows and planner tasks that reference it while disappearing from every picker. Never
   let `ActivityRequest` learn about `IsArchived`: the edit form does not carry it, so an assignment
-  there would silently un-archive on every save.
+  there would silently un-archive on every save. **Archiving exists on `Activity` and nowhere else** —
+  roles, categories and both preset kinds have no retire path, so the only way to get a stale role out
+  of the pickers is to delete it, which is the destructive option the next gotcha is about.
 
 - **Deleting a lookup is not a small delete, and the two lookups answer differently.** `ActivityRole`
   and `ActivityCategory` sit *above* `Activity`, so a cascade from either continues through all 17 FKs

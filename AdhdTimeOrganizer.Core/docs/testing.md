@@ -41,6 +41,9 @@ Each one exists because the failure it catches produces no exception, no log lin
 | `SeamWiringTests.*` (6 tests) | Seams are declared in Core and implemented in slice `seam/` folders; both keyed source families cover every key **exactly** once; the single seams and `IActivityReferenceService` resolve exactly once; every `ISeamEvent` has a handler |
 | `ActivityMergeTests.Merge_RepointsEveryReferencingSlice` | The merge actually moves rows in every slice — the one assertion a lowered count cannot fake |
 | `ActivityForeignKeyInventoryTests.EveryForeignKeyIntoActivity_MatchesTheFrozenInventory` | The full set of activity FKs and their delete behaviours. The merge's repoint-then-delete ordering rests on this inventory, and it has been quietly false before |
+| `ActivityForeignKeyInventoryTests.EveryForeignKeyOutOfActivity_MatchesTheFrozenInventory` | The FKs in the other direction — `RoleId` `Cascade`, `CategoryId` `SetNull`. The first inventory only ever walked FKs whose *principal* is `Activity`, which is how the cascading lookups went unnoticed |
+| `ActivityLookupDeleteCascadeTests` | Deleting a category blanks the classification and keeps the activities; deleting a role that still carries activities is a 409; deleting an unused lookup still works |
+| `CoreForeignKeyOwnershipTests` | A caller-supplied `roleId` / `categoryId` / `activityId` belonging to another user is a **404**, on every Core create/update path including quick-edit and clone |
 | `ActivityArchivingTests.*` | Both halves of archiving: the pickers exclude, everything else still resolves. `Update_DoesNotUnarchive` is the one that catches `ActivityRequest` learning about `IsArchived`; `UsageCount_IsSortable` catches `usageCount` moving out of the SQL projection |
 | `ActivityRoleSystemKeyTests.*` | Lookup survives a rename; an unknown key does not fall through to `SystemKey == null` and match every user-created role; a keyed role cannot be deleted; re-seeding does not duplicate a renamed system role |
 | `ActivityProfilesRouteSmokeTests.Core_DoesNotReferenceActivityProfiles` | The dependency direction, from the other side |
@@ -61,7 +64,16 @@ Nothing in Core is currently carried as an expected-failing `[Trait("Status","Kn
 items that used to be (the `DefaultUsersSeeder` create-path failure, `Activity.Clone`'s
 `MemberwiseClone`) are now green regression pins rather than gaps.
 
-Two standing caveats rather than gaps:
+Three standing caveats rather than gaps:
+
+- **The three nullable preset cascades are an open decision, carried as a comment rather than a trait.**
+  `ActivityForeignKeyInventoryTests.cs:61-90` freezes `PomodoroTimerPreset.FocusActivityId` /
+  `RestActivityId` and `TimerPreset.ActivityId` as `Cascade` under an explicit `TODO` / "⚠ OPEN
+  QUESTION" block: all three are **nullable**, so `SetNull` is available (it is what the structurally
+  identical `TodoListItem.PairedLeisureActivityId` uses), and deleting an activity today destroys the
+  whole preset — name, five durations, cycle count. The inventory is green because it records the
+  present, not because anybody judged these three. It is a known gap in everything but the trait; see
+  `MIG-3` in `../review/03-risks-rollout.md`. Don't read those rows as intent.
 
 - **`UserDataExportAndDeletionTests.KnownGaps`** is a real, deliberately maintained list of user-scoped
   entities that are not exported. Adding a user-scoped entity to Core fails that test until it is

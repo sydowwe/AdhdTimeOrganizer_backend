@@ -21,7 +21,7 @@ Point-in-time snapshot, 2026-08-31. IDs reference [02-findings.md](02-findings.m
 | 12 | 🟡 | Six indexes on the most-written table; two are largely subsumed by the composites | `PERF-3` | `infrastructure/persistence/configuration/activity/ActivityConfiguration.cs:37-42` |
 | 13 | 🟡 | Redundant hand-written archival predicate next to the comment warning against it | `CQ-5` | `application/endpoint/activity/activity/query/GetSelectOptionsActivityEndpoint.cs:23` |
 | 14 | 🟡 | Dead `.Include()`s before a projection | `CQ-6` | `application/endpoint/base/BaseActivityFormSelectOptionsEndpoint.cs:68-69` |
-| 15 | 🟡 | `by-Name` role lookup still routed — the surface `SystemActivityRole` replaced | `CQ-7` | `application/endpoint/activity/role/query/GetByNameActivityRoleEndpoint.cs` |
+| 15 | 🟡 ✅ fixed 2026-09-01 | `by-Name` role lookup still routed — the surface `SystemActivityRole` replaced; deleted after confirming no SPA call site | `CQ-7` | `application/endpoint/activity/role/query/GetByNameActivityRoleEndpoint.cs` (deleted) |
 | 16 | 🟡 | `UserId = 0` placeholder the framework explicitly removed the need for | `CQ-8` | `application/dto/request/timer/PomodoroTimerPresetRequest.cs:34` |
 | 17 | 🟡 | Root-admin seed failures log "Failed to…" without `IdentityResult.Errors` | `CQ-9` | `infrastructure/persistence/seeder/default/DefaultUsersSeeder.cs:69-77` |
 | 18 | 🟡 | Root admin seeded with `TimeZoneInfo.Local` — the exact fallback `IUserTimeZoneResolver` refuses | `CQ-10` | `infrastructure/persistence/seeder/default/DefaultUsersSeeder.cs:27` |

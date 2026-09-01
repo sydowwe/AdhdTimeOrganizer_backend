@@ -202,7 +202,8 @@ its seeded English display name, so renaming it — which the Slovak UI must do 
 silently killed quick-create. The enum member names are the wire contract (camelCase via
 `JsonStringEnumMemberName`, sent verbatim as a path segment, and doubling as i18n sub-keys
 client-side): **never rename one**. The persisted column holds the C# member name instead, so the two
-spellings are independent.
+spellings are independent. The `by-Name` role lookup that failure came from is gone — it was deleted
+once the SPA was confirmed to have no remaining call site.
 
 **A missing user's time zone resolves to UTC, not `TimeZoneInfo.Local`** — the answer must not depend
 on which machine the server happens to be running on.
@@ -274,7 +275,7 @@ what keeps that from recurring.
 | `SetArchivedActivityEndpoint` | Endpoint | `PATCH /activity/{id}/archived` — the **only** writer of `IsArchived`; idempotent 204 | `activity/activity/command/` |
 | `MergeActivityEndpoint` | Endpoint | `POST /activity/merge` — repoint-then-delete in one transaction | `activity/activity/command/` |
 | Role: `Create` · `Update` · `Delete` | Endpoint | CRUD. Delete refuses a `SystemKey` role with 409 | `activity/role/command/` |
-| Role: `GetAll` · `GetById` · `GetByName` · `GetBySystemKey` · `GetSelectOptions` · `Grid` | Endpoint | Reads. `GetBySystemKey` is the identity-based replacement for `GetByName` | `activity/role/query/` |
+| Role: `GetAll` · `GetById` · `GetBySystemKey` · `GetSelectOptions` · `Grid` | Endpoint | Reads. `GetBySystemKey` is the identity-based lookup; the `by-Name` endpoint it replaced has been deleted | `activity/role/query/` |
 | Category: `Create` · `Update` · `Delete` · `BatchDelete` | Endpoint | CRUD | `activity/category/command/` |
 | Category: `GetAll` · `GetById` · `GetSelectOptions` · `Grid` | Endpoint | Reads | `activity/category/query/` |
 | `TimerPreset` · `PomodoroTimerPreset` (5 each) | Endpoint | Create/Update/Delete + GetAll/GetById | `timer/**` |

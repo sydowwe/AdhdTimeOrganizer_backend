@@ -12,9 +12,9 @@ subclassed **zero** times. So:
 | `GET api/activity/all` | `GetAllActivityEndpoint.cs` | none |
 | `GET api/activity-role/all` | `GetAllActivityRoleEndpoint.cs` | none |
 | `GET api/activity-category/all` | `GetAllActivityCategoryEndpoint.cs` | none |
-| `GET api/activity-role/by-Name/{value}` | `GetByNameActivityRoleEndpoint.cs` | none |
+| ~~`GET api/activity-role/by-Name/{value}`~~ | ~~`GetByNameActivityRoleEndpoint.cs`~~ | **route deleted 2026-09-01 — see Part B** |
 
-All four are one-line subclasses of Framework bases, so the risk is low per route — but "returns every
+The three remaining ones are one-line subclasses of Framework bases, so the risk is low per route — but "returns every
 row this user owns" is the shape where a missing user filter is invisible until it isn't, and these are
 the only Core reads with no assertion of any kind behind them.
 
@@ -63,9 +63,16 @@ different, that is a product decision worth making explicitly — the "only pick
 activities" rule in `../../docs/domain-map.md` does not say which side of the line `/all` is on, and
 this test is what forces the question.
 
-## Part B — `TEST-12`, `GET /activity-role/by-Name/{value}`
+## Part B — `TEST-12`, `GET /activity-role/by-Name/{value}` — ✅ CLOSED 2026-09-01, no test written
 
-`GetByNameActivityRoleEndpoint.cs:8-16` is a `BaseGetByFieldEndpoint` matching on `Name ==`. It is the
+> **Resolved by the first branch below.** The SPA sweep found no caller: the only `by-name` string
+> left in `AntiProcrastinationApp-frontend/src` is the historical note in
+> `core/activity/dto/enum/SystemActivityRole.ts:6`, and quick-create already calls
+> `/activity-role/by-system-key/{key}` (`core/activity/api/activityOptionsApi.ts:82`). The endpoint is
+> deleted and `docs/domain-map.md`'s Navigation index no longer lists `GetByName`. No test needed —
+> the untested surface is gone. The analysis below is the original prompt, kept as written.
+
+`GetByNameActivityRoleEndpoint.cs:8-16` was a `BaseGetByFieldEndpoint` matching on `Name ==`. It is the
 surface `SystemActivityRole` was introduced to replace: looking a role up by its **user-editable**
 display name is what broke quick-create for anyone who renamed one, which is the whole story in
 `domain/model/enum/SystemActivityRole.cs:9-12`. The replacement

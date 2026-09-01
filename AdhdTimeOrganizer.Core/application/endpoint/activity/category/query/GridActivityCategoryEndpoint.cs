@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.application.dto.filter;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
@@ -36,11 +37,19 @@ public class GridActivityCategoryEndpoint(
 
     protected override IQueryable<ActivityCategory> ApplyCustomFiltering(IQueryable<ActivityCategory> query, CategoryFilterRequest filter)
     {
+        // ILIKE, not Contains: Contains is case-sensitive in Postgres and neither shape is indexable.
+        // See FreeTextFilterExtensions.
         if (!string.IsNullOrWhiteSpace(filter.Name))
-            query = query.Where(c => c.Name.Contains(filter.Name));
+        {
+            var pattern = filter.Name.ToContainsPattern();
+            query = query.Where(c => EF.Functions.ILike(c.Name, pattern));
+        }
 
         if (!string.IsNullOrWhiteSpace(filter.Text))
-            query = query.Where(c => c.Text != null && c.Text.Contains(filter.Text));
+        {
+            var pattern = filter.Text.ToContainsPattern();
+            query = query.Where(c => c.Text != null && EF.Functions.ILike(c.Text, pattern));
+        }
 
         if (!string.IsNullOrWhiteSpace(filter.Color))
             query = query.Where(c => c.Color == filter.Color);

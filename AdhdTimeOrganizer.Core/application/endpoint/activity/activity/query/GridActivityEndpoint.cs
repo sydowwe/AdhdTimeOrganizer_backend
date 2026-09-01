@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.application.dto.filter;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.request.@base.table;
@@ -58,6 +59,15 @@ public class GridActivityEndpoint(
     /// table in the union. If it ever stops being affordable, the agreed fallback is <c>canDelete</c>
     /// everywhere and <c>usageCount</c> on <c>GET /activity/{id}</c> only — and the column loses its sort.
     /// </para>
+    /// <para>
+    /// ⚠ <b>Deriving <c>canDelete</c> from <c>usageCount</c> to "save a scan" makes it worse — measured,
+    /// don't redo it.</b> The obvious rewrite (project the count into a transparent identifier, then
+    /// <c>CanDelete = x.UsageCount == 0</c>) does not give EF one subquery to reuse: it inlines the
+    /// identifier, and the comparison brings nullable semantics with it, so the page query comes back as
+    /// <b>three</b> union subqueries — <c>count(*)</c> for the column, then <c>count(*) = 0 AND count(*)
+    /// IS NOT NULL</c> for the boolean. The shape below is two, and the second is an <c>EXISTS</c>, which
+    /// stops at the first matching row instead of counting to the end.
+    /// </para>
     /// </remarks>
     protected override Func<IQueryable<Activity>, IQueryable<ActivityResponse>> Projection => query =>
     {
@@ -87,20 +97,34 @@ public class GridActivityEndpoint(
         if (filter.IsArchived.HasValue)
             query = query.Where(a => a.IsArchived == filter.IsArchived.Value);
 
+        // ILIKE, not Contains: Contains is case-sensitive in Postgres and neither shape is indexable.
+        // See FreeTextFilterExtensions.
         if (!string.IsNullOrWhiteSpace(filter.Name))
-            query = query.Where(a => a.Name.Contains(filter.Name));
+        {
+            var pattern = filter.Name.ToContainsPattern();
+            query = query.Where(a => EF.Functions.ILike(a.Name, pattern));
+        }
 
         if (!string.IsNullOrWhiteSpace(filter.Text))
-            query = query.Where(a => a.Text != null && a.Text.Contains(filter.Text));
+        {
+            var pattern = filter.Text.ToContainsPattern();
+            query = query.Where(a => a.Text != null && EF.Functions.ILike(a.Text, pattern));
+        }
 
         if (filter.IsUnavoidable.HasValue)
             query = query.Where(a => a.IsUnavoidable == filter.IsUnavoidable.Value);
 
         if (!string.IsNullOrWhiteSpace(filter.RoleName))
-            query = query.Where(a => a.Role.Name.Contains(filter.RoleName));
+        {
+            var pattern = filter.RoleName.ToContainsPattern();
+            query = query.Where(a => EF.Functions.ILike(a.Role.Name, pattern));
+        }
 
         if (!string.IsNullOrWhiteSpace(filter.CategoryName))
-            query = query.Where(a => a.Category != null && a.Category.Name.Contains(filter.CategoryName));
+        {
+            var pattern = filter.CategoryName.ToContainsPattern();
+            query = query.Where(a => a.Category != null && EF.Functions.ILike(a.Category.Name, pattern));
+        }
 
         if (filter.RoleId.HasValue)
             query = query.Where(a => a.RoleId == filter.RoleId.Value);

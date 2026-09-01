@@ -7,9 +7,9 @@ using Sydowwe.Framework.application.endpoint.@base.read;
 namespace AdhdTimeOrganizer.Core.application.endpoint.activity.role.query;
 
 /// <summary>
-/// <c>GET /activity-role/by-system-key/{key}</c> — the identity-based replacement for
-/// <see cref="GetByNameActivityRoleEndpoint"/> on the three roles the app itself references. The
-/// client sends the camelCase <see cref="SystemActivityRole"/> value verbatim as the path segment.
+/// <c>GET /activity-role/by-system-key/{key}</c> — the identity-based replacement for the removed
+/// <c>by-Name</c> lookup on the three roles the app itself references. The client sends the camelCase
+/// <see cref="SystemActivityRole"/> value verbatim as the path segment.
 ///
 /// <para>A pure read: a missing role is a 404, never a lazy create. Deleting a keyed role is refused
 /// (<c>DeleteActivityRoleEndpoint</c>) and renaming one keeps the key, so for any account seeded
