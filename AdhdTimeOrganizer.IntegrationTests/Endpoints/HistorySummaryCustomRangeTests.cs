@@ -45,6 +45,13 @@ public class HistorySummaryCustomRangeTests(AppDbContextFixture fixture) : Postg
     private const string SummaryCardsRoute = "/api/activity-history/dashboard/summary/summary-cards";
     private const string TimeOfDayRoute = "/api/activity-history/dashboard/summary/time-of-day";
 
+    /// <summary>
+    /// The fifth range-taking route in the slice. It does not carry a <see cref="DateRangeDto"/> — it has
+    /// its own <c>startDate</c>/<c>endDate</c> pair — so it is not covered by the per-route theories above
+    /// and gets its own guard below.
+    /// </summary>
+    private const string CalendarRoute = "/api/activity-history/dashboard/calendar";
+
     private static readonly TimeZoneInfo Bratislava = TimeZoneInfo.FindSystemTimeZoneById("Europe/Bratislava");
 
     /// <summary>The ticket's own example: a user picks 1 March and 31 March and expects March.</summary>
@@ -232,6 +239,43 @@ public class HistorySummaryCustomRangeTests(AppDbContextFixture fixture) : Postg
         HourTotals(withStaleEndDate).Sum().Should().Be(HourTotals(without).Sum());
     }
 
+    /// <summary>
+    /// The same cap on the calendar dashboard, which reaches it by a different road: its request is a plain
+    /// <c>startDate</c>/<c>endDate</c> pair rather than a <see cref="DateRangeDto"/>, so
+    /// <c>CalendarActivityRequestValidator</c> restates the rules instead of reusing
+    /// <c>ApplyValidationRules</c>. Without a concrete validator FastEndpoints skips validation silently and
+    /// the route answers 200 for a decade, loading every <c>ActivityHistory</c> row the caller owns —
+    /// with <c>Activity</c> and <c>ActivityRole</c> joined — into memory.
+    ///
+    /// <para><c>topN</c> is in here because it is the per-day <c>Take</c>, and it was caller-controlled and
+    /// unbounded for the same reason the range was.</para>
+    /// </summary>
+    [Fact]
+    public async Task Calendar_RejectsARangeItWillNotAnswer_AndAnUnboundedTopN()
+    {
+        var ok = await PostRawAsync(CalendarRoute, CalendarBody(RangeStart, RangeEnd));
+        ok.StatusCode.Should().Be(HttpStatusCode.OK, "a well-formed March request is still answered");
+
+        var longest = await PostRawAsync(
+            CalendarRoute, CalendarBody(RangeStart, RangeStart.AddDays(DateRangeDto.MaxCustomRangeDays - 1)));
+        longest.StatusCode.Should().Be(HttpStatusCode.OK, "the span is counted inclusively, as it is above");
+
+        var inverted = await PostRawAsync(CalendarRoute, CalendarBody(RangeEnd, RangeStart));
+        inverted.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "an inverted range currently yields an empty answer, which is indistinguishable from a user " +
+            "who logged nothing");
+
+        var tooLong = await PostRawAsync(
+            CalendarRoute, CalendarBody(RangeStart, RangeStart.AddDays(DateRangeDto.MaxCustomRangeDays)));
+        tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var topNZero = await PostRawAsync(CalendarRoute, CalendarBody(RangeStart, RangeEnd, 0));
+        topNZero.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var topNTooLarge = await PostRawAsync(CalendarRoute, CalendarBody(RangeStart, RangeEnd, 11));
+        topNTooLarge.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ---- helpers ---------------------------------------------------------
 
     /// <summary>
@@ -297,6 +341,9 @@ public class HistorySummaryCustomRangeTests(AppDbContextFixture fixture) : Postg
             .SelectMany(w => w.GetProperty("items").EnumerateArray())
             .Sum(i => i.GetProperty("totalSeconds").GetInt64())
     };
+
+    private static object CalendarBody(DateOnly startDate, DateOnly endDate, int topN = 3) =>
+        new { startDate, endDate, topN };
 
     private static List<long> HourTotals(JsonElement body) => body.GetProperty("hours").EnumerateArray()
         .Select(h => h.GetProperty("totalSeconds").GetInt64()).ToList();

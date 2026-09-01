@@ -74,7 +74,7 @@ endpoint in the slice.
 
 `Doc impact: none`
 
-### `SEC-3` 🟡 · The calendar dashboard is the one unbounded, unvalidated range in the slice
+### `SEC-3` 🟡 ✅ FIXED 2026-09-01 · The calendar dashboard is the one unbounded, unvalidated range in the slice
 
 `application/endpoint/CalendarActivityEndpoint.cs:14-32` · `application/dto/request/CalendarActivityRequest.cs`
 
@@ -88,6 +88,13 @@ rather than a 400), and `TopN` is unbounded and unchecked. A single request for 
 **Fix:** add `CalendarActivityRequestValidator` beside the four `summary/` ones — `EndDate >= StartDate`,
 span within `DateRangeDto.MaxCustomRangeDays`, `TopN` in `1..10`. Note the same silent-resolution trap
 applies: FastEndpoints binds a validator by the request's exact type, so it must be a concrete class.
+
+**Fixed:** `application/validator/CalendarActivityRequestValidator.cs` — a concrete
+`Validator<CalendarActivityRequest>`. `CalendarActivityRequest` carries no `DateRangeDto`, so it cannot
+reuse `ApplyValidationRules` and restates the same three constraints: both dates non-empty, `EndDate >=
+StartDate`, an inclusive span under `DateRangeDto.MaxCustomRangeDays` (guarded on the inverted case so a
+negative span is reported as inverted rather than as "too long"), and `TopN` in `1..10`
+(`MaxTopN`). No frontend caller sends `TopN` today, so the `1..10` bound narrows nothing in use.
 
 `Doc impact: domain-map.md → Navigation index` (add the validator row beside
 `HistorySummaryDateRangeValidators`).
