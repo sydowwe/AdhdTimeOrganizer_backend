@@ -36,33 +36,25 @@ public class GetFilteredTableActivityHistoryEndpoint(
 
     public override async Task HandleAsync(BaseFilterSortPaginateRequest<ActivityHistoryFilterRequest> req, CancellationToken ct)
     {
-        try
-        {
-            var query = WithIncludes(dbContext.Set<ActivityHistory>().AsNoTracking());
+        var query = WithIncludes(dbContext.Set<ActivityHistory>().AsNoTracking());
 
-            query = query.FilteredByUser(User.GetId());
+        query = query.FilteredByUser(User.GetId());
 
-            if (req is { UseFilter: true, Filter: not null })
-                query = ApplyCustomFiltering(query, req.Filter);
+        if (req is { UseFilter: true, Filter: not null })
+            query = ApplyCustomFiltering(query, req.Filter);
 
-            var history = await ActivityHistoryResponse.Projection(query)
-                .GroupBy(hr => hr.StartTimestamp.ToUniversalTime().Date)
-                .Select(group => new ActivityHistoryListGroupedByDateResponse
-                {
-                    Date = group.Key,
-                    // Ensure IEnumerable<T> in final projection
-                    HistoryResponseList = group.OrderBy(h => h.StartTimestamp).ToList()
-                })
-                .OrderBy(response => response.Date)
-                .ToListAsync(ct);
+        var history = await ActivityHistoryResponse.Projection(query)
+            .GroupBy(hr => hr.StartTimestamp.ToUniversalTime().Date)
+            .Select(group => new ActivityHistoryListGroupedByDateResponse
+            {
+                Date = group.Key,
+                // Ensure IEnumerable<T> in final projection
+                HistoryResponseList = group.OrderBy(h => h.StartTimestamp).ToList()
+            })
+            .OrderBy(response => response.Date)
+            .ToListAsync(ct);
 
-            await Send.OkAsync(history, ct);
-        }
-        catch (Exception ex)
-        {
-            AddError($"An error occurred while retrieving filtered data: {ex.Message}");
-            await Send.ErrorsAsync(500, ct);
-        }
+        await Send.OkAsync(history, ct);
     }
 
     protected IQueryable<ActivityHistory> WithIncludes(IQueryable<ActivityHistory> query)

@@ -18,7 +18,7 @@ sets `Npgsql.EnableLegacyTimestampBehavior`. Each has a one-line test in its pro
 
 ## 5. Security & authorization
 
-### `SEC-1` 🟠 · A timer alarm accepts any `activityId`, and the job handler resolves the name unscoped
+### `SEC-1` 🟠 ✅ FIXED 2026-09-01 · A timer alarm accepts any `activityId`, and the job handler resolves the name unscoped
 
 `AdhdTimeOrganizer.History/application/validator/ScheduleTimerAlarmsValidator.cs:35` ·
 `application/job/TimerBoundaryAlarmJobHandler.cs:52`
@@ -45,7 +45,7 @@ userId, ct)) ThrowError(...)`. Belt-and-braces: scope the handler's lookup with
 `Doc impact: summary.md → Timer-boundary alarms` (the "the recipient is always the caller, so there is
 nothing to spoof" note is true of the recipient and not of `ActivityId`; state the ownership check).
 
-### `SEC-2` 🟠 · The grid returns raw exception text to the client
+### `SEC-2` 🟠 ✅ FIXED 2026-09-01 · The grid returns raw exception text to the client
 
 `application/endpoint/query/GetFilteredTableActivityHistoryEndpoint.cs:61-65`
 
@@ -66,6 +66,11 @@ rather than a 400.
 
 **Fix:** delete the `catch`, or narrow it: log via `ILogger` with the correlation id, rethrow
 `OperationCanceledException`, and return a fixed message. No other endpoint in the slice does this.
+
+**Fixed:** the `catch` is gone. `Program.cs`'s `UseUnhandledExceptionHandler` already logs the
+exception and returns a 500 carrying only an error id, and the pipeline above it already maps a
+client-aborted `OperationCanceledException` away from a 500 — so the handler now matches every other
+endpoint in the slice.
 
 `Doc impact: none`
 
