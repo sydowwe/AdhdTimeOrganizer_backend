@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.application.dto.request.activity;
 using FastEndpoints;
 using FluentValidation;
+using Sydowwe.Framework.domain;
 
 namespace AdhdTimeOrganizer.Core.application.validator;
 
@@ -10,10 +11,10 @@ public class ActivityValidator : Validator<ActivityRequest>
     {
         RuleFor(x => x.Name)
             .NotEmpty()
-            .MaximumLength(50);
+            .MaximumLength(EntityFieldLengths.Name);
 
         RuleFor(x => x.Text)
-            .MaximumLength(500);
+            .MaximumLength(EntityFieldLengths.Text);
 
         RuleFor(x => x.RoleId)
             .NotEmpty();
