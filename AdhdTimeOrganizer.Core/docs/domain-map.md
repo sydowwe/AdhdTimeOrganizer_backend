@@ -236,8 +236,9 @@ one fails). Summary:
 | `IActivityTimeAttributionSink` | Seam (write, single) | Records observed time into the activity ledger — History implements, Tracking consumes | `IActivityTimeAttributionSink.cs` |
 | `ICalendarDayLookup` | Seam (read, single) | Calendar-day metadata for a range — Planning implements, History consumes | `ICalendarDayLookup.cs` |
 | `ITodoListItemLoggedTimeSource` | Seam (read, single) | Seconds logged per to-do item on a day, keyed on `ActivityHistory.TodoListItemId` **only** | `ITodoListItemLoggedTimeSource.cs` |
+| `IUserOwnedReferenceVerifier` | Seam (read, keyed) | "Is this row of yours the caller's?" for a client-supplied id — TodoLists/Routines implement, History's write path consumes. **Fails closed** | `IUserOwnedReferenceVerifier.cs` |
 | `TimerPresetActivityReferenceSource` | Implementation | Core's own reference source: the three nullable activity columns on the two preset entities | `TimerPresetActivityReferenceSource.cs` |
-| `ActivityMembershipSourceKeys` / `ActivityReferenceSourceKeys` | Constants | The known keys. Read the constant, never retype the literal — a typo is a silent no-op | `*SourceKeys.cs` |
+| `ActivityMembershipSourceKeys` / `ActivityReferenceSourceKeys` / `UserOwnedReferenceKeys` | Constants | The known keys. Read the constant, never retype the literal — a typo is a silent no-op | `*Keys.cs` |
 
 ### Seam events — `application/event/`
 
@@ -259,6 +260,8 @@ what keeps that from recurring.
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `ActivityReferenceService` | Service | Folds every `IActivityReferenceSource` into one composable `UNION ALL` + an atomic repoint. Sources run sequentially — they share one `DbContext` | `service/ActivityReferenceService.cs` |
+| `ActivityIdOwnershipExtensions` | Endpoint extension | `EnsureOwnsActivityAsync` — the one-line `BeforeMapping` guard for any request built on `IActivityIdRequest`; 404s on the `ActivityId` field. Used by the to-do/routine item and memory-anchor writes | `endpoint/extensions/ActivityIdOwnershipExtensions.cs` |
+| `ReferencedIdOwnershipService` | Service | "Is this client-supplied id the caller's?" — `Activity` directly (lifting archival only), other slices' rows through `IUserOwnedReferenceVerifier`. Fails closed on an unclaimed key (`IReferencedIdOwnershipService`) | `service/ReferencedIdOwnershipService.cs` |
 | `UserDefaultsService` | Service | Runs every per-user default seeder for a new account (`IUserDefaultsService`) | `service/UserDefaultsService.cs` |
 | `UserTimeZoneResolver` | Service | A user's zone for resolving wall-clock times; memoised per request, keyed by user id | `service/UserTimeZoneResolver.cs` |
 

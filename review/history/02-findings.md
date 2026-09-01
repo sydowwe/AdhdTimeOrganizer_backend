@@ -99,7 +99,7 @@ negative span is reported as inverted rather than as "too long"), and `TopN` in 
 `Doc impact: domain-map.md → Navigation index` (add the validator row beside
 `HistorySummaryDateRangeValidators`).
 
-### `SEC-4` 🟠 (PLAUSIBLE) · Nothing checks that `ActivityId` / `TodoListItemId` / `RoutineTodoListId` belong to the caller
+### `SEC-4` 🟠 ✅ FIXED 2026-09-02 · Nothing checks that `ActivityId` / `TodoListItemId` / `RoutineTodoListId` belong to the caller
 
 `application/validator/ActivityHistoryValidator.cs:11-28` ·
 `application/dto/request/ActivityHistoryRequest.cs:29-38`
@@ -127,6 +127,30 @@ someone else's delete.
 
 **Fix:** one ownership check in the validator (or a small `IActivityIdRequest` guard in Core, since
 several slices share the shape) covering all three ids. Prefer Core: this is not a History-specific rule.
+
+**Fixed:** in Core, as suggested — but as a service rather than a validator rule, because the check
+needs the request scope's `DbContext` and the principal, and FluentValidation validators here are
+stateless rule declarations. `IReferencedIdOwnershipService` (`Core/domain/serviceContract/`,
+implemented by `Core/application/service/ReferencedIdOwnershipService.cs`) answers both halves:
+`Activity` directly — lifting `AppQueryFilters.ActivityArchived` only, since archival is not
+ownership and an edit of pre-archival history must still save — and the two item ids through a new
+keyed seam, `IUserOwnedReferenceVerifier`, implemented by `TodoListItemOwnedReferenceVerifier`
+(TodoLists) and `RoutineTodoListOwnedReferenceVerifier` (Routines). A seam rather than a direct query
+because History can see neither slice; both verifiers filter on the user id they are handed rather
+than the ambient query filter, since this is a security answer and not a scoped read.
+
+`Create`/`UpdateActivityHistoryEndpoint` call it from `BeforeMapping` via the shared
+`ActivityHistoryReferencedIds` helper and answer **404 on the offending field** — a foreign id and a
+nonexistent one stay indistinguishable, so the endpoint is not an existence oracle over another
+account's ids. Update checks all three even though `UpdateEntity` deliberately does not write the item
+links: one query beats two different rules for one DTO.
+
+The keyed lookup **fails closed** — an unclaimed key rejects the write instead of skipping the check —
+so a slice dropped from `ModuleAssemblies` degrades to a 404 rather than back to this hole.
+`SeamWiringTests.UserOwnedReferenceVerifiers_CoverEveryKey_Exactly` pins the registration and
+`ActivityHistoryReferencedIdOwnershipTests` asserts on rows in both directions (three foreign ids
+refused with nothing written, the caller's own activity + item accepted and linked, an own *archived*
+activity still accepted, and the update path refused without applying).
 
 `Doc impact: domain-map.md → Invariants` (add an "ownership of referenced ids" line — the Ownership
 invariant today covers reads only, and states nothing about ids arriving on a write).

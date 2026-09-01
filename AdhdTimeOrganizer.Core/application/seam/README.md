@@ -18,6 +18,7 @@ if the two ever drift apart.
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint` |
 | `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint` |
+| `IUserOwnedReferenceVerifier` | read | keyed `IEnumerable<>` | TodoLists (`todoListItem`), Routines (`routineTodoList`) | History — `Create`/`UpdateActivityHistoryEndpoint`, through Core's `IReferencedIdOwnershipService` |
 
 ## Event seams (`ISeamEvent`)
 
@@ -107,6 +108,14 @@ None of these break the build, and only one of them throws.
   only ever find *more* — double-counts, because two to-do items may share one activity and would
   each be credited the same seconds. `TodoListItemDailyRecapTests.TimeIsAttributedByItem_NotByActivity`
   is the guard, and it asserts on the returned totals rather than on the query.
+- **`IUserOwnedReferenceVerifier` is the one that fails *closed*.** `ReferencedIdOwnershipService`
+  looks a verifier up by key and answers `false` when none matches, so a slice dropped from
+  `ModuleAssemblies` or a renamed key rejects every write carrying that id instead of waving them all
+  through. That is the right direction for a security check and still an outage nothing logs: saving a
+  recording from a completed to-do item starts 404ing for everyone, with a "To-do item not found."
+  message that is true of no row. `SeamWiringTests.UserOwnedReferenceVerifiers_CoverEveryKey_Exactly`
+  pins coverage; `ActivityHistoryReferencedIdOwnershipTests` asserts on rows, both directions, so a
+  verifier that answers `true` for everything fails too.
 - **Seam events fail silently in both directions**: an event with no handler is inert, and a handler
   that throws is logged and swallowed by design. Guarded by
   `SeamWiringTests.SeamEvents_AllHaveAHandler` plus behavioural tests on rows —

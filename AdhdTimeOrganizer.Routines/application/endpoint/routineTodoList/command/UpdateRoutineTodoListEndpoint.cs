@@ -1,3 +1,5 @@
+using AdhdTimeOrganizer.Core.application.endpoint.extensions;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Routines.application.dto.request.todoList;
 using AdhdTimeOrganizer.Routines.application.validator;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
@@ -6,7 +8,7 @@ using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.Routines.application.endpoint.todoList.routineTodoList.command;
 
-public class UpdateRoutineTodoListEndpoint(DbContext dbContext)
+public class UpdateRoutineTodoListEndpoint(DbContext dbContext, IReferencedIdOwnershipService ownership)
     : BaseUpdateEndpoint<RoutineTodoList, UpdateRoutineTodoListRequest>(dbContext)
 {
     public override void Configure()
@@ -14,6 +16,13 @@ public class UpdateRoutineTodoListEndpoint(DbContext dbContext)
         base.Configure();
         Validator<UpdateRoutineTodoListValidator>();
     }
+
+    /// <summary>
+    /// The edit rewrites <c>ActivityId</c>, so it can repoint one of the caller's own routines at
+    /// another user's activity. Same guard as the create path.
+    /// </summary>
+    protected override Task<bool> BeforeMapping(UpdateRoutineTodoListRequest req, CancellationToken ct = default) =>
+        this.EnsureOwnsActivityAsync(req, ownership, DbContext, ct);
 
     protected override Task<bool> AfterMapping(RoutineTodoList entity, UpdateRoutineTodoListRequest req, CancellationToken ct = default)
     {

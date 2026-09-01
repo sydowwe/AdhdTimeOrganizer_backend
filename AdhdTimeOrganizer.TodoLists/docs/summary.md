@@ -23,12 +23,16 @@ project's bases.
 - **Referenced by:** the host, and `AdhdTimeOrganizer.Routines` — the solution's **only** outbound
   slice edge, and it exists for the shared to-do bases listed above.
 - **Zero outbound slice edges of its own.** Everything it needs from another slice goes through Core.
-- **Implements two Core seams** (`application/seam/`), so other slices can reach to-do rows without
+- **Implements three Core seams** (`application/seam/`), so other slices can reach to-do rows without
   referencing this project:
   - `TodoListActivityMembershipSource` (key `ActivityMembershipSourceKeys.TodoList`) — "this activity
     is on a to-do list", faceted by `TaskPriorityId`. Consumed by History's grid filters.
   - `TodoListActivityReferenceSource` (key `ActivityReferenceSourceKeys.TodoList`) — counts and
     repoints **two** activity columns during an activity merge.
+  - `TodoListItemOwnedReferenceVerifier` (key `UserOwnedReferenceKeys.TodoListItem`) — "is this item
+    id the caller's?", so History can refuse a recording linked to somebody else's task. It filters on
+    the user id it is handed rather than the ambient query filter: this answers a security question,
+    not a scoped read, and must not change with whoever happens to be executing.
 - **Consumes one Core seam:** `ITodoListItemLoggedTimeSource`, implemented in History, for the daily
   recap's per-item logged time.
 - **Publishes completion through Core events** (`TodoListItemIsDoneChangedEvent`) rather than calling

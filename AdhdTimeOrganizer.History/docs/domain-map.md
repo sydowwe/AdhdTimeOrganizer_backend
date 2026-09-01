@@ -167,6 +167,7 @@ rather than an error (`HistoryTimeOfDayDashboardTests` pins all three on values)
 | `ActivityHistoryTimeAttributionSink` | Seam impl | Core's `IActivityTimeAttributionSink`: records N seconds against an activity for Tracking. Mutates the caller's `DbContext`, **never** saves; extends a contiguous window instead of inserting | `application/seam/ActivityHistoryTimeAttributionSink.cs` |
 | `TodoListItemLoggedTimeSource` | Seam impl | Core's `ITodoListItemLoggedTimeSource` for TodoLists' daily recap. Keys on `TodoListItemId` **alone** | `application/seam/TodoListItemLoggedTimeSource.cs` |
 | `ActivityHistoryActivityReferenceSource` | Seam impl | Core's `IActivityReferenceSource`: reports/repoints this slice's references to an activity for merge and delete | `application/seam/ActivityHistoryActivityReferenceSource.cs` |
+| `ActivityHistoryReferencedIds` | Helper | The create/update ownership check over the three client-supplied ids. Needs the request scope and the principal, which is why it is not in the validator | `application/endpoint/command/ActivityHistoryReferencedIds.cs` |
 | `ActivityHistoryValidator` | Validator | Create/update rules, incl. the mutual exclusion of `TodoListItemId` and `RoutineTodoListId` | `application/validator/ActivityHistoryValidator.cs` |
 | `HistorySummaryDateRangeValidators` | Validators | One concrete class per `summary/` request type. FastEndpoints resolves validators by **exact type** and skips validation silently without one — that is why these are four classes, not one generic | `application/validator/HistorySummaryDateRangeValidators.cs` |
 | `CalendarActivityRequestValidator` | Validator | The calendar dashboard's range rules. `CalendarActivityRequest` carries no `DateRangeDto`, so it restates ordered ends, the `MaxCustomRangeDays` span cap and a bounded `TopN` itself | `application/validator/CalendarActivityRequestValidator.cs` |
@@ -185,6 +186,16 @@ global query filter (`!IsAuthenticated || e.UserId == currentUserId`) and every 
 endpoint is scoped. The base endpoints' `ApplyUserScoping` is a **no-op virtual** and scopes nothing
 — do not treat it as the guard. `GetFilteredTableActivityHistoryEndpoint` additionally calls
 `FilteredByUser(User.GetId())` by hand.
+
+**Ownership of referenced ids.** The Ownership invariant above covers *reads*. On a **write**, all
+three ids on `ActivityHistoryRequest` — `ActivityId`, `TodoListItemId`, `RoutineTodoListId` — arrive
+from the client and must belong to the caller. Nothing but the endpoint can check that: the row's own
+`UserId` is stamped server-side, so the insert is a legitimate row of the caller's pointing somewhere
+it should not; the `Activity` FK enforces existence, not ownership; and the two item columns are
+navigation-free. `Create`/`UpdateActivityHistoryEndpoint` check all three in `BeforeMapping` through
+Core's `IReferencedIdOwnershipService` and answer **404 on the offending field** — a foreign id and a
+nonexistent one are the same answer, so the endpoint is not an existence oracle. Archived activities
+still pass: archival is not ownership. `ActivityHistoryReferencedIdOwnershipTests` is the guard.
 
 **Write ordering.** Any save touching `ActivityHistory` triggers
 `SuggestionPatternRefreshInterceptor` (host-side), which `REFRESH`es three materialized views. They
@@ -212,7 +223,9 @@ AdhdTimeOrganizer.History
   └── AdhdTimeOrganizer.Core          entities (Activity, User, base shims), DTO bases,
                                       shared enums, IActivityMembershipSource,
                                       ICalendarDayLookup, IActivityTimeAttributionSink,
-                                      IActivityReferenceSource, ITodoListItemLoggedTimeSource
+                                      IActivityReferenceSource, ITodoListItemLoggedTimeSource,
+                                      IReferencedIdOwnershipService (over
+                                      IUserOwnedReferenceVerifier)
 ```
 
 This slice **implements** two seams as well as consuming one: `ActivityHistoryTimeAttributionSink`

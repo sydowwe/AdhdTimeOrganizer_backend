@@ -142,6 +142,22 @@ A source resolved by string key fails **silently** when it is missing or misregi
 error, no exception, the filter just stops narrowing.
 `HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam` is what catches that; keep it.
 
+### The ownership seam — the same trick, on the write path
+
+`ActivityHistoryRequest` carries three ids the client chooses and the server does not:
+`ActivityId`, `TodoListItemId`, `RoutineTodoListId`. **Nothing but the endpoint can check them** —
+the row's `UserId` is stamped server-side, so a request naming a stranger's id inserts a perfectly
+valid row *of the caller's own* that points at somebody else's, and the caller's grid then throws on
+every read of that date group (the global filter empties the `Activity` include and the projection
+materializes a non-nullable `Id` off the null).
+
+`Create`/`UpdateActivityHistoryEndpoint` check all three in `BeforeMapping` through Core's
+`IReferencedIdOwnershipService`: `Activity` directly, the two item ids through
+`IUserOwnedReferenceVerifier`, which TodoLists and Routines implement so this slice still names
+neither. A failure is a **404 on the field** — missing and foreign must stay indistinguishable.
+Archived activities pass; archival is not ownership. Guarded by
+`ActivityHistoryReferencedIdOwnershipTests`.
+
 ## Gotchas
 
 - **History takes a plain `DbContext`, never `AppDbContext`** — `ModuleServiceExtensions` aliases it.

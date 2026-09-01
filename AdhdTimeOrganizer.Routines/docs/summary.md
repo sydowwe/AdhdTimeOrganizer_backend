@@ -40,7 +40,7 @@ has no knowledge of Planning at all.
   shared base types), not a membership-filter query, so it is **not** a candidate for the
   seam-inversion trick below — there is no `IQueryable` to hand back through an interface for "this
   type derives from that base." Nothing points back from TodoLists.
-- **Two keyed Core seams are implemented here**, both in `application/seam/`:
+- **Three keyed Core seams are implemented here**, all in `application/seam/`:
   - `RoutineTodoListActivityMembershipSource` (`IActivityMembershipSource`) publishes "this activity is
     on a routine to-do list", so History's grid can filter on routine membership without either
     project referencing the other. The facet is `TimePeriodId`.
@@ -48,10 +48,15 @@ has no knowledge of Planning at all.
     column to Core's activity-merge/delete machinery and repoints it on merge. **Streaks are carried
     across a merge untouched** — two routines on two duplicate activities stay two routines; merging
     says the activities were the same thing, not that the habits were.
+  - `RoutineTodoListOwnedReferenceVerifier` (`IUserOwnedReferenceVerifier`) answers "is this routine
+    item id the caller's?" for slices that store the id on their own rows — History's recordings
+    today. It filters on the user id it is handed, not the ambient query filter, because this is a
+    security answer rather than a scoped read.
 
-  Both resolve **by string key**, not by type. A missing, misregistered or renamed key is silent — no
-  build error, the consumer just quietly stops finding rows — so any consumer needs a behavioural test
-  asserting rows, not a route smoke test.
+  All three resolve **by string key**, not by type. A missing, misregistered or renamed key is silent — no
+  build error, the consumer just quietly stops finding rows (for the verifier: starts refusing every
+  write carrying a routine item id, since that one fails closed) — so any consumer needs a behavioural
+  test asserting rows, not a route smoke test.
 
 ## Gotchas — things that will bite you
 

@@ -1,3 +1,5 @@
+using AdhdTimeOrganizer.Core.application.endpoint.extensions;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Routines.application.dto.request.todoList;
 using AdhdTimeOrganizer.Routines.application.validator;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
@@ -10,7 +12,10 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Routines.application.endpoint.todoList.routineTodoList.command;
 
-public class CreateRoutineTodoListEndpoint(DbContext dbContext, IOptions<TodoListSettings> settings)
+public class CreateRoutineTodoListEndpoint(
+    DbContext dbContext,
+    IOptions<TodoListSettings> settings,
+    IReferencedIdOwnershipService ownership)
     : BaseCreateEndpoint<RoutineTodoList, CreateRoutineTodoListRequest>(dbContext)
 {
     private readonly DbContext _dbContext = dbContext;
@@ -21,6 +26,13 @@ public class CreateRoutineTodoListEndpoint(DbContext dbContext, IOptions<TodoLis
         base.Configure();
         Validator<CreateRoutineTodoListValidator>();
     }
+
+    /// <summary>
+    /// Same client-supplied <c>ActivityId</c>, same guard as the to-do item it shares a request base
+    /// with — see <see cref="ActivityIdOwnershipExtensions"/>.
+    /// </summary>
+    protected override Task<bool> BeforeMapping(CreateRoutineTodoListRequest req, CancellationToken ct = default) =>
+        this.EnsureOwnsActivityAsync(req, ownership, _dbContext, ct);
 
     protected override async Task<bool> AfterMapping(RoutineTodoList entity, CreateRoutineTodoListRequest req, CancellationToken ct = default)
     {

@@ -136,6 +136,46 @@ public class SeamWiringTests(AppDbContextFixture fixture) : PostgresTestBase(fix
     }
 
     /// <summary>
+    /// The <b>ownership</b> verifiers resolve, their keys are distinct, and they cover
+    /// <see cref="UserOwnedReferenceKeys"/> exactly.
+    /// </summary>
+    /// <remarks>
+    /// This one fails in the safe direction and still needs pinning. <c>ReferencedIdOwnershipService</c>
+    /// looks a verifier up by key and answers <c>false</c> when it finds none, so a slice dropped from
+    /// <c>ModuleAssemblies</c> or a renamed key turns every write carrying that id into a 404 —
+    /// nothing throws, nothing logs, and the feature (saving a recording from a completed to-do item)
+    /// simply stops working for everyone. A key with no verifier is that outage; a verifier with no key
+    /// is a check nobody performs.
+    /// </remarks>
+    [Fact]
+    public void UserOwnedReferenceVerifiers_CoverEveryKey_Exactly()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+        // The face the endpoints inject over them, registered the same way and for the same reason as
+        // IActivityReferenceService: resolved singly, so a missing registration throws at activation.
+        AssertRegisteredOnce<IReferencedIdOwnershipService>(scope.ServiceProvider);
+
+        var verifiers = scope.ServiceProvider.GetServices<IUserOwnedReferenceVerifier>().ToList();
+
+        var declaredKeys = typeof(UserOwnedReferenceKeys)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(f => f is { IsLiteral: true, IsInitOnly: false } && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+
+        var resolvedKeys = verifiers.Select(v => v.Key).ToList();
+
+        Assert.True(resolvedKeys.Distinct().Count() == resolvedKeys.Count,
+            "Two IUserOwnedReferenceVerifier implementations claim the same Key, so one of them never "
+            + "runs: " + string.Join(", ", verifiers.Select(v => $"{v.Key}={v.GetType().Name}")));
+
+        Assert.True(declaredKeys.OrderBy(k => k).SequenceEqual(resolvedKeys.OrderBy(k => k)),
+            $"UserOwnedReferenceKeys declares [{string.Join(", ", declaredKeys.OrderBy(k => k))}] but the "
+            + $"container resolved [{string.Join(", ", resolvedKeys.OrderBy(k => k))}]. A key with no "
+            + "verifier fails closed — every write carrying that id becomes a 404.");
+    }
+
+    /// <summary>
     /// <c>IActivityReferenceService</c> — the single face the endpoints inject — resolves exactly once.
     /// </summary>
     /// <remarks>

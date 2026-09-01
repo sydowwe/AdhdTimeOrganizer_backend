@@ -172,6 +172,7 @@ They are picked up by the `IScopedService` marker scan like any other service, t
 |---|---|---|---|
 | `RoutineTodoListActivityMembershipSource` | `IActivityMembershipSource` | "This activity is on a routine to-do list", faceted by `TimePeriodId`. Applies no user scoping — the query is composed into the caller's | `RoutineTodoListActivityMembershipSource.cs` |
 | `RoutineTodoListActivityReferenceSource` | `IActivityReferenceSource` | Exposes and repoints `RoutineTodoList.ActivityId` for activity merge/delete. Streaks carry across a merge untouched | `RoutineTodoListActivityReferenceSource.cs` |
+| `RoutineTodoListOwnedReferenceVerifier` | `IUserOwnedReferenceVerifier` | "Is this `RoutineTodoList` id the caller's?", for slices that store the id on their own rows. Filters on the supplied user id, not the ambient filter | `RoutineTodoListOwnedReferenceVerifier.cs` |
 
 ### Persistence — `infrastructure/persistence/`
 

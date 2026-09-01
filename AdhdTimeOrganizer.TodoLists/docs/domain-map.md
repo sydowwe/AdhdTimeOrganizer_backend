@@ -64,6 +64,7 @@ comes from `Sydowwe.Framework`; the `IsManyWithOneUser` / `IsManyWithOneActivity
 |---|---|---|---|
 | `TodoListActivityMembershipSource` | Seam impl (keyed) | "This activity is on a to-do list", faceted by `TaskPriorityId`. Composed into the caller's query, so it does no user scoping of its own | `application/seam/TodoListActivityMembershipSource.cs` |
 | `TodoListActivityReferenceSource` | Seam impl (keyed) | Counts + repoints both activity columns on an activity merge, including the self-pairing collapse | `application/seam/TodoListActivityReferenceSource.cs` |
+| `TodoListItemOwnedReferenceVerifier` | Seam impl (keyed) | "Is this `TodoListItem` id the caller's?", so a slice writing `TodoListItemId` can refuse a stranger's. Filters on the supplied user id, **not** the ambient filter | `application/seam/TodoListItemOwnedReferenceVerifier.cs` |
 
 ### Shared endpoint bases — `application/endpoint/`
 
