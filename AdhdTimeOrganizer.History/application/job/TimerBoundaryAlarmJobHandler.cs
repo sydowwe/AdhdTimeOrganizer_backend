@@ -49,9 +49,12 @@ public class TimerBoundaryAlarmJobHandler(
 
         // Resolved at fire time rather than snapshotted at registration, so a renamed activity reads
         // correctly. Null (deleted activity, or none named) renders the name-less body — never throws.
+        // Scoped to the alarm's own UserId, not left to the global filter: this context is unauthenticated,
+        // so that filter passes every row. The schedule endpoint already proves ownership, and this keeps a
+        // foreign name unreachable even if a row with someone else's activity id ever reaches the table.
         var activityName = alarm.ActivityId is { } activityId
             ? await dbContext.Set<Activity>()
-                .Where(a => a.Id == activityId)
+                .Where(a => a.Id == activityId && a.UserId == alarm.UserId)
                 .Select(a => (string?)a.Name)
                 .FirstOrDefaultAsync(ct)
             : null;

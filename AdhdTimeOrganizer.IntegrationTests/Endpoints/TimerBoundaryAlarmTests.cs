@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.History.application.job;
 using AdhdTimeOrganizer.History.application.service;
 using AdhdTimeOrganizer.History.domain.model.entity.timerAlarm;
@@ -12,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.Contracts.scheduling;
+using Sydowwe.Framework.domain.extServiceContract.user;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Notifications.domain.entity;
 using Sydowwe.Notifications.infrastructure;
@@ -183,6 +186,137 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
         (await db.Set<Notification>().CountAsync(CancellationToken)).Should().Be(0);
     }
 
+    // ---- the client-supplied activity id ----------------------------------------------------------
+
+    /// <summary>
+    /// <c>ActivityId</c> is the one id on this request that is not the caller's own, and nothing downstream
+    /// can check it: the row carries no FK (it lives minutes), and the handler that resolves the name into
+    /// the push body runs unauthenticated, where the global user filter passes every row. So the endpoint is
+    /// the only place ownership can be established, and it silently was not — a sequential guess returned
+    /// another user's activity name in a push.
+    /// </summary>
+    [Fact(DisplayName = "Scheduling against another user's activityId is rejected and writes no rows")]
+    public async Task Schedule_WithForeignActivityId_IsRejected()
+    {
+        var foreignActivityId = await SeedForeignActivityAsync("Foreign Timer Activity");
+
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await PostSessionAsync(
+            factory.CreateClient(), Guid.NewGuid(), foreignActivityId, DateTime.UtcNow.AddMinutes(25));
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            "an activity the caller does not own is indistinguishable from one that does not exist");
+
+        await using var db = CreateDbContext();
+        (await db.Set<TimerBoundaryAlarm>().CountAsync(CancellationToken))
+            .Should().Be(0, "the whole set is refused — a rejected activity id must not leave alarms behind");
+    }
+
+    /// <summary>
+    /// The control for the rejection above: the caller's own id is accepted and its name reaches the push
+    /// body, so the check cannot be passing merely because the name is never rendered.
+    /// </summary>
+    [Fact(DisplayName = "The caller's own activityId is accepted and its name reaches the push body")]
+    public async Task Schedule_WithOwnActivityId_RendersTheName()
+    {
+        const string ownName = "Own Timer Activity";
+        var sender = new CapturingWebPushSender();
+
+        await using var factory = CreateFactory(
+            TestRoles.AdminAndUser,
+            configureServices: services => services.AddSingleton<IWebPushSender>(sender),
+            configOverrides: PushOn);
+
+        await SeedPushSubscriptionAsync();
+
+        long ownActivityId;
+        await using (var seed = CreateDbContext())
+            ownActivityId = await SeedActivityAsync(seed, TestUserId, ownName);
+
+        var response = await PostSessionAsync(
+            factory.CreateClient(), Guid.NewGuid(), ownActivityId, DateTime.UtcNow.AddMinutes(25));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        long alarmId;
+        await using (var db = CreateDbContext())
+        {
+            var alarm = await db.Set<TimerBoundaryAlarm>().SingleAsync(CancellationToken);
+            alarm.ActivityId.Should().Be(ownActivityId);
+            alarmId = alarm.Id;
+        }
+
+        await FireAsync(factory, alarmId);
+
+        var payload = sender.Payloads.Should().ContainSingle().Subject;
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("body").GetString()
+            .Should().Contain(ownName, "resolving the name at fire time is the whole point of carrying the id");
+    }
+
+    /// <summary>
+    /// Belt-and-braces for the same leak, one layer down: even a row that already carries a foreign activity
+    /// id — written before the endpoint check existed, or by any future writer — must degrade to the
+    /// name-less body rather than reading a stranger's row.
+    /// <para>
+    /// <b>The host here is deliberately unauthenticated</b>, which is what the Scheduler's dispatcher runs in.
+    /// The default test host always has a logged user, so its <c>ScopeUserId</c> hides the foreign activity
+    /// and the global filter would silently do this test's work — it would pass with the handler's own
+    /// predicate deleted. Swapping <see cref="BackgroundLoggedUserService"/> in makes <c>ScopeUserId</c> null,
+    /// the filter passes every row exactly as it does in production, and the predicate is the only thing left
+    /// standing between the two users.
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "The handler will not resolve an activity name off another user's row")]
+    public async Task Handler_WithForeignActivityIdOnTheRow_RendersNoName()
+    {
+        const string foreignName = "Stranger Timer Activity";
+        var sender = new CapturingWebPushSender();
+        var boundaryAt = DateTime.UtcNow.AddMinutes(25);
+
+        await using var factory = CreateFactory(
+            TestRoles.AdminAndUser,
+            configureServices: services =>
+            {
+                services.AddSingleton<IWebPushSender>(sender);
+                services.AddScoped<ILoggedUserService, BackgroundLoggedUserService>();
+            },
+            configOverrides: PushOn);
+
+        await SeedPushSubscriptionAsync();
+
+        var foreignActivityId = await SeedForeignActivityAsync(foreignName);
+
+        // Written straight to the table, bypassing the endpoint: the point is that the handler holds on its
+        // own even when a bad row exists, so the endpoint's check must not be what makes this pass.
+        long alarmId;
+        await using (var seed = CreateDbContext())
+        {
+            var alarm = new TimerBoundaryAlarm
+            {
+                UserId = TestUserId,
+                SessionId = Guid.NewGuid(),
+                BoundaryAt = DateTime.SpecifyKind(boundaryAt, DateTimeKind.Utc),
+                Phase = TimerBoundaryPhase.Focus,
+                ActivityId = foreignActivityId,
+                Url = "/activity-history/pomodoro"
+            };
+            seed.Add(alarm);
+            await seed.SaveChangesAsync(CancellationToken);
+            alarmId = alarm.Id;
+        }
+
+        await FireAsync(factory, alarmId);
+
+        var payload = sender.Payloads.Should().ContainSingle().Subject;
+        using var document = JsonDocument.Parse(payload);
+
+        // The push still arrives — the alarm is the user's own and they are waiting for it. Only the name is
+        // withheld, which is exactly what a deleted activity already produces.
+        var body = document.RootElement.GetProperty("body").GetString();
+        body.Should().NotBeNullOrWhiteSpace();
+        body.Should().NotContain(foreignName, "the name belongs to another user's activity row");
+    }
+
     // ---- the wire format the service worker depends on --------------------------------------------
 
     [Fact(DisplayName = "The push document carries title, body, tag and url at the TOP level")]
@@ -313,10 +447,15 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
 
     // ---- helpers ----------------------------------------------------------------------------------
 
-    private Task PostSessionAsync(HttpClient client, Guid sessionId, params DateTime[] boundaries) =>
+    private Task<HttpResponseMessage> PostSessionAsync(HttpClient client, Guid sessionId, params DateTime[] boundaries) =>
+        PostSessionAsync(client, sessionId, activityId: null, boundaries);
+
+    private Task<HttpResponseMessage> PostSessionAsync(
+        HttpClient client, Guid sessionId, long? activityId, params DateTime[] boundaries) =>
         client.PostAsJsonAsync(ScheduleRoute, new
         {
             SessionId = sessionId,
+            ActivityId = activityId,
             Url = "/activity-history/pomodoro",
             Boundaries = boundaries.Select(at => new
             {
@@ -328,6 +467,30 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
                 CycleTotal = 2
             }).ToArray()
         }, JsonOpts, CancellationToken);
+
+    /// <summary>
+    /// An activity owned by a second <b>real</b> user — created through <c>UserManager</c>, like every other
+    /// cross-user test here, so the row is the shape a real account produces.
+    /// </summary>
+    private async Task<long> SeedForeignActivityAsync(string name)
+    {
+        var otherUserId = await ActivityMergeTestSupport.SecondUserAsync(Fixture, $"timer-alarm-{Guid.NewGuid():N}@test.com");
+
+        await using var db = CreateDbContext();
+        return await SeedActivityAsync(db, otherUserId, name);
+    }
+
+    private async Task<long> SeedActivityAsync(DbContext db, long userId, string name)
+    {
+        var role = new ActivityRole { UserId = userId, Name = $"{name} Role {Guid.NewGuid():N}", Color = "#112233" };
+        db.Set<ActivityRole>().Add(role);
+        await db.SaveChangesAsync(CancellationToken);
+
+        var activity = new Activity { UserId = userId, Name = name, RoleId = role.Id };
+        db.Set<Activity>().Add(activity);
+        await db.SaveChangesAsync(CancellationToken);
+        return activity.Id;
+    }
 
     private async Task SeedPushSubscriptionAsync()
     {
@@ -369,6 +532,22 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
             CorrelationId = "timer-alarm-test",
             TriggerSource = TriggerSource.Manual
         }, CancellationToken);
+    }
+
+    /// <summary>
+    /// A scope with no logged user, which is what a scheduled job runs in: <c>ScopeUserId</c> resolves to
+    /// null and the global user filter passes every row. The default fake reports
+    /// <c>IsAuthenticated == true</c> unconditionally, so a background context cannot be simulated by
+    /// leaving the principal out.
+    /// </summary>
+    private sealed class BackgroundLoggedUserService : ILoggedUserService
+    {
+        public ClaimsPrincipal? LoggedUserPrincipal => null;
+        public bool IsAuthenticated => false;
+        public IEnumerable<string> GetRoles => [];
+        public string GetEmail => throw new InvalidOperationException("No logged user in a background context.");
+        public long GetUserId => throw new InvalidOperationException("No logged user in a background context.");
+        public long? GetUserIdOrNull => null;
     }
 
     /// <summary>Captures the exact bytes that would go to the push service, so the wire format can be asserted.</summary>

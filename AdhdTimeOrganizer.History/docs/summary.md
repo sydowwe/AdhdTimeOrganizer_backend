@@ -89,6 +89,14 @@ Things that are load-bearing and not obvious:
 - **The table self-drains** — deleted on fire, on cancel, and by the registrar's stale sweep — which is why
   it has no retention job and no `FiredAt` column. Rows live minutes. That is also why `ActivityId` is a
   plain column with no FK: an orphan degrades to a name-less body and is gone within the hour.
+- **`ActivityId` ownership is checked at the schedule endpoint, and nowhere else can check it.** The
+  recipient is always the caller and needs no check, but `ActivityId` is a client-supplied id for someone
+  else's table: no FK means the database does not check it, and the fire-time handler runs
+  **unauthenticated**, where the global filter (`ScopeUserId == null || …`) passes *every* row. So the
+  endpoint verifies `Activity.UserId == User.GetId()` before the rows are written — otherwise posting a
+  stranger's sequential id returns their activity name in the push body. The handler's name lookup is
+  additionally scoped to `alarm.UserId`, which costs nothing and makes the leak unreachable even from a bad
+  row.
 - **`payload.Tag` is not decoration.** The still-open tab shows its own notification under the same tag and
   the push replaces it in place instead of stacking a second one. It is derived from the boundary instant so
   the client rebuilds it with no round trip. Never set `renotify` — the replacement has to be silent.

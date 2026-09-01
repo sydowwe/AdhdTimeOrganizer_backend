@@ -1,7 +1,9 @@
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.History.application.dto.request.timerAlarm;
 using AdhdTimeOrganizer.History.application.validator;
 using AdhdTimeOrganizer.History.domain.serviceContract;
 using FastEndpoints;
+using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.History.application.endpoint.command;
@@ -19,7 +21,7 @@ namespace AdhdTimeOrganizer.History.application.endpoint.command;
 /// re-sending after a reload should not have to know what landed the first time.
 /// </para>
 /// </summary>
-public class ScheduleTimerAlarmsEndpoint(ITimerBoundaryAlarmService alarms)
+public class ScheduleTimerAlarmsEndpoint(ITimerBoundaryAlarmService alarms, DbContext dbContext)
     : Endpoint<ScheduleTimerAlarmsRequest, ScheduleTimerAlarmsResponse>
 {
     public override void Configure()
@@ -40,6 +42,19 @@ public class ScheduleTimerAlarmsEndpoint(ITimerBoundaryAlarmService alarms)
         // recipient on the request to be spoofed — and the service scopes its cancel-by-session read to this
         // same id, which is what stops one user cancelling another's alarms by guessing a session guid.
         var userId = User.GetId();
+
+        // ActivityId is the one client-supplied id here that is *not* the caller's own, and the row carries
+        // no FK (it lives minutes), so nothing downstream checks it: the fire-time handler runs unauthenticated,
+        // where the global user filter passes every row. Ownership is therefore established here, while there
+        // is still a principal to check it against — otherwise posting a stranger's sequential id would return
+        // their activity name in the push body.
+        if (req.ActivityId is { } activityId
+            && !await dbContext.Set<Activity>().AnyAsync(a => a.Id == activityId && a.UserId == userId, ct))
+        {
+            AddError(r => r.ActivityId, "Activity not found.");
+            await Send.ErrorsAsync(404, ct);
+            return;
+        }
 
         var registered = await alarms.ReplaceSessionAsync(userId, req.SessionId, req.ToEntities(), ct);
 
