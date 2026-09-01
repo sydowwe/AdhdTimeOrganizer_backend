@@ -11,6 +11,9 @@ x86/
 # Ignore build output folders
 bin/
 obj/
+# CLI builds go here (dotnet build --artifacts-path) so they never fight the IDE's
+# bin/ for a lock while the app is running under the debugger
+artifacts-cli/
 logs/
 temp/
 

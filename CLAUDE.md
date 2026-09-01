@@ -62,6 +62,35 @@ The portal has been fully split into vertical slices; **the split is finished**.
   FastEndpoints `o.Assemblies`) **on a type that can move slices.** It compiles fine and silently
   drops half the model.
 
+## Building and running tests — always through `scripts/test.ps1`
+
+The app is usually running under the Rider debugger, which holds
+`AdhdTimeOrganizer/bin/Debug/net10.0/*.dll` open. A plain `dotnet build` of *any* project rebuilds the
+host into that same folder and dies with `MSB3021 … being used by another process` — the compile
+itself was fine, so read past the copy errors before believing your code is broken.
+
+```powershell
+./scripts/test.ps1 -Class '*CoreForeignKeyOwnershipTests'   # build + run one class
+./scripts/test.ps1 -Class '*Activity*' -Class '*TimerPreset*'  # filters OR together
+./scripts/test.ps1 -Method '*.Create_*' -Trait 'Status=KnownGap'
+./scripts/test.ps1 -BuildOnly -Project AdhdTimeOrganizer.Core  # compile check, no run
+./scripts/test.ps1 -NoBuild -Class '*Foo*'                   # rerun what's already built
+./scripts/test.ps1                                            # everything
+```
+
+It routes every build through `--artifacts-path artifacts-cli`, which relocates `bin/` **and** `obj/`
+for the whole project graph, so CLI builds and the IDE never contend for a lock. The first build in
+that tree is a full one; after that it is incremental. `artifacts-cli/` is gitignored.
+
+- **`dotnet test` does not work here.** On the .NET 10 SDK it still drives VSTest, which
+  Microsoft.Testing.Platform refuses. The script runs the xunit v3 executable directly; its filter
+  syntax (`-class` / `-method` / `-trait`, `*` at either end) is xunit's, not VSTest's.
+- Integration tests start their own Postgres via Testcontainers — **Docker must be up**, and they
+  never touch the dev database the debugged app is using, so running them against a live app is safe.
+- Building by hand instead? `dotnet build <proj> --artifacts-path .\artifacts-cli`. The narrower
+  `dotnet build <proj> -t:Compile -p:BuildProjectReferences=false` is a fast syntax-only check that is
+  also lock-free.
+
 ## Writing code here
 
 - **Entities** derive from the `Sydowwe.Framework` bases (`BaseEntity`, `BaseTableEntity`,
