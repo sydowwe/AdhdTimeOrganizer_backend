@@ -81,7 +81,21 @@ Business rule "Deleting a role or a category" beside "Archiving vs. deleting an 
 
 ---
 
-### `SEC-2` 🟠 Every Core write accepts another user's foreign-key ids
+### `SEC-2` 🟠 ✅ FIXED 2026-09-01 · Every Core write accepts another user's foreign-key ids
+
+> **Resolved.** `infrastructure/persistence/extensions/CallerVisibleReferenceExtensions.cs` looks a
+> caller-supplied id up through the caller's own filtered `DbSet` (`AllVisibleAsync<T>`, plus
+> `AllActivitiesVisibleAsync` which lifts `ActivityArchived` so the check is about ownership only and
+> an existing row pointing at a since-archived activity stays editable). It is wired into the
+> `AfterMapping` hook of `CreateActivityEndpoint`, `UpdateActivityEndpoint`, `Create`/`UpdateTimerPresetEndpoint`
+> and `Create`/`UpdatePomodoroTimerPresetEndpoint`, and inline in the two hand-rolled
+> `QuickEditActivityEndpoint` / `CloneActivityEndpoint` before anything is mutated. All of them answer
+> **404**, matching `MergeActivityEndpoint`. Behavioural guard:
+> `AdhdTimeOrganizer.IntegrationTests/Endpoints/CoreForeignKeyOwnershipTests.cs` (8 tests, no
+> `KnownGap` traits), including the cross-user cascade chain end to end. Docs reconciled in
+> `docs/domain-map.md` (invariant 6) and, per the note below, the identical wording in
+> `AdhdTimeOrganizer.TodoLists/docs/domain-map.md` (invariant 3) — TodoLists' own `SEC-1` is still
+> open and the doc now says so. The description below is the original finding, kept as written.
 
 - `application/dto/request/activity/ActivityRequest.cs:12-24` — `RoleId`, `CategoryId` copied straight
   into the entity by `ToEntity` / `UpdateEntity`

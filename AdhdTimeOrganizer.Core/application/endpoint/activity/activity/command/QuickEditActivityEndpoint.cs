@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.application.dto.request.activity;
 using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.infrastructure.persistence;
@@ -32,6 +33,16 @@ public class QuickEditActivityEndpoint(DbContext dbContext) : Endpoint<QuickEdit
             if (entity == null)
             {
                 AddError("Activity not found.");
+                await Send.ErrorsAsync(404, ct);
+                return;
+            }
+
+            // QuickEditActivityValidator checks the category id's magnitude only, and another user's
+            // category satisfies the FK constraint — so this is the ownership check. 404, not 403, to
+            // keep the id unconfirmable across accounts (see MergeActivityEndpoint).
+            if (!await dbContext.AllVisibleAsync<ActivityCategory>(ct, req.CategoryId))
+            {
+                AddError("Activity category not found.");
                 await Send.ErrorsAsync(404, ct);
                 return;
             }

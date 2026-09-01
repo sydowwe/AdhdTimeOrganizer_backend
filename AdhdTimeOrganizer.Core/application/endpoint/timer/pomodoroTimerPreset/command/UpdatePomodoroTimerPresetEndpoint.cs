@@ -1,6 +1,8 @@
 using AdhdTimeOrganizer.Core.application.dto.request.timer;
 using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Core.domain.model.entity.timer;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
+using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.command;
 
@@ -13,5 +15,19 @@ public class UpdatePomodoroTimerPresetEndpoint(DbContext dbContext)
     {
         base.Configure();
         Validator<PomodoroTimerPresetValidator>();
+    }
+
+    /// <summary>
+    /// Same guard as <c>CreatePomodoroTimerPresetEndpoint</c> — an update repoints both cascading FKs.
+    /// </summary>
+    protected override async Task<bool> AfterMapping(PomodoroTimerPreset entity, PomodoroTimerPresetRequest req,
+        CancellationToken ct = default)
+    {
+        if (await DbContext.AllActivitiesVisibleAsync(ct, req.FocusActivityId, req.RestActivityId))
+            return true;
+
+        AddError("Activity not found.");
+        await Send.ErrorsAsync(404, ct);
+        return false;
     }
 }

@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.application.dto.request.activity;
 using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.infrastructure.persistence;
@@ -31,6 +32,15 @@ public class CloneActivityEndpoint(DbContext dbContext) : Endpoint<QuickEditActi
             if (entity == null)
             {
                 AddError("Activity not found.");
+                await Send.ErrorsAsync(404, ct);
+                return;
+            }
+
+            // Same ownership check as QuickEditActivityEndpoint — the clone form is the quick-edit form
+            // and carries the same caller-supplied category id.
+            if (!await dbContext.AllVisibleAsync<ActivityCategory>(ct, req.CategoryId))
+            {
+                AddError("Activity category not found.");
                 await Send.ErrorsAsync(404, ct);
                 return;
             }

@@ -96,10 +96,19 @@ App-enforced only:
    API path can set or clear a key — only the seeder writes it. The activity count deliberately lifts
    `AppQueryFilters.ActivityArchived`: an archived activity cascades exactly like an active one and is
    the row a user has forgotten owning.
-6. **Per-user scoping is the DbContext's job**, via Framework's global filter on `IEntityWithUser` —
-   not the endpoints (`ApplyUserScoping` is a no-op virtual). Core entities must stay
-   `IEntityWithUser` and keep their FKs and cascades. `UserTimeZoneResolver` is the one deliberate
-   `IgnoreQueryFilters` read, because it is what everything else's scoping is resolved *from*.
+6. **Per-user scoping of *reads* is the DbContext's job**, via Framework's global filter on
+   `IEntityWithUser` — not the endpoints (`ApplyUserScoping` is a no-op virtual). Core entities must
+   stay `IEntityWithUser` and keep their FKs and cascades. `UserTimeZoneResolver` is the one
+   deliberate `IgnoreQueryFilters` read, because it is what everything else's scoping is resolved
+   *from*.
+   **Reads only — any caller-supplied FK id is the endpoint's responsibility.** Writing a raw `long`
+   into an FK column satisfies the constraint whoever owns the target row, so the filter never sees
+   it: that is how a preset used to be able to point at another user's activity and be destroyed by
+   *their* delete, while their `usageCount` read 0. `CallerVisibleReferenceExtensions`
+   (`AllVisibleAsync<T>` / `AllActivitiesVisibleAsync`) is the check, wired into the create/update
+   hooks of the activity and both preset endpoints plus quick-edit and clone; it answers **404, never
+   403**, so a foreign id stays indistinguishable from a missing one. Pinned by
+   `CoreForeignKeyOwnershipTests`.
 7. **A seam's `IQueryable` must stay composable.** `IActivityMembershipSource.ActivityIds`,
    `IActivityReferenceSource.ReferencingActivityIds` and `IActivityReferenceService` are all composed
    into an outer query as subqueries. A `ToList()` in an implementation turns one query into twelve

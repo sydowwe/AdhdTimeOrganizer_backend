@@ -1,7 +1,9 @@
 using AdhdTimeOrganizer.Core.application.dto.request.activity;
 using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.command;
 
@@ -22,5 +24,20 @@ public class UpdateActivityEndpoint(DbContext dbContext)
     {
         base.Configure();
         Validator<ActivityValidator>();
+    }
+
+    /// <summary>
+    /// Same guard as <c>CreateActivityEndpoint</c> — an update repoints the same two FKs, so it hands
+    /// out the same existence oracle and can strand the row behind the user-filtered <c>Role</c> join.
+    /// </summary>
+    protected override async Task<bool> AfterMapping(Activity entity, ActivityRequest req, CancellationToken ct = default)
+    {
+        if (await DbContext.AllVisibleAsync<ActivityRole>(ct, req.RoleId)
+            && await DbContext.AllVisibleAsync<ActivityCategory>(ct, req.CategoryId))
+            return true;
+
+        AddError("Activity role or category not found.");
+        await Send.ErrorsAsync(404, ct);
+        return false;
     }
 }

@@ -2,6 +2,17 @@
 
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first. Finding: `SEC-2` 🟠.
 
+> ## ✅ Done, 2026-09-01 — this prompt has been executed and `SEC-2` fixed
+>
+> `AdhdTimeOrganizer.IntegrationTests/Endpoints/CoreForeignKeyOwnershipTests.cs` exists and is green,
+> with **no `KnownGap` traits** — the six cases below were written against the corrected behaviour and
+> the behaviour was corrected in the same commit, so they assert rather than pin. Two departures from
+> the prompt: case 1 drops the grid half (the create is now a 404, so there is no row to go looking
+> for), and a seventh case covers `POST api/activity/{id}/clone`, which shares quick-edit's request
+> and therefore its unchecked `categoryId`. Case 6 keeps its `usageCount` / `canDelete` assertions as
+> the documentation of *why*. The guard itself is
+> `AdhdTimeOrganizer.Core/infrastructure/persistence/extensions/CallerVisibleReferenceExtensions.cs`.
+
 **Status today:** `TimerPresetCrudAuthMatrixTests` seeds foreign presets for six read/update/delete
 scenarios; `ActivityEndpointTests` proves a cross-user `{id}` is a 404 on nine routes. All of that
 proves you cannot **read** another user's row. None of it proves you cannot **point at one**, and that

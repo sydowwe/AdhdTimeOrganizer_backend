@@ -151,10 +151,15 @@ Which of these the database actually enforces, and which are only app-level:
    History: the daily recap reads logged time through Core's `ITodoListItemLoggedTimeSource` rather
    than touching `ActivityHistory`. *Compile-enforced*, and pinned from the other side by the route
    smoke tests.
-3. **Per-user scoping is the DbContext's job**, via the named global filter on `IEntityWithUser` —
-   not the endpoints (`ApplyUserScoping` is a no-op virtual). *DB-enforced at query time* as long as
-   these entities stay `IEntityWithUser`. The seams and `TodoListExtensions` deliberately pass an
-   explicit `userId` on top of it.
+3. **Per-user scoping of *reads* is the DbContext's job**, via the named global filter on
+   `IEntityWithUser` — not the endpoints (`ApplyUserScoping` is a no-op virtual). *DB-enforced at
+   query time* as long as these entities stay `IEntityWithUser`. The seams and `TodoListExtensions`
+   deliberately pass an explicit `userId` on top of it.
+   **Reads only — any caller-supplied FK id is the endpoint's responsibility**, because writing a raw
+   `long` into an FK column satisfies the constraint whoever owns the target row.
+   `MoveTodoListItemEndpoint` shows the shape (look the row up through the caller's own filtered set,
+   404 when it is not there); Core's `CallerVisibleReferenceExtensions` is the same check generalised.
+   This slice's own create/update paths are **not** covered yet — that is its `SEC-1`.
 4. **`TodoListItem` is unique on `(UserId, ActivityId, TodoListId)`** — one item per activity per
    list. *DB-enforced* (unique index); surfaces as a 409 through the base endpoints' exception
    mapping.
