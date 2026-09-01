@@ -156,7 +156,7 @@ Cross-cutting, not per-route: `CoreRouteSmokeTests` (2) pins Core's assembly in 
 | Dev seeders (`ActivityRole`/`Category`/`Activity`) | 0 | Never executed by any test. Their whole-table truncate is unasserted (`TEST-14`). |
 | Seam surface | 6 | `SeamWiringTests`. |
 | EF configuration | 4 | `ActivityForeignKeyInventoryTests` — now **two** inventories, FKs *into* Activity and (since `SEC-1`, 2026-09-01) FKs *out of* it; `ModuleSchemaTests`, `NamedQueryFilterTests`. |
-| Validators | 5, indirect | Only `TimerPresetValidationTests` + the two 400 paths in `ActivityEndpointTests`. The Icon-length mismatch (`CQ-1`) and the never-invoked `TimeDtoValidator` (`CQ-2`) are both uncovered. |
+| Validators | 5, indirect + 11 direct | `TimerPresetValidationTests` + the two 400 paths in `ActivityEndpointTests`; the never-invoked `TimeDtoValidator` (`CQ-2`) is now covered directly by `TimeDtoRangeValidationTests` (since 2026-09-01). The Icon-length mismatch (`CQ-1`) is fixed but still has no test of its own. |
 | `PortalRoleCatalog` · `PortalAuthorizationPolicies` | indirect | Through every role-gated test; `Root` assignment pinned at `DefaultUsersSeederTests:233`. |
 
 ### The honest number
@@ -194,7 +194,7 @@ the fixture, auth-client and `KnownGap` conventions the individual prompts assum
 | `TEST-3` ✅ closed 2026-09-01 | `POST /activity/merge` 404s when a merged id is archived | `SEC-3` | [MergeArchivedMergedId.md](testingPrompts/MergeArchivedMergedId.md) → 4 tests in `Endpoints/ActivityMergeTests.cs` |
 | `TEST-4` | `usageCount` on an archived activity omits filtered dependents; merge into an archived survivor holding a profile | `SEC-4` | [ArchivedActivityReferenceCount.md](testingPrompts/ArchivedActivityReferenceCount.md) |
 | `TEST-5` | An `icon` of 51–255 chars passes validation and fails in Postgres | `CQ-1` | [IconLengthValidatorVsColumn.md](testingPrompts/IconLengthValidatorVsColumn.md) |
-| `TEST-6` | `TimeDto` hours/minutes unvalidated on the requests Planning does not hand-check | `CQ-2` | [TimeDtoRangeValidation.md](testingPrompts/TimeDtoRangeValidation.md) |
+| `TEST-6` ✅ closed 2026-09-01 | `TimeDto` hours/minutes unvalidated on the requests Planning does not hand-check | `CQ-2` | [TimeDtoRangeValidation.md](testingPrompts/TimeDtoRangeValidation.md) → 11 cases in `Endpoints/TimeDtoRangeValidationTests.cs` |
 | `TEST-7` | Quick-edit and clone 404 on an archived activity while update and get-by-id do not | `CQ-3` | [QuickEditCloneArchived.md](testingPrompts/QuickEditCloneArchived.md) |
 | `TEST-8` | `Activity.Clone()` copies the source's created/modified timestamps | `CQ-4` | [CloneTimestamps.md](testingPrompts/CloneTimestamps.md) |
 | `TEST-9` | Grid `Contains` filters are case-sensitive against a Postgres `LIKE` | `PERF-2` | [GridFilterCaseSensitivity.md](testingPrompts/GridFilterCaseSensitivity.md) |

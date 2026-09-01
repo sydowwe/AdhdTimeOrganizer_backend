@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using FluentValidation;
 
@@ -33,8 +34,10 @@ public static class DashboardDateRangeRules
     {
         validator.RuleFor(x => x.DateFrom).NotEmpty();
         validator.RuleFor(x => x.DateTo).NotEmpty();
-        validator.RuleFor(x => x.From).NotEmpty();
-        validator.RuleFor(x => x.To).NotEmpty();
+        // Range-checked, not merely non-empty: ToDailyWindows resolves both through TimeDto.ToTimeOnly(),
+        // which throws on an out-of-range value and turns what should be a 400 into a 500.
+        validator.RuleFor(x => x.From).NotEmpty().ApplyTimeOfDayRules();
+        validator.RuleFor(x => x.To).NotEmpty().ApplyTimeOfDayRules();
 
         validator.RuleFor(x => x.DateTo)
             .GreaterThanOrEqualTo(x => x.DateFrom)

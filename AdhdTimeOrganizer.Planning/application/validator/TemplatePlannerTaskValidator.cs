@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner.template;
 using FastEndpoints;
 using FluentValidation;
@@ -18,13 +19,8 @@ public class TemplatePlannerTaskValidator : Validator<TemplatePlannerTaskRequest
         RuleFor(x => x.TemplateId)
             .GreaterThan(0);
 
-        RuleFor(x => x.StartTime)
-            .Must(t => t.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
-            .WithMessage("StartTime hours must be 0–23 and minutes 0–59.");
-
-        RuleFor(x => x.EndTime)
-            .Must(t => t.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
-            .WithMessage("EndTime hours must be 0–23 and minutes 0–59.");
+        RuleFor(x => x.StartTime).ApplyTimeOfDayRules();
+        RuleFor(x => x.EndTime).ApplyTimeOfDayRules();
 
         RuleFor(x => x.Location)
             .MaximumLength(200)

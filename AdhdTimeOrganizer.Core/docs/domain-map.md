@@ -288,9 +288,13 @@ DTOs sit under `application/dto/` — `request/activity`, `request/timer`, `requ
 `IProjectionResponse`), not a mapper generic.
 
 `application/validator/` holds 10: the four activity-side ones (`Activity`, `ActivityRole`,
-`ActivityCategory`, `QuickEditActivity`), `MergeActivityValidator`, the two timer ones, and the three
-shared ones — `NameTextColorIconValidator`, `ValueRequestValidator`, `TimeDtoValidator` (`TimeDto`
-itself is Framework's).
+`ActivityCategory`, `QuickEditActivity`), `MergeActivityValidator`, the two timer ones, the two shared
+validators (`NameTextColorIconValidator`, `ValueRequestValidator`), and `TimeDtoRules` — a static rule
+helper, **not** a validator. `TimeDto` (Framework's) is only ever a member of a request, never a request
+itself, and FastEndpoints resolves validators by exact request type, so the `Validator<TimeDto>` that
+used to sit here was never instantiated. Call `RuleFor(x => x.SomeTime).ApplyTimeOfDayRules()` from the
+concrete request validator instead; `IsBefore` orders two `TimeDto`s without `ToTimeOnly()`, which throws
+on the very values the range rule is there to reject.
 
 ### Seeding — `infrastructure/persistence/seeder/`
 

@@ -172,7 +172,10 @@ See also the query-filter caching trap in `docs/claude/persistence.md`.
 
 - **Time-of-day values** in portal requests and responses use `TimeDto`
   (`AdhdTimeOrganizer/application/dto/dto/TimeDto.cs`) instead of `TimeOnly`. Call `.ToTimeOnly()` when
-  assigning to an entity. Validated by `application/validator/TimeDtoValidator.cs`.
+  assigning to an entity — which throws on an out-of-range value, so **every request validator that
+  carries one must call `RuleFor(x => x.SomeTime).ApplyTimeOfDayRules()`**
+  (`AdhdTimeOrganizer.Core/application/validator/TimeDtoRules.cs`). There is deliberately no
+  `Validator<TimeDto>`: FastEndpoints resolves validators by exact request type, so one would never run.
 - **Date ranges** in the history dashboards use `DateRangeDto`
   (`AdhdTimeOrganizer.Core/application/dto/dto/DateRangeDto.cs`): a `Date`, a `RangeType`, and an
   `EndDate` that **only `CustomRange` reads** — it is the range end, inclusive, capped at

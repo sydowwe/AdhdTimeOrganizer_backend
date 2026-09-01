@@ -1,6 +1,8 @@
 using AdhdTimeOrganizer.Core.application.dto.dto;
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.summary;
 using FastEndpoints;
+using FluentValidation;
 
 namespace AdhdTimeOrganizer.History.application.validator;
 
@@ -21,8 +23,20 @@ public abstract class DateRangeRequestValidator<TRequest> : Validator<TRequest>
     protected DateRangeRequestValidator() => DateRangeDto.ApplyValidationRules(this, x => x);
 }
 
+/// <summary>
+/// The one summary request that carries more than a date range. <c>WindowStartTime</c> /
+/// <c>WindowEndTime</c> reach <c>TimeDto.ToTimeOnly()</c> in the endpoint, which throws on an out-of-range
+/// value — so without these rules <c>{"hours": 99}</c> is a 500, not the 400 it is now.
+/// </summary>
 public class HistorySummaryStackedBarsRequestValidator
-    : DateRangeRequestValidator<HistorySummaryStackedBarsRequest>;
+    : DateRangeRequestValidator<HistorySummaryStackedBarsRequest>
+{
+    public HistorySummaryStackedBarsRequestValidator()
+    {
+        RuleFor(x => x.WindowStartTime).ApplyTimeOfDayRules();
+        RuleFor(x => x.WindowEndTime).ApplyTimeOfDayRules();
+    }
+}
 
 public class HistorySummaryPieChartRequestValidator
     : DateRangeRequestValidator<HistorySummaryPieChartRequest>;

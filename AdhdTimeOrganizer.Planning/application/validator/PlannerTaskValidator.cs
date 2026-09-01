@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using FastEndpoints;
@@ -32,18 +33,10 @@ public class PlannerTaskValidator : Validator<PlannerTaskRequest>
             .GreaterThan(0)
             .When(x => x.TodolistId.HasValue);
 
-        RuleFor(x => x.StartTime)
-            .Must(t => t.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
-            .WithMessage("StartTime hours must be 0–23 and minutes 0–59.");
+        RuleFor(x => x.StartTime).ApplyTimeOfDayRules();
+        RuleFor(x => x.EndTime).ApplyTimeOfDayRules();
 
-        RuleFor(x => x.EndTime)
-            .Must(t => t.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
-            .WithMessage("EndTime hours must be 0–23 and minutes 0–59.");
-
-        RuleFor(x => x.ActualStartTime)
-            .Must(t => t!.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
-            .WithMessage("ActualStartTime hours must be 0–23 and minutes 0–59.")
-            .When(x => x.ActualStartTime != null);
+        RuleFor(x => x.ActualStartTime!).ApplyTimeOfDayRules().When(x => x.ActualStartTime != null);
 
         // "Work began at" only means something for a task that has begun. ApplyStatus clears the actual times
         // for NotStarted and Cancelled, so accepting one here would store a value the next status change drops

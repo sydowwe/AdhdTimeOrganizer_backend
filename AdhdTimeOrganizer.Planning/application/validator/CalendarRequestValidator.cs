@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using FastEndpoints;
 using FluentValidation;
@@ -8,13 +9,8 @@ public class CalendarRequestValidator : Validator<CalendarRequest>
 {
     public CalendarRequestValidator()
     {
-        RuleFor(x => x.WakeUpTime)
-            .Must(t => t.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
-            .WithMessage("WakeUpTime hours must be 0–23 and minutes 0–59.");
-
-        RuleFor(x => x.BedTime)
-            .Must(t => t.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
-            .WithMessage("BedTime hours must be 0–23 and minutes 0–59.");
+        RuleFor(x => x.WakeUpTime).ApplyTimeOfDayRules();
+        RuleFor(x => x.BedTime).ApplyTimeOfDayRules();
 
         RuleFor(x => x.Label)
             .MaximumLength(100)

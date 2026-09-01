@@ -269,7 +269,7 @@ since almost every column on it is either a credential or personal data.
 
 ## 6. Code quality
 
-### `CQ-1` 🟠 `icon` passes validation at 255 chars and fails in Postgres at 51
+### `CQ-1` 🟠 ✅ FIXED 2026-09-01 `icon` passes validation at 255 chars and fails in Postgres at 51
 
 `application/validator/NameTextColorIconValidator.cs:21-22` allows `MaximumLength(255)`. The column is
 `varchar(50)` — `framework/Sydowwe.Framework/infrastructure/persistence/configuration/extensions/NameTextColorEntityConfigurationExtension.cs:11,18`
@@ -286,7 +286,31 @@ lengths should be sourced from one place rather than restated in both layers.
 
 ---
 
-### `CQ-2` 🟠 `TimeDtoValidator` never runs, and the requests that rely on it are unvalidated
+### `CQ-2` 🟠 ✅ FIXED 2026-09-01 `TimeDtoValidator` never runs, and the requests that rely on it are unvalidated
+
+> **Resolved.** `TimeDtoValidator` is gone, replaced by `application/validator/TimeDtoRules.cs` — a
+> static rule helper carrying `ApplyTimeOfDayRules()`. It is an extension on the rule builder rather
+> than the `TimeDto.ApplyValidationRules(validator, selector)` suggested below: every call site is a
+> plain member access (`RuleFor(x => x.WindowStartTime)`), so FluentValidation infers the wire name on
+> its own and the `OverridePropertyName` scaffolding `DateRangeDto` needs has no purpose here. The
+> helper lives in **Core, not the submodule**, so this stayed a single-repo change.
+>
+> Two things beyond the finding. **First**, there were **nine** inline copies of the range check in
+> Planning, not seven — `PlannerTaskValidator`, `TemplatePlannerTaskValidator` and
+> `TaskPlannerDayTemplateValidator` carry it too; all nine now call the shared rule. **Second**,
+> Tracking had the same hole as History: `DashboardDateRangeRules.ApplyDateRangeRules` only asserted
+> `.NotEmpty()` on `From` / `To`, and `DateRangeAndTimeRangeDto.ToDailyWindows` puts both through
+> `ToTimeOnly()` — so all twelve tracking dashboards shared the 500. Both are range-checked now.
+>
+> A second latent 500 surfaced during the fix and is closed with it: FluentValidation runs *every*
+> `RuleFor` chain, not just the ones up to the first failure, so the `StartTime.ToTimeOnly() <
+> EndTime.ToTimeOnly()` ordering rules still executed on the request the range rule had just rejected
+> — and threw out of the validator, turning the 400 it was about to produce back into a 500. Ordering
+> now goes through `TimeDtoRules.IsBefore`, which is minute-of-day arithmetic and cannot throw.
+>
+> Pinned by `Endpoints/TimeDtoRangeValidationTests.cs` (11 cases): both window properties, five
+> out-of-range shapes, the `00:00` / `23:59` boundaries, and one Planning route to prove the folded
+> inline checks kept their 400.
 
 `application/validator/TimeDtoValidator.cs:7-13`. FastEndpoints resolves validators by the endpoint's
 **request** type. No endpoint anywhere takes a bare `TimeDto` as its request, so this validator is
@@ -513,6 +537,6 @@ index twice — worth one look at the snapshot, not worth a finding until confir
 | `DOC-2` | `domain-map.md` → Invariants #6: "Per-user scoping is the DbContext's job … not the endpoints (`ApplyUserScoping` is a no-op virtual)". True for reads; read as a general licence it authorises `SEC-2` | **Doc.** Add "reads only — any caller-supplied FK id must be checked against the caller's own rows". Same sentence flagged as `DOC-5` in `review/todo-lists/02-findings.md` | `SEC-2` |
 | `DOC-3` | `IActivityReferenceSource.cs:62-67` asserts the only ambient concern is user scoping and that "no source here needs a hand-written scope". There is a second ambient filter — `ActivityArchived` — on three of the entities the ActivityProfiles source reads | **Both.** Decide the rule (references count regardless of archival state), implement it centrally, and rewrite the remark | `SEC-4` |
 | `DOC-4` ✅ closed 2026-09-01 | `domain-map.md` → Business rules → merge: "an archived survivor is allowed" — silent on archived *merged* ids, which failed the whole merge | **Code.** The filter was lifted and the doc (plus the endpoint's `<remarks>`) now says both directions are allowed | `SEC-3` |
-| `DOC-5` | `domain-map.md` → `application/validator/` lists `TimeDtoValidator` among "the three shared ones", implying it runs. It cannot | **Both.** Replace the validator with a rules helper, then update the sentence | `CQ-2` |
+| `DOC-5` ✅ closed 2026-09-01 | `domain-map.md` → `application/validator/` lists `TimeDtoValidator` among "the three shared ones", implying it runs. It cannot | **Both.** The validator became `TimeDtoRules`; the sentence now names it a rule helper and says why there is deliberately no `Validator<TimeDto>`. `docs/claude/endpoints.md` carried the same claim and was corrected with it | `CQ-2` |
 | `DOC-6` | `docs/testing.md` → "Known gaps": *"Nothing in Core is currently carried as an expected-failing `[Trait("Status","KnownGap")]` test"*. Literally true, but `ActivityForeignKeyInventoryTests.cs:72-84` carries a `TODO` / "⚠ OPEN QUESTION" on the three preset cascades — a known gap in everything but the trait | **Doc.** List it under "Two standing caveats" so it is visible from `testing.md` rather than only from the test literal | `MIG-3` |
 | `DOC-7` | `summary.md` → Gotchas describes `IsArchived` and the pickers thoroughly, but nowhere says that archiving is available on activities **only** — roles, categories and presets have no retire path, so the only way to remove a stale role is the destructive one | **Doc.** One sentence in Gotchas | `SEC-1` |

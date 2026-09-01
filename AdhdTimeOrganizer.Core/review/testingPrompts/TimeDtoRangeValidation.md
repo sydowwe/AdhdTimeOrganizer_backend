@@ -2,6 +2,23 @@
 
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first. Finding: `CQ-2` 🟠.
 
+> ✅ **Done 2026-09-01.** The fix landed and `Endpoints/TimeDtoRangeValidationTests.cs` is green with
+> **no `KnownGap` traits** — the tests below were written against the corrected behaviour. Sections 1
+> and 3 were merged into one theory that varies which of the two window properties carries the bad
+> value; section 4 needs no seeded task, since validation runs before the handler and the valid case
+> falling through to a 404 is what proves the time was accepted.
+>
+> Two deviations from "the fix, for reference" at the bottom of this file. The helper is an extension
+> on the rule builder (`RuleFor(x => x.SomeTime).ApplyTimeOfDayRules()`) rather than a
+> `(validator, selector)` pair: every call site is a plain member access, so FluentValidation infers
+> the name and the `OverridePropertyName` scaffolding is unnecessary. And it lives in **Core**
+> (`application/validator/TimeDtoRules.cs`), which is the alternative this file offers — so no
+> two-repo commit.
+>
+> Wider than described: Planning had **nine** inline copies, not seven, and **Tracking** had the same
+> unvalidated hole as History across all twelve dashboards. Both are covered. The rest of this file is
+> kept as the record of why.
+
 ## Why the validator is dead
 
 FastEndpoints resolves validators by the endpoint's **request** type. No endpoint anywhere takes a bare
