@@ -385,6 +385,126 @@ public class ActivityMergeTests(AppDbContextFixture fixture) : PostgresTestBase(
         (await assertDb.Set<TimerPreset>().AnyAsync(p => p.ActivityId == survivorId, CancellationToken)).Should().BeTrue();
     }
 
+    /// <summary>
+    /// An archived activity may be merged <em>away</em>, not just merged into — `SEC-3`. The dialog draws
+    /// its candidates from the grid's All view, which is the whole reason <c>IsArchived</c> is tri-state,
+    /// so an archived duplicate is selectable; leaving the archival filter on the merged query made the
+    /// count fall short and 404'd the entire merge over an id the UI itself offered.
+    /// </summary>
+    [Fact]
+    public async Task Merge_AnArchivedActivity_CanBeMergedAway()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Active Survivor");
+        var archivedDuplicateId = await SeedActivityAsync(db, "Archived Duplicate", isArchived: true);
+
+        var history = new ActivityHistory
+        {
+            UserId = UserId,
+            ActivityId = archivedDuplicateId,
+            StartTimestamp = DateTime.UtcNow.AddHours(-2),
+            Length = new IntTime(0, 30),
+            EndTimestamp = DateTime.UtcNow.AddMinutes(-90)
+        };
+        db.Set<ActivityHistory>().Add(history);
+        await db.SaveChangesAsync(CancellationToken);
+
+        var response = await MergeAsync(survivorId, archivedDuplicateId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<MergeResult>(JsonOpts, CancellationToken))!.MergedCount.Should().Be(1);
+
+        await using var assertDb = CreateDbContext();
+        (await assertDb.Set<ActivityHistory>().IgnoreQueryFilters().FirstAsync(h => h.Id == history.Id, CancellationToken))
+            .ActivityId.Should().Be(survivorId, "the archived duplicate's history must land on the survivor");
+        (await assertDb.Set<Activity>().IgnoreQueryFilters().AnyAsync(a => a.Id == archivedDuplicateId, CancellationToken))
+            .Should().BeFalse("merged activities are deleted, archived or not");
+    }
+
+    /// <summary>
+    /// A mixed set merges as one unit. Before `SEC-3` the single archived id 404'd the whole call, so the
+    /// active duplicate was not merged either and the user was told "not found" about a set on screen.
+    /// </summary>
+    [Fact]
+    public async Task Merge_MixedActiveAndArchivedMergedIds_MergesAsAUnit()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Mixed Survivor");
+        var activeDuplicateId = await SeedActivityAsync(db, "Mixed Active Duplicate");
+        var archivedDuplicateId = await SeedActivityAsync(db, "Mixed Archived Duplicate", isArchived: true);
+
+        var activePreset = new TimerPreset { UserId = UserId, Duration = 600, ActivityId = activeDuplicateId };
+        var archivedPreset = new TimerPreset { UserId = UserId, Duration = 900, ActivityId = archivedDuplicateId };
+        db.Set<TimerPreset>().AddRange(activePreset, archivedPreset);
+        await db.SaveChangesAsync(CancellationToken);
+
+        var response = await MergeAsync(survivorId, activeDuplicateId, archivedDuplicateId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<MergeResult>(JsonOpts, CancellationToken))!.MergedCount.Should().Be(2);
+
+        await using var assertDb = CreateDbContext();
+        var presets = await assertDb.Set<TimerPreset>()
+            .Where(p => p.Id == activePreset.Id || p.Id == archivedPreset.Id).ToListAsync(CancellationToken);
+
+        presets.Should().HaveCount(2).And.OnlyContain(p => p.ActivityId == survivorId, "both halves move or neither does");
+        (await assertDb.Set<Activity>().IgnoreQueryFilters()
+            .CountAsync(a => a.Id == activeDuplicateId || a.Id == archivedDuplicateId, CancellationToken))
+            .Should().Be(0);
+    }
+
+    /// <summary>
+    /// Archived into archived — the case that proves the filter is lifted on <em>both</em> queries rather
+    /// than swapped from one to the other.
+    /// </summary>
+    [Fact]
+    public async Task Merge_ArchivedIntoArchived_IsAllowed_AndLeavesTheSurvivorArchived()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Retired Survivor", isArchived: true);
+        var archivedDuplicateId = await SeedActivityAsync(db, "Retired Duplicate", isArchived: true);
+
+        var preset = new TimerPreset { UserId = UserId, Duration = 1200, ActivityId = archivedDuplicateId };
+        db.Set<TimerPreset>().Add(preset);
+        await db.SaveChangesAsync(CancellationToken);
+
+        var response = await MergeAsync(survivorId, archivedDuplicateId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var assertDb = CreateDbContext();
+        var survivor = await assertDb.Set<Activity>().IgnoreQueryFilters([AppQueryFilters.ActivityArchived])
+            .FirstAsync(a => a.Id == survivorId, CancellationToken);
+
+        survivor.IsArchived.Should().BeTrue("merging is not a restore");
+        (await assertDb.Set<TimerPreset>().FirstAsync(p => p.Id == preset.Id, CancellationToken))
+            .ActivityId.Should().Be(survivorId);
+        (await assertDb.Set<Activity>().IgnoreQueryFilters().AnyAsync(a => a.Id == archivedDuplicateId, CancellationToken))
+            .Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The regression pin that matters most here: lifting the archival filter must not lift the per-user
+    /// one with it. A foreign archived id stays a 404.
+    /// </summary>
+    [Fact]
+    public async Task Merge_AnotherUsersArchivedActivity_StillReturns404()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Mine, Again");
+
+        var otherUserId = await ActivityMergeTestSupport.SecondUserAsync(Fixture, $"merge-archived-{Guid.NewGuid():N}@test.com");
+        var foreignRole = new ActivityRole { UserId = otherUserId, Name = $"Foreign Role {Guid.NewGuid():N}", Color = "#445566" };
+        db.Set<ActivityRole>().Add(foreignRole);
+        await db.SaveChangesAsync(CancellationToken);
+        var foreign = new Activity { UserId = otherUserId, Name = "Theirs, Archived", RoleId = foreignRole.Id, IsArchived = true };
+        db.Set<Activity>().Add(foreign);
+        await db.SaveChangesAsync(CancellationToken);
+
+        (await MergeAsync(survivorId, foreign.Id)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await using var assertDb = CreateDbContext();
+        (await assertDb.Set<Activity>().IgnoreQueryFilters().AnyAsync(a => a.Id == foreign.Id, CancellationToken))
+            .Should().BeTrue("the per-user filter must stay on when the archival one is lifted");
+    }
+
     // ---- failure responses -----------------------------------------------------------------------
 
     [Fact]

@@ -184,8 +184,12 @@ contract `ActivityResponse` documents.
 referencing row onto the survivor, saves, *then* deletes the merged activities, all inside one
 explicit transaction. Deleting first would cascade the rows away silently — no exception, no log line,
 and a plausible-looking count in the response. Cross-role and cross-category merges are permitted and
-the survivor's placement wins; an archived survivor is allowed; a single unknown id fails the whole
+the survivor's placement wins; **archived activities may be merged in both directions** — into an
+archived survivor (which stays archived) and away as a merged id — because the dialog draws its
+candidates from the grid's All view and offers exactly those; a single unknown id fails the whole
 merge; a cross-user id is a **404, never a 403**, so existence is never confirmable across accounts.
+Both queries lift only `AppQueryFilters.ActivityArchived`; the per-user filter is what keeps the
+foreign id a 404.
 
 **Quick-create resolves its role by `SystemKey`, not by name.** The client used to look the role up by
 its seeded English display name, so renaming it — which the Slovak UI must do — 404'd the lookup and

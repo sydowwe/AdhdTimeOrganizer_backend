@@ -30,10 +30,14 @@ namespace AdhdTimeOrganizer.Core.application.endpoint.activity.activity.command;
 /// that defaulted to different roles. The merged rows' placement is discarded along with the rows.
 /// </para>
 /// <para>
-/// <b>An archived survivor is allowed.</b> The user selected it from the All view, so the merged history
-/// landing on an activity that is invisible in every picker is what they asked for, and it is one
-/// restore away from being visible again. Rejecting it would mean the only way to consolidate into a
-/// retired activity is to restore it, merge, and re-archive.
+/// <b>Archived activities merge in both directions.</b> The user selected them from the All view, so
+/// merged history landing on an activity that is invisible in every picker is what they asked for, and
+/// it is one restore away from being visible again. Rejecting an archived survivor would mean the only
+/// way to consolidate into a retired activity is to restore it, merge, and re-archive; rejecting an
+/// archived <em>merged</em> id would make deduplicating something you already retired impossible, and
+/// 404 the whole set over an id the dialog itself offered. Both queries therefore lift
+/// <c>AppQueryFilters.ActivityArchived</c> — and only that one: the per-user filter stays on, which is
+/// what keeps a foreign id a 404. An archived survivor stays archived; merging is not a restore.
 /// </para>
 /// <para>
 /// <b>Atomic.</b> Everything runs inside one explicit transaction: a partially applied merge would leave
@@ -88,7 +92,11 @@ public class MergeActivityEndpoint(
             return;
         }
 
-        var merged = await dbContext.Set<Activity>().Where(a => mergedIds.Contains(a.Id)).ToListAsync(ct);
+        // Archival is lifted here for the same reason as on the survivor: the dialog draws its candidates
+        // from the grid's All view, so an archived duplicate is selectable, and leaving the filter on made
+        // the count fall short and 404'd the whole merge. The per-user filter stays on, so cross-user is
+        // still a 404.
+        var merged = await dbContext.Set<Activity>().IgnoreQueryFilters([AppQueryFilters.ActivityArchived]).Where(a => mergedIds.Contains(a.Id)).ToListAsync(ct);
         if (merged.Count != mergedIds.Count)
         {
             // The whole merge fails; no partial. One unknown id means the user's mental model of the set

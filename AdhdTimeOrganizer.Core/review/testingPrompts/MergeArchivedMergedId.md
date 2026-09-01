@@ -1,5 +1,12 @@
 # TEST-3 — `POST /activity/merge` refuses an archived merged id
 
+> ✅ **Done 2026-09-01.** The fix landed (`merged` query lifts `AppQueryFilters.ActivityArchived`) and
+> all four tests below are in `Endpoints/ActivityMergeTests.cs` — `Merge_AnArchivedActivity_CanBeMergedAway`,
+> `Merge_MixedActiveAndArchivedMergedIds_MergesAsAUnit`,
+> `Merge_ArchivedIntoArchived_IsAllowed_AndLeavesTheSurvivorArchived`,
+> `Merge_AnotherUsersArchivedActivity_StillReturns404`. None carries `KnownGap`; they pass. The rest of
+> this file is kept as the record of why.
+
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first. Finding: `SEC-3` 🟠.
 
 **Status today:** `Endpoints/ActivityMergeTests.cs` has 13 tests covering the repoint fan-out, profile

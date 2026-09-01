@@ -144,7 +144,15 @@ wording is flagged as `DOC-5` in the TodoLists review; fix both or neither.)
 
 ---
 
-### `SEC-3` 🟠 `POST /activity/merge` refuses any merged id that is archived, while the dialog offers exactly those
+### `SEC-3` 🟠 ✅ FIXED 2026-09-01 · `POST /activity/merge` refuses any merged id that is archived, while the dialog offers exactly those
+
+> **Resolved.** The `merged` query now lifts `AppQueryFilters.ActivityArchived` too, so archived
+> activities merge in both directions; nothing else changed, and the per-user filter stays on, so a
+> foreign id is still a 404. `ActivityMergeTests` gained four guards — merged-away, a mixed
+> active + archived set as one unit, archived-into-archived (which is what proves the filter was lifted
+> on both queries rather than swapped), and the cross-user-archived 404 pin. `DOC-4` shipped with it:
+> the endpoint's `<remarks>` and `domain-map.md` → Business rules both now state the both-directions
+> rule.
 
 `application/endpoint/activity/activity/command/MergeActivityEndpoint.cs:84` vs `:91`
 
@@ -229,7 +237,7 @@ composable **and** must be explicit about which ambient filters it runs under).
 
 ---
 
-### `SEC-5` 🟡 `User.WeatherLocation` is personal data with no `[AuditIgnore]`
+### `SEC-5` 🟡 ✅ FIXED 2026-09-01 `User.WeatherLocation` is personal data with no `[AuditIgnore]`
 
 `domain/model/entity/user/User.cs:20-31`. Its own doc comment says *"Do not log this value… it is
 still personal data and log files survive a GDPR erasure"*, and the two credential fields immediately
@@ -490,7 +498,7 @@ index twice — worth one look at the snapshot, not worth a finding until confir
 | `DOC-1` | `domain-map.md` → Invariants #3 states "`Activity.RoleId` is required; `CategoryId` is optional. Both cascade" as a neutral fact, and no Business rule covers deleting a role or a category. The Business rules section discusses cascade blast radius **only** for deleting an activity | **Both.** The code should stop cascading through an optional FK; the doc should state the blast radius and say where the `usageCount` promise ends | `SEC-1` |
 | `DOC-2` | `domain-map.md` → Invariants #6: "Per-user scoping is the DbContext's job … not the endpoints (`ApplyUserScoping` is a no-op virtual)". True for reads; read as a general licence it authorises `SEC-2` | **Doc.** Add "reads only — any caller-supplied FK id must be checked against the caller's own rows". Same sentence flagged as `DOC-5` in `review/todo-lists/02-findings.md` | `SEC-2` |
 | `DOC-3` | `IActivityReferenceSource.cs:62-67` asserts the only ambient concern is user scoping and that "no source here needs a hand-written scope". There is a second ambient filter — `ActivityArchived` — on three of the entities the ActivityProfiles source reads | **Both.** Decide the rule (references count regardless of archival state), implement it centrally, and rewrite the remark | `SEC-4` |
-| `DOC-4` | `domain-map.md` → Business rules → merge: "an archived survivor is allowed" — silent on archived *merged* ids, which today fail the whole merge | **Code.** Lift the filter and then make the doc say both directions are allowed | `SEC-3` |
+| `DOC-4` ✅ closed 2026-09-01 | `domain-map.md` → Business rules → merge: "an archived survivor is allowed" — silent on archived *merged* ids, which failed the whole merge | **Code.** The filter was lifted and the doc (plus the endpoint's `<remarks>`) now says both directions are allowed | `SEC-3` |
 | `DOC-5` | `domain-map.md` → `application/validator/` lists `TimeDtoValidator` among "the three shared ones", implying it runs. It cannot | **Both.** Replace the validator with a rules helper, then update the sentence | `CQ-2` |
 | `DOC-6` | `docs/testing.md` → "Known gaps": *"Nothing in Core is currently carried as an expected-failing `[Trait("Status","KnownGap")]` test"*. Literally true, but `ActivityForeignKeyInventoryTests.cs:72-84` carries a `TODO` / "⚠ OPEN QUESTION" on the three preset cascades — a known gap in everything but the trait | **Doc.** List it under "Two standing caveats" so it is visible from `testing.md` rather than only from the test literal | `MIG-3` |
 | `DOC-7` | `summary.md` → Gotchas describes `IsArchived` and the pickers thoroughly, but nowhere says that archiving is available on activities **only** — roles, categories and presets have no retire path, so the only way to remove a stale role is the destructive one | **Doc.** One sentence in Gotchas | `SEC-1` |

@@ -108,7 +108,7 @@ Legend: ✅ covered · ⚠️ base-class only (route + status, no behaviour) · 
 | `PUT /activity/{id}/quick-edit` | ✅ | ⚠️ **archived row untested** | ✅ 404 | `ActivityEndpointTests:1036,1061` · `TEST-7` |
 | `POST /activity/{id}/clone` | ✅ | ✅ copy suffix; ⚠️ **timestamps, archived row untested** | ✅ 404 | `ActivityEndpointTests:946,1003,1021` · `TEST-7`, `TEST-8` |
 | `PATCH /activity/{id}/archived` | ✅ | ✅ idempotent, unknown id | ✅ 404 | `ActivityArchivingTests:76,101,112,124` |
-| `POST /activity/merge` | ✅ | ✅ 8 edges; ❌ **archived merged id**, ❌ **archived survivor w/ profile** | ✅ 404 | `ActivityMergeTests` (13) · `TEST-3`, `TEST-4` |
+| `POST /activity/merge` | ✅ | ✅ 12 edges, incl. ✅ **archived merged id** (both directions, mixed sets); ❌ **archived survivor w/ profile** | ✅ 404, incl. a foreign *archived* id | `ActivityMergeTests` (17) · `TEST-4` |
 | `POST /activity-role` | ✅ | ✅ dup name 409 | ⚠️ | `ActivityEndpointTests:224,833` |
 | `PUT /activity-role/{id}` | ⚠️ | ❌ | ⚠️ | `ActivityEndpointTests:233` |
 | `DELETE /activity-role/{id}` | ✅ | ✅ 409 on system key; ✅ 409 when activities exist (incl. archived) | ✅ | `ActivityRoleSystemKeyTests:166,186` · `ActivityLookupDeleteCascadeTests` |
@@ -191,7 +191,7 @@ the fixture, auth-client and `KnownGap` conventions the individual prompts assum
 |---|---|---|---|
 | `TEST-1` ✅ closed 2026-09-01 | Deleting a role or category destroys every activity under it, and their cross-slice rows | `SEC-1` | [ActivityLookupDeleteCascade.md](testingPrompts/ActivityLookupDeleteCascade.md) → `Endpoints/ActivityLookupDeleteCascadeTests.cs` + `Modules/ActivityForeignKeyInventoryTests.cs` |
 | `TEST-2` | Core writes accept another user's `roleId` / `categoryId` / `activityId` | `SEC-2` | [CoreForeignKeyOwnership.md](testingPrompts/CoreForeignKeyOwnership.md) |
-| `TEST-3` | `POST /activity/merge` 404s when a merged id is archived | `SEC-3` | [MergeArchivedMergedId.md](testingPrompts/MergeArchivedMergedId.md) |
+| `TEST-3` ✅ closed 2026-09-01 | `POST /activity/merge` 404s when a merged id is archived | `SEC-3` | [MergeArchivedMergedId.md](testingPrompts/MergeArchivedMergedId.md) → 4 tests in `Endpoints/ActivityMergeTests.cs` |
 | `TEST-4` | `usageCount` on an archived activity omits filtered dependents; merge into an archived survivor holding a profile | `SEC-4` | [ArchivedActivityReferenceCount.md](testingPrompts/ArchivedActivityReferenceCount.md) |
 | `TEST-5` | An `icon` of 51–255 chars passes validation and fails in Postgres | `CQ-1` | [IconLengthValidatorVsColumn.md](testingPrompts/IconLengthValidatorVsColumn.md) |
 | `TEST-6` | `TimeDto` hours/minutes unvalidated on the requests Planning does not hand-check | `CQ-2` | [TimeDtoRangeValidation.md](testingPrompts/TimeDtoRangeValidation.md) |
