@@ -28,6 +28,7 @@ public sealed class User : BaseUser, IBaseTableEntity
     /// <para><b>Do not log this value.</b> A town is not a name or an address, but it is still personal data
     /// and log files survive a GDPR erasure — log <c>{UserId}</c> instead, as the weather endpoint does.</para>
     /// </summary>
+    [AuditIgnore]
     public string? WeatherLocation { get; set; }
 
 
