@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
+using AdhdTimeOrganizer.Core.domain.model.entity.@base;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.timer;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
@@ -394,6 +397,80 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
 
         row!.UsageCount.Should().Be(1);
         row.CanDelete.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// `SEC-4` — the count must include the references that the <b>archival</b> filter hides, not just
+    /// the ones the per-user filter leaves visible.
+    /// </summary>
+    /// <remarks>
+    /// The three <c>Activity*Profile</c> tables mirror <c>AppQueryFilters.ActivityArchived</c>, so an
+    /// archived activity's profiles vanish from the seam's subquery unless the source lifts it — and the
+    /// activity then reports <c>usageCount: 0</c> / <c>canDelete: true</c> while its profile rows exist.
+    /// That is not merely a wrong number on screen: <c>DeleteActivityEndpoint</c> lifts the archival
+    /// filter on purpose so the archive view's delete row action works, so the enabled button succeeds
+    /// and cascades away exactly the rows the count said were not there. Both read paths are asserted —
+    /// <c>GET /activity/{id}</c> groups, the grid correlates a subquery.
+    /// </remarks>
+    [Fact]
+    public async Task UsageCount_CountsTheProfilesOfAnArchivedActivity()
+    {
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, "Archived But Profiled", isArchived: true);
+        await SeedBacklogProfileAsync(db, activityId);
+
+        var row = await CreateClient().GetFromJsonAsync<ActivityRow>($"api/activity/{activityId}", JsonOpts, CancellationToken);
+
+        row!.UsageCount.Should().Be(1, "the profile still exists and the delete would still destroy it");
+        row.CanDelete.Should().BeFalse("canDelete is the only thing withholding the archive view's delete row action");
+
+        var page = await FetchTableAsync(new { IsArchived = true });
+        var gridRow = page.Items.Single(i => i.Id == activityId);
+
+        gridRow.UsageCount.Should().Be(1, "the grid's correlated subquery is a second code path over the same seam");
+        gridRow.CanDelete.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The other side of lifting the archival filter inside the seam's subquery: EF applies a named
+    /// <c>IgnoreQueryFilters</c> across the whole compiled query, so the grid's default view must still
+    /// hide archived rows even though its projection now correlates a subquery that lifts the filter.
+    /// </summary>
+    [Fact]
+    public async Task FilteredTable_DefaultView_StillHidesArchived_EvenThoughTheUsageSubqueryLiftsTheFilter()
+    {
+        await using var db = CreateDbContext();
+        var archivedId = await SeedActivityAsync(db, "Hidden From Default", isArchived: true);
+        await SeedBacklogProfileAsync(db, archivedId);
+
+        var page = await FetchTableAsync(null);
+
+        page.Items.Should().NotContain(i => i.Id == archivedId,
+            "the unfiltered view means active only, and the reference subquery must not un-archive the outer query");
+    }
+
+    private async Task SeedBacklogProfileAsync(DbContext db, long activityId)
+    {
+        db.Set<ActivityBacklogProfile>().Add(new ActivityBacklogProfile
+        {
+            ActivityId = activityId,
+            LocationTypeId = await SeedLookupAsync<ActivityLocationType>(db),
+            WeatherDependencyId = await SeedLookupAsync<ActivityWeatherDependency>(db),
+            EnergyLevel = EnergyLevel.Medium,
+            MinParticipants = 1,
+            ExpectedCostTierId = await SeedLookupAsync<ActivityExpectedCostTier>(db),
+            DurationMinutes = 30,
+            IsRepeatable = true
+        });
+        await db.SaveChangesAsync(CancellationToken);
+    }
+
+    private async Task<long> SeedLookupAsync<TLookup>(DbContext db) where TLookup : BaseLookupWithUser, new()
+    {
+        var lookup = new TLookup { UserId = UserId, Text = $"{typeof(TLookup).Name}-{Guid.NewGuid():N}" };
+        db.Set<TLookup>().Add(lookup);
+        await db.SaveChangesAsync(CancellationToken);
+        return lookup.Id;
     }
 
     /// <summary>

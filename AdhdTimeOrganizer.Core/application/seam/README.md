@@ -87,7 +87,16 @@ None of these break the build, and only one of them throws.
   `Cascade`, so they are destroyed rather than orphaned, while the response still reports a
   plausible-looking count. `SeamWiringTests.ActivityReferenceSources_CoverEveryKey_Exactly` pins
   coverage; `ActivityMergeTests.Merge_RepointsEveryReferencingSlice` asserts on surviving rows in six
-  projects rather than on `repointedCount`.
+  projects rather than on `repointedCount`. **Its third silent mode is ambient query filters.** A
+  source's subquery runs under whatever global filters its tables carry, and only the per-user one is
+  safe to lean on — `AppQueryFilters.ActivityArchived` is mirrored onto the three `Activity*Profile`
+  tables, so reading them unlifted hides an archived activity's profiles from its own `usageCount`.
+  `canDelete` then comes back `true` on the one surface that lifts the archival filter for the delete
+  (`DeleteActivityEndpoint`), and the cascade destroys the rows the count said were not there. The
+  same hidden row makes `RepointUniqueProfileAsync`'s survivor-collision check read `false` and fails
+  an entire merge on a unique index. The rule is on `ReferencingActivityIds` and each implementation
+  applies it; it cannot be centralised, because by the time `ActivityReferenceService` sees the
+  queryable it is an `IQueryable<long>` and `IgnoreQueryFilters` needs an entity type.
 - **The three single seams throw at endpoint activation** if unregistered. That is the point of
   resolving them as a single service rather than an `IEnumerable<>`. `IActivityReferenceService` —
   the one face Core's endpoints inject over the keyed sources — is registered the same way and for the

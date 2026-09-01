@@ -386,6 +386,43 @@ public class ActivityMergeTests(AppDbContextFixture fixture) : PostgresTestBase(
     }
 
     /// <summary>
+    /// `SEC-4` — the same archived survivor, but carrying a profile of its own. The collision check in
+    /// <c>ActivityProfileActivityReferenceSource</c> reads the survivor's profile through a table that
+    /// mirrors <c>AppQueryFilters.ActivityArchived</c>, so unlifted it sees nothing, concludes the
+    /// survivor is bare, and repoints the merged profile onto an <c>ActivityId</c> that is <b>unique</b>
+    /// — the index rejects it, the transaction rolls back, and the user gets an error on an irreversible
+    /// action they already confirmed. The archived case has to resolve exactly like the active one.
+    /// </summary>
+    [Fact]
+    public async Task Merge_IntoAnArchivedSurvivorThatAlreadyHasAProfile_KeepsTheSurvivorsProfile()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Archived Profiled Survivor", isArchived: true);
+        var duplicateId = await SeedActivityAsync(db, "Duplicate For Archived Profile");
+
+        var survivorProfileId = await SeedBacklogProfileAsync(db, survivorId, durationMinutes: 20);
+        var duplicateProfileId = await SeedBacklogProfileAsync(db, duplicateId, durationMinutes: 80);
+
+        var response = await MergeAsync(survivorId, duplicateId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "the whole merge must not fail on a unique index");
+
+        await using var assertDb = CreateDbContext();
+        var profiles = await assertDb.Set<ActivityBacklogProfile>()
+            .IgnoreQueryFilters([AppQueryFilters.ActivityArchived])
+            .Where(p => p.ActivityId == survivorId)
+            .ToListAsync(CancellationToken);
+
+        profiles.Should().ContainSingle("ActivityBacklogProfile.ActivityId is unique — two cannot survive");
+        profiles[0].Id.Should().Be(survivorProfileId, "archived or not, the survivor's own profile wins");
+        profiles[0].DurationMinutes.Should().Be(20);
+
+        (await assertDb.Set<ActivityBacklogProfile>()
+            .IgnoreQueryFilters([AppQueryFilters.ActivityArchived])
+            .AnyAsync(p => p.Id == duplicateProfileId, CancellationToken))
+            .Should().BeFalse();
+    }
+
+    /// <summary>
     /// An archived activity may be merged <em>away</em>, not just merged into — `SEC-3`. The dialog draws
     /// its candidates from the grid's All view, which is the whole reason <c>IsArchived</c> is tri-state,
     /// so an archived duplicate is selectable; leaving the archival filter on the merged query made the

@@ -113,6 +113,12 @@ App-enforced only:
    `IActivityReferenceSource.ReferencingActivityIds` and `IActivityReferenceService` are all composed
    into an outer query as subqueries. A `ToList()` in an implementation turns one query into twelve
    plus a client-side group-by, and silently breaks `usageCount` sorting.
+   **And it must be explicit about which ambient filters it runs under.** Only the per-user filter is
+   safe to lean on. `IActivityReferenceSource` counts references *regardless of archival state*, so a
+   source whose tables mirror `AppQueryFilters.ActivityArchived` — the three `Activity*Profile` ones —
+   lifts it in both `ReferencingActivityIds` and `RepointAsync`. Left filtered, an archived activity
+   reports `usageCount: 0` while its profiles exist, and the delete row action `canDelete` exists to
+   withhold is offered on the one surface that lifts the filter for the delete itself.
 8. **A seam that writes must not call `SaveChanges`.** `IActivityTimeAttributionSink` and
    `IActivityReferenceSource.RepointAsync` both mutate the caller's context and leave the commit to
    it. For the merge this is load-bearing, not tidiness: it is what makes the operation atomic.

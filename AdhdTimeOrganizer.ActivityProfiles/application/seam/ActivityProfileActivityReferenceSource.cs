@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.entityInterface;
@@ -42,17 +43,44 @@ namespace AdhdTimeOrganizer.ActivityProfiles.application.seam;
 /// user's activity and therefore cannot match. Any future method here that filters on something other
 /// than an activity id does <b>not</b> inherit that guarantee.
 /// </para>
+/// <para>
+/// ⚠ <b>This is the only source whose tables carry <c>AppQueryFilters.ActivityArchived</c></b> — the
+/// three profiles mirror <c>!Activity.IsArchived</c> — so it is the only one that has to lift it, and
+/// every profile query here does. The seam counts references <em>regardless of archival state</em>
+/// (see <see cref="IActivityReferenceSource.ReferencingActivityIds"/>); left filtered, an archived
+/// activity reports <c>usageCount: 0</c> while its profiles exist, the archive grid offers the delete
+/// row action that <c>canDelete</c> exists to withhold, and the survivor-collision check below reads
+/// <c>false</c> for an archived survivor that already holds a profile — repointing a second row onto
+/// a unique <c>ActivityId</c> and failing the whole merge on the index.
+/// </para>
 /// </remarks>
 public sealed class ActivityProfileActivityReferenceSource : IActivityReferenceSource, IScopedService
 {
     public string Key => ActivityReferenceSourceKeys.ActivityProfile;
 
     public IQueryable<long> ReferencingActivityIds(DbContext db) =>
-        db.Set<ActivityBacklogProfile>().Select(p => p.ActivityId)
-            .Concat(db.Set<ActivityProjectProfile>().Select(p => p.ActivityId))
-            .Concat(db.Set<ActivityBucketListProfile>().Select(p => p.ActivityId))
+        Profiles<ActivityBacklogProfile>(db).Select(p => p.ActivityId)
+            .Concat(Profiles<ActivityProjectProfile>(db).Select(p => p.ActivityId))
+            .Concat(Profiles<ActivityBucketListProfile>(db).Select(p => p.ActivityId))
             .Concat(db.Set<MemoryAnchor>().Select(a => a.ActivityId))
             .Concat(db.Set<LeisureSuggestionRecord>().Select(r => r.ActivityId));
+
+    /// <summary>
+    /// One profile family, counted and repointed <b>regardless of archival state</b> —
+    /// <see cref="AppQueryFilters.ActivityArchived"/> lifted, the per-user filter left on (these tables
+    /// have none of their own; see the type remarks for why that is safe).
+    /// </summary>
+    /// <remarks>
+    /// EF applies a named <c>IgnoreQueryFilters</c> across the whole compiled query, so lifting it here
+    /// also lifts it on the outer query when <c>GridActivityEndpoint</c> correlates this subquery into
+    /// its projection. That is harmless because the grid never leans on the ambient filter for archival:
+    /// the unfiltered view adds <c>!IsArchived</c> itself, a two-state filter adds
+    /// <c>IsArchived == value</c>, and the "both" view lifts the filter on purpose.
+    /// <c>ActivityArchivingTests</c> pins that the default grid still hides archived rows.
+    /// </remarks>
+    private static IQueryable<TProfile> Profiles<TProfile>(DbContext db)
+        where TProfile : class, IActivityProfile
+        => db.Set<TProfile>().IgnoreQueryFilters([AppQueryFilters.ActivityArchived]);
 
     public async Task<int> RepointAsync(DbContext db, long survivorId, IReadOnlyCollection<long> mergedIds, CancellationToken ct)
     {
@@ -79,7 +107,7 @@ public sealed class ActivityProfileActivityReferenceSource : IActivityReferenceS
     private static async Task<int> RepointUniqueProfileAsync<TProfile>(DbContext db, long survivorId, IReadOnlyCollection<long> mergedIds, CancellationToken ct)
         where TProfile : class, IActivityProfile, IEntityWithId
     {
-        var candidates = await db.Set<TProfile>()
+        var candidates = await Profiles<TProfile>(db)
             .Where(p => mergedIds.Contains(p.ActivityId))
             .OrderBy(p => p.Id)
             .ToListAsync(ct);
@@ -87,7 +115,10 @@ public sealed class ActivityProfileActivityReferenceSource : IActivityReferenceS
         if (candidates.Count == 0)
             return 0;
 
-        var survivorHasOne = await db.Set<TProfile>().AnyAsync(p => p.ActivityId == survivorId, ct);
+        // Archival lifted here too, and it is load-bearing rather than tidy: an archived survivor's
+        // profile is invisible under the ambient filter, so this reads false, the merged profile is
+        // repointed onto an ActivityId that already has one, and the unique index fails the whole merge.
+        var survivorHasOne = await Profiles<TProfile>(db).AnyAsync(p => p.ActivityId == survivorId, ct);
 
         // Ordered by id and taking the first, so that when the survivor has no profile of this kind and
         // several merged activities do, the oldest one wins — the profile the user has had longest —

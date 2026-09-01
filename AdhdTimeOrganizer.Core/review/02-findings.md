@@ -186,7 +186,7 @@ activities may be merged away as well as merged into); `MergeActivityEndpoint`'s
 
 ---
 
-### `SEC-4` 🟠 The reference seam ignores the archival query filter, so an archived activity can report `usageCount: 0` while its profiles exist
+### `SEC-4` 🟠 ✅ FIXED 2026-09-01 The reference seam ignores the archival query filter, so an archived activity can report `usageCount: 0` while its profiles exist
 
 - `application/seam/IActivityReferenceSource.cs:62-67` — the contract's remarks address **only** user
   scoping: *"No user scoping here on purpose: `AppDbContext`'s global `IEntityWithUser` filter already
@@ -230,6 +230,20 @@ and it is the opposite of the guarantee the seam's own remarks give. Verify it r
 `ActivityReferenceService.ReferencingActivityIds` / `CountByActivityAsync` (one place, all sources),
 or require each implementation to lift it — the former is far less likely to rot. The
 `survivorHasOne` check in ActivityProfiles must lift it either way.
+
+**Fixed as:** the rule *"references are counted regardless of archival state"* is now on
+`IActivityReferenceSource.ReferencingActivityIds`, and each implementation applies it. It could **not**
+be centralised in `ActivityReferenceService` as suggested: `IgnoreQueryFilters` is constrained to
+entity types and by that point the queryable is an `IQueryable<long>`. ActivityProfiles is the only
+affected source (the other six read no table carrying `ActivityArchived`), and it lifts the filter in
+one private helper used by `ReferencingActivityIds` and by both of `RepointUniqueProfileAsync`'s reads,
+including `survivorHasOne`. Guards, on rows:
+`ActivityArchivingTests.UsageCount_CountsTheProfilesOfAnArchivedActivity` (both read paths —
+`GET /activity/{id}` groups, the grid correlates),
+`ActivityMergeTests.Merge_IntoAnArchivedSurvivorThatAlreadyHasAProfile_KeepsTheSurvivorsProfile`, and
+`ActivityArchivingTests.FilteredTable_DefaultView_StillHidesArchived_EvenThoughTheUsageSubqueryLiftsTheFilter`
+for the grid concern raised above — a named `IgnoreQueryFilters` applies across the whole compiled
+query, so that one pins that the subquery's lift does not un-archive the outer page.
 
 **Doc impact:** `../application/seam/README.md` → "How each one fails" (add the archival-filter mode
 to `IActivityReferenceSource`); `domain-map.md` → Invariants #7 (a seam's `IQueryable` must stay

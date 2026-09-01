@@ -60,10 +60,27 @@ public interface IActivityReferenceSource : ISeam
     /// subquery — never materialize it.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// No user scoping here on purpose: <c>AppDbContext</c>'s global <c>IEntityWithUser</c> filter
     /// already scopes every entity involved by the time the subquery reaches Postgres, and the outer
     /// query is scoped too. The one entity outside that filter — <c>WebExtensionActivityEntry</c> —
     /// holds no activity FK, so no source here needs a hand-written scope.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>References are counted regardless of archival state, and the implementation owns that.</b>
+    /// The per-user filter is the <em>only</em> ambient filter a source may lean on. Archival is a
+    /// second one: <c>AppQueryFilters.ActivityArchived</c> is mirrored from <c>Activity</c> onto every
+    /// dependent that must vanish with it, and a source reading such a table unlifted reports fewer
+    /// references than exist. That is not a cosmetic undercount — <c>canDelete</c> is
+    /// <c>usageCount == 0</c>, and <c>DeleteActivityEndpoint</c> lifts the archival filter on purpose so
+    /// the archive grid's delete row action works, so the count is the only thing standing between an
+    /// archived activity and a cascade through rows the seam claimed did not exist. So: if your table
+    /// carries <c>ActivityArchived</c>, lift it — in <see cref="RepointAsync"/>'s own reads as well,
+    /// where a hidden row also breaks a collision check. It cannot be lifted centrally in
+    /// <c>ActivityReferenceService</c>: <c>IgnoreQueryFilters</c> is constrained to entity types and
+    /// this method has already projected to <c>long</c>. Today ActivityProfiles is the only source
+    /// affected. <c>ActivityArchivingTests</c> and <c>ActivityMergeTests</c> are the guards.
+    /// </para>
     /// </remarks>
     IQueryable<long> ReferencingActivityIds(DbContext db);
 
