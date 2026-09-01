@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.application.dto.filter;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.infrastructure.persistence;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.request.generic;
@@ -18,6 +19,15 @@ public class GridActivityCategoryEndpoint(
     /// aggregate proxy, which orders by the same leading role name. See
     /// <see cref="ActivityCategoryGridResponse.RoleSortKey"/>.
     /// </summary>
+    /// <summary>
+    /// Lifts the archival filter so <c>ActivityCategoryGridResponse.Projection</c>'s <c>usageCount</c> sees
+    /// every activity a delete would reclassify, archived included. Categories are not archivable
+    /// themselves, and the projection's <c>role</c> column re-applies <c>!IsArchived</c> by hand, so this
+    /// changes nothing else on the grid.
+    /// </summary>
+    protected override IQueryable<ActivityCategory> ApplyBaseFiltering(IQueryable<ActivityCategory> query) =>
+        query.IgnoreQueryFilters([AppQueryFilters.ActivityArchived]);
+
     protected override SortByRequest[] PreprocessSortBy(SortByRequest[] sortBy) =>
         sortBy.Select(s => s.Key.Pascalize() == nameof(ActivityCategoryGridResponse.Role)
                 ? s with { Key = nameof(ActivityCategoryGridResponse.RoleSortKey) }

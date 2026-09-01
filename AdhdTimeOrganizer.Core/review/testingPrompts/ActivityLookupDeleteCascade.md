@@ -2,7 +2,18 @@
 
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first. Finding: `SEC-1` 🔴.
 
-**Status today:** `ActivityEndpointTests.cs:250` (`ActivityRoleDeleteTests`) and `:326`
+> ## ✅ Done, 2026-09-01 — this prompt has been executed and `SEC-1` fixed
+>
+> `AdhdTimeOrganizer.IntegrationTests/Endpoints/ActivityLookupDeleteCascadeTests.cs` exists and is
+> green, with **no `KnownGap` traits** — cases 1–5 below were written against the corrected behaviour
+> and the behaviour was corrected in the same commit, so they assert rather than pin. Two cases were
+> added beyond this prompt, both about the archival filter: an archived activity survives its
+> category's delete, and an archived activity still blocks its role's. Case 6 landed as
+> `ExpectedOutbound` / `EveryForeignKeyOutOfActivity_MatchesTheFrozenInventory` in
+> `Modules/ActivityForeignKeyInventoryTests.cs`, with `CategoryId` frozen at `SetNull` rather than
+> `Cascade` — the literal below describes the pre-fix model. Everything else here is left as written.
+
+**Status when written:** `ActivityEndpointTests.cs:250` (`ActivityRoleDeleteTests`) and `:326`
 (`ActivityCategoryDeleteTests`) are `BaseDeleteEndpointTests` subclasses that delete an **unused**
 lookup row and assert 204 + a cross-user 404. `ActivityCategoryBatchDeleteTests:357` does the same in
 bulk. Nothing anywhere asserts what a delete takes with it. This is the largest gap in Core and it is

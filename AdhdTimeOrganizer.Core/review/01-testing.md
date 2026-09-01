@@ -111,7 +111,7 @@ Legend: ✅ covered · ⚠️ base-class only (route + status, no behaviour) · 
 | `POST /activity/merge` | ✅ | ✅ 8 edges; ❌ **archived merged id**, ❌ **archived survivor w/ profile** | ✅ 404 | `ActivityMergeTests` (13) · `TEST-3`, `TEST-4` |
 | `POST /activity-role` | ✅ | ✅ dup name 409 | ⚠️ | `ActivityEndpointTests:224,833` |
 | `PUT /activity-role/{id}` | ⚠️ | ❌ | ⚠️ | `ActivityEndpointTests:233` |
-| `DELETE /activity-role/{id}` | ✅ | ✅ 409 on system key; ❌ **cascade blast radius** | ⚠️ | `ActivityRoleSystemKeyTests:166,186` · `TEST-1` |
+| `DELETE /activity-role/{id}` | ✅ | ✅ 409 on system key; ✅ 409 when activities exist (incl. archived) | ✅ | `ActivityRoleSystemKeyTests:166,186` · `ActivityLookupDeleteCascadeTests` |
 | `GET /activity-role/all` | ❌ | ❌ | ❌ | — · `TEST-11` |
 | `GET /activity-role/{id}` | ⚠️ | ❌ | ⚠️ | `ActivityEndpointTests:201` |
 | `GET /activity-role/by-Name/{v}` | ❌ | ❌ | ❌ | — · `TEST-12` |
@@ -120,8 +120,8 @@ Legend: ✅ covered · ⚠️ base-class only (route + status, no behaviour) · 
 | `GET /activity-role/filtered-table` | ⚠️ | ❌ filter predicates untested | ⚠️ | `ActivityEndpointTests:216` |
 | `POST /activity-category` | ✅ | ✅ dup name 409 | ⚠️ | `ActivityEndpointTests:300,859` |
 | `PUT /activity-category/{id}` | ⚠️ | ❌ | ⚠️ | `ActivityEndpointTests:309` |
-| `DELETE /activity-category/{id}` | ⚠️ | ❌ **cascade blast radius** | ⚠️ | `ActivityEndpointTests:326` · `TEST-1` |
-| `POST /activity-category/batch-delete` | ✅ | ✅ foreign id 404 | ✅ | `ActivityEndpointTests:357,371` · but `TEST-1` |
+| `DELETE /activity-category/{id}` | ✅ | ✅ SetNull keeps the activity + its history; archived too | ✅ | `ActivityEndpointTests:326` · `ActivityLookupDeleteCascadeTests` |
+| `POST /activity-category/batch-delete` | ✅ | ✅ foreign id 404; ✅ SetNull in bulk | ✅ | `ActivityEndpointTests:357,371` · `ActivityLookupDeleteCascadeTests` |
 | `GET /activity-category/all` | ❌ | ❌ | ❌ | — · `TEST-11` |
 | `GET /activity-category/{id}` | ⚠️ | ❌ | ⚠️ | `ActivityEndpointTests:277` |
 | `GET /activity-category/all-options` | ⚠️ | ❌ | ⚠️ | `ActivityEndpointTests:341` |
@@ -155,7 +155,7 @@ Cross-cutting, not per-route: `CoreRouteSmokeTests` (2) pins Core's assembly in 
 | `DefaultActivityRoleSeeder` · `TimerPresetSeeder` · `PomodoroTimerPresetSeeder` | 14 (theory-driven) + 9 matcher | `PerUserDefaultSeederTests` + `PerUserDefaultMatcherTests`. Idempotence, gap-refill, reset-in-place, rename survival — thorough. |
 | Dev seeders (`ActivityRole`/`Category`/`Activity`) | 0 | Never executed by any test. Their whole-table truncate is unasserted (`TEST-14`). |
 | Seam surface | 6 | `SeamWiringTests`. |
-| EF configuration | 3 | `ActivityForeignKeyInventoryTests` (FKs *into* Activity), `ModuleSchemaTests`, `NamedQueryFilterTests`. **No inventory of FKs *out of* Activity** — which is why `SEC-1` is invisible. |
+| EF configuration | 4 | `ActivityForeignKeyInventoryTests` — now **two** inventories, FKs *into* Activity and (since `SEC-1`, 2026-09-01) FKs *out of* it; `ModuleSchemaTests`, `NamedQueryFilterTests`. |
 | Validators | 5, indirect | Only `TimerPresetValidationTests` + the two 400 paths in `ActivityEndpointTests`. The Icon-length mismatch (`CQ-1`) and the never-invoked `TimeDtoValidator` (`CQ-2`) are both uncovered. |
 | `PortalRoleCatalog` · `PortalAuthorizationPolicies` | indirect | Through every role-gated test; `Root` assignment pinned at `DefaultUsersSeederTests:233`. |
 
@@ -168,12 +168,14 @@ spread thin.
 
 **The riskiest gaps, in order:**
 
-1. **Lookup deletion.** `DELETE /activity-category/{id}`, its batch sibling and
-   `DELETE /activity-role/{id}` are covered only by base-class tests that delete an *unused* row.
-   Nothing asserts what happens when the row is in use, and the answer (`SEC-1`) is that every
-   activity under it is destroyed, and through the activity cascade every history row, planner task,
-   to-do item and profile that pointed at those activities. This is the single largest gap in Core and
-   it is invisible because a green delete test sits next to it.
+1. ~~**Lookup deletion.**~~ ✅ **Closed 2026-09-01.** `DELETE /activity-category/{id}`, its batch
+   sibling and `DELETE /activity-role/{id}` were covered only by base-class tests that delete an
+   *unused* row. Nothing asserted what happens when the row is in use, and the answer (`SEC-1`) was
+   that every activity under it is destroyed, and through the activity cascade every history row,
+   planner task, to-do item and profile that pointed at those activities. This was the single largest
+   gap in Core and it was invisible because a green delete test sat next to it.
+   `ActivityLookupDeleteCascadeTests` is the guard, and the model half is a second frozen inventory in
+   `ActivityForeignKeyInventoryTests`.
 2. **Write-side FK ownership** (`SEC-2`). Five request DTOs copy caller-supplied FK ids straight into
    columns with no ownership check, and the suite's entire notion of "auth" is read-side.
 3. **The archival filter inside the reference seam** (`SEC-4`) — `usageCount` on an archived activity,
@@ -187,7 +189,7 @@ the fixture, auth-client and `KnownGap` conventions the individual prompts assum
 
 | ID | Gap | Finding | Prompt |
 |---|---|---|---|
-| `TEST-1` | Deleting a role or category destroys every activity under it, and their cross-slice rows | `SEC-1` | [ActivityLookupDeleteCascade.md](testingPrompts/ActivityLookupDeleteCascade.md) |
+| `TEST-1` ✅ closed 2026-09-01 | Deleting a role or category destroys every activity under it, and their cross-slice rows | `SEC-1` | [ActivityLookupDeleteCascade.md](testingPrompts/ActivityLookupDeleteCascade.md) → `Endpoints/ActivityLookupDeleteCascadeTests.cs` + `Modules/ActivityForeignKeyInventoryTests.cs` |
 | `TEST-2` | Core writes accept another user's `roleId` / `categoryId` / `activityId` | `SEC-2` | [CoreForeignKeyOwnership.md](testingPrompts/CoreForeignKeyOwnership.md) |
 | `TEST-3` | `POST /activity/merge` 404s when a merged id is archived | `SEC-3` | [MergeArchivedMergedId.md](testingPrompts/MergeArchivedMergedId.md) |
 | `TEST-4` | `usageCount` on an archived activity omits filtered dependents; merge into an archived survivor holding a profile | `SEC-4` | [ArchivedActivityReferenceCount.md](testingPrompts/ArchivedActivityReferenceCount.md) |

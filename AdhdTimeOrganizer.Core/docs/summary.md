@@ -60,6 +60,19 @@ than out of the host. `Activity` and `User` lost five navigation properties in t
   let `ActivityRequest` learn about `IsArchived`: the edit form does not carry it, so an assignment
   there would silently un-archive on every save.
 
+- **Deleting a lookup is not a small delete, and the two lookups answer differently.** `ActivityRole`
+  and `ActivityCategory` sit *above* `Activity`, so a cascade from either continues through all 17 FKs
+  into `Activity` and takes history, planner tasks, to-do items, profiles, presets and tracker mappings
+  with it. Category is `SetNull` (optional FK — the activity survives uncategorised, 204); role is
+  refused with a 409 by `DeleteActivityRoleEndpoint` when anything is still filed under it (required
+  FK, so `SetNull` is unavailable). Both counts lift `ActivityArchived` — an archived activity cascades
+  like any other. `usageCount` / `canDelete` now reach both lookups, but only on their **grid and
+  get-by-id**; everywhere else, including the role and category nested in an `ActivityResponse`, the
+  fields are defaults meaning "not asked for". And on a category `canDelete` is advisory — the delete
+  still succeeds. `ActivityLookupDeleteCascadeTests` and the second inventory in
+  `ActivityForeignKeyInventoryTests` are the guards; note that the first inventory structurally could
+  not see this, since it only walks FKs whose *principal* is `Activity`.
+
 - **Do not re-add inverse collections to `User` or `Activity`.** A completed refactor removed 22 of
   them precisely so Core would stop pointing into the feature areas; the ActivityProfiles extraction
   removed the last 5. What legitimately remains is Core→Core only: `User` keeps `ActivityList`,

@@ -4811,7 +4811,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityCategory", "Category")
                         .WithMany("Activities")
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_activity_activity_categories_category_id");
 
                     b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.ActivityRole", "Role")

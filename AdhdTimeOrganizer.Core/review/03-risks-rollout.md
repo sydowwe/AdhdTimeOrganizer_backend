@@ -7,7 +7,7 @@ Point-in-time snapshot, 2026-08-31. IDs reference [02-findings.md](02-findings.m
 
 | # | Sev | Issue | ID | File |
 |---|---|---|---|---|
-| 1 | 🔴 | Deleting an activity role or category cascade-destroys every activity under it, and through the activity cascade every history row, planner task, to-do item, profile and preset that pointed at them — 204, no warning, no `canDelete` | `SEC-1` | `infrastructure/persistence/configuration/activity/ActivityConfiguration.cs:25-34` |
+| 1 | 🔴 ✅ fixed 2026-09-01 | Deleting an activity role or category cascade-destroys every activity under it, and through the activity cascade every history row, planner task, to-do item, profile and preset that pointed at them — 204, no warning, no `canDelete` | `SEC-1` | `infrastructure/persistence/configuration/activity/ActivityConfiguration.cs:25-34` |
 | 2 | 🟠 | Every Core write accepts another user's FK ids: existence oracle, rows that vanish from their owner's grid, and cross-user cascade deletion behind a `canDelete: true` | `SEC-2` | `application/dto/request/activity/ActivityRequest.cs:12-24` |
 | 3 | 🟠 | The reference seam runs under the archival filter it never lifts: `usageCount: 0` on an archived activity that has profiles, and a merge into an archived survivor with a profile violates a unique index and rolls the whole merge back | `SEC-4` | `application/seam/IActivityReferenceSource.cs:62-67` |
 | 4 | 🟠 | `POST /activity/merge` 404s on an archived merged id, which is exactly what the All view offers | `SEC-3` | `application/endpoint/activity/activity/command/MergeActivityEndpoint.cs:91` |
@@ -31,6 +31,15 @@ Doc drift `DOC-1`…`DOC-7` is tracked in [02-findings.md](02-findings.md#codedo
 attached to the finding whose fix must carry it.
 
 ## 10. Migration / rollout risks
+
+> **`MIG-1` and `MIG-2` shipped together on 2026-09-01, against this table's advice.** It recommended
+> landing the `SetNull` migration alone and putting `usageCount` on `ActivityRoleResponse` *before* role
+> deletion starts refusing, so the grid could grey the button first. `SEC-1` was fixed as one commit
+> instead: FK, endpoint refusal, both lookups' `usageCount` / `canDelete`, and the tests. The staging
+> the table asks for buys nothing here — the only caller is this repo's own SPA, and it takes the
+> projection and the refusal from the same deploy, so there is no window in which the button is enabled
+> against a backend that refuses. `MIG-3` (the three preset cascades) is **still open** and was
+> deliberately not folded in; the `TODO` block in `ActivityForeignKeyInventoryTests` stands.
 
 | Risk | Likelihood | Mitigation | ID |
 |---|---|---|---|

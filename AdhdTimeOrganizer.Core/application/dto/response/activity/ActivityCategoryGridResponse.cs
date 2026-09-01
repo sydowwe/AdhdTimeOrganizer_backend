@@ -14,8 +14,17 @@ public record ActivityCategoryGridResponse : ActivityCategoryResponse, IProjecti
     /// <summary>
     /// Every distinct role worn by the activities in this category, alphabetical and comma-joined
     /// (<c>"Personal, Work"</c>); empty when the category has no activities. Archived activities do not
-    /// count — the <c>ActivityArchived</c> query filter reaches into this subquery too.
+    /// count.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ⚠ The <c>!a.IsArchived</c> below is written out rather than left to the <c>ActivityArchived</c>
+    /// query filter, which used to reach into this subquery on its own. <c>GridActivityCategoryEndpoint</c>
+    /// now lifts that filter so <see cref="ActivityCategoryResponse.UsageCount"/> can see archived rows,
+    /// and the two want opposite things from the same navigation — this is a display column, that is a
+    /// blast radius. Spelling it out makes this half independent of what the endpoint lifts.
+    /// </para>
+    /// </remarks>
     /// <remarks>
     /// <b>This property cannot be sorted on.</b> Npgsql does not turn <c>string.Join</c> into
     /// <c>string_agg</c>: EF renders the subquery as a <c>LEFT JOIN LATERAL</c> yielding one row per role
@@ -37,6 +46,12 @@ public record ActivityCategoryGridResponse : ActivityCategoryResponse, IProjecti
     [JsonIgnore]
     public string? RoleSortKey { get; init; }
 
+    /// <summary>
+    /// Assumes its caller has lifted <c>AppQueryFilters.ActivityArchived</c> — only
+    /// <c>GridActivityCategoryEndpoint</c> uses this projection, and it does. Without the lift
+    /// <see cref="ActivityCategoryResponse.UsageCount"/> silently undercounts by the archived activities,
+    /// which are exactly the ones a user filing a category away has forgotten about.
+    /// </summary>
     public new static IQueryable<ActivityCategoryGridResponse> Projection(IQueryable<ActivityCategory> query)
     {
         return query.Select(e => new ActivityCategoryGridResponse
@@ -46,8 +61,10 @@ public record ActivityCategoryGridResponse : ActivityCategoryResponse, IProjecti
             Text = e.Text,
             Color = e.Color,
             Icon = e.Icon,
-            Role = string.Join(", ", e.Activities.Select(a => a.Role.Name).Distinct().OrderBy(n => n)),
-            RoleSortKey = e.Activities.Select(a => a.Role.Name).Min()
+            Role = string.Join(", ", e.Activities.Where(a => !a.IsArchived).Select(a => a.Role.Name).Distinct().OrderBy(n => n)),
+            RoleSortKey = e.Activities.Where(a => !a.IsArchived).Select(a => a.Role.Name).Min(),
+            UsageCount = e.Activities.Count(),
+            CanDelete = !e.Activities.Any()
         });
     }
 }

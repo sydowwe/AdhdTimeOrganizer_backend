@@ -7,9 +7,15 @@ using Xunit;
 namespace AdhdTimeOrganizer.IntegrationTests.Modules;
 
 /// <summary>
-/// Freezes every foreign key in the solution whose principal is <see cref="Activity"/>: which entity
-/// declares it, whether it is required, whether it is unique (i.e. a 1:1), and what happens to the
-/// dependent row when the activity is deleted.
+/// Freezes every foreign key in the solution that touches <see cref="Activity"/> at either end: which
+/// entity declares it, whether it is required, whether it is unique (i.e. a 1:1), and what a delete on
+/// the other side does to it.
+///
+/// <para>Two inventories, because they answer two different questions and one used to hide behind the
+/// other. <see cref="Expected"/> is the FKs whose <b>principal</b> is the activity — what
+/// <c>DELETE /activity/{id}</c> destroys. <see cref="ExpectedOutbound"/> is the three whose
+/// <b>dependent</b> is the activity — what a delete on a role, a category or a user does to the activity
+/// itself.</para>
 /// </summary>
 /// <remarks>
 /// <para>
@@ -109,6 +115,68 @@ public class ActivityForeignKeyInventoryTests(AppDbContextFixture fixture) : Pos
         new("TrackerAndroidMappingByPattern", "ActivityId", false, false, DeleteBehavior.Cascade),
         new("TrackerDesktopMappingByPattern", "ActivityId", false, false, DeleteBehavior.Cascade)
     ];
+
+    /// <summary>
+    /// The three model edges <b>out of</b> <see cref="Activity"/> — the ones where the activity is the
+    /// dependent and something else's delete decides its fate.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why this exists separately.</b> <see cref="Expected"/> queries on
+    /// <c>fk.PrincipalEntityType == Activity</c>, so these three are structurally outside it and always
+    /// were. That blind spot hid the finding this list was added for: <c>CategoryId</c> was
+    /// <c>Cascade</c>, so <c>DELETE /activity-category/{id}</c> answered 204 and destroyed every activity
+    /// filed under the category — and then, through the 17 edges in the list above, that activity's
+    /// history, planner tasks, to-do items, profiles, presets and tracker mappings. The delete tests next
+    /// to it were green the whole time, because they delete an <em>unused</em> lookup.
+    /// </para>
+    /// <para>
+    /// <b>The policy this pins.</b> A lookup is a classification, not an owner. Losing one must not
+    /// destroy what it classified. <c>CategoryId</c> is optional, so <c>SetNull</c> says exactly that.
+    /// <c>RoleId</c> is <c>NOT NULL</c> and cannot, so the refusal lives in
+    /// <c>DeleteActivityRoleEndpoint</c> instead — it counts dependent activities (archived included) and
+    /// answers 409. That means <b>this row staying <c>Cascade</c> is load-bearing on an endpoint, not on
+    /// the database</b>: the guard is <c>ActivityLookupDeleteCascadeTests</c>, not this literal.
+    /// <c>UserId</c> is the one place cascade is the intent — deleting an account is meant to take
+    /// everything with it (see <c>UserDataExportAndDeletionTests</c>).
+    /// </para>
+    /// </remarks>
+    private static readonly ActivityFk[] ExpectedOutbound =
+    [
+        new("Activity", "CategoryId", false, false, DeleteBehavior.SetNull),
+        new("Activity", "RoleId", true, false, DeleteBehavior.Cascade),
+        new("Activity", "UserId", true, false, DeleteBehavior.Cascade)
+    ];
+
+    [Fact]
+    public void EveryForeignKeyOutOfActivity_MatchesTheFrozenInventory()
+    {
+        using var db = CreateDbContext();
+
+        var actual = db.Model.FindEntityType(typeof(Activity))!
+            .GetForeignKeys()
+            .SelectMany(fk => fk.Properties.Select(p => new ActivityFk(
+                fk.DeclaringEntityType.ClrType.Name,
+                p.Name,
+                !p.IsNullable,
+                fk.IsUnique,
+                fk.DeleteBehavior)))
+            .OrderBy(fk => fk.Property, StringComparer.Ordinal)
+            .ToList();
+
+        var expected = ExpectedOutbound.OrderBy(fk => fk.Property, StringComparer.Ordinal).ToList();
+
+        var missing = expected.Except(actual).ToList();
+        var unexpected = actual.Except(expected).ToList();
+
+        Assert.True(missing.Count == 0 && unexpected.Count == 0,
+            "The set of foreign keys out of Activity has changed. Each one is a decision about what "
+            + "somebody else's delete destroys — read the policy in this member's remarks first.\n"
+            + "  no longer in the model (or changed shape): " + Describe(missing) + "\n"
+            + "  in the model but not in the inventory:     " + Describe(unexpected));
+
+        Assert.Equal(expected.Count, actual.Count);
+    }
 
     [Fact]
     public void EveryForeignKeyIntoActivity_MatchesTheFrozenInventory()

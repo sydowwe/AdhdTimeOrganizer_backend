@@ -16,7 +16,18 @@ question asked one level up*, where the answer is much less defensible.
 
 ## 5. Security & authorization
 
-### `SEC-1` 🔴 Deleting an activity role or category destroys every activity under it — and everything in every slice that pointed at those activities
+### `SEC-1` 🔴 ✅ FIXED 2026-09-01 · Deleting an activity role or category destroys every activity under it — and everything in every slice that pointed at those activities
+
+> **Resolved.** All four parts of the suggested fix landed together: `CategoryId` → `SetNull`
+> (migration `20260901180030_ActivityCategorySetNullOnDelete`, FK swap only, no data change);
+> `DeleteActivityRoleEndpoint` counts dependent activities with `ActivityArchived` lifted and answers
+> 409 beside its `SystemKey` refusal; `usageCount` / `canDelete` project onto `ActivityRoleResponse`
+> and `ActivityCategoryResponse` on both lookups' grid and get-by-id; and
+> `ActivityForeignKeyInventoryTests` gained a second frozen inventory for the FKs *out of* `Activity`.
+> Behavioural guard: `AdhdTimeOrganizer.IntegrationTests/Endpoints/ActivityLookupDeleteCascadeTests.cs`
+> (7 tests, no `KnownGap` traits). Docs reconciled in `docs/domain-map.md` (invariants 3 and 5, new
+> business rule "Deleting a role or a category") and `docs/summary.md` (Gotchas). The description below
+> is the original finding, kept as written.
 
 `AdhdTimeOrganizer.Core/infrastructure/persistence/configuration/activity/ActivityConfiguration.cs:25-34`
 

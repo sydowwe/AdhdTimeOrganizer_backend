@@ -74,16 +74,28 @@ DB-enforced:
 2. `ActivityRole` is unique per `(UserId, SystemKey)` **filtered to `system_key IS NOT NULL`** — a user
    holds at most one role per system key, which is what makes `GetBySystemKeyActivityRoleEndpoint`'s
    `FirstOrDefault` deterministic, while user-created roles (all `null`) do not collide.
-3. `Activity.RoleId` is required; `CategoryId` is optional. Both cascade.
+3. `Activity.RoleId` is required and **cascades**; `CategoryId` is optional and is **`SetNull`**. The
+   asymmetry is the point, and the blast radius is why: an activity cascade does not stop at the
+   activity — it continues through all 17 FKs into `Activity` (history rows, planner tasks in three
+   shapes, to-do items, routine to-do lists, tracker mappings, all three profiles, memory anchors,
+   leisure suggestion records, timer presets). So deleting a lookup could destroy a year of history
+   behind a `204`. `CategoryId` being optional means `SetNull` says what was meant — losing a category
+   is losing a classification. `RoleId` cannot go null, so the equivalent refusal lives in the endpoint
+   instead (invariant 5 below). Both directions are frozen by
+   `ActivityForeignKeyInventoryTests`, which now carries a second inventory for the FKs **out of**
+   `Activity` — the first one only ever saw those whose principal is `Activity`, which is exactly how
+   this went unnoticed.
 
 App-enforced only:
 
 4. **`IsArchived` is written by `PATCH /activity/{id}/archived` and nothing else.** No DB constraint
    stops another endpoint touching it, and `ActivityRequest` deliberately does not carry it.
    `ActivityArchivingTests.Update_DoesNotUnarchive` is the guard.
-5. **A role carrying a `SystemKey` cannot be deleted** (`DeleteActivityRoleEndpoint`, 409). Renaming,
-   recolouring and re-iconing stay allowed. No API path can set or clear a key — only the seeder
-   writes it.
+5. **A role cannot be deleted while it carries a `SystemKey` or still has activities under it**
+   (`DeleteActivityRoleEndpoint`, 409 for both). Renaming, recolouring and re-iconing stay allowed. No
+   API path can set or clear a key — only the seeder writes it. The activity count deliberately lifts
+   `AppQueryFilters.ActivityArchived`: an archived activity cascades exactly like an active one and is
+   the row a user has forgotten owning.
 6. **Per-user scoping is the DbContext's job**, via Framework's global filter on `IEntityWithUser` —
    not the endpoints (`ApplyUserScoping` is a no-op virtual). Core entities must stay
    `IEntityWithUser` and keep their FKs and cascades. `UserTimeZoneResolver` is the one deliberate
@@ -110,6 +122,25 @@ every slice. That asymmetry is why the grid computes `canDelete`. Enforced acros
 `SetArchivedActivityEndpoint`, `GridActivityEndpoint.ApplyBaseFiltering`,
 `BaseActivityFormSelectOptionsEndpoint` and the `ActivityArchived` filter in `AppDbContext`.
 
+**Deleting a role or a category.** A lookup is a classification, not an owner, so losing one must never
+destroy what it classified — and until this was fixed both cascaded straight into `Activity` and from
+there through every slice, behind a `204 No Content`. The two answers differ only because the columns
+do:
+
+- **Category** — the FK is optional, so `DeleteBehavior.SetNull`. `DELETE /activity-category/{id}` and
+  `POST /activity-category/batch-delete` still answer 204 and still remove the lookup; the activities
+  survive, uncategorised, with their history intact. `usageCount` / `canDelete` on the category is
+  therefore *advisory* — it exists so the confirmation dialog can say how many activities the delete
+  will reclassify, not to predict a refusal.
+- **Role** — the FK is required, so `SetNull` is unavailable and refusing is the only non-destructive
+  answer. `DeleteActivityRoleEndpoint` counts dependent activities (archived included) and answers 409,
+  reusing the branch the `SystemKey` refusal already established. `canDelete` on the role really is a
+  prediction of that 409, and it is false for a keyed role however empty it is.
+
+Deleting an **unused** lookup keeps working in both cases — that half is pinned by
+`ActivityLookupDeleteCascadeTests` alongside the destructive ones, so the rule cannot over-correct into
+"lookups can never be deleted".
+
 **The unfiltered grid view means "active only", not "everything".** `BaseGridEndpoint` skips
 `ApplyCustomFiltering` entirely when `useFilter` is false, so a default on
 `ActivityFilterRequest.IsArchived` would never be read and every archived row would come back into the
@@ -129,6 +160,16 @@ in the right-looking order. The cost is one correlated count over a `UNION ALL` 
 tables per row, bounded by the 200-row page cap and the global user filter. The agreed fallback if
 that stops being affordable: `canDelete` everywhere, `usageCount` on `GET /activity/{id}` only — and
 the column loses its sort.
+
+The same pair now rides `ActivityRoleResponse` and `ActivityCategoryResponse`, on the grid and the
+get-by-id of each — the two surfaces that draw a delete button. Their counts are a plain correlated
+count of activities rather than a twelve-table union, and both **lift `ActivityArchived`**, so the role
+and category grids override `ApplyBaseFiltering` to do it. That is why
+`ActivityCategoryGridResponse.Role` spells out `!a.IsArchived` by hand instead of leaning on the
+filter: the display column wants active activities and the count wants every one a delete would touch,
+off the same navigation. Everywhere else — `GetAll`, select-options, and the role/category nested
+inside every `ActivityResponse` — the fields stay at their defaults and mean "not asked for", the same
+contract `ActivityResponse` documents.
 
 **Merge is all-or-nothing, and order is load-bearing.** `POST /activity/merge` repoints every
 referencing row onto the survivor, saves, *then* deletes the merged activities, all inside one
