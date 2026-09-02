@@ -84,9 +84,8 @@ remarks carry the rest.
 | `/activity-history/{id}` | PUT | `command/UpdateActivityHistoryEndpoint` |
 | `/activity-history/{id}` | DELETE | `command/DeleteActivityHistoryEndpoint` |
 | `/activity-history/{id}` | GET | `query/GetByIdActivityHistoryEndpoint` |
-| `/activity-history/all-options` | GET | `query/FormSelectOptionsActivityHistoryEndpoint` |
+| `/activity-history/form-select-options?includeArchived=` | GET | `query/FormSelectOptionsActivityHistoryEndpoint` |
 | `/activity-history/filter` | POST | `query/FilterActivityHistoryEndpoint` |
-| `/activity-history/gird` | POST | `query/GetFilteredTableActivityHistoryEndpoint` |
 | `/activity-history/aggregate-by-activity` | POST | `query/AggregateByActivityActivityHistoryEndpoint` |
 | `/activity-history/dashboard/detail/{pie-chart,stacked-bars,summary-cards}` | POST | `query/dashboard/detail/*` |
 | `/activity-history/dashboard/summary/{pie-chart,stacked-bars,summary-cards,time-of-day}` | POST | `query/dashboard/summary/*` |
@@ -99,8 +98,16 @@ on an unknown session, never a 404** — a partially-registered set is the norma
 mid-flight. `schedule` is idempotent by `sessionId` and drops boundaries already in the past rather
 than firing them immediately.
 
-⚠ **`gird` is not a typo to fix.** It is the shipped path (`EndpointPath => "gird"`) and the SPA calls
-it that way.
+⚠ **There is no grid route.** `/activity-history/gird` was deleted with `CQ-1` — it applied neither
+paging nor sorting, and nothing in the frontend ever called it (the claim that "the SPA calls it that
+way" was never true). `/activity-history/filter` is the only list read on this entity.
+
+⚠ **The select-options route is `form-select-options`, not `all-options`.** It comes from
+`Core/application/endpoint/base/BaseActivityFormSelectOptionsEndpoint`, whose own remarks name
+`/activity-history/form-select-options`; `all-options` is `BaseGetSelectOptionsEndpoint`'s route and
+this endpoint does not derive from it. `HistoryRouteSmokeTests.HistorySelectOptionsRoute_IsRegistered`
+pins the distinction. The route takes `?includeArchived=true` — the reason that base carries a flag at
+all: an edit form still has to list the archived activity a stored row points at.
 
 ⚠ **`aggregate-by-activity` is still not the pie chart, now that the pie chart is id-keyed too.**
 It once existed because `HistoryPieChartItem` carried nothing but a display name; every group-shaped
@@ -162,7 +169,7 @@ rather than an error (`HistoryTimeOfDayDashboardTests` pins all three on values)
 | `HistoryGrouping` | Helper | The one place a dashboard group is resolved to `(Id, Name, Color)` — `HistoryGroupKey`. Every group-shaped response keys off this | `application/dashboard/HistoryGrouping.cs` |
 | `HistoryPieChartBuilder` | Helper | The whole pie-chart response after the query: grouping, the 1% threshold, the `_other` roll-up, the totals. Both `detail/` and `summary/` pie-chart endpoints call it | `application/dashboard/HistoryPieChartBuilder.cs` |
 | `HistorySummaryCardsBuilder` | Helper | The whole summary-cards response after the queries: top-N cards, baseline comparison, period-over-period total. Both `detail/` and `summary/` summary-cards endpoints call it | `application/dashboard/HistorySummaryCardsBuilder.cs` |
-| `HistoryBaselineWindow` | Helper | Resolves the request's `baseline` string to the range the baseline query runs over, plus the `sameWeekday` filter and the day count the average divides by | `application/dashboard/HistoryBaselineWindow.cs` |
+| `HistoryBaselineWindow` | Helper | Resolves the request's `HistoryBaseline` to the range the baseline query runs over, plus the `sameWeekday` filter and the day count the average divides by. Both switches are **exhaustive and throw** on an unhandled member — there is no fallback-to-`last7days` arm | `application/dashboard/HistoryBaselineWindow.cs` |
 | `TimerBoundaryAlarmService` | Service | `ReplaceSessionAsync` / cancel-by-session / fire; owns the Scheduler `RunOnceAt` registration. Implements `ITimerBoundaryAlarmService` | `application/service/TimerBoundaryAlarmService.cs` |
 | `ITimerBoundaryAlarmService` | Contract | The service's port, so the endpoints and the registrar depend on the shape rather than the class | `domain/serviceContract/ITimerBoundaryAlarmService.cs` |
 | `TimerBoundaryAlarmJobHandler` | Job handler | Fires one alarm: resolves the activity name, pushes the notification, then **deletes the row** (self-drain). No-op if the row is gone | `application/job/TimerBoundaryAlarmJobHandler.cs` |
@@ -173,10 +180,12 @@ rather than an error (`HistoryTimeOfDayDashboardTests` pins all three on values)
 | `ActivityHistoryReferencedIds` | Helper | The create/update ownership check over the three client-supplied ids. Needs the request scope and the principal, which is why it is not in the validator | `application/endpoint/command/ActivityHistoryReferencedIds.cs` |
 | `ActivityHistoryValidator` | Validator | Create/update rules, incl. the mutual exclusion of `TodoListItemId` and `RoutineTodoListId` | `application/validator/ActivityHistoryValidator.cs` |
 | `HistorySummaryDateRangeValidators` | Validators | One concrete class per `summary/` request type. FastEndpoints resolves validators by **exact type** and skips validation silently without one — that is why these are four classes, not one generic | `application/validator/HistorySummaryDateRangeValidators.cs` |
+| `HistoryDetailSummaryCardsRequestValidator` | Validator | The only validator on a `detail/` request: `Baseline` must be a defined `HistoryBaseline`. It deliberately does not restate the range rules — the `detail/` requests carry a `DateAndTimeRangeDto` and are otherwise unvalidated | `application/validator/HistoryDetailSummaryCardsRequestValidator.cs` |
 | `CalendarActivityRequestValidator` | Validator | The calendar dashboard's range rules. `CalendarActivityRequest` carries no `DateRangeDto`, so it restates ordered ends, the `MaxCustomRangeDays` span cap and a bounded `TopN` itself | `application/validator/CalendarActivityRequestValidator.cs` |
 | `ActivityHistoryAggregateByActivityValidator` · `ScheduleTimerAlarmsValidator` | Validators | The aggregate request; the alarm batch (relative `Url`, boundary sanity) | `application/validator/` |
 | `ActivityHistorySeeder` | Dev seeder | Per-user dev fixture, Order **300**. Seeds 30 days of history; truncates (dev seeders only) | `infrastructure/persistence/seeder/dev/ActivityHistorySeeder.cs` |
 | `HistoryGroupBy` | Enum | The dashboard grouping dimension (activity / role / category) | `application/dto/enum/HistoryGroupBy.cs` |
+| `HistoryBaseline` | Enum | What a summary card is compared against (`Last7Days` / `Last30Days` / `SameWeekday` / `AllTime`). Was a `string` with a silent fallback; an unknown value is now a 400, not a wrong-but-plausible 200 | `application/dto/enum/HistoryBaseline.cs` |
 
 DTOs are not listed individually — `application/dto/` mirrors the endpoint tree
 (`request/dashboard/{detail,summary}/`, `response/dashboard/`, `filter/`), so the endpoint's file path
@@ -248,9 +257,11 @@ point: **Tracking** writes through Core's `IActivityTimeAttributionSink` (implem
 `PlannerSuggestionFromActivityHistory` — the keyless entity over the materialized view, which Planning
 owns. Neither names `ActivityHistory`.
 
-### The membership seam
+### The membership seam — declared, implemented, unconsumed
 
-The four grid filters that used to reach into TodoLists and Routines:
+The four filters that used to reach into TodoLists and Routines. They lived on the `gird` grid, which
+`CQ-1` deleted, so **nothing consumes this seam today**; the sources stay registered and guarded for
+the next consumer:
 
 | Filter field | Source key | Facet |
 |---|---|---|
@@ -258,8 +269,8 @@ The four grid filters that used to reach into TodoLists and Routines:
 | `IsFromRoutineTodoList` | `ActivityMembershipSourceKeys.RoutineTodoList` | `RoutineTimePeriodId` |
 
 ```
-History  ──consumes──►  IActivityMembershipSource  ◄──implements──  TodoLists
-   (Core)                        (Core)                             Routines
+(no consumer)  ──►  IActivityMembershipSource  ◄──implements──  TodoLists
+                            (Core)                              Routines
 ```
 
 Neither side references the other. See `summary.md` → "The membership seam" before touching it, and

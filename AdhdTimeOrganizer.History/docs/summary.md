@@ -1,7 +1,7 @@
 # AdhdTimeOrganizer.History — Agent Summary
 
 **Purpose:** The activity-history slice. Owns the `ActivityHistory` entity, its CRUD/read endpoints,
-the paginated grid, the seven dashboard endpoints (three `HistoryDetail*`, four `HistorySummary*`), and
+the seven dashboard endpoints (three `HistoryDetail*`, four `HistorySummary*`), and
 the timer-boundary alarms.
 
 **Third project of the portal split**, after `AdhdTimeOrganizer.Core` and
@@ -77,7 +77,9 @@ Things that are load-bearing and not obvious:
   `ScheduleSpec.RunOnceAt` is a real trigger on the exact instant. The cost is one live trigger per
   boundary — the thing Reminders refuses to do — which is fine here and would not be at thousands of
   concurrent timers. Reminders' register endpoint is Admin/Root-only diagnostic surface besides; users get
-  this slice's own endpoint, the same split `Planning.ReminderRegistrationService` makes.
+  this slice's own endpoint, the same split `Planning.ReminderRegistrationService` makes. Neither
+  timer-alarm endpoint narrows `AllowedRoles()` — **User + Admin + Root by default, deliberately**: a timer
+  is ordinary user surface, and that is the whole contrast with Reminders' Admin/Root-only register route.
 - **`TimerBoundaryAlarmRegistrar` is not optional.** The Quartz job store is in-memory (deliberate, see
   `SchedulerQuartzConfig`), so a restart loses *every* trigger and there is no generic reconciliation. Each
   owner re-pushes on boot. Drop this hosted service and nothing breaks at build time, nothing throws, and
@@ -85,7 +87,13 @@ Things that are load-bearing and not obvious:
   job key is derived from the row id (reschedules in place) and the run-log dedup, which survives the
   restart, recognises an already-fired instant.
 - **`dueAt` is an absolute instant, scheduled verbatim.** It was computed from the client's own clock;
-  re-deriving it from a duration against the server clock puts the two clocks' skew into the alarm.
+  re-deriving it from a duration against the server clock puts the two clocks' skew into the alarm. It must
+  carry an offset on the wire (a trailing `Z` is the usual one) — the validator rejects an offset-less
+  instant rather than reading it as server-local, which is what it silently did before.
+- **`schedule` replaces, but not atomically.** `ReplaceSessionAsync` deletes the old rows in one save and
+  writes the new ones in another, so two concurrent POSTs for one session can interleave. Left that way on
+  purpose: the cost is a duplicate push under the same `Tag`, which the client's own tag replacement
+  collapses, and a transaction would have to span a Scheduler call.
 - **The table self-drains** — deleted on fire, on cancel, and by the registrar's stale sweep — which is why
   it has no retention job and no `FiredAt` column. Rows live minutes. That is also why `ActivityId` is a
   plain column with no FK: an orphan degrades to a name-less body and is gone within the hour.
@@ -116,21 +124,25 @@ renderer that reads them is in the Notification module, which cannot see a slice
   **Nothing else** — in particular *not* `AdhdTimeOrganizer.TodoLists` and not the host.
 - **Referenced by:** `AdhdTimeOrganizer` (the host) and the integration test project.
 
-### ⚠ The membership seam — the one thing not to undo
+### ⚠ The membership seam — no consumer today, still not to undo
 
-The grid filters on to-do / routine membership (`IsFromTodoList`, `TaskPriorityId`,
+The deleted `gird` grid filtered on to-do / routine membership (`IsFromTodoList`, `TaskPriorityId`,
 `IsFromRoutineTodoList`, `RoutineTimePeriodId`). It used to do that by querying
 `dbContext.TodoListItems` / `dbContext.RoutineTodoLists` directly, which made History depend on
 TodoLists *and* Routines and forced a fixed extraction order across three slices.
 
-It now goes through **`IActivityMembershipSource`** (`AdhdTimeOrganizer.Core/application/seam/`):
+That was rewritten onto **`IActivityMembershipSource`** (`AdhdTimeOrganizer.Core/application/seam/`),
+and then the grid itself was deleted (`CQ-1`) because no client ever called it. **So this slice
+consumes the seam nowhere today** — the interface, the two sources and the guards over them are kept
+for the next consumer, and the pattern below is still the one to copy:
 
 - Core declares the interface and the key constants (`ActivityMembershipSourceKeys`).
 - The owning slice implements it — `TodoListActivityMembershipSource` in
   `AdhdTimeOrganizer.TodoLists`, `RoutineTodoListActivityMembershipSource` in
   `AdhdTimeOrganizer.Routines` (it moved there with the entity; nothing on this side changed, which
   is the seam working as intended).
-- History consumes `IEnumerable<IActivityMembershipSource>` and matches on `Key`.
+- The consumer resolves `IEnumerable<IActivityMembershipSource>` and matches on `Key`. History was
+  that consumer until the grid went; nothing consumes it now.
 
 Each source returns a **composable** `IQueryable<long>` of activity ids, so `ids.Contains(...)`
 renders as `IN (SELECT …)` — the same plan the hand-written `EXISTS` subqueries produced. Do not
@@ -139,17 +151,19 @@ materialize it, and do not "simplify" the seam back into a direct
 without.
 
 A source resolved by string key fails **silently** when it is missing or misregistered — no build
-error, no exception, the filter just stops narrowing.
-`HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam` is what catches that; keep it.
+error, no exception, the filter just stops narrowing. `SeamWiringTests` is what catches that — the
+key-coverage guards plus `TodoListMembershipSource_NarrowsToActivitiesOnAList`, which asserts on rows
+rather than on registration. Keep them; they are the only thing holding the seam correct while it has
+no consumer to notice.
 
 ### The ownership seam — the same trick, on the write path
 
 `ActivityHistoryRequest` carries three ids the client chooses and the server does not:
 `ActivityId`, `TodoListItemId`, `RoutineTodoListId`. **Nothing but the endpoint can check them** —
 the row's `UserId` is stamped server-side, so a request naming a stranger's id inserts a perfectly
-valid row *of the caller's own* that points at somebody else's, and the caller's grid then throws on
-every read of that date group (the global filter empties the `Activity` include and the projection
-materializes a non-nullable `Id` off the null).
+valid row *of the caller's own* that points at somebody else's, and the caller's own list reads then
+throw on it (the global filter empties the `Activity` include and the projection materializes a
+non-nullable `Id` off the null).
 
 `Create`/`UpdateActivityHistoryEndpoint` check all three in `BeforeMapping` through Core's
 `IReferencedIdOwnershipService`: `Activity` directly, the two item ids through
@@ -184,8 +198,12 @@ Archived activities pass; archival is not ownership. Guarded by
   fails with 42P01. The app installs them via `SuggestionPatternViewInstaller` (embedded resources);
   the test fixture applies `sqlScripts/*.sql` in `AppDbContextFixture.OnSchemaCreatedAsync`. If
   history tests start failing with 42P01, that plumbing is what broke — not this slice.
-- **The grid route is `/activity-history/gird`.** The typo is in the shipped contract
-  (`EndpointPath => "gird"`); the SPA calls it that way. Do not "fix" it without changing the SPA.
+- **There is no grid endpoint.** `/activity-history/gird` (`GetFilteredTableActivityHistoryEndpoint`)
+  was deleted with `CQ-1`: it ignored the `ItemsPerPage`/`Page`/`SortBy` its own request declared
+  `required`, returned the caller's entire ledger on every call — and **no client ever called it**.
+  The SPA's only list read is `POST /activity-history/filter`. The doc note that used to sit here,
+  "the SPA calls it that way, do not fix the typo", was simply wrong: `gird` appears nowhere in the
+  frontend repo. The to-do / routine membership filters went with it and exist on no endpoint today.
 - **Four registration sites, none of which break the build if missed:** FastEndpoints `o.Assemblies`
   in `Program.cs` (miss → routes 404), `ModuleAssemblies` in `ModuleServiceExtensions` (miss → the
   seeder is registered by the AppDomain sweep instead; being in *both* registers it twice),

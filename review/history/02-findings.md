@@ -167,7 +167,7 @@ invariant today covers reads only, and states nothing about ids arriving on a wr
 
 ## 6. Code quality
 
-### `CQ-1` 🟠 · The grid ignores paging and sorting, both of which its request declares `required`
+### `CQ-1` 🟠 ✅ FIXED 2026-09-02 · The grid ignores paging and sorting, both of which its request declares `required`
 
 `application/endpoint/query/GetFilteredTableActivityHistoryEndpoint.cs:37-57`
 
@@ -190,6 +190,31 @@ the request and cap the range instead. Either way apply `SortBy`, since the SPA 
 
 `Doc impact: domain-map.md → Endpoints` (the `gird` row should say what the response actually pages by,
 and `summary.md`'s grid note should stop implying a paginated grid).
+
+**Fixed — the endpoint is deleted, not paged.** The premise the finding (and `docs/summary.md:187`,
+`domain-map.md:102`, `_SHARED-CONTEXT.md` and this prompt set) all rested on — *"`gird` is the shipped
+path and the SPA calls it that way"* — is **false**. `grep -ri gird` over the whole frontend repo
+(`AntiProcrastinationApp-frontend`, excluding `node_modules`/`dist`) returns **zero hits**; the SPA's
+only history list read is `POST /activity-history/filter` (`historyDashboardApi.ts:81`,
+`getDetailTimeline`). Nothing else in the solution posts to it either. So there was no contract to
+decide and no client to migrate: `GetFilteredTableActivityHistoryEndpoint`,
+`ActivityHistoryListGroupedByDateResponse` and `ActivityHistoryFilterRequest` are gone, which closes
+`CQ-1`, `PERF-1` and the grid half of `DOC-2` outright, and retires `MIG-2`.
+
+Two things went with it and are worth knowing:
+
+- **The to-do / routine membership filters** (`IsFromTodoList`, `IsFromRoutineTodoList` + facets) lived
+  only on this endpoint, so they now exist on no route. That leaves Core's `IActivityMembershipSource`
+  with **no consumer at all** — the interface and both sources are kept (they are the reference shape
+  for inverting a slice→slice read) and their behaviour is now pinned directly on the source by
+  `SeamWiringTests.TodoListMembershipSource_NarrowsToActivitiesOnAList`, which replaces
+  `HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam`. Deleting the seam too is a
+  separate call, deliberately not made here.
+- **`ActivityHistoryGetFilteredTableTests.GetFilteredTable_ExcludesOtherUsersHistory`** is gone with its
+  endpoint; the equivalent assertion on `/filter`
+  (`ActivityHistoryFilterTests.Filter_ExcludesOtherUsersHistory`) already existed and remains.
+
+`TEST-1` / `GridPaginationAndSorting.md` is therefore withdrawn rather than written.
 
 ### `CQ-2` 🟠 ✅ FIXED 2026-09-02 · The detail and summary dashboards are duplicated, not shared
 
@@ -361,7 +386,7 @@ the baseline query and `allTime`'s day count), the unused `baselineFrom` paramet
 
 `Doc impact: none`
 
-### `CQ-7` 🟡 · `Baseline` is a magic string with a silent fallback
+### `CQ-7` 🟡 ✅ FIXED 2026-09-02 · `Baseline` is a magic string with a silent fallback
 
 `application/dto/request/dashboard/summary/HistorySummarySummaryCardsRequest.cs:5` ·
 both endpoints' `ComputeBaselineRange` / `ComputeBaselineDays` `switch`
@@ -376,20 +401,39 @@ the two `switch`es become exhaustive over it. Combine with `CQ-2`.
 
 `Doc impact: domain-map.md → Navigation index` (`HistoryGroupBy` row becomes two enums).
 
-### `CQ-8` 🟡 · No `AsNoTracking()` on any dashboard read
+**Fixed:** `application/dto/enum/HistoryBaseline.cs` (`Last7Days` / `Last30Days` / `SameWeekday` /
+`AllTime`); both requests now carry it, defaulted to `Last7Days`. `HistoryBaselineWindow.Resolve` and
+`DayCount` are exhaustive over the enum and **throw** on an unhandled member instead of falling back to
+7 days. `IsInEnum()` is on `HistorySummarySummaryCardsRequestValidator` and on a new
+`HistoryDetailSummaryCardsRequestValidator` (the first validator on a `detail/` request — it covers
+`Baseline` only and says so, rather than half-fixing the range gap). Wire compatibility holds:
+`JsonStringEnumConverter` matches member names case-insensitively, so `"last7days"` / `"sameWeekday"` /
+`"allTime"` bind unchanged. `HistorySummaryCardsBaselineTests.UnknownBaseline_IsRefused` pins the 400 on
+both routes; its resolver theory now takes the enum, so the "made-up value" case is gone by construction.
+Whitespace is deliberately not asserted — `Enum.TryParse` trims, so `"last30Days "` resolves to the
+member the caller meant, which is leniency rather than a wrong baseline. Nav index updated.
+
+### `CQ-8` 🟡 ✅ FIXED 2026-09-02 · No `AsNoTracking()` on any dashboard read
 
 All seven dashboard endpoints plus `CalendarActivityEndpoint` materialize entities (with `Include`s)
-into the change tracker for a pure read. The grid gets it right (`…gird:41`), and the two projecting
+into the change tracker for a pure read. The deleted grid got it right, and the two projecting
 reads (`time-of-day`, `aggregate-by-activity`) avoid it by projecting. See `PERF-3`.
 
 `Doc impact: none`
 
-### `CQ-9` 🟡 · Sync database call inside an async seeder
+**Fixed:** `AsNoTracking()` on all nine materializing reads — `CalendarActivityEndpoint`, both
+pie-chart and both stacked-bars endpoints, and all three queries in each summary-cards endpoint
+(current, baseline, previous). The two projecting reads are left alone: a projection is never tracked,
+so the call would be noise. `PERF-3` closes with this.
+
+### `CQ-9` 🟡 ✅ FIXED 2026-09-02 · Sync database call inside an async seeder
 
 `infrastructure/persistence/seeder/dev/ActivityHistorySeeder.cs:25-27` — `dbContext.Set<Activity>()…
 .ToList()` inside `async Task SeedForUser`. Dev-only and harmless in practice; `ToListAsync` is one word.
 
 `Doc impact: none`
+
+**Fixed:** `await … .ToListAsync()`.
 
 ### `CQ-10` 🟡 · `FilterActivityHistoryEndpoint` overrides `ApplyUserScoping` to do something else
 
@@ -428,7 +472,7 @@ promise.
 `Doc impact: domain-map.md → Endpoints` (state which timestamp `filter` bounds on, whichever way it
 lands).
 
-### `CQ-12` 🟡 · `ReplaceSessionAsync` is two transactions and a lost-update window
+### `CQ-12` 🟡 ✅ NOTED 2026-09-02 · `ReplaceSessionAsync` is two transactions and a lost-update window
 
 `application/service/TimerBoundaryAlarmService.cs:50-77`
 
@@ -442,15 +486,19 @@ doesn't assume atomicity.
 
 `Doc impact: summary.md → Timer-boundary alarms` (one line: replace is not atomic; the tag absorbs it).
 
+**Noted, not changed:** `ReplaceSessionAsync`'s remarks now say the two saves are not one unit, why it
+is left that way (the transaction would have to span a Scheduler call) and what absorbs the collision
+(the client's own `Tag` replacement). `summary.md` carries the same line.
+
 ---
 
 ## 9. Performance hotspots
 
 | Where | Issue | Impact | Mitigation | ID |
 |---|---|---|---|---|
-| `GetFilteredTableActivityHistoryEndpoint:37-57` | Unpaginated: the caller's whole ledger, `Activity`+`Role`+`Category` joined, materialized and grouped per request | Grows without bound — a two-year user is tens of thousands of rows and a multi-MB JSON body on every grid open | Page it, or bound the range (`CQ-1`) | `PERF-1` |
+| ~~`GetFilteredTableActivityHistoryEndpoint:37-57`~~ ✅ **RESOLVED 2026-09-02** | Unpaginated: the caller's whole ledger, `Activity`+`Role`+`Category` joined, materialized and grouped per request | Grows without bound — a two-year user is tens of thousands of rows and a multi-MB JSON body on every grid open | Endpoint deleted with `CQ-1` — no client ever called it | `PERF-1` |
 | Five dashboards (`summary/pie-chart`, `summary/stacked-bars`, both `summary-cards`, `detail/*`) | Whole entity graphs materialized, then grouped in memory, because `IntTime` is behind a converter and `TotalSeconds` will not translate | A `Year` range × three roundtrips (current + baseline + previous) on summary-cards; the joins are read and thrown away except for name/colour | Project instead of `Include`: `Select(ah => new { ah.Length, ah.StartTimestamp, ah.ActivityId, ah.Activity.RoleId, ah.Activity.Role.Name, … })`. `time-of-day` and `aggregate-by-activity` already do exactly this and say why | `PERF-2` |
-| All dashboards + calendar | No `AsNoTracking()` — every read builds change-tracker entries and identity-map fixup for entities that are discarded | Allocation and CPU proportional to rows; nothing is ever saved on these paths | Add `AsNoTracking()` (moot for rows that become projections under `PERF-2`) | `PERF-3` |
+| All dashboards + calendar | No `AsNoTracking()` — every read builds change-tracker entries and identity-map fixup for entities that are discarded | Allocation and CPU proportional to rows; nothing is ever saved on these paths | ✅ **FIXED 2026-09-02** — `AsNoTracking()` on all nine materializing reads (`CQ-8`); moot for rows that become projections under `PERF-2` | `PERF-3` |
 | `CalendarActivityEndpoint:28-32` | Unbounded date range (`SEC-3`) with two joins, materialized, then grouped and `Take(TopN)` in memory | A decade-wide request is a full table scan of the user's history | Validator cap + project only `(StartTimestamp, Length, Activity.RoleId, Role.Name, Role.Color)` | `PERF-4` |
 | `HistorySummarySummaryCardsEndpoint:52,103` (and detail twin) | Three sequential full reads per request; `baseline: "alltime"` is unbounded below | 3× latency; `alltime` reads the entire ledger to divide by a day count | Once `CQ-4` drops the sentinel, `alltime` can be a single grouped aggregate; the `previous` read only needs `Length` (no includes — it already has none, good) | `PERF-5` |
 | `TimerBoundaryAlarmRegistrar:43` | `Set<TimerBoundaryAlarm>().ToListAsync()` — every pending alarm for every user, unbatched, at boot | Fine today (the table self-drains, rows live minutes) and correctly indexed on `BoundaryAt`; would be a boot stall only if the self-drain ever broke | Note only. If a retention path is ever added, batch this | `PERF-6` |
@@ -478,7 +526,7 @@ out of scope here, noted for whoever audits index bloat.
 
 ## Code/doc drift
 
-### `DOC-1` 🟠 · The endpoint table names a route that does not exist
+### `DOC-1` 🟠 ✅ FIXED 2026-09-02 · The endpoint table names a route that does not exist
 
 `docs/domain-map.md:87` lists `/activity-history/all-options` → `query/FormSelectOptionsActivityHistoryEndpoint`.
 
@@ -495,6 +543,11 @@ the reason that base takes a flag at all and which this route is the motivating 
 
 `Doc impact: domain-map.md → Endpoints (the all-options row → form-select-options, + includeArchived)`
 
+**Fixed:** the row now reads `/activity-history/form-select-options?includeArchived=`, and a ⚠ note
+beside it names the two bases that own the two routes, points at the smoke test that pins the
+distinction, and says why the flag exists (an edit form must still list the archived activity a stored
+row points at).
+
 ### `DOC-2` 🟠 · The Timezone invariant says "every dashboard"; two surfaces fold in UTC
 
 `docs/domain-map.md:194` ("Every dashboard folds and bounds its range in `User.Timezone`, never UTC")
@@ -506,8 +559,9 @@ dashboard table, yet it bounds its range at **UTC** midnights (`ToDateTime(TimeO
 DateTimeKind.Utc)`) and buckets rows by `DateOnly.FromDateTime(ah.StartTimestamp)` — the UTC date. For a
 user at UTC+2, an 01:00 local session lands on the previous day's calendar cell; at UTC−5 an evening
 session lands on the next one. It never resolves `IUserTimeZoneResolver` at all, and it is the only
-dashboard that doesn't inject it. The grid has the same UTC-date grouping at line 49
-(`hr.StartTimestamp.ToUniversalTime().Date`), so a user's day breaks in the list view too.
+dashboard that doesn't inject it. The grid had the same UTC-date grouping at line 49
+(`hr.StartTimestamp.ToUniversalTime().Date`) — that half is now moot: the grid endpoint was deleted with
+`CQ-1`, so **only `CalendarActivityEndpoint` remains to fix here**.
 
 **The code is wrong, on both.** The invariant is right and the rest of the slice already honours it;
 `CalendarActivityEndpoint` predates the zone work (it moved in from the host with the Planning
@@ -518,10 +572,10 @@ Note the knock-on: the days come from `ICalendarDayLookup` keyed by `DateOnly`, 
 history into the *user's* date to line up with the calendar rows it is joined against — using UTC on one
 side and the user's calendar on the other is what makes the mismatch invisible.
 
-`Doc impact: domain-map.md → Invariants (Timezone)` — once fixed, add the calendar and the grid to
+`Doc impact: domain-map.md → Invariants (Timezone)` — once fixed, add the calendar to
 `HistoryDashboardUserZoneTests`' guard row in `docs/testing.md`.
 
-### `DOC-3` 🟡 · The aggregate endpoint's summary describes a pie chart that no longer exists
+### `DOC-3` 🟡 ✅ FIXED 2026-09-02 · The aggregate endpoint's summary describes a pie chart that no longer exists
 
 `application/endpoint/query/AggregateByActivityActivityHistoryEndpoint.cs:10-14`: *"Exists because the
 pie-chart dashboard endpoint groups by activity **name**, and names are not unique."*
@@ -534,7 +588,11 @@ Replace the class summary with the two real reasons; the current one invites del
 
 `Doc impact: none` (doc is already correct — fix the code comment).
 
-### `DOC-4` 🟡 · `summary.md` implies the alarm endpoints are the only user-facing scheduling surface
+**Fixed:** the class summary now records that the name-uniqueness reason is dead (every group-shaped
+response carries `groupId`) and states the two live ones — it spans all history with no date range, and
+it omits ids with no rows rather than returning zeros — with a pointer to *Group identity*.
+
+### `DOC-4` 🟡 ✅ FIXED 2026-09-02 · `summary.md` implies the alarm endpoints are the only user-facing scheduling surface
 
 `summary.md:79-80` contrasts this slice's endpoint with Reminders' Admin/Root-only register endpoint.
 Accurate, but neither timer-alarm endpoint declares `AllowedRoles()` — they inherit the default
@@ -543,24 +601,32 @@ a deliberate choice rather than an omission.
 
 `Doc impact: summary.md → Timer-boundary alarms` (one clause).
 
+**Fixed:** the Scheduler-vs-Reminders bullet now ends by saying neither timer-alarm endpoint narrows
+`AllowedRoles()` — User + Admin + Root by default, deliberately — so the contrast with Reminders'
+Admin/Root-only register route reads as a choice rather than an omission.
+
 ---
 
 ## 🟡 Nits appendix
 
-- `GetFilteredTableActivityHistoryEndpoint:19` — `public virtual string EndpointPath => "gird"` is
-  `virtual` with no subclass anywhere. Harmless, but it advertises an extension point that isn't one.
-- `HistoryDetailPieChartEndpoint:51-52,61-67,87` retains scaffolding comments (`// Always use 1%
-  threshold`, `// No data, return empty list`) that its summary twin already dropped — a small tell for
-  which of the two duplicates was edited last, and an argument for `CQ-2`.
-- `ActivityHistory.EndTimestamp` is a plain `DateTime` set from `StartTimestamp + Length` in
-  `ToEntity` and left *unchanged* by `UpdateEntity` (which writes `StartTimestamp` and `Length`). So an
-  edit that shortens a recording leaves a stale `EndTimestamp`, and the attribution sink's
-  contiguous-window probe (`EndTimestamp == windowStart`) reads it. Small, real, and the only place the
-  three fields can disagree — either recompute it in `UpdateEntity` or make it computed.
-- `ScheduleTimerAlarmsValidator:49` — `at.ToUniversalTime()` on an `Unspecified`-kind `DateTime` treats it
-  as local server time. The service later force-labels the same value UTC (`SpecifyKind`), so a client
-  posting an unsuffixed instant is validated against one interpretation and stored under another. Both
-  are wrong for a non-UTC server; require the `Z` (or `DateTimeOffset`) instead.
-- `CalendarActivityEndpoint:53` — `Color = g.First().Activity.Role.Color ?? ""` silently converts a null
-  colour to empty string here while every other group-shaped response passes `null` through. Minor
-  client-side inconsistency.
+- ✅ **Moot.** `HistoryDetailPieChartEndpoint:51-52,61-67,87` retained scaffolding comments (`// Always
+  use 1% threshold`, `// No data, return empty list`) that its summary twin had dropped. `CQ-2` deleted
+  both bodies in favour of `HistoryPieChartBuilder`; there is nothing left to diverge.
+- ✅ **FIXED 2026-09-02.** `ActivityHistory.EndTimestamp` is a plain `DateTime` set from `StartTimestamp
+  + Length` in `ToEntity` and was left *unchanged* by `UpdateEntity` (which writes `StartTimestamp` and
+  `Length`), so an edit that shortened a recording left a stale `EndTimestamp` — which the attribution
+  sink's contiguous-window probe (`EndTimestamp == windowStart`) reads. `UpdateEntity` now recomputes it
+  from the two fields it writes, with a comment saying why it is not optional.
+- ✅ **FIXED 2026-09-02.** `ScheduleTimerAlarmsValidator:49` — `at.ToUniversalTime()` on an
+  `Unspecified`-kind `DateTime` read it as *server local* time while the service force-labelled the same
+  value UTC (`SpecifyKind`), so an unsuffixed instant was validated under one interpretation and stored
+  under another. The validator now rejects an `Unspecified` kind outright (`Cascade(Stop)`, so the
+  horizon rule does not also fire on it), **and** `ReplaceSessionAsync` normalizes with
+  `ToUniversalTime()` before the past-boundary cutoff comparison instead of relabelling with
+  `SpecifyKind` afterwards — relabelling an offset-carrying instant moves it. ⚠ This tightens the wire
+  contract: a client posting `boundaryAt` without an offset now gets a 400. Nothing in this repo sends
+  one (the SPA is not here), and the integration tests post UTC-kinded instants, which serialize with a
+  trailing `Z`.
+- ✅ **FIXED 2026-09-02.** `CalendarActivityEndpoint:53` — `Color = … ?? ""` flattened a null colour to
+  an empty string while every other group-shaped response passes `null` through. `CalendarTopRoleItem.Color`
+  is now `string?` and the colour is passed through.
