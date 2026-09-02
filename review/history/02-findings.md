@@ -14,6 +14,14 @@ strict-UTC rule for `timestamp with time zone` parameters. That rule is in force
 confirms `activity_history.start_timestamp` is `timestamp with time zone`, and nothing in the solution
 sets `Npgsql.EnableLegacyTimestampBehavior`. Each has a one-line test in its prompt file that settles it.
 
+> **Correction, 2026-09-02.** The last sentence of that paragraph was wrong in a way that matters, and
+> the error was load-bearing for how both findings were rated. `Npgsql.EnableLegacyTimestampBehavior`
+> *is* set — not by the host, but by `Sydowwe.Framework.Testing.PostgresContainerFixture`'s static
+> constructor, which means **every integration test in this solution runs under timestamp semantics
+> production does not have**, and no round-trip test here could have settled either finding. Both are
+> now confirmed by running the suite with the switch off: `CQ-4` and `CQ-5` are real, and the same run
+> surfaced two further production defects nobody had found. Written up as `INFRA-1` in `01-testing.md`.
+
 ---
 
 ## 5. Security & authorization

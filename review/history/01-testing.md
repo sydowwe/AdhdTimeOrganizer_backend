@@ -19,11 +19,112 @@ id. Two slice-specific setup facts: `AppDbContextFixture.OnSchemaCreatedAsync` i
 fixture user's `Timezone` is **UTC**, so any test that means to prove a user-zone fold must seed its
 own non-UTC user.
 
-Nothing bespoke or fragile in the harness itself. The one structural fragility is *ownership of
-coverage*: eight history suites all seed their own users/activities through near-identical private
-helpers (`HistoryCrudAuthMatrixTests`'s `file static class Seed`, `HistoryRouteSmokeTests`'s
-`SeedActivityAsync`, `TimerBoundaryAlarmTests`'s own), so a change to the seeding shape has eight
-copies to chase. Not worth consolidating today — each is short — but note it before adding a ninth.
+~~Nothing bespoke or fragile in the harness itself.~~ **Superseded by `INFRA-1` below**, added 2026-09-02
+while fixing `CQ-4`: the harness sets one `AppContext` switch that the host does not, and it is currently
+hiding three separate production defects. The rest of this paragraph stands. The one *other* structural
+fragility is *ownership of coverage*: eight history suites all seed their own users/activities through
+near-identical private helpers (`HistoryCrudAuthMatrixTests`'s `file static class Seed`,
+`HistoryRouteSmokeTests`'s `SeedActivityAsync`, `TimerBoundaryAlarmTests`'s own), so a change to the
+seeding shape has eight copies to chase. Not worth consolidating today — each is short — but note it
+before adding a ninth.
+
+## Test-harness integrity
+
+`INFRA-n` rather than `TEST-n` on purpose. A `TEST-n` is a gap — a rule nothing asserts, closed by
+writing a test. The finding below is the opposite failure: tests that *do* run, *do* pass, and prove
+less than they appear to. Closing it means changing the harness, and until it is closed, adding
+`TEST-n` coverage in the affected area buys less than the matrix in § 8 implies.
+
+### `INFRA-1` 🔴 · The test harness enables `Npgsql.EnableLegacyTimestampBehavior`; the host does not
+
+`framework/Sydowwe.Framework.Testing/PostgresContainerFixture.cs:26` (submodule)
+
+```csharp
+static PostgresContainerFixture()
+{
+    AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+```
+
+This is the **only** occurrence of that switch in the solution. `Program.cs` does not set it, and no
+`appsettings*.json` or launch profile does either — so every integration test in this repo runs under
+`DateTime`/`DateTimeOffset` semantics that production does not have. Legacy mode accepts an
+`Unspecified`- or `Local`-kind `DateTime`, and a `DateTimeOffset` with a non-zero offset, at a
+`timestamptz` parameter; strict mode — what the deployed app runs — throws `ArgumentException` on all
+three. The switch is process-wide and set in a static constructor, so it applies to every suite in the
+assembly regardless of which fixture a test uses.
+
+**The consequence is not "some tests are weak".** It is that *no round-trip test in this repo can fail
+on a parameter-kind bug*, which is a defect class this codebase produces steadily: it is timezone-heavy
+(`WallClockZone`, per-user `TimeZoneInfo`, quiet hours, DST cases) and every dashboard, ledger and
+notification column is `timestamptz`. `CQ-4` is one instance; the review flagged it and `CQ-5` as
+**PLAUSIBLE** precisely because it could not tell whether the rule was in force, and the preamble to
+`02-findings.md` reasoned "nothing in the solution sets `EnableLegacyTimestampBehavior`" — true of the
+host, false of the harness that would have had to catch them.
+
+**Measured, not argued.** Flipping the switch to `false` and running the full suite unchanged:
+
+| | Switch on (today) | Switch off |
+|---|---|---|
+| Result | 1626 total, **0 failed**, 144 skipped | 1626 total, **6 failed**, 144 skipped |
+
+Five of those six are **production** code throwing, not test code:
+
+| Failing test | Throws in | Kind |
+|---|---|---|
+| `ExtensionActivityTrackingTests.Heartbeat_MappedEntry_AttributesTimeAndCompletesPlannerTask` ✅ fixed | `History.ActivityHistoryTimeAttributionSink.TotalSecondsOnDayAsync:60`, via `Tracking.DesktopActivityHeartbeatEndpoint:117` → **500 on the desktop heartbeat ingest path** | `Unspecified` |
+| `TrackingDashboardDateRangeTests.ProcessDetails_ApplyTheDailyWindowToTheEnvelopeItIsOpenedWith` ✅ fixed | `Tracking.DesktopProcessDetailsEndpoint.HandleAsync:32` → **500 on `POST /api/activity-tracking/desktop/pie-chart`'s details panel** | `Local` |
+| `QuietHoursUserZoneAndLateDeliveryTests.QuietHours_AreEvaluatedInEachRecipientsOwnZone_NotOneDeploymentZone` | `Sydowwe.Notifications.NotificationService.NotifyAsync:129` (submodule) | `DateTimeOffset` `+12:00` |
+| `…DeferredUntil_IsTheWindowEndInTheRecipientsOwnZone` | same | `DateTimeOffset` `+12:00` |
+| `…QuietHoursDeferral_CrossesSpringForward_AndFlushesWebPushAndEmail` | same | `DateTimeOffset` `+02:00` |
+| `RepeatingPlannerTaskSuggestionsTests.Tier2Suppresses_Tier3` | the test's own `SeedActivityHistoryOnWeekdayAsync:198` — the one genuine test-side bug | `Unspecified` |
+
+So the switch is hiding **three distinct production defects**, only one of which the review had found:
+
+1. **`CQ-5`, now confirmed rather than plausible.** The attribution sink threw a real 500 on the desktop
+   heartbeat — a live ingest path. (Fixed in the working tree on 2026-09-02; this run predates the fix
+   and is the independent confirmation `CQ-5` asked for.)
+2. **`DesktopProcessDetailsEndpoint`** — new and unreported when this was written; **fixed 2026-09-02**.
+   `DailyWindowMaskRequest.From`/`To` are `[QueryParam] DateTime`, bound straight from the query string
+   into a `timestamptz` comparison. FastEndpoints yields `Utc` only for a `Z`-suffixed value; an
+   offset-bearing string gives `Local` and a bare one gives `Unspecified`. **Two of the three shapes a
+   client can legitimately send 500'd this endpoint**, and both details endpoints share the base.
+   Outside History's slice — belongs to Tracking's review, raised here because this is where the
+   evidence surfaced.
+
+   **Fixed:** `From`/`To` normalize on binding via a private `AsUtcInstant` (`Local` →
+   `ToUniversalTime()`, otherwise `SpecifyKind(Utc)`) — the same close every other client-supplied
+   instant here gets (`ScheduleSpec.RunAtUtc`, `AndroidSyncEndpoint`). Applied to the shared base, so
+   `domain-details` is covered by the same change. `Unspecified` reads as UTC because these two are an
+   instant envelope that `DailyWindowSet.FromEnvelope` already consumes through `WallClockZone.FromUtc`.
+   Pinned by `DailyWindowMaskRequestKindTests` — asserting on the DTO, not through a request, for the
+   reason this whole finding exists; verified by re-running
+   `TrackingDashboardDateRangeTests` with the switch off, where it now passes.
+3. **`Sydowwe.Notifications.NotificationService.NotifyAsync` persists a zoned `DateTimeOffset`.** The
+   quiet-hours deferral computes `deferredUntil` on the *recipient's* clock and saves it with that
+   offset attached. It only carries a non-zero offset when the recipient is **not** in UTC — i.e. this
+   throws for exactly the users the feature exists for, and never for the UTC fixture user. Three tests
+   written specifically to prove per-recipient zone handling all die on the write. In the submodule, so
+   fixing it is a two-repo operation.
+
+**Fix, in order.** The three defects first — they are live regardless of what the harness does. Two are
+done (`CQ-5`'s sink and the details endpoint); **the notification one is the outstanding blocker**, and
+it is the one with real user exposure. Then the harness: delete the switch. Only one test genuinely depends on it
+(`RepeatingPlannerTaskSuggestionsTests`, a one-line seeding fix), and the whole test project contains
+just **5 kind-less `new DateTime(...)` literals across 2 files**, so the cleanup is small and bounded.
+Deleting it is what makes every future round-trip test load-bearing for this defect class. Until then,
+any assertion about a `timestamptz` parameter's kind must be made **directly on the value** rather than
+through a request — see `HistorySummaryCardsBaselineTests.ResolvedBaseline_HasNoLowerBoundThatIsNotUtc`,
+which is the shape to copy, and note it is the *only* assertion in that file that fails when `CQ-4`'s
+sentinel is put back.
+
+Two smaller harness notes found alongside, neither worth its own ID: the fixture pins the host port with
+`WithPortBinding(5432, 5432)`, so one leaked container makes every subsequent run fail at
+`InitializeAsync` with `port is already allocated` rather than anything diagnostic; and it also sets
+`FIELD_ENCRYPTION_KEY` in the same static constructor, which is fine but means the constructor is now
+doing two unrelated global things and deserves a comment saying so.
+
+`Doc impact:` `docs/testing.md` should state that the harness diverges from the host here, for as long
+as it does. **`02-findings.md`'s preamble has been corrected** — it asserted the switch was set nowhere.
 
 ## 7. Test quality assessment
 
@@ -165,6 +266,12 @@ Prompts are self-contained and paste-ready for a context-less agent; all live un
 | `TEST-6` | `ActivityHistoryValidator` mutual exclusion; duplicate `(UserId, ActivityId, StartTimestamp)`; foreign `ActivityId` on create | 🟠 | [`ActivityHistoryWriteRules.md`](testingPrompts/ActivityHistoryWriteRules.md) |
 | `TEST-7` ✅ **written 2026-09-02** | `detail/stacked-bars` emits 24 windows regardless of the picked range | 🟠 | [`DetailStackedBarsWindows.md`](testingPrompts/DetailStackedBarsWindows.md) — landed in `HistoryDashboardUserZoneTests` alongside the `CQ-3` fix |
 | `TEST-8` | `UpdateEntity` must not write the two item links | 🟡 | [`UpdateKeepsItemLinks.md`](testingPrompts/UpdateKeepsItemLinks.md) |
+
+`TEST-2` ✅ **written 2026-09-02** — `HistorySummaryCardsBaselineTests` drives all four baselines on both
+summary-cards routes, landed with the `CQ-4` fix. Left in the table above rather than struck through,
+because it is the one entry whose severity was *understated*: the prompt assumed a round trip would
+catch the `alltime` 500, and `INFRA-1` shows it cannot. The suite it produced is still worth having —
+it pins what the baselines *mean* — but the kind assertion had to be made on the resolver instead.
 
 **Previously known — do not re-flag** (`docs/testing.md` → Known gaps): the registrar's boot
 re-registration, `ActivityHistorySeeder`, and the accepted residual cancel race (a tab killed between

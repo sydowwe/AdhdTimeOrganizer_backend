@@ -7,6 +7,7 @@ to the detail there and are never restated here.
 
 | # | Sev | Issue | ID | File |
 |---|---|---|---|---|
+| 0 | 🔴 | **The test harness enables `Npgsql.EnableLegacyTimestampBehavior` and the host does not**, so no round-trip test in the repo can fail on a parameter-kind bug. Running the suite with it off fails 6 tests, 5 of them production code: rows 1 and 2 below, plus a 500 on the desktop details panel and three on the notification quiet-hours path | `INFRA-1` | `framework/Sydowwe.Framework.Testing/PostgresContainerFixture.cs:26` |
 | 1 | 🔴 | `baseline: "alltime"` passes an `Unspecified`-kind `DateTime` to a `timestamptz` column → unhandled 500, in both summary-cards endpoints | `CQ-4` | `…/dashboard/{summary,detail}/History*SummaryCardsEndpoint.cs:142` |
 | 2 | 🟠 | The tracking attribution sink bounds its day with an `Unspecified` kind, a closed `MaxValue` range and UTC midnights — on a live heartbeat path with zero tests | `CQ-5` | `application/seam/ActivityHistoryTimeAttributionSink.cs:53-67` |
 | 3 | 🟠 | A timer alarm accepts any `activityId` and the job handler resolves the name unscoped → another user's activity name in the push body | `SEC-1` | `application/validator/ScheduleTimerAlarmsValidator.cs:35`, `application/job/TimerBoundaryAlarmJobHandler.cs:52` |
@@ -29,7 +30,11 @@ to the detail there and are never restated here.
 | 20 | 🟡 | `summary.md` doesn't state the alarm endpoints' role gate | `DOC-4` | `docs/summary.md:79-80` |
 
 Test gaps are ranked separately in `01-testing.md` § 12; `TEST-4` and `TEST-2` are the two that would
-have caught rows 1–2 of this table before a user did.
+have caught rows 1–2 of this table before a user did — **with the caveat `INFRA-1` adds**: as the harness
+stands, neither of them written as an ordinary round trip would have failed on the kind bug in either
+row. Row 0 is ranked above row 1 because it is the reason rows 1 and 2 reached a review rather than a
+red build, and because two of the defects it is hiding are not in this table at all (they are outside
+History's slice).
 
 ## 10. Migration / rollout risks
 
@@ -41,6 +46,8 @@ have caught rows 1–2 of this table before a user did.
 | **`SEC-4` (ownership validation) may reject data that already exists.** If any production row points at a foreign `ActivityId` / `TodoListItemId`, a new *write* check won't fix it and a new *DB constraint* would fail to apply. There is no unique/composite constraint to add here — ownership isn't expressible as an FK — so this stays app-enforced | Low | Ship the write-side check alone. Before considering anything stronger, run the read-only audit query in `ActivityHistoryWriteRules.md` to see whether such rows exist | `MIG-4` |
 | **`CQ-2` (de-duplicating the four dashboards) is the highest-churn change in this list and touches the four endpoints most covered by value-asserting tests.** That is a feature, not a risk — but only if the extraction is done *before* the behaviour fixes (`CQ-3`, `CQ-4`, `CQ-7`), not after | Medium | Order: extract shared builders → run the existing suites unchanged → then fix behaviour once, in one place | `MIG-5` |
 | **`SEC-3` (calendar range cap) can 400 a request the SPA sends today.** Unknown what range the calendar view actually asks for | Medium | Read the SPA's calendar request before picking the cap; reuse `DateRangeDto.MaxCustomRangeDays` rather than inventing a second limit | `MIG-6` |
+| **Removing the `INFRA-1` switch is a submodule change with a solution-wide blast radius, but a measured one.** Deleting it turns 0 failures into 6; one is a test-side seeding fix and the other five are production defects that must be fixed first anyway. The whole test project holds only 5 kind-less `DateTime` literals across 2 files, so there is no long tail | Low, once the five are fixed | Fix the three production defects, then delete the switch and the one seeding bug in the same submodule-first commit pair. Do **not** delete it before the fixes — it converts three latent 500s into a red build with no product change | `MIG-9` |
+| **`INFRA-1`'s notification defect is the one with real user exposure.** `NotificationService.NotifyAsync` throws for any recipient outside UTC whose delivery is deferred by quiet hours. It cannot be reproduced by the UTC fixture user, and it lives in `Sydowwe.Notifications`, so any host that takes that module has it | High for non-UTC users with quiet hours set | Fix in the submodule (`.ToUniversalTime()` at the persistence boundary, not at the policy — the offset is meaningful up to that point), push there first, then the gitlink. Check whether any rows were written under legacy semantics in a dev database before assuming the column is clean | `MIG-10` |
 | **Drift risk: there is no sandbox copy of this slice to keep in sync**, and `framework/` is a submodule. The one cross-repo hazard in scope is `CQ-5`'s companion edit to `IActivityTimeAttributionSink`'s XML — that interface lives in `AdhdTimeOrganizer.Core`, *not* in the submodule, so no two-repo dance is needed. If a fix here ever does reach `Sydowwe.Framework*`, commit and push the submodule **first**, then the gitlink | Low | Nothing to do today; noted so nobody assumes a framework edit travels with a parent push | `MIG-7` |
 | **Five silent registration sites, plus the sixth this slice added.** `Program.cs` FastEndpoints `o.Assemblies`, `ModuleAssemblies`, `ApplyHostConfigurations`, the `.sln`, and `AddHostedService<TimerBoundaryAlarmRegistrar>()`. All are assembly-anchored and currently correct; the registrar is the one nothing scans for, and dropping it loses every alarm across a restart with no error | Low, catastrophic-quiet | Unchanged from `summary.md` — but note that `TEST` coverage for the registrar is still zero (previously known), so the only thing standing between a bad refactor and silent alarm loss is the doc | `MIG-8` |
 
