@@ -55,7 +55,7 @@ live at deploy, not behind a log-only release.
 
 `Doc impact: none` (the doc is right; the code is wrong).
 
-### SEC-2 🟠 Mapping create accepts another user's `activityId` / `roleId` / `categoryId`
+### SEC-2 🟠 ✅ FIXED 2026-09-03 · Mapping create accepts another user's `activityId` / `roleId` / `categoryId`
 
 `application/dto/request/desktop/CreateTrackerDesktopMappingRequest.cs:29-43`,
 `application/dto/request/android/CreateTrackerAndroidMappingRequest.cs:23-35`,
@@ -80,10 +80,25 @@ user's name — which is why this would never be reported as a bug.
 `MoveTodoListItemEndpoint.cs:51-54` in TodoLists is the shape to copy. Better: lift it into a Framework
 helper, since this is now the third slice with the same hole.
 
-`Doc impact: domain-map.md → Invariants (add "a mapping's activity/role/category is the author's own",
-app-enforced)`
+**Fixed:** through the guard History's `SEC-4` already put in Core rather than a fourth copy —
+`IReferencedIdOwnershipService` gained `OwnsActivityRoleAsync` / `OwnsActivityCategoryAsync` beside the
+existing `OwnsActivityAsync` (roles and categories are strictly per-user, so both are a plain `UserId`
+comparison with no filter to lift). `application/endpoint/extensions/MappingTargetOwnershipExtensions.cs`
+wraps the three checks into one call and is invoked from `BeforeMapping` on
+`CreateTracker{Desktop,Android}MappingEndpoint`, so the row is never mapped, let alone added.
+`BeforeMapping` rather than `AfterMapping`: the ids are the request's, not the entity's, and rejecting
+before the insert keeps the failure off the change tracker. 404 per offending field, with the same
+message for a missing id as for a foreign one — distinguishing them makes the endpoint an existence
+oracle over another account's ids. The update DTOs carry none of the three ids (`CQ-10` is that gap),
+so create is the whole write surface today.
 
-### SEC-3 🟠 `AndroidSessionData` is never purged — the retention job covers two of the three ledgers
+Pinned by `TrackerMappingTargetOwnershipTests` (5 cases: foreign activity on both endpoints, foreign
+role + category, and an own-activity control on each so the guard cannot degrade into a blanket 404).
+
+`Doc impact: domain-map.md → Invariants (add "a mapping's activity/role/category is the author's own",
+app-enforced)` — done.
+
+### SEC-3 🟠 ✅ FIXED 2026-09-03 · `AndroidSessionData` is never purged — the retention job covers two of the three ledgers
 
 `infrastructure/jobs/PurgeExpiredActivityTrackingEntriesJobHandler.cs:42-50`
 

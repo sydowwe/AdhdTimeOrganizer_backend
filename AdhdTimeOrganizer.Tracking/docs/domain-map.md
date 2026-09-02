@@ -46,6 +46,11 @@ dashboards' comparison window (`Last7Days` / `Last30Days` / `SameWeekday` / `All
   `RoleId`/`CategoryId` (both allowed together). *DB-enforced*
   (`CK_Tracker*MappingByPattern_TargetRequired`).
 - **`IsIgnored` is `true` or `NULL`, never `false`.** *DB-enforced* (`…_IsIgnoredOnlyTrue`).
+- **A mapping's `ActivityId` / `RoleId` / `CategoryId` is the author's own.** *App-enforced* on the two
+  create endpoints (`MappingTargetOwnershipExtensions.EnsureOwnsMappingTargetsAsync` from
+  `BeforeMapping`, over Core's `IReferencedIdOwnershipService`), a 404 per offending field. The FK
+  enforces existence only, and a mapping is a standing rule — an unchecked id would attribute time to
+  another account's activity on every matching heartbeat, invisibly, because read-back is filtered.
 - **A pattern column implies its match type** (`process_name IS NULL OR process_name_match_type IS NOT
   NULL`, and the same for product name / window title / package name / app label). *DB-enforced*.
 - **One pattern per user.** *DB-enforced*, unique with `NULLS NOT DISTINCT` so two NULL process names

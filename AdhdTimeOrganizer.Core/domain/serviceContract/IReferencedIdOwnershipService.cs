@@ -38,6 +38,20 @@ public interface IReferencedIdOwnershipService
     Task<bool> OwnsActivityAsync(DbContext db, long userId, long activityId, CancellationToken ct);
 
     /// <summary>
+    /// Whether <paramref name="roleId"/> is an activity role owned by <paramref name="userId"/>.
+    /// </summary>
+    /// <remarks>
+    /// Roles are per-user with no shared rows — the three keyed ones are seeded per account — so this
+    /// is a plain ownership comparison with no filter to lift.
+    /// </remarks>
+    Task<bool> OwnsActivityRoleAsync(DbContext db, long userId, long roleId, CancellationToken ct);
+
+    /// <summary>
+    /// Whether <paramref name="categoryId"/> is an activity category owned by <paramref name="userId"/>.
+    /// </summary>
+    Task<bool> OwnsActivityCategoryAsync(DbContext db, long userId, long categoryId, CancellationToken ct);
+
+    /// <summary>
     /// Whether <paramref name="id"/> is a row of the table named by <paramref name="key"/> (a
     /// <c>UserOwnedReferenceKeys</c> constant) owned by <paramref name="userId"/>.
     /// </summary>

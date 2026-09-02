@@ -31,6 +31,14 @@ public sealed class ReferencedIdOwnershipService(IEnumerable<IUserOwnedReference
             .AnyAsync(a => a.Id == activityId && a.UserId == userId, ct);
 
     /// <inheritdoc />
+    public Task<bool> OwnsActivityRoleAsync(DbContext db, long userId, long roleId, CancellationToken ct) =>
+        db.Set<ActivityRole>().AnyAsync(r => r.Id == roleId && r.UserId == userId, ct);
+
+    /// <inheritdoc />
+    public Task<bool> OwnsActivityCategoryAsync(DbContext db, long userId, long categoryId, CancellationToken ct) =>
+        db.Set<ActivityCategory>().AnyAsync(c => c.Id == categoryId && c.UserId == userId, ct);
+
+    /// <inheritdoc />
     public async Task<bool> OwnsReferenceAsync(DbContext db, string key, long userId, long id, CancellationToken ct)
     {
         var verifier = _verifiers.FirstOrDefault(v => v.Key == key);
