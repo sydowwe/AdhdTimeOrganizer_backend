@@ -24,6 +24,7 @@ public class HistoryDetailPieChartEndpoint(DbContext db, IUserTimeZoneResolver t
         var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
 
         var records = await db.Set<ActivityHistory>()
+            .AsNoTracking()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Include(ah => ah.Activity).ThenInclude(a => a.Category)
             .Where(ah => ah.UserId == userId)

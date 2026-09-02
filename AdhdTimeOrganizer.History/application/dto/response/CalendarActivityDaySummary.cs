@@ -24,6 +24,12 @@ public record CalendarTopRoleItem
     public long RoleId { get; init; }
 
     public string RoleName { get; init; } = null!;
-    public string Color { get; init; } = null!;
+
+    /// <summary>
+    /// The role's colour, or <c>null</c> when it has none — passed through rather than flattened to
+    /// <c>""</c>, so this reads like every other group-shaped response in the slice and a client can tell
+    /// "no colour set" from "colour is the empty string".
+    /// </summary>
+    public string? Color { get; init; }
     public long TotalSeconds { get; init; }
 }

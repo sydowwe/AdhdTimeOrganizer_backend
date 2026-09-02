@@ -22,9 +22,9 @@ public class ActivityHistorySeeder(
 
     public async Task SeedForUser(long userId)
     {
-        var activities = dbContext.Set<Activity>()
+        var activities = await dbContext.Set<Activity>()
             .Where(a => a.UserId == userId)
-            .ToList();
+            .ToListAsync();
 
         if (activities.Count == 0)
         {

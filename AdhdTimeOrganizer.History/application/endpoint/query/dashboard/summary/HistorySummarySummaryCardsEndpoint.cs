@@ -27,6 +27,7 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResol
         var dayCount = (int)Math.Ceiling((to - from).TotalDays);
 
         var currentRecords = await db.Set<ActivityHistory>()
+            .AsNoTracking()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Include(ah => ah.Activity).ThenInclude(a => a.Category)
             .Where(ah => ah.UserId == userId)
@@ -36,6 +37,7 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResol
         var window = HistoryBaselineWindow.Resolve(from, fromDate, toDate, req.Baseline);
 
         var baselineQuery = db.Set<ActivityHistory>()
+            .AsNoTracking()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Include(ah => ah.Activity).ThenInclude(a => a.Category)
             .Where(ah => ah.UserId == userId);
@@ -45,6 +47,7 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResol
         var previousFrom = from.AddDays(-dayCount);
 
         var previousRecords = await db.Set<ActivityHistory>()
+            .AsNoTracking()
             .Where(ah => ah.UserId == userId)
             .Where(ah => ah.StartTimestamp >= previousFrom && ah.StartTimestamp < from)
             .ToListAsync(ct);

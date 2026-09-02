@@ -26,6 +26,7 @@ public class CalendarActivityEndpoint(DbContext db, ICalendarDayLookup calendarD
         var calendars = await calendarDayLookup.GetDaysAsync(db, userId, req.StartDate, req.EndDate, ct);
 
         var histories = await db.Set<ActivityHistory>()
+            .AsNoTracking()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Where(ah => ah.UserId == userId)
             .Where(ah => ah.StartTimestamp >= from && ah.StartTimestamp < to)
@@ -50,7 +51,7 @@ public class CalendarActivityEndpoint(DbContext db, ICalendarDayLookup calendarD
                 {
                     RoleId = g.Key,
                     RoleName = g.First().Activity.Role.Name,
-                    Color = g.First().Activity.Role.Color ?? "",
+                    Color = g.First().Activity.Role.Color,
                     TotalSeconds = g.Sum(ah => (long)ah.Length.TotalSeconds)
                 })
                 .OrderByDescending(r => r.TotalSeconds)
