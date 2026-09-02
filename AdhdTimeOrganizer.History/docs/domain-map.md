@@ -160,6 +160,9 @@ rather than an error (`HistoryTimeOfDayDashboardTests` pins all three on values)
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `HistoryGrouping` | Helper | The one place a dashboard group is resolved to `(Id, Name, Color)` — `HistoryGroupKey`. Every group-shaped response keys off this | `application/dashboard/HistoryGrouping.cs` |
+| `HistoryPieChartBuilder` | Helper | The whole pie-chart response after the query: grouping, the 1% threshold, the `_other` roll-up, the totals. Both `detail/` and `summary/` pie-chart endpoints call it | `application/dashboard/HistoryPieChartBuilder.cs` |
+| `HistorySummaryCardsBuilder` | Helper | The whole summary-cards response after the queries: top-N cards, baseline comparison, period-over-period total. Both `detail/` and `summary/` summary-cards endpoints call it | `application/dashboard/HistorySummaryCardsBuilder.cs` |
+| `HistoryBaselineWindow` | Helper | Resolves the request's `baseline` string to the range the baseline query runs over, plus the `sameWeekday` filter and the day count the average divides by | `application/dashboard/HistoryBaselineWindow.cs` |
 | `TimerBoundaryAlarmService` | Service | `ReplaceSessionAsync` / cancel-by-session / fire; owns the Scheduler `RunOnceAt` registration. Implements `ITimerBoundaryAlarmService` | `application/service/TimerBoundaryAlarmService.cs` |
 | `ITimerBoundaryAlarmService` | Contract | The service's port, so the endpoints and the registrar depend on the shape rather than the class | `domain/serviceContract/ITimerBoundaryAlarmService.cs` |
 | `TimerBoundaryAlarmJobHandler` | Job handler | Fires one alarm: resolves the activity name, pushes the notification, then **deletes the row** (self-drain). No-op if the row is gone | `application/job/TimerBoundaryAlarmJobHandler.cs` |

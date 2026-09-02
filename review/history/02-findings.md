@@ -183,7 +183,7 @@ the request and cap the range instead. Either way apply `SortBy`, since the SPA 
 `Doc impact: domain-map.md → Endpoints` (the `gird` row should say what the response actually pages by,
 and `summary.md`'s grid note should stop implying a paginated grid).
 
-### `CQ-2` 🟠 · The detail and summary dashboards are duplicated, not shared
+### `CQ-2` 🟠 ✅ FIXED 2026-09-02 · The detail and summary dashboards are duplicated, not shared
 
 `application/endpoint/query/dashboard/detail/HistoryDetailSummaryCardsEndpoint.cs:34-182` vs
 `…/dashboard/summary/HistorySummarySummaryCardsEndpoint.cs:36-182` ·
@@ -204,7 +204,17 @@ applied to one of them will pass review and ship half-done. That is the concrete
 resolution + query + one call. `HistoryGrouping` already sets the precedent for "the one place a
 dashboard concept is resolved".
 
-`Doc impact: domain-map.md → Navigation index` (new helper rows).
+**Fixed:** three helpers in `application/dashboard/`, beside `HistoryGrouping`.
+`HistoryPieChartBuilder.Build(records, groupBy, maxItems)` owns the grouping, the 1% threshold, the
+`_other` roll-up and the totals; `HistorySummaryCardsBuilder.Build(...)` owns the top-N cards, the
+baseline comparison and the period comparison; `HistoryBaselineWindow` owns the `baseline` string —
+`Resolve` gives the range the baseline query runs over, `Filter` applies the `sameWeekday` filter and
+`DayCount` gives the divisor. It is a separate type because the range has to be resolved *before* the
+query the builder consumes. Each of the four endpoints is now range resolution + query + one call, and
+each of the two `switch`es on `baseline` exists once — which is what `CQ-7` needs before it can turn
+them into an enum.
+
+`Doc impact: domain-map.md → Navigation index` (new helper rows). **Done** — three rows added.
 
 ### `CQ-3` 🟠 · `detail/stacked-bars` always emits 24 hourly windows, ignoring the picked range
 
@@ -287,12 +297,16 @@ a bare `DateOnly` with no zone); at minimum record which day it means in
 `Doc impact: domain-map.md → Navigation index` (the `ActivityHistoryTimeAttributionSink` row should say
 which day boundary `TotalSecondsOnDayAsync` uses) + `Core`'s seam XML.
 
-### `CQ-6` 🟡 · Dead computation in both summary-cards endpoints
+### `CQ-6` 🟡 ✅ FIXED 2026-09-02 · Dead computation in both summary-cards endpoints
 
 Both files: `ComputeBaselineRange` returns a `BaselineTo` that no caller reads (line 50); its
 `baselineFrom` parameter is unused (line 161); and `topGroups`'s anonymous type materializes
 `Records = g.ToList()` (line 43) which is never touched — one extra list allocation per group per
 request. Delete all three.
+
+**Fixed:** all three are gone with the `CQ-2` extraction. `HistoryBaselineWindow.To` is read (it bounds
+the baseline query and `allTime`'s day count), the unused `baselineFrom` parameter has no successor, and
+`HistorySummaryCardsBuilder`'s `topGroups` carries only the key and the total.
 
 `Doc impact: none`
 
