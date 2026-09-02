@@ -5,7 +5,9 @@ using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboa
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.History.application.endpoint.activityHistory.activityHistory.query.dashboard.detail;
 
@@ -21,7 +23,8 @@ public class HistoryDetailStackedBarsEndpoint(DbContext db, IUserTimeZoneResolve
     {
         var userId = User.GetId();
 
-        var (from, to) = req.ToDateTimeRange(await timeZones.GetAsync(userId, ct));
+        var timeZone = await timeZones.GetAsync(userId, ct);
+        var (from, to) = req.ToDateTimeRange(timeZone);
 
         var records = await db.Set<ActivityHistory>()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
@@ -31,7 +34,7 @@ public class HistoryDetailStackedBarsEndpoint(DbContext db, IUserTimeZoneResolve
             .ToListAsync(ct);
 
 
-        var windows = GenerateWindows(from, to);
+        var windows = GenerateWindows(req.Date, req.From.ToTimeOnly(), to, timeZone);
 
         var response = new HistoryStackedBarsResponse
         {
@@ -57,15 +60,38 @@ public class HistoryDetailStackedBarsEndpoint(DbContext db, IUserTimeZoneResolve
         await Send.ResponseAsync(response, cancellation: ct);
     }
 
+    /// <summary>
+    /// One-hour bands across the window the user picked, clipped at its end — not a fixed 24, which put
+    /// sixteen always-empty bars outside a 09:00–17:00 request and ran the last of them into the next day.
+    ///
+    /// <para>The walk is over the user's <b>wall clock</b> and every boundary is resolved back through the
+    /// zone, for the reason the summary sibling's <c>GenerateFixedWindows</c> spells out: adding hours to a
+    /// UTC instant slides every bar by the offset change on a DST transition day. <paramref name="to"/> is
+    /// the instant <see cref="DateAndTimeRangeDto.ToDateTimeRange"/> already resolved, over-midnight rule
+    /// included, so this needs no second reading of what the picked window means.</para>
+    /// </summary>
     private static List<(DateTime Start, DateTime End)> GenerateWindows(
-        DateTime from, DateTime to)
+        DateOnly date, TimeOnly startTime, DateTime to, TimeZoneInfo timeZone)
     {
         var windows = new List<(DateTime Start, DateTime End)>();
 
-        for (var h = 0; h < 24; h++)
+        var wallClock = date.ToDateTime(startTime);
+        var current = WallClockZone.ToUtc(wallClock, timeZone);
+
+        while (current < to)
         {
-            var start = from.AddHours(h);
-            windows.Add((start, start.AddHours(1)));
+            wallClock = wallClock.AddHours(1);
+
+            var next = WallClockZone.ToUtc(wallClock, timeZone);
+            if (next > to)
+                next = to;
+
+            // A band the spring-forward gap swallowed names no instants at all — both its boundaries
+            // resolve to the moment the gap closes — so it is dropped rather than emitted as an empty bar.
+            if (next > current)
+                windows.Add((current, next));
+
+            current = next;
         }
 
         return windows;

@@ -146,6 +146,157 @@ public class HistoryDashboardUserZoneTests(AppDbContextFixture fixture) : Postgr
     }
 
     /// <summary>
+    /// `TEST-7` / `CQ-3`. The detail dashboard used to emit a fixed 24 hourly bars from the picked start and
+    /// never read the picked end, so 09:00-17:00 answered with sixteen always-empty bars, the last of them
+    /// ending at 09:00 the following day. Asserting the count <b>and</b> both outer bounds is what the
+    /// agreement test above could not catch: it only compared the windows that overlapped.
+    /// </summary>
+    [Theory]
+    [InlineData(9, 17, 8)]
+    // A whole day still has to come back as 24 -- a fix that simply capped the loop in the wrong place
+    // would satisfy the case above and break this one.
+    [InlineData(0, 0, 24)]
+    // Over midnight: DateAndTimeRangeDto reads to <= from as a band running into the next date, so this is
+    // 22:00 through 06:00 on the user's clock, not a zero-length or a backwards window.
+    [InlineData(22, 6, 8)]
+    public async Task DetailStackedBars_EmitsOneBarPerHourOfThePickedWindow_AndNoneOutsideIt(
+        int fromHour, int toHour, int expectedWindows)
+    {
+        var windows = await WindowBoundsAsync("/api/activity-history/dashboard/detail/stacked-bars", new
+        {
+            date = SummerDay,
+            from = new { hours = fromHour, minutes = 0 },
+            to = new { hours = toHour, minutes = 0 },
+            groupBy = "Activity"
+        });
+
+        // July, so Bratislava is UTC+2 throughout and the picked wall clock is the hour minus two.
+        var expectedStart = new DateTimeOffset(2026, 7, 15, fromHour, 0, 0, TimeSpan.Zero).AddHours(-2);
+        var expectedEnd = expectedStart.AddHours(expectedWindows);
+
+        windows.Should().HaveCount(expectedWindows,
+            "the bars span the window the user picked -- a fixed 24 ignores the picked end and pads the " +
+            "chart with bars that can never hold a row");
+        windows[0].Start.Should().Be(expectedStart);
+        windows[^1].End.Should().Be(expectedEnd);
+
+        windows.Should().OnlyContain(w => w.Start >= expectedStart && w.End <= expectedEnd,
+            "no bar may lie outside the picked window, whatever the edge arithmetic does");
+        windows.Zip(windows.Skip(1)).Should().OnlyContain(p => p.First.End == p.Second.Start,
+            "the bands tile the window with no gap and no overlap");
+    }
+
+    /// <summary>
+    /// The detail side's counterpart to <see cref="DetailWindow_StartingInsideTheSpringForwardGap_ResolvesToTheEndOfTheGap"/>,
+    /// and the second half of `CQ-3`: the old walk added hours to a UTC instant, so on a transition day every
+    /// bar after the change drifted an hour against the clock the user reads. Local 00:00-06:00 is five real
+    /// hours on the spring-forward day, and the last band must still be the user's 05:00-06:00.
+    /// </summary>
+    [Fact]
+    public async Task DetailStackedBars_OnTheSpringForwardDay_KeepTheUsersWallClock()
+    {
+        var windows = await WindowBoundsAsync("/api/activity-history/dashboard/detail/stacked-bars", new
+        {
+            date = SpringForwardDay,
+            from = new { hours = 0, minutes = 0 },
+            to = new { hours = 6, minutes = 0 },
+            groupBy = "Activity"
+        });
+
+        windows.Should().HaveCount(5,
+            "the local hour 02:00-03:00 does not exist on this date, so the band that names it is dropped " +
+            "rather than emitted empty -- 00:00 to 06:00 is five hours here");
+
+        // Local clocks jump 02:00 -> 03:00 at 01:00Z: the first two bands are UTC+1, the rest UTC+2.
+        windows[0].Start.Should().Be(new DateTimeOffset(2026, 3, 28, 23, 0, 0, TimeSpan.Zero));
+        windows[^1].Start.Should().Be(new DateTimeOffset(2026, 3, 29, 3, 0, 0, TimeSpan.Zero),
+            "the user's 05:00 is 03:00Z once the clocks have gone forward -- adding hours to the UTC start " +
+            "instead lands it an hour early, which is the drift the summary side already guards against");
+        windows[^1].End.Should().Be(new DateTimeOffset(2026, 3, 29, 4, 0, 0, TimeSpan.Zero));
+    }
+
+    /// <summary>
+    /// The agreement test's stronger form. Given the same picked window at the same resolution, the two
+    /// stacked-bars endpoints must return the <b>same</b> window list, not merely overlapping ones — the
+    /// assertion that could not have passed while the detail side emitted 24 bars for a 09:00-13:00 pick.
+    /// </summary>
+    [Fact]
+    public async Task SummaryAndDetailStackedBars_ReturnTheSameWindowsAtTheSameResolution()
+    {
+        var detail = await WindowStartsAsync("/api/activity-history/dashboard/detail/stacked-bars", new
+        {
+            date = SummerDay,
+            from = new { hours = 9, minutes = 0 },
+            to = new { hours = 13, minutes = 0 },
+            groupBy = "Activity"
+        });
+
+        var summary = await WindowStartsAsync("/api/activity-history/dashboard/summary/stacked-bars", new
+        {
+            date = SummerDay,
+            // The one member that reads endDate; equal ends are the single day the detail request picks.
+            rangeType = "CustomRange",
+            endDate = SummerDay,
+            groupBy = "Activity",
+            windowMinutes = 60,
+            windowStartTime = new { hours = 9, minutes = 0 },
+            windowEndTime = new { hours = 13, minutes = 0 }
+        });
+
+        detail.Should().Equal(summary,
+            "the two dashboards window a picked day identically -- the summary side clips its bands at the " +
+            "picked end and the detail side must do the same, or the two charts disagree about their axis");
+    }
+
+    /// <summary>
+    /// The bucketing rule itself: a row belongs to the band whose half-open <c>[Start, End)</c> contains its
+    /// <c>StartTimestamp</c>, the same rule every other read in the slice applies.
+    /// </summary>
+    [Fact]
+    public async Task DetailStackedBars_PutEachRowInTheBandItsStartFallsIn()
+    {
+        var earlyId = await SeedActivityAsync("09:30 half hour");
+        var lateId = await SeedActivityAsync("11:30 half hour");
+
+        // 07:30Z and 09:30Z are 09:30 and 11:30 on the user's July clock.
+        await SeedHistoryAsync(
+            (earlyId, new DateTime(2026, 7, 15, 7, 30, 0, DateTimeKind.Utc)),
+            (lateId, new DateTime(2026, 7, 15, 9, 30, 0, DateTimeKind.Utc)));
+
+        var response = await CreateUserRoleClient().PostAsJsonAsync(
+            "/api/activity-history/dashboard/detail/stacked-bars",
+            new
+            {
+                date = SummerDay,
+                from = new { hours = 9, minutes = 0 },
+                to = new { hours = 13, minutes = 0 },
+                groupBy = "Activity"
+            },
+            Json, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var windows = (await response.Content.ReadFromJsonAsync<JsonElement>(Json, CancellationToken))
+            .GetProperty("windows").EnumerateArray()
+            .Select(w => (
+                Start: w.GetProperty("windowStart").GetDateTimeOffset(),
+                Items: w.GetProperty("items").EnumerateArray()
+                    .Select(i => (Name: i.GetProperty("name").GetString(),
+                        Seconds: i.GetProperty("totalSeconds").GetDouble()))
+                    .ToList()))
+            .ToList();
+
+        windows.Should().HaveCount(4);
+
+        windows[0].Items.Should().ContainSingle()
+            .Which.Should().Be(("09:30 half hour", 1800d));
+        windows[1].Items.Should().BeEmpty("nothing was logged in the user's 10:00 hour");
+        windows[2].Items.Should().ContainSingle()
+            .Which.Should().Be(("11:30 half hour", 1800d));
+        windows[3].Items.Should().BeEmpty("nothing was logged in the user's 12:00 hour");
+    }
+
+    /// <summary>
     /// The summary dashboards' day boundaries are the user's midnights. Both rows below sit in the half-open
     /// UTC hour that the two readings disagree about, one on each side, so a UTC-midnight range returns
     /// precisely the inverse of the correct set.
@@ -278,6 +429,21 @@ public class HistoryDashboardUserZoneTests(AppDbContextFixture fixture) : Postgr
         return (await response.Content.ReadFromJsonAsync<JsonElement>(Json, CancellationToken))
             .GetProperty("windows").EnumerateArray()
             .Select(w => w.GetProperty("windowStart").GetDateTimeOffset())
+            .ToList();
+    }
+
+    /// <summary>Both bounds of every returned band, for the cases that assert on where a window ends.</summary>
+    private async Task<List<(DateTimeOffset Start, DateTimeOffset End)>> WindowBoundsAsync(
+        string route, object body)
+    {
+        var response = await CreateUserRoleClient().PostAsJsonAsync(route, body, Json, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        return (await response.Content.ReadFromJsonAsync<JsonElement>(Json, CancellationToken))
+            .GetProperty("windows").EnumerateArray()
+            .Select(w => (
+                w.GetProperty("windowStart").GetDateTimeOffset(),
+                w.GetProperty("windowEnd").GetDateTimeOffset()))
             .ToList();
     }
 }

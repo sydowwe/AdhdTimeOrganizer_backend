@@ -216,7 +216,7 @@ them into an enum.
 
 `Doc impact: domain-map.md → Navigation index` (new helper rows). **Done** — three rows added.
 
-### `CQ-3` 🟠 · `detail/stacked-bars` always emits 24 hourly windows, ignoring the picked range
+### `CQ-3` 🟠 ✅ FIXED 2026-09-02 · `detail/stacked-bars` always emits 24 hourly windows, ignoring the picked range
 
 `application/endpoint/query/dashboard/detail/HistoryDetailStackedBarsEndpoint.cs:60-72`
 
@@ -241,6 +241,20 @@ having fixed.
 
 **Fix:** `while (current < to)` with a final clip, and resolve each boundary through the zone the way
 `GenerateFixedWindows` does. `TEST-7`.
+
+**Fixed:** `GenerateWindows` now takes the picked `Date`, the picked start `TimeOnly` and the resolved
+`to`, walks the user's **wall clock** an hour at a time and converts each boundary back with
+`WallClockZone.ToUtc`, clipping the last band at `to`. `to` comes from
+`DateAndTimeRangeDto.ToDateTimeRange`, which has already applied the over-midnight rule, so the loop
+does not restate it. A band the spring-forward gap swallows has both boundaries resolve to the moment
+the gap closes and is dropped rather than emitted zero-length — which is also what terminates the walk
+past a transition.
+
+`TEST-7` landed with it, in `HistoryDashboardUserZoneTests`: a theory over 09:00–17:00 (8 bars),
+00:00–00:00 (24, so the fix does not simply cap in the wrong place) and 22:00–06:00 (8, over midnight)
+asserting count, both outer bounds, containment and tiling; a spring-forward case pinning that the
+user's 05:00 bar is still 03:00Z; the full-resolution `detail`/`summary` window-list **equality** the
+old agreement test could not assert; and a per-band `totalSeconds` case for the half-open bucketing.
 
 `Doc impact: none` (the docs already describe the intended behaviour; the code is wrong).
 

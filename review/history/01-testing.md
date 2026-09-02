@@ -107,7 +107,7 @@ across a UTC midnight boundary would seed one day and query another. Not observe
 | `POST /activity-history/gird` | ✅ 2 | ❌ paging + sorting + UTC date grouping `TEST-1` | ✅ 1 | `HistoryRouteSmokeTests`, `HistoryCrudAuthMatrixTests` |
 | `POST /activity-history/aggregate-by-activity` | ✅ 1 (values, omits-empty, scoping) | ❌ 500-id cap, empty list | ✅ 1 | `HistoryRouteSmokeTests` |
 | `POST …/dashboard/detail/pie-chart` | ✅ 2 | ✅ zone | ⚠️ smoke | `HistoryDashboardGroupIdentityTests`, `…UserZoneTests` |
-| `POST …/dashboard/detail/stacked-bars` | ✅ 2 | ❌ window count vs picked range `TEST-7` | ⚠️ smoke | `HistoryDashboardUserZoneTests` |
+| `POST …/dashboard/detail/stacked-bars` | ✅ 8 | ✅ window count vs picked range, over-midnight, DST, summary parity (`TEST-7`) | ⚠️ smoke | `HistoryDashboardUserZoneTests` |
 | `POST …/dashboard/detail/summary-cards` | ⚠️ smoke only | ❌ baselines `TEST-2` | ⚠️ smoke | `HistoryRouteSmokeTests` |
 | `POST …/dashboard/summary/pie-chart` | ✅ 4 | ✅ range + zone | ⚠️ smoke | `…GroupIdentityTests`, `…CustomRangeTests` |
 | `POST …/dashboard/summary/stacked-bars` | ✅ 3 | ✅ zone + DST gap | ⚠️ smoke | `HistoryDashboardUserZoneTests` |
@@ -163,7 +163,7 @@ Prompts are self-contained and paste-ready for a context-less agent; all live un
 | `TEST-4` | `ActivityHistoryTimeAttributionSink` — contiguous-window extension and day totals, both untested on a live path | 🔴 | [`TimeAttributionSink.md`](testingPrompts/TimeAttributionSink.md) |
 | `TEST-5` | `ScheduleTimerAlarmsValidator` caps + foreign `ActivityId` + cross-user cancel | 🟠 | [`TimerAlarmInputValidation.md`](testingPrompts/TimerAlarmInputValidation.md) |
 | `TEST-6` | `ActivityHistoryValidator` mutual exclusion; duplicate `(UserId, ActivityId, StartTimestamp)`; foreign `ActivityId` on create | 🟠 | [`ActivityHistoryWriteRules.md`](testingPrompts/ActivityHistoryWriteRules.md) |
-| `TEST-7` | `detail/stacked-bars` emits 24 windows regardless of the picked range | 🟠 | [`DetailStackedBarsWindows.md`](testingPrompts/DetailStackedBarsWindows.md) |
+| `TEST-7` ✅ **written 2026-09-02** | `detail/stacked-bars` emits 24 windows regardless of the picked range | 🟠 | [`DetailStackedBarsWindows.md`](testingPrompts/DetailStackedBarsWindows.md) — landed in `HistoryDashboardUserZoneTests` alongside the `CQ-3` fix |
 | `TEST-8` | `UpdateEntity` must not write the two item links | 🟡 | [`UpdateKeepsItemLinks.md`](testingPrompts/UpdateKeepsItemLinks.md) |
 
 **Previously known — do not re-flag** (`docs/testing.md` → Known gaps): the registrar's boot
