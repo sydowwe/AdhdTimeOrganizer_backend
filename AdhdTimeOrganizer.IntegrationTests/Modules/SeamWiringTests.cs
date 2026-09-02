@@ -1,8 +1,11 @@
 using System.Reflection;
 using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Testing;
 using Xunit;
@@ -19,10 +22,17 @@ namespace AdhdTimeOrganizer.IntegrationTests.Modules;
 /// three single-service seams (<see cref="IActivityTimeAttributionSink"/>,
 /// <see cref="ICalendarDayLookup"/>, <see cref="ITodoListItemLoggedTimeSource"/>) fail at endpoint
 /// activation, which is deliberate. But
-/// <see cref="IActivityMembershipSource"/> is resolved as a keyed <c>IEnumerable&lt;&gt;</c> and its
-/// consumer falls back to <em>not filtering</em> when no source matches the key — so a slice dropped
-/// from <c>ModuleServiceExtensions.ModuleAssemblies</c>, a renamed key, or a duplicate key silently
-/// widens the History grid to every row. Likewise a seam event with no handler is simply inert.
+/// <see cref="IActivityMembershipSource"/> is resolved as a keyed <c>IEnumerable&lt;&gt;</c> and the
+/// consumer pattern falls back to <em>not filtering</em> when no source matches the key — so a slice
+/// dropped from <c>ModuleServiceExtensions.ModuleAssemblies</c>, a renamed key, or a duplicate key
+/// silently widens the caller's query to every row. Likewise a seam event with no handler is simply
+/// inert.
+/// </para>
+/// <para>
+/// ⚠ <see cref="IActivityMembershipSource"/> currently has <b>no consumer</b>: its only one was
+/// History's <c>gird</c> endpoint, deleted with <c>CQ-1</c> because no client ever called it. The two
+/// implementations and the guards over them are kept deliberately — see
+/// <see cref="TodoListMembershipSource_NarrowsToActivitiesOnAList"/>.
 /// </para>
 /// </summary>
 [Collection("Postgres")]
@@ -64,13 +74,16 @@ public class SeamWiringTests(AppDbContextFixture fixture) : PostgresTestBase(fix
     /// <see cref="ActivityMembershipSourceKeys"/> exactly.
     /// </summary>
     /// <remarks>
-    /// This is the assertion that matters most in the file. <c>ApplyMembershipFilter</c> in
-    /// <c>GetFilteredTableActivityHistoryEndpoint</c> looks a source up with
-    /// <c>FirstOrDefault(s =&gt; s.Key == key)</c> and returns the query <em>unfiltered</em> when it
-    /// finds nothing — so a missing source does not throw, it just stops narrowing, and a duplicate
-    /// key silently picks whichever implementation registered first. Comparing against the constants
-    /// (rather than a hard-coded count) also means adding a key without shipping an implementation
-    /// fails here rather than in production.
+    /// The consumer pattern this guards is a <c>FirstOrDefault(s =&gt; s.Key == key)</c> lookup that
+    /// leaves the query <em>unfiltered</em> when it finds nothing — so a missing source does not throw,
+    /// it just stops narrowing, and a duplicate key silently picks whichever implementation registered
+    /// first. Comparing against the constants (rather than a hard-coded count) also means adding a key
+    /// without shipping an implementation fails here rather than in production.
+    /// <para>
+    /// The consumer that made this load-bearing (History's <c>gird</c> endpoint) is gone; the guard
+    /// stays because the sources and their keys are still registered and still exported to whatever
+    /// consumes them next.
+    /// </para>
     /// </remarks>
     [Fact]
     public void ActivityMembershipSources_CoverEveryKey_Exactly()
@@ -93,7 +106,73 @@ public class SeamWiringTests(AppDbContextFixture fixture) : PostgresTestBase(fix
         Assert.True(declaredKeys.OrderBy(k => k).SequenceEqual(resolvedKeys.OrderBy(k => k)),
             $"ActivityMembershipSourceKeys declares [{string.Join(", ", declaredKeys.OrderBy(k => k))}] "
             + $"but the container resolved [{string.Join(", ", resolvedKeys.OrderBy(k => k))}]. A key with "
-            + "no source silently stops narrowing the History grid; a source with no key is dead code.");
+            + "no source silently stops narrowing its consumer's query; a source with no key is dead code.");
+    }
+
+    /// <summary>
+    /// The to-do source actually narrows: seeded two activities for one user, one carried by a
+    /// <c>TodoListItem</c> and one not, its <c>ActivityIds</c> query returns the first and not the
+    /// second.
+    /// </summary>
+    /// <remarks>
+    /// Resolution alone is not the whole mechanism — a source can register under the right key and
+    /// still hand back a query that matches everything (or nothing), and no consumer would throw. This
+    /// used to be asserted end-to-end through the History grid
+    /// (<c>HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam</c>), but that endpoint
+    /// was deleted with <c>CQ-1</c> — no client ever called it — which as of today leaves
+    /// <see cref="IActivityMembershipSource"/> with <b>no consumer at all</b>. The behaviour is pinned
+    /// here rather than dropped so the next consumer inherits a working seam.
+    /// </remarks>
+    [Fact]
+    public async Task TodoListMembershipSource_NarrowsToActivitiesOnAList()
+    {
+        const long userId = FakeLoggedUserService.TestUserId;
+
+        long onListActivityId;
+        long offListActivityId;
+
+        await using var db = CreateDbContext();
+
+        onListActivityId = await SeedActivityAsync(db, userId, "Seam on a to-do list");
+        offListActivityId = await SeedActivityAsync(db, userId, "Seam not on any list");
+
+        var priority = new TaskPriority { UserId = userId, Text = "Normal", Color = "#445566", Priority = 1 };
+        db.Set<TaskPriority>().Add(priority);
+        await db.SaveChangesAsync(CancellationToken);
+
+        db.Set<TodoListItem>().Add(new TodoListItem
+        {
+            UserId = userId,
+            ActivityId = onListActivityId,
+            TaskPriorityId = priority.Id
+        });
+        await db.SaveChangesAsync(CancellationToken);
+
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+        var source = scope.ServiceProvider.GetServices<IActivityMembershipSource>()
+            .Single(s => s.Key == ActivityMembershipSourceKeys.TodoList);
+
+        var anyFacet = await source.ActivityIds(db, null).ToListAsync(CancellationToken);
+        var matchingFacet = await source.ActivityIds(db, priority.Id).ToListAsync(CancellationToken);
+        var otherFacet = await source.ActivityIds(db, priority.Id + 9_100).ToListAsync(CancellationToken);
+
+        Assert.Contains(onListActivityId, anyFacet);
+        Assert.DoesNotContain(offListActivityId, anyFacet);
+
+        Assert.Contains(onListActivityId, matchingFacet);
+        Assert.DoesNotContain(onListActivityId, otherFacet);
+    }
+
+    private static async Task<long> SeedActivityAsync(DbContext db, long userId, string name)
+    {
+        var role = new ActivityRole { UserId = userId, Name = $"{name} Role {Guid.NewGuid():N}", Color = "#112233" };
+        db.Set<ActivityRole>().Add(role);
+        await db.SaveChangesAsync(CancellationToken);
+
+        var activity = new Activity { UserId = userId, Name = name, RoleId = role.Id };
+        db.Set<Activity>().Add(activity);
+        await db.SaveChangesAsync(CancellationToken);
+        return activity.Id;
     }
 
     /// <summary>

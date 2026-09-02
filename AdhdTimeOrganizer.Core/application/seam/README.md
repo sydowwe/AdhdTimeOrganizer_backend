@@ -13,7 +13,7 @@ if the two ever drift apart.
 
 | Seam | Kind | Resolution | Implemented by | Consumed by |
 |---|---|---|---|---|
-| `IActivityMembershipSource` | read | keyed `IEnumerable<>` | TodoLists (`todoList`), Routines (`routineTodoList`) | History — `GetFilteredTableActivityHistoryEndpoint` |
+| `IActivityMembershipSource` | read | keyed `IEnumerable<>` | TodoLists (`todoList`), Routines (`routineTodoList`) | **nobody** — its one consumer, History's `gird` grid, was deleted with `CQ-1`. Kept for the next one |
 | `IActivityReferenceSource` | read **+ write**, in the caller's transaction | keyed `IEnumerable<>` | Core (`timerPreset`), History (`activityHistory`), TodoLists (`todoList`), Routines (`routineTodoList`), Planning (`plannerTask`), Tracking (`trackerMapping`), ActivityProfiles (`activityProfile`) | Core — `GridActivityEndpoint`, `GetByIdActivityEndpoint`, `MergeActivityEndpoint`, all through `IActivityReferenceService` |
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint` |
@@ -74,11 +74,13 @@ activation.
 
 None of these break the build, and only one of them throws.
 
-- **`IActivityMembershipSource` fails silently.** `ApplyMembershipFilter` does
-  `FirstOrDefault(s => s.Key == key)` and, on `null`, returns the query **unfiltered** — so a slice
+- **`IActivityMembershipSource` fails silently.** The consumer pattern is
+  `FirstOrDefault(s => s.Key == key)` and, on `null`, returning the query **unfiltered** — so a slice
   dropped from `ModuleAssemblies`, a renamed key, or a second implementation claiming an existing key
-  all just quietly stop narrowing the grid. `SeamWiringTests.ActivityMembershipSources_CoverEveryKey_Exactly`
-  and `HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam` are the guards.
+  all just quietly stop narrowing. It has no consumer at present;
+  `SeamWiringTests.ActivityMembershipSources_CoverEveryKey_Exactly` and
+  `SeamWiringTests.TodoListMembershipSource_NarrowsToActivitiesOnAList` keep the sources honest until
+  there is one again.
 - **`IActivityReferenceSource` fails silently in two directions at once**, and it is the worst of the
   set. `ActivityReferenceService` folds whatever resolved into one `UNION ALL`; a slice dropped from
   `ModuleAssemblies` or a renamed key simply contributes nothing. On the **read** side `usageCount`

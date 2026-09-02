@@ -26,7 +26,8 @@ project's bases.
 - **Implements three Core seams** (`application/seam/`), so other slices can reach to-do rows without
   referencing this project:
   - `TodoListActivityMembershipSource` (key `ActivityMembershipSourceKeys.TodoList`) — "this activity
-    is on a to-do list", faceted by `TaskPriorityId`. Consumed by History's grid filters.
+    is on a to-do list", faceted by `TaskPriorityId`. **Consumed by nobody today** — History's grid
+    filters were its only consumer and went with the grid (`CQ-1`).
   - `TodoListActivityReferenceSource` (key `ActivityReferenceSourceKeys.TodoList`) — counts and
     repoints **two** activity columns during an activity merge.
   - `TodoListItemOwnedReferenceVerifier` (key `UserOwnedReferenceKeys.TodoListItem`) — "is this item

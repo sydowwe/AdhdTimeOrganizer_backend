@@ -23,12 +23,9 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// 404s rather than 403s -- same reasoning as <see cref="ActivityEndpointTests"/>'s header, which this
 /// follows in shape.
 /// <para>
-/// GetFilteredTableActivityHistoryEndpoint ("gird") is deliberately NOT retested here with
-/// BaseGridEndpointTests: its response is List&lt;ActivityHistoryListGroupedByDateResponse&gt; (grouped
-/// by date), not the Items/ItemsCount/PageCount shape that base assumes, and its route registration plus
-/// the to-do/routine membership seam are already pinned by HistoryRouteSmokeTests. What is still
-/// missing -- and the only thing added for it below -- is proof that the grid itself excludes another
-/// user's rows, which no existing test exercises (the membership-seam test only ever uses one user).
+/// There is no grid case here. GetFilteredTableActivityHistoryEndpoint ("gird") was deleted with CQ-1 --
+/// no client ever called it -- so FilterActivityHistoryEndpoint ("filter") below is the only list read
+/// on this entity, and it carries the cross-user assertion the grid case used to hold.
 /// </para>
 /// </summary>
 file static class Seed
@@ -202,46 +199,5 @@ public class ActivityHistoryFilterTests(AppDbContextFixture fixture) : BaseFilte
         items!.Select(i => i.GetProperty("id").GetInt64())
             .Should().Contain(ownId, "the caller's own row must be returned")
             .And.HaveCount(1, "another user's row must never leak into the filter results");
-    }
-}
-
-// =====================================================================================================
-// GetFilteredTableActivityHistoryEndpoint ("api/activity-history/gird") -- route registration and the
-// to-do/routine membership seam are already pinned by HistoryRouteSmokeTests; this proves the one thing
-// that suite never exercises with a second user present: another user's history rows do not leak in.
-// =====================================================================================================
-
-[Collection("Postgres")]
-public class ActivityHistoryGetFilteredTableTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
-{
-    private static object GridBody() => new
-    {
-        useFilter = false,
-        filter = new { },
-        sortBy = Array.Empty<object>(),
-        itemsPerPage = 100,
-        page = 1
-    };
-
-    [Fact]
-    public async Task GetFilteredTable_ExcludesOtherUsersHistory()
-    {
-        await using var db = CreateDbContext();
-        var ownId = await Seed.HistoryAsync(db, FakeLoggedUserService.TestUserId, "Own Grid History");
-
-        var otherUserId = await Seed.SecondUserAsync(Fixture, $"history-gird-{Guid.NewGuid():N}@test.com");
-        await Seed.HistoryAsync(db, otherUserId, "Foreign Grid History");
-
-        var response = await CreateClient().PostAsJsonAsync("api/activity-history/gird", GridBody(), JsonOpts, TestContext.Current.CancellationToken);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var groups = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOpts, CancellationToken);
-        var ids = groups.EnumerateArray()
-            .SelectMany(g => g.GetProperty("historyResponseList").EnumerateArray())
-            .Select(h => h.GetProperty("id").GetInt64())
-            .ToList();
-
-        ids.Should().Contain(ownId, "the caller's own row must be returned")
-            .And.HaveCount(1, "another user's row must never leak into the grid -- FilteredByUser must actually scope the query");
     }
 }

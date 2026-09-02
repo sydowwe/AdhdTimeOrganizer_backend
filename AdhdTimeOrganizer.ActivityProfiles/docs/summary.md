@@ -33,7 +33,7 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
 
 - **References:** `AdhdTimeOrganizer.Core`, `Sydowwe.Framework`, `Sydowwe.Framework.Contracts`.
   **Zero outbound slice edges**, and it needed no seam to achieve that — unlike History
-  (`IActivityMembershipSource`) or Tracking (`IActivityTimeAttributionSink` +
+  (`ICalendarDayLookup`) or Tracking (`IActivityTimeAttributionSink` +
   `ActivityTimeRecordedEvent`). Nothing outside Core ever referenced these eight entities.
 - **Referenced by:** the host and `AdhdTimeOrganizer.IntegrationTests`. **No other slice references
   it, and none should** — see the note in the csproj.

@@ -231,7 +231,7 @@ one fails). Summary:
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `ISeam` / `ISeamEvent` | Marker | Makes the whole seam surface findable by type hierarchy; `ISeamEvent : IEvent` | `ISeam.cs` |
-| `IActivityMembershipSource` | Seam (read, keyed) | "Which activities appear in your area?" — TodoLists/Routines implement, History consumes | `IActivityMembershipSource.cs` |
+| `IActivityMembershipSource` | Seam (read, keyed) | "Which activities appear in your area?" — TodoLists/Routines implement; **no consumer today**, History's `gird` grid was deleted with `CQ-1` | `IActivityMembershipSource.cs` |
 | `IActivityReferenceSource` | Seam (read + write, keyed) | "Which of your rows point at an activity" + "repoint them" — every slice implements, Core consumes | `IActivityReferenceSource.cs` |
 | `IActivityTimeAttributionSink` | Seam (write, single) | Records observed time into the activity ledger — History implements, Tracking consumes | `IActivityTimeAttributionSink.cs` |
 | `ICalendarDayLookup` | Seam (read, single) | Calendar-day metadata for a range — Planning implements, History consumes | `ICalendarDayLookup.cs` |

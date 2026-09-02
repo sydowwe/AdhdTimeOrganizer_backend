@@ -142,8 +142,11 @@ as it does. **`02-findings.md`'s preamble has been corrected** — it asserted t
   smoke-tested (a 404 for a missing row is indistinguishable from a 404 for a missing route) and why the
   POST routes assert `NotBe(404) && NotBe(405)` rather than `Be(200)`. That is the right instinct, and
   it is documented in the file rather than in a review.
-- **`Grid_MembershipFilter_NarrowsThroughTheSeam` asserts on rows, not routes** — the seam is resolved
-  by string key and fails silently, and this test partitions two seeded activities to catch it. Keep it.
+- **The membership-seam test asserts on rows, not routes** — the seam is resolved by string key and
+  fails silently, and the test partitions two seeded activities to catch it. Keep it. *(2026-09-02: it
+  ran through the `gird` grid as `Grid_MembershipFilter_NarrowsThroughTheSeam`; that endpoint was
+  deleted with `CQ-1`, so it now lives on the source itself as
+  `SeamWiringTests.TodoListMembershipSource_NarrowsToActivitiesOnAList`.)*
 - **The CRUD/auth matrix leans on Framework base test classes** (`BaseGetByIdEndpointTests`,
   `BaseCreateEndpointTests`, `BaseUpdateEndpointTests`, `BaseDeleteEndpointTests`,
   `BaseFilterEndpointTests`) and only hand-writes the two shapes the bases don't cover. Cross-user rows
@@ -154,12 +157,12 @@ as it does. **`02-findings.md`'s preamble has been corrected** — it asserted t
 
 **Weaknesses.**
 
-- **The grid's contract is asserted at exactly one bit of resolution.**
-  `ActivityHistoryGetFilteredTableTests.GetFilteredTable_ExcludesOtherUsersHistory` posts
-  `itemsPerPage: 100, page: 1, sortBy: []` and asserts the result contains one id. Both paging fields are
-  `required` on `BaseFilterSortPaginateRequest` and **neither is read by the endpoint** (see `CQ-1`), and
-  no test would notice: 1 row fits in any page. Passing a request field that the server ignores is the
-  cheapest possible silent failure, and it is uncovered. → `TEST-1`
+- ~~**The grid's contract is asserted at exactly one bit of resolution.**~~ ✅ **MOOT 2026-09-02.**
+  `ActivityHistoryGetFilteredTableTests.GetFilteredTable_ExcludesOtherUsersHistory` posted
+  `itemsPerPage: 100, page: 1, sortBy: []` and asserted the result contained one id; neither paging field
+  was read by the endpoint. The endpoint was deleted with `CQ-1` — no client ever called it — so `TEST-1`
+  is withdrawn rather than written, and `/filter` (which the SPA does call) keeps its own cross-user
+  assertion.
 - **Route-registration theatre in one place.** `HistoryDashboardRoutes_AreRegistered` posts a shared
   `DashboardBody()` to all seven dashboards and asserts only "not 404, not 405". That is the correct
   assertion *for the question it asks*, but it means five of those seven routes have no other test that
@@ -205,7 +208,6 @@ across a UTC midnight boundary would seed one day and query another. Not observe
 | `GET /activity-history/{id}` | ✅ 1 | — | ✅ 4 | `HistoryCrudAuthMatrixTests` |
 | `GET /activity-history/form-select-options` | ✅ 1 (200 only) | ❌ no value assertion; `?includeArchived` untested | ⚠️ implicit | `HistoryRouteSmokeTests` |
 | `POST /activity-history/filter` | ✅ 2 | ❌ over-midnight / `EndTimestamp <= to` (`CQ-11`) | ✅ 2 | `HistoryCrudAuthMatrixTests` (`ActivityHistoryFilterTests`) |
-| `POST /activity-history/gird` | ✅ 2 | ❌ paging + sorting + UTC date grouping `TEST-1` | ✅ 1 | `HistoryRouteSmokeTests`, `HistoryCrudAuthMatrixTests` |
 | `POST /activity-history/aggregate-by-activity` | ✅ 1 (values, omits-empty, scoping) | ❌ 500-id cap, empty list | ✅ 1 | `HistoryRouteSmokeTests` |
 | `POST …/dashboard/detail/pie-chart` | ✅ 2 | ✅ zone | ⚠️ smoke | `HistoryDashboardGroupIdentityTests`, `…UserZoneTests` |
 | `POST …/dashboard/detail/stacked-bars` | ✅ 8 | ✅ window count vs picked range, over-midnight, DST, summary parity (`TEST-7`) | ⚠️ smoke | `HistoryDashboardUserZoneTests` |
@@ -244,12 +246,13 @@ Read-and-authorization surface is genuinely well covered — the CRUD auth matri
 filter mean the classic IDOR shapes are closed and *proven* closed, and the four dashboards that carry
 the hard arithmetic (`summary/*`) are tested on values rather than status codes, which is the standard
 this slice's docs set. The 30% that is missing is not evenly spread: it is concentrated in the three
-places where a failure is a plausible number rather than an error — **the grid's ignored paging
-contract**, **the summary-cards baselines** (including one, `alltime`, that inspection says throws), and
+places where a failure is a plausible number rather than an error — ~~the grid's ignored paging
+contract~~ (endpoint deleted, `CQ-1`), **the summary-cards baselines** (including one, `alltime`, that inspection says throws), and
 **the calendar dashboard's UTC fold**. Add to that the attribution sink, which has zero tests despite
 sitting on the desktop-tracking write path. Ranked by expected damage: `TEST-4` (silent wrong totals on
 a live ingest path, plus a suspected crash) > `TEST-2` (a 500 on a shipped `baseline` value) >
-`TEST-1` (whole ledger returned per grid call) > `TEST-3` > `TEST-7` > `TEST-5` > `TEST-6` > `TEST-8`.
+`TEST-3` > `TEST-7` > `TEST-5` > `TEST-6` > `TEST-8`. (`TEST-1` — the whole ledger returned per grid
+call — is withdrawn: the endpoint is gone.)
 
 ## 12. Missing tests — backlog
 
@@ -258,7 +261,7 @@ Prompts are self-contained and paste-ready for a context-less agent; all live un
 
 | ID | Gap | Sev | Prompt |
 |---|---|---|---|
-| `TEST-1` | The grid ignores `page` / `itemsPerPage` / `sortBy`; nothing notices | 🟠 | [`GridPaginationAndSorting.md`](testingPrompts/GridPaginationAndSorting.md) |
+| ~~`TEST-1`~~ | ~~The grid ignores `page` / `itemsPerPage` / `sortBy`; nothing notices~~ — **withdrawn 2026-09-02**: endpoint deleted with `CQ-1`, no client ever called it | — | ~~`GridPaginationAndSorting.md`~~ |
 | `TEST-2` | `summary-cards` `baseline` values (`alltime` suspected 500, `sameWeekday`, `last30days`) never driven | 🔴 | [`SummaryCardsBaselines.md`](testingPrompts/SummaryCardsBaselines.md) |
 | `TEST-3` | Calendar dashboard: day fold, range bounds, `TopN`, cross-user | 🟠 | [`CalendarDashboardBounds.md`](testingPrompts/CalendarDashboardBounds.md) |
 | `TEST-4` | `ActivityHistoryTimeAttributionSink` — contiguous-window extension and day totals, both untested on a live path | 🔴 | [`TimeAttributionSink.md`](testingPrompts/TimeAttributionSink.md) |

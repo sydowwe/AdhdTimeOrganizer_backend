@@ -5,8 +5,9 @@ using Sydowwe.Framework.config.dependencyInjection;
 namespace AdhdTimeOrganizer.TodoLists.application.seam;
 
 /// <summary>
-/// Publishes "this activity is on a to-do list" through Core's seam, so slices that want to filter on
-/// it (History's grid, today) do not have to reference TodoLists.
+/// Publishes "this activity is on a to-do list" through Core's seam, so a slice that wants to filter on
+/// it does not have to reference TodoLists. History's grid was that slice until <c>CQ-1</c> deleted it;
+/// there is no consumer at present — see <see cref="IActivityMembershipSource"/>.
 /// </summary>
 /// <remarks>
 /// The facet is <c>TaskPriorityId</c>. No user scoping here on purpose: the query is composed into the

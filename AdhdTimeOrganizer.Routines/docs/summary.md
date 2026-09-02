@@ -42,8 +42,8 @@ has no knowledge of Planning at all.
   type derives from that base." Nothing points back from TodoLists.
 - **Three keyed Core seams are implemented here**, all in `application/seam/`:
   - `RoutineTodoListActivityMembershipSource` (`IActivityMembershipSource`) publishes "this activity is
-    on a routine to-do list", so History's grid can filter on routine membership without either
-    project referencing the other. The facet is `TimePeriodId`.
+    on a routine to-do list" without either project referencing the other. The facet is `TimePeriodId`.
+    Its consumer was History's grid, deleted with `CQ-1`, so nothing reads it at present.
   - `RoutineTodoListActivityReferenceSource` (`IActivityReferenceSource`) exposes the `ActivityId`
     column to Core's activity-merge/delete machinery and repoints it on merge. **Streaks are carried
     across a merge untouched** — two routines on two duplicate activities stay two routines; merging

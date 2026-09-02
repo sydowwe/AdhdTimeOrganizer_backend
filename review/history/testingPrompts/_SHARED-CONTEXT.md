@@ -35,7 +35,7 @@ Existing history suites, for reference and for copying shape from:
 - Cancellation: `TestContext.Current.CancellationToken`, or the base's `CancellationToken` property.
 - JSON: `private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);` and
   `PostAsJsonAsync(route, body, JsonOpts, ct)`. Routes are prefixed **`api/`** (e.g.
-  `api/activity-history/gird`).
+  `api/activity-history/filter`).
 - Assertions: FluentAssertions, with a `because` string on anything non-obvious. Prefer reading the
   response as `JsonElement` over defining a mirror DTO — the existing suites do this.
 
@@ -59,7 +59,10 @@ unique, so vary the start or the activity between seeded rows.
    `SuggestionPatternRefreshInterceptor`, which `REFRESH`es three materialized views installed by
    `AppDbContextFixture.OnSchemaCreatedAsync`. A wave of `42P01` across unrelated tests means that
    fixture step broke, not your test.
-2. **The grid route is `gird`**, not `grid`. It is the shipped path and the SPA calls it that way.
+2. ~~**The grid route is `gird`**, not `grid`.~~ **Withdrawn 2026-09-02.** The `gird` endpoint was
+   deleted with `CQ-1`: it applied neither paging nor sorting, and — contrary to what this file, the
+   findings doc and both slice docs claimed — **the SPA never called it** (`grep -ri gird` over the
+   frontend repo: zero hits). `POST /activity-history/filter` is the only list read on this entity.
 
 ## Pinning a gap you cannot fix
 

@@ -72,7 +72,8 @@ activity id.
 
 - Assert **400**. Today the insert succeeds.
 - Then, if it does succeed, follow through and assert what happens on read: `GET
-  api/activity-history/{id}` and `POST api/activity-history/gird`. `Activity` is `IEntityWithUser`, so
+  api/activity-history/{id}` and `POST api/activity-history/filter` (the `gird` grid this used to name
+  was deleted with `CQ-1`). `Activity` is `IEntityWithUser`, so
   the global filter applies to the `Include` as well — the join yields null and
   `ActivityHistoryResponse.Projection`'s non-nullable `Id = e.Activity.Id` materialises from a null.
   Record precisely what comes back (a 500? a null activity? an exception message via `SEC-2`?). That

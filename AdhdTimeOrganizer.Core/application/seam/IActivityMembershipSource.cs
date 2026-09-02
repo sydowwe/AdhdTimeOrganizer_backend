@@ -9,10 +9,18 @@ namespace AdhdTimeOrganizer.Core.application.seam;
 /// <remarks>
 /// <para>
 /// This exists so a slice can filter on "activity is on a to-do list" / "activity is in a routine"
-/// without referencing the slice that owns to-do lists or routines. History is the first consumer:
+/// without referencing the slice that owns to-do lists or routines. History was the first consumer:
 /// its grid used to reach into <c>TodoListItems</c> / <c>RoutineTodoLists</c> directly, which made
 /// History depend on TodoLists <i>and</i> Routines and forced all three to be extracted in a fixed
-/// order. With this seam History depends on Core alone.
+/// order. With this seam History depended on Core alone.
+/// </para>
+/// <para>
+/// ⚠ <b>Nothing consumes this today.</b> That grid endpoint was deleted with <c>CQ-1</c> — it applied
+/// neither the paging nor the sorting its request declared, and no client ever called it — and the
+/// membership filters went with it. The interface and both implementations are kept deliberately: they
+/// are the reference shape for inverting a slice→slice read (see <c>docs/claude/slices.md</c>), and
+/// <c>SeamWiringTests</c> keeps them working. Wire a new consumer to it rather than reaching into
+/// another slice's tables.
 /// </para>
 /// <para>
 /// The direction matters: the owning slice implements this and points at Core; the consuming slice
@@ -32,8 +40,9 @@ namespace AdhdTimeOrganizer.Core.application.seam;
 public interface IActivityMembershipSource : ISeam
 {
     /// <summary>
-    /// Stable wire key naming this source. It appears in filter DTOs and therefore in the SPA's
-    /// request payloads — treat it as public API and do not rename it with the implementing class.
+    /// Stable key naming this source. It reached the wire while History's grid existed, and is meant
+    /// to again the moment another filter DTO exposes it — treat it as public API and do not rename it
+    /// with the implementing class.
     /// </summary>
     string Key { get; }
 

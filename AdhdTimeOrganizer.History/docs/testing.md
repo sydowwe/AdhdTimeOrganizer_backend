@@ -45,8 +45,8 @@ below.
 
 | Test | Pins |
 |---|---|
-| `HistoryRouteSmokeTests.HistoryDashboardRoutes_AreRegistered` (7 routes) · `HistoryGridRoute_IsRegistered` · `HistorySelectOptionsRoute_IsRegistered` | The slice's assembly is in FastEndpoints' `o.Assemblies`. Missing → every history route 404s, with no build error |
-| `HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam` | `IActivityMembershipSource` is resolved and matched by key. A missing or misregistered source fails **silently** — the filter simply stops narrowing |
+| `HistoryRouteSmokeTests.HistoryDashboardRoutes_AreRegistered` (7 routes) · `HistorySelectOptionsRoute_IsRegistered` | The slice's assembly is in FastEndpoints' `o.Assemblies`. Missing → every history route 404s, with no build error |
+| `SeamWiringTests.TodoListMembershipSource_NarrowsToActivitiesOnAList` | `IActivityMembershipSource` is resolved by key **and actually narrows**. A missing or misregistered source fails **silently** — the filter simply stops narrowing. This used to run through the `gird` grid; that endpoint was deleted with `CQ-1`, leaving the seam with no consumer, so the assertion moved onto the source itself |
 | `HistoryRouteSmokeTests.AggregateByActivity_SumsPerId_OmitsEmptyIds_AndExcludesOtherUsers` | The aggregate keys by id, **omits** ids with no rows rather than returning zeros (which is what lets callers divide by `entryCount` unguarded), and is user-scoped |
 | `HistoryDashboardGroupIdentityTests` (7 tests) | Every group-shaped response carries the `groupId` of the entity it grouped by; identity survives a rename; `groupId` is null on exactly the two synthetic buckets (`Uncategorized`, the pie's `_other` roll-up). A name-keyed response is well-formed and its numbers add up — this is the only thing that catches it |
 | `HistoryDashboardUserZoneTests` (4 tests) | Ranges and picked windows resolve in `User.Timezone`, not UTC; summary and detail agree on the instants a window names; a window starting inside the spring-forward gap resolves to the end of the gap |

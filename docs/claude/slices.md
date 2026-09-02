@@ -65,10 +65,12 @@ and `ExecuteUpdateAsync` bypasses it — keep `IsDone` writes on tracked entitie
 
 ## AdhdTimeOrganizer.History
 
-`ActivityHistory`, its 13 endpoints (CRUD, the `gird` grid, and the six `HistoryDetail*` /
-`HistorySummary*` dashboards), DTOs, the `HistoryGroupBy` enum, validator and dev seeder.
-**References Core and the framework only — not TodoLists, not Routines**: the grid's to-do / routine
-membership filters were rewritten onto the `IActivityMembershipSource` seam.
+`ActivityHistory`, its endpoints (CRUD, `filter`, `aggregate-by-activity`, the seven
+`HistoryDetail*` / `HistorySummary*` dashboards, the calendar and the timer alarms), DTOs, the `HistoryGroupBy` enum, validator
+and dev seeder. **References Core and the framework only — not TodoLists, not Routines**: the to-do /
+routine membership filters that forced those edges were rewritten onto the
+`IActivityMembershipSource` seam, and then deleted along with the `gird` grid that carried them
+(`CQ-1` — nothing ever called it), so History consumes that seam nowhere today.
 
 ⚠ **`ActivityHistory` carries two nullable item links**, `TodoListItemId` / `RoutineTodoListId` —
 which task a recording was saved from, stamped when the user accepts the save-to-history prompt on
@@ -173,8 +175,9 @@ reference or a sequencing constraint:
 1. A **materialized view** (Planning ← History).
 2. A **navigation-free FK declared in the host** (Planning → TodoLists; History → TodoLists /
    Routines for the recording↔task links).
-3. The **`IActivityMembershipSource` seam** (History ← TodoLists / Routines; the same shape carries
-   `ITodoListItemLoggedTimeSource` the other way, TodoLists ← History).
+3. The **`IActivityMembershipSource` seam** (History ← TodoLists / Routines until the `gird` grid was
+   deleted; the same shape carries `ITodoListItemLoggedTimeSource` the other way, TodoLists ← History,
+   which is live).
 4. For a **write**, which none of the others can invert — an **event whose decision moves to a
    subscriber** (Tracking → Planning / TodoLists / Routines, via `ActivityTimeRecordedEvent`).
 
@@ -188,8 +191,9 @@ constants, the **owning** slice implements it (`TodoListActivityMembershipSource
 rules: the returned `IQueryable<long>` must stay **composable** (callers use it as a subquery, so
 `ToList()` turns one `EXISTS` into a client-side filter), and because resolution is by *string key* a
 missing or misregistered implementation is **silent** — no build error, no exception, the filter just
-stops narrowing. Every consumer needs a test asserting the rows, not merely the route
-(`HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam`).
+stops narrowing. Every consumer needs a test asserting the rows, not merely the route. It has **no
+consumer today** — History's grid was its only one — so the row-level assertion currently sits on the
+source itself (`SeamWiringTests.TodoListMembershipSource_NarrowsToActivitiesOnAList`).
 
 **`IActivityTimeAttributionSink`** (same folder) — the heartbeat's `ActivityHistory` write. History
 implements it; Tracking calls it. Resolved as a **single** service, not a keyed `IEnumerable`, so a
