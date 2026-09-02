@@ -15,7 +15,7 @@ Paths are relative to `AdhdTimeOrganizer.Tracking/` unless stated.
 
 ## 5. Security & authorization
 
-### SEC-1 🟠 The web-extension heartbeat is missing the `ActivityTracking` policy
+### SEC-1 🟠 ✅ FIXED 2026-09-03 · The web-extension heartbeat is missing the `ActivityTracking` policy
 
 `application/endpoint/webExtension/command/WebExtensionDataHeartbeatEndpoint.cs:10-24`
 
@@ -41,6 +41,17 @@ all (`TEST-1`).
 
 **Fix:** add `Policies(PortalAuthorizationPolicies.ActivityTracking);` to `Configure()`, and move the
 route onto a group the way the other two are (see `MIG-3` — this changes who gets a 403).
+
+**Fixed 2026-09-03.** `Policies(PortalAuthorizationPolicies.ActivityTracking)` added to `Configure()`.
+The route was **not** moved onto a group: there is no `ActivityTrackingWebExtensionGroup`, and the other
+five web-extension endpoints all declare literal routes, so grouping this one alone would split the
+folder's convention — that is a separate change across all six. `TEST-1`'s auth matrix is now covered by
+three cases in `ExtensionActivityTrackingTests`
+(`WebExtensionHeartbeat_WithExtensionToken_ReturnsOk`,
+`WebExtensionHeartbeat_WithExtensionToken_ButNoActivityTrackingRole_Returns403`,
+`WebJwt_CannotAccess_WebExtensionHeartbeat_Returns403`); the rest of `TEST-1` — the running-total
+upsert, minute alignment, the `isFinal` latch — is still open. The `MIG-3` rollout risk stands: this is
+live at deploy, not behind a log-only release.
 
 `Doc impact: none` (the doc is right; the code is wrong).
 
@@ -424,7 +435,7 @@ reject it in the grid validators. Either is better than the silent reinterpretat
 
 ## Code/doc drift
 
-### DOC-1 🟠 `domain-map.md` states an auth rule the web-extension heartbeat does not follow
+### DOC-1 🟠 ✅ MOOT 2026-09-03 · `domain-map.md` states an auth rule the web-extension heartbeat does not follow
 
 `docs/domain-map.md:189-191` — *"the three ingest endpoints carry `[AllowExtensionClients]` **and**
 `Policies(PortalAuthorizationPolicies.ActivityTracking)`"*. Two of the three do. **The code is wrong**

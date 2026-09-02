@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.heartbeat;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
@@ -21,6 +22,11 @@ public class WebExtensionDataHeartbeatEndpoint(DbContext dbContext) : Endpoint<W
             s.Response<int>(200, "Success - returns count of processed activities");
             s.Response(400, "Bad request");
         });
+        // [AllowExtensionClients] only lifts the blanket DenyExtensionClients policy -- it grants
+        // nothing. Without this the route falls back to the configurator's Roles("User","Admin","Root"),
+        // so a plain web JWT could post browsing rows into the ledger. Its two ingest siblings
+        // (DesktopActivityHeartbeatEndpoint, AndroidSyncEndpoint) carry the same pair.
+        Policies(PortalAuthorizationPolicies.ActivityTracking);
     }
 
     public override async Task HandleAsync(WebExtensionHeartbeatRequest req, CancellationToken ct)

@@ -11,6 +11,7 @@ using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.heartbeat;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
@@ -154,6 +155,86 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
         var response = await webClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    /// <summary>
+    /// The web-extension heartbeat is the third ingest route, and it is gated the same way as the
+    /// desktop and android ones. <c>[AllowExtensionClients]</c> alone only lifts the blanket
+    /// <c>DenyExtensionClients</c> policy — it grants nothing — so without an explicit
+    /// <c>Policies(ActivityTracking)</c> the route silently falls back to the configurator's
+    /// <c>Roles("User","Admin","Root")</c> and any web session can post browsing rows into the ledger.
+    /// Nothing about that shows up as a build error or a log line, hence these three cases.
+    /// </summary>
+    [Fact]
+    public async Task WebExtensionHeartbeat_WithExtensionToken_ReturnsOk()
+    {
+        var email = "web-heartbeat-user@test.com";
+        await CreateUserWithExtensionAccess(email, true);
+
+        var loginResult = await ExtensionLoginSuccessAsync(email);
+
+        using var extensionClient = CreateCookieClient();
+        extensionClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
+
+        var response = await extensionClient.PostAsJsonAsync("activity-tracking/web-extension/heartbeat",
+            WebExtensionHeartbeat(), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task WebExtensionHeartbeat_WithExtensionToken_ButNoActivityTrackingRole_Returns403()
+    {
+        var email = "web-heartbeat-no-role-user@test.com";
+        await CreateUserWithExtensionAccess(email, true, false);
+
+        var loginResult = await ExtensionLoginSuccessAsync(email);
+
+        using var extensionClient = CreateCookieClient();
+        extensionClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
+
+        var response = await extensionClient.PostAsJsonAsync("activity-tracking/web-extension/heartbeat",
+            WebExtensionHeartbeat(), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task WebJwt_CannotAccess_WebExtensionHeartbeat_Returns403()
+    {
+        using var webClient = CreateCookieClient();
+        await LoginAsync(webClient, TestEmail, TestPassword);
+
+        var response = await webClient.PostAsJsonAsync("activity-tracking/web-extension/heartbeat",
+            WebExtensionHeartbeat(), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    /// <summary>
+    /// A minimal request the validator accepts: one whole-minute window, one entry inside the 0-60
+    /// second bounds.
+    /// </summary>
+    private static WebExtensionHeartbeatRequest WebExtensionHeartbeat()
+    {
+        var now = DateTime.UtcNow;
+        return new WebExtensionHeartbeatRequest
+        {
+            HeartbeatAt = now,
+            WindowStart = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerMinute, DateTimeKind.Utc),
+            WindowMinutes = 1,
+            IsFinal = false,
+            Activities =
+            [
+                new WebExtensionEntryDto
+                {
+                    Domain = "example.com",
+                    Url = "https://example.com/page",
+                    ActiveSeconds = 30,
+                    BackgroundSeconds = 0
+                }
+            ]
+        };
     }
 
     [Fact]
