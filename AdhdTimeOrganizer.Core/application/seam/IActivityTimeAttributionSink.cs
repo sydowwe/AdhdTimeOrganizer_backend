@@ -41,7 +41,16 @@ public interface IActivityTimeAttributionSink : ISeam
     /// across every source — not just the one that produced the current batch.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Read <em>after</em> the caller has saved, otherwise the batch being processed is not counted.
+    /// </para>
+    /// <para>
+    /// ⚠ <paramref name="day"/> is a <b>UTC</b> calendar day: implementations bound it half-open on UTC
+    /// midnights (<c>[day 00:00Z, day+1 00:00Z)</c>), so callers must derive it from a UTC instant. It
+    /// is <em>not</em> the caller's local day — for a user away from UTC the total therefore covers a
+    /// window shifted from their own midnight. Changing that is a signature change (this takes a bare
+    /// <see cref="DateOnly"/> with no zone), not an implementation detail.
+    /// </para>
     /// </remarks>
     Task<int> TotalSecondsOnDayAsync(DbContext db, long userId, long activityId, DateOnly day, CancellationToken ct);
 }

@@ -52,14 +52,18 @@ public sealed class ActivityHistoryTimeAttributionSink : IActivityTimeAttributio
 
     public async Task<int> TotalSecondsOnDayAsync(DbContext db, long userId, long activityId, DateOnly day, CancellationToken ct)
     {
-        var dayStart = day.ToDateTime(TimeOnly.MinValue);
-        var dayEnd = day.ToDateTime(TimeOnly.MaxValue);
+        // Half-open UTC range, matching TodoListItemLoggedTimeSource and every History dashboard.
+        // The Kind is not cosmetic: Npgsql rejects an Unspecified DateTime against a timestamptz
+        // column, and this runs on the live heartbeat path. A closed range on TimeOnly.MaxValue would
+        // additionally drop whatever lands in the final tick.
+        var from = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var to = from.AddDays(1);
 
         // Summed in memory, as it was before the move: Length is an IntTime value object behind a
         // converter, so its TotalSeconds is not translatable to SQL.
         var lengths = await db.Set<ActivityHistory>()
             .Where(h => h.UserId == userId && h.ActivityId == activityId
-                                           && h.StartTimestamp >= dayStart && h.StartTimestamp <= dayEnd)
+                                           && h.StartTimestamp >= from && h.StartTimestamp < to)
             .Select(h => h.Length)
             .ToListAsync(ct);
 

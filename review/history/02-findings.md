@@ -298,7 +298,7 @@ review — but it is a solution-wide blind spot and belongs in its own finding.
 
 `Doc impact: none`
 
-### `CQ-5` 🟠 (PLAUSIBLE) · The attribution sink bounds its day wrongly, three ways
+### `CQ-5` 🟠 ✅ FIXED 2026-09-02 · The attribution sink bounds its day wrongly, three ways
 
 `application/seam/ActivityHistoryTimeAttributionSink.cs:53-67`
 
@@ -324,8 +324,21 @@ DateTimeKind.Utc)`, half-open `>= from && < to`. Item 3 is a wider decision (the
 a bare `DateOnly` with no zone); at minimum record which day it means in
 `Core/application/seam/IActivityTimeAttributionSink.cs`. `TEST-4`.
 
-`Doc impact: domain-map.md → Navigation index` (the `ActivityHistoryTimeAttributionSink` row should say
-which day boundary `TotalSecondsOnDayAsync` uses) + `Core`'s seam XML.
+**Fixed:** items 1 and 2 in code — `TotalSecondsOnDayAsync` now builds `from =
+day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)` / `to = from.AddDays(1)` and filters `>= from && <
+to`, identical to `TodoListItemLoggedTimeSource`, with a comment saying why the kind is load-bearing.
+Item 3 is recorded rather than changed: `IActivityTimeAttributionSink.TotalSecondsOnDayAsync`'s remarks
+now state that `day` is a **UTC** calendar day bounded half-open on UTC midnights, that callers must
+derive it from a UTC instant, and that making it the user's day is a signature change (the parameter is
+a bare `DateOnly` with no zone) — the same UTC-vs-user's-day gap `DOC-2` tracks slice-wide.
+
+Note the coverage caveat from `CQ-4`: `PostgresContainerFixture` enables
+`Npgsql.EnableLegacyTimestampBehavior`, so no integration round trip in this repo would have failed on
+item 1 — a test for it has to assert the bound's `Kind` directly. `TEST-4` still stands for the
+sink's behaviour.
+
+`Doc impact: done` — `History/docs/domain-map.md` → Navigation index (the
+`ActivityHistoryTimeAttributionSink` row now names the day boundary) + `Core`'s seam XML.
 
 ### `CQ-6` 🟡 ✅ FIXED 2026-09-02 · Dead computation in both summary-cards endpoints
 
