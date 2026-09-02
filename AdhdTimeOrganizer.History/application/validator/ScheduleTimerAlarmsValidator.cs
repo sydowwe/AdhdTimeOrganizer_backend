@@ -46,6 +46,13 @@ public class ScheduleTimerAlarmsValidator : Validator<ScheduleTimerAlarmsRequest
         RuleForEach(x => x.Boundaries).ChildRules(boundary =>
         {
             boundary.RuleFor(b => b.BoundaryAt)
+                .Cascade(CascadeMode.Stop)
+                // An instant with no offset is read as *server local* time by ToUniversalTime, so an
+                // unsuffixed value was validated against one interpretation and then stored under another
+                // (the service labels it UTC). Both readings are wrong on a non-UTC server, and the
+                // difference is silent: the alarm simply rings at the wrong hour. Require the offset.
+                .Must(at => at.Kind != DateTimeKind.Unspecified)
+                .WithMessage("BoundaryAt must be an ISO-8601 instant carrying an offset (a trailing 'Z' is the usual one).")
                 .Must(at => at.ToUniversalTime() <= DateTime.UtcNow + MaxHorizon)
                 .WithMessage($"A boundary may be at most {MaxHorizon.TotalHours:0} hours ahead.");
 

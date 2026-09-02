@@ -46,11 +46,26 @@ public class TimerBoundaryAlarmService(
     /// are dropped here rather than registered: <c>RunOnceAt</c> would fire a past-due instant immediately via
     /// the misfire path, which for a boundary the user already lived through is a spurious alarm.
     /// </para>
+    /// <para>
+    /// <b>Not atomic.</b> The cancel saves (deleting rows) before the new rows are added and saved, so two
+    /// concurrent POSTs for one session can interleave and leave both sets registered, or delete rows the
+    /// other just inserted. Deliberately not wrapped in a transaction — that would have to span a Scheduler
+    /// call — because the blast radius is one duplicate push under the same <c>Tag</c>, which the client's
+    /// own tag replacement collapses. Do not read the two saves as one unit.
+    /// </para>
     /// </summary>
     public async Task<int> ReplaceSessionAsync(
         long userId, Guid sessionId, IReadOnlyCollection<TimerBoundaryAlarm> boundaries, CancellationToken ct = default)
     {
         await CancelSessionAsync(userId, sessionId, ct);
+
+        // Normalized before the cutoff comparison, not after it: the boundary carries whatever kind the
+        // client's instant parsed to, and both the comparison below and the timestamptz column need UTC.
+        // ToUniversalTime, not SpecifyKind — relabelling an offset-carrying instant as UTC moves it by the
+        // offset. The validator has already rejected an Unspecified kind, which is the one value neither
+        // call can convert correctly.
+        foreach (var alarm in boundaries)
+            alarm.BoundaryAt = alarm.BoundaryAt.ToUniversalTime();
 
         var cutoff = DateTime.UtcNow;
         var pending = boundaries.Where(b => b.BoundaryAt > cutoff).ToList();
@@ -61,7 +76,6 @@ public class TimerBoundaryAlarmService(
         {
             alarm.UserId = userId;
             alarm.SessionId = sessionId;
-            alarm.BoundaryAt = DateTime.SpecifyKind(alarm.BoundaryAt, DateTimeKind.Utc);
         }
 
         await dbContext.AddRangeAsync(pending, ct);

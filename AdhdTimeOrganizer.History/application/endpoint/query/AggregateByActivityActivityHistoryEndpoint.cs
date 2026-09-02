@@ -8,9 +8,13 @@ using Sydowwe.Framework.application.extensions;
 namespace AdhdTimeOrganizer.History.application.endpoint.activityHistory.activityHistory.query;
 
 /// <summary>
-/// Logged-time totals per activity id, across all of the caller's history. Exists because the pie-chart
-/// dashboard endpoint groups by activity <em>name</em>, and names are not unique — a caller holding an
-/// activity id cannot match a pie slice back to it reliably.
+/// Logged-time totals per activity id, across all of the caller's history.
+///
+/// <para>It used to exist because the pie chart grouped by activity <em>name</em>. It no longer does —
+/// every group-shaped response carries a <c>groupId</c> — and two other reasons keep this endpoint:
+/// it spans <b>all</b> history with no date range, which no dashboard offers; and it <b>omits ids with
+/// no rows</b> rather than returning zeros for them, which is what lets a caller divide by
+/// <c>entryCount</c> without guarding. See <c>domain-map.md</c> → <i>Group identity</i>.</para>
 /// </summary>
 public class AggregateByActivityActivityHistoryEndpoint(DbContext db)
     : Endpoint<ActivityHistoryAggregateByActivityRequest, List<ActivityHistoryAggregateByActivityResponse>>

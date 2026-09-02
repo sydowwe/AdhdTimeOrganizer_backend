@@ -43,6 +43,12 @@ public record ActivityHistoryRequest : ActivityIdRequest, IMyRequest<ActivityHis
         e.StartTimestamp = StartTimestamp;
         e.Length = Length;
 
+        // Recomputed, never left alone: EndTimestamp is a stored derivation of the two fields above, and
+        // the attribution sink's contiguous-window probe reads it (EndTimestamp == windowStart). An edit
+        // that shortened a recording used to leave the old end behind, which is the only way those three
+        // columns can disagree.
+        e.EndTimestamp = StartTimestamp.AddSeconds(Length.TotalSeconds);
+
         // The two item links are deliberately NOT written here. They record which prompt raised the
         // recording, which the edit form neither shows nor knows about — assigning them would post
         // null on every ordinary edit and silently unlink the row from its task, dropping it out of
