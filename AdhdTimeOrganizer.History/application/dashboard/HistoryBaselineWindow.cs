@@ -13,7 +13,7 @@ namespace AdhdTimeOrganizer.History.application.dashboard;
 /// </remarks>
 public readonly record struct HistoryBaselineWindow
 {
-    private HistoryBaselineWindow(DateTime from, DateTime to, string baseline, HashSet<DayOfWeek>? weekdayFilter)
+    private HistoryBaselineWindow(DateTime? from, DateTime to, string baseline, HashSet<DayOfWeek>? weekdayFilter)
     {
         From = from;
         To = to;
@@ -21,8 +21,13 @@ public readonly record struct HistoryBaselineWindow
         WeekdayFilter = weekdayFilter;
     }
 
-    /// <summary>Inclusive start of the baseline range. <c>DateTime.MinValue</c> for <c>allTime</c>.</summary>
-    public DateTime From { get; }
+    /// <summary>
+    /// Inclusive start of the baseline range, or null for <c>allTime</c>, which has no lower bound.
+    /// Apply it with <see cref="ApplyRange"/> rather than reading it — a sentinel here would be an
+    /// <c>Unspecified</c>-kind <see cref="DateTime"/>, which Npgsql refuses to write to a
+    /// <c>timestamptz</c> column.
+    /// </summary>
+    public DateTime? From { get; }
 
     /// <summary>Exclusive end — always the current period's start, so the two never overlap.</summary>
     public DateTime To { get; }
@@ -49,9 +54,23 @@ public readonly record struct HistoryBaselineWindow
             "last30days" => new HistoryBaselineWindow(currentFrom.AddDays(-30), currentFrom, baseline, null),
             "sameweekday" => new HistoryBaselineWindow(
                 currentFrom.AddDays(-56), currentFrom, baseline, GetWeekdaysInRange(dateFrom, dateTo)),
-            "alltime" => new HistoryBaselineWindow(DateTime.MinValue, currentFrom, baseline, null),
+            "alltime" => new HistoryBaselineWindow(null, currentFrom, baseline, null),
             _ => new HistoryBaselineWindow(currentFrom.AddDays(-7), currentFrom, baseline, null)
         };
+    }
+
+    /// <summary>
+    /// Narrows a baseline query to this window. <c>allTime</c> gets no lower bound at all, so the
+    /// query stays a plain range scan on <c>(UserId, StartTimestamp)</c> instead of carrying a
+    /// predicate that excludes nothing.
+    /// </summary>
+    public IQueryable<ActivityHistory> ApplyRange(IQueryable<ActivityHistory> query)
+    {
+        if (From is { } from)
+            query = query.Where(ah => ah.StartTimestamp >= from);
+
+        var to = To;
+        return query.Where(ah => ah.StartTimestamp < to);
     }
 
     /// <summary>Drops the rows the window's range could not exclude — today, only the weekday filter.</summary>

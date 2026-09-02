@@ -34,12 +34,12 @@ public class HistoryDetailSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolv
         var window = HistoryBaselineWindow.Resolve(
             from, DateOnly.FromDateTime(from), DateOnly.FromDateTime(to), req.Baseline);
 
-        var baselineRecords = await db.Set<ActivityHistory>()
+        var baselineQuery = db.Set<ActivityHistory>()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Include(ah => ah.Activity).ThenInclude(a => a.Category)
-            .Where(ah => ah.UserId == userId)
-            .Where(ah => ah.StartTimestamp >= window.From && ah.StartTimestamp < window.To)
-            .ToListAsync(ct);
+            .Where(ah => ah.UserId == userId);
+
+        var baselineRecords = await window.ApplyRange(baselineQuery).ToListAsync(ct);
 
         var previousFrom = from.AddDays(-dayCount);
 

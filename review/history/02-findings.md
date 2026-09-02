@@ -258,7 +258,7 @@ old agreement test could not assert; and a per-band `totalSeconds` case for the 
 
 `Doc impact: none` (the docs already describe the intended behaviour; the code is wrong).
 
-### `CQ-4` 🔴 (PLAUSIBLE) · `baseline: "alltime"` sends `DateTime.MinValue` at a `timestamptz` column
+### `CQ-4` 🔴 ✅ FIXED 2026-09-02 · `baseline: "alltime"` sends `DateTime.MinValue` at a `timestamptz` column
 
 `…/summary/HistorySummarySummaryCardsEndpoint.cs:142` · `…/detail/HistoryDetailSummaryCardsEndpoint.cs:142`
 
@@ -279,6 +279,22 @@ No test drives any non-default baseline (`TEST-2`), which is why this has surviv
 **Fix:** `DateTime.UnixEpoch` (UTC-kinded) — or better, drop the sentinel and omit the lower bound
 entirely for `alltime`, which is both correct and lets Postgres use the `(UserId, StartTimestamp)` index
 without a useless predicate. Fix in both files (`CQ-2`).
+
+**Fixed:** the second way. The sentinel is gone — `HistoryBaselineWindow.From` is now `DateTime?`, null
+for `allTime`, and the new `ApplyRange` adds the lower-bound predicate only when there is one. Both
+endpoints hand their user-scoped baseline query to it, so the shape is stated once (`CQ-2`).
+
+**A correction to this finding's last paragraph, which matters more than the fix.** A test *does* now
+drive every baseline on both routes (`HistorySummaryCardsBaselineTests`) — and it passes with the
+sentinel put back. `Sydowwe.Framework.Testing.PostgresContainerFixture`'s static constructor sets
+`AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true)`, and the host does not, so **every
+integration test in this solution runs under timestamp semantics production does not have.** No
+round-trip test in this repo can catch an `Unspecified`-kind bound, here or anywhere else; `TEST-2`
+would have closed the coverage gap and still missed the defect. The kind is therefore pinned directly
+on the resolver (`ResolvedBaseline_HasNoLowerBoundThatIsNotUtc`), which is the only assertion in the
+file that fails when the sentinel returns. The divergence itself is out of this finding's scope — the
+fixture lives in the `framework/` submodule and the switch is load-bearing for tests that predate this
+review — but it is a solution-wide blind spot and belongs in its own finding.
 
 `Doc impact: none`
 
