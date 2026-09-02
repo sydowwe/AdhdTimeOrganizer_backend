@@ -41,8 +41,20 @@ public class HistorySummaryStackedBarsRequestValidator
 public class HistorySummaryPieChartRequestValidator
     : DateRangeRequestValidator<HistorySummaryPieChartRequest>;
 
+/// <summary>
+/// <c>Baseline</c> is an enum on the wire, so a made-up string is already a 400 from the binder. This rule
+/// closes the other door: a numeric body value (<c>"baseline": 99</c>) binds to an undefined member, which
+/// <c>HistoryBaselineWindow</c> now throws on rather than silently reading as <c>last7days</c> — a 400 is
+/// the right answer to it, not a 500.
+/// </summary>
 public class HistorySummarySummaryCardsRequestValidator
-    : DateRangeRequestValidator<HistorySummarySummaryCardsRequest>;
+    : DateRangeRequestValidator<HistorySummarySummaryCardsRequest>
+{
+    public HistorySummarySummaryCardsRequestValidator()
+    {
+        RuleFor(x => x.Baseline).IsInEnum();
+    }
+}
 
 public class HistorySummaryTimeOfDayRequestValidator
     : DateRangeRequestValidator<HistorySummaryTimeOfDayRequest>;

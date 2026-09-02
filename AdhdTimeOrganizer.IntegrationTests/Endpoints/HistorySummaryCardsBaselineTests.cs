@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.History.application.dashboard;
+using AdhdTimeOrganizer.History.application.dto.@enum;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
@@ -73,6 +74,31 @@ public class HistorySummaryCardsBaselineTests(AppDbContextFixture fixture) : Pos
     }
 
     /// <summary>
+    /// The other half of <c>CQ-7</c>, and the reason <c>Baseline</c> stopped being a <c>string</c>: a value
+    /// nobody advertises must be <b>refused</b>, not quietly answered as <c>last7days</c>. A typo used to
+    /// come back 200 carrying a baseline the caller never asked for — a wrong number that looks right, which
+    /// is the failure mode this slice is supposed to design against.
+    ///
+    /// <para>Surrounding whitespace is <b>not</b> in here on purpose: <c>Enum.TryParse</c>, which the
+    /// converter uses, trims it, so <c>"last30Days "</c> resolves to the member the caller plainly meant.
+    /// That is leniency, not a wrong answer — the hazard was only ever a value with no member behind it.</para>
+    /// </summary>
+    [Theory]
+    [InlineData(DetailRoute, "somethingTheClientMadeUp")]
+    [InlineData(DetailRoute, "last_30_days")]
+    [InlineData(SummaryRoute, "somethingTheClientMadeUp")]
+    [InlineData(SummaryRoute, "last_30_days")]
+    public async Task UnknownBaseline_IsRefused(string route, string baseline)
+    {
+        await SeedTheTwoRowsAsync();
+
+        var response = await PostRawAsync(route, BodyFor(route, baseline));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "an unrecognised baseline must be an error the caller can see, not a silent fallback to last7days");
+    }
+
+    /// <summary>
     /// <c>allTime</c> means all time: a row two months old is in its baseline, and in no other one. Asserted
     /// through <c>isNew</c> / <c>averageSeconds</c> because those are the only two fields on the wire that
     /// change when the baseline range does — a card whose baseline found nothing reads as new.
@@ -107,12 +133,11 @@ public class HistorySummaryCardsBaselineTests(AppDbContextFixture fixture) : Pos
     /// UTC-kinded or absent, and this is what says so.
     /// </summary>
     [Theory]
-    [InlineData("last7days")]
-    [InlineData("last30days")]
-    [InlineData("sameWeekday")]
-    [InlineData("allTime")]
-    [InlineData("somethingTheClientMadeUp")]
-    public void ResolvedBaseline_HasNoLowerBoundThatIsNotUtc(string baseline)
+    [InlineData(HistoryBaseline.Last7Days)]
+    [InlineData(HistoryBaseline.Last30Days)]
+    [InlineData(HistoryBaseline.SameWeekday)]
+    [InlineData(HistoryBaseline.AllTime)]
+    public void ResolvedBaseline_HasNoLowerBoundThatIsNotUtc(HistoryBaseline baseline)
     {
         var currentFrom = new DateTime(2026, 3, 9, 0, 0, 0, DateTimeKind.Utc);
 
