@@ -16,7 +16,7 @@ exposes another user's records to a reader.
 | 4 | 🟠 | `AllTime` baselines pass `DateTime.MinValue` to a `timestamptz` column — 500 in production, impossible to reproduce in tests | `CQ-1` | three `*SummaryCardsEndpoint.cs` |
 | 5 | 🟠 | Summary-cards baselines ignore the per-day window the current period applies, inflating every comparison | `CQ-2` | three `*SummaryCardsEndpoint.cs` |
 | 6 | 🟠 | An unbounded android session (accepted at ingest) expands to one record per minute in the unified loader | `SEC-5` | `application/validator/android/AndroidSyncValidator.cs`, `service/unified/UnifiedActivityLoader.cs:311` |
-| 7 | 🟠 | User-authored regexes run with no timeout on the once-a-minute ingest path | `SEC-4` | `endpoint/desktop/command/DesktopActivityHeartbeatEndpoint.cs:150` |
+| 7 | 🟠 | ✅ FIXED 2026-09-03 — User-authored regexes run with no timeout on the once-a-minute ingest path | `SEC-4` | `endpoint/desktop/command/DesktopActivityHeartbeatEndpoint.cs:150` |
 | 8 | 🟠 | Android sync mislabels an offset-bearing timestamp as UTC instead of converting it | `CQ-6` | `endpoint/android/command/AndroidSyncEndpoint.cs:37` |
 | 9 | 🟠 | Duplicated session inside one sync batch → unique violation → the whole batch 500s and the device retries forever | `CQ-7` | `endpoint/android/command/AndroidSyncEndpoint.cs:88` |
 | 10 | 🟠 | Two same-titled windows of one process in one heartbeat → unique violation → the window is lost | `CQ-8` | `endpoint/desktop/command/DesktopActivityHeartbeatEndpoint.cs:69` |

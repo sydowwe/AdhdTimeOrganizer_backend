@@ -139,7 +139,7 @@ Two things deliberately left out of this change:
 which column each ages on); `domain-map.md` → Infrastructure (retention row) and the `AndroidSessionData`
 entity row, which now says it is the one unpartitioned ledger. `DOC-3` closes with this.
 
-### SEC-4 🟠 User-authored regexes run un-timed on the ingest thread
+### SEC-4 🟠 ✅ FIXED 2026-09-03 · User-authored regexes run un-timed on the ingest thread
 
 `application/endpoint/desktop/command/DesktopActivityHeartbeatEndpoint.cs:141-153`
 
@@ -157,7 +157,17 @@ auto-retrying client into a sustained CPU load, and nothing bounds it.
 as "no match"), or use `RegexOptions.NonBacktracking`; cache the compiled `Regex` per mapping row for the
 lifetime of the request rather than re-parsing per entry.
 
-`Doc impact: summary.md → Gotchas (the "matched in memory, not in SQL" bullet gains the timeout)`
+**Fixed:** the three matching helpers moved into a request-scoped `PatternMatcher` (one instance per
+`HandleAsync`) that caches the compiled `Regex` per `(pattern, matchType)`, so a pattern is parsed once
+per request instead of once per entry × mapping. `Wildcard` and `Regex` now share one path built with
+`new Regex(expression, RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100))`, and
+`RegexMatchTimeoutException` is caught as "no match" — a catastrophic pattern costs 100 ms per value
+rather than a thread. `NonBacktracking` was not used: it would reject the lookarounds and backreferences
+a user may legitimately have stored, and would change which existing mappings still match.
+Compilation stays lazy inside the match, so an invalid user regex still throws at the same point it did.
+`Exact` / `Contains` are untouched.
+
+`Doc impact: summary.md → Gotchas (the "matched in memory, not in SQL" bullet gains the timeout)` — done.
 
 ### SEC-5 🟠 No bound on ingest batch size or android session length
 

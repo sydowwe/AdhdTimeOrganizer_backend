@@ -59,9 +59,11 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
             .Where(m => m.UserId == userId && m.IsActive)
             .ToListAsync(ct);
 
+        var matcher = new PatternMatcher();
+
         foreach (var entry in req.Entries.Where(e => e.ActiveSeconds != 0 || e.BackgroundSeconds != 0))
         {
-            var match = mappings.FirstOrDefault(m => MatchesPattern(m, entry));
+            var match = mappings.FirstOrDefault(m => matcher.MatchesPattern(m, entry));
 
             if (match?.IsIgnored == true)
                 continue;
@@ -121,34 +123,73 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
         await new ActivityTimeRecordedEvent(userId, day, totals).PublishAsync(Mode.WaitForAll, ct);
     }
 
-    private static bool MatchesPattern(TrackerDesktopMappingByPattern mapping, DesktopActivityEntryDto entry)
+    /// <summary>
+    /// Matches entries against the user's mapping rows. The <c>Regex</c> and <c>Wildcard</c> patterns are
+    /// user-authored and run <em>entries × active mappings</em> times per heartbeat, so each one is parsed
+    /// once per request and every match is bounded by <see cref="MatchTimeout"/> — without that, one
+    /// catastrophic pattern (<c>(a+)+$</c> against a long window title) would pin a request thread on
+    /// every heartbeat the agent posts. A pattern that times out counts as "no match".
+    /// </summary>
+    private sealed class PatternMatcher
     {
-        if (mapping.ProcessName != null && mapping.ProcessNameMatchType != null)
-            if (!MatchesString(entry.ProcessName, mapping.ProcessName, mapping.ProcessNameMatchType.Value))
-                return false;
+        private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(100);
 
-        if (mapping.ProductName != null && mapping.ProductNameMatchType != null)
-            if (!MatchesString(entry.ProductName, mapping.ProductName, mapping.ProductNameMatchType.Value))
-                return false;
+        private readonly Dictionary<(string Pattern, PatternMatchType MatchType), Regex> compiled = new();
 
-        if (mapping.WindowTitle != null && mapping.WindowTitleMatchType != null)
-            if (!MatchesString(entry.WindowTitle, mapping.WindowTitle, mapping.WindowTitleMatchType.Value))
-                return false;
-
-        return true;
-    }
-
-    private static bool MatchesString(string? value, string pattern, PatternMatchType matchType)
-    {
-        if (value == null)
-            return false;
-        return matchType switch
+        public bool MatchesPattern(TrackerDesktopMappingByPattern mapping, DesktopActivityEntryDto entry)
         {
-            PatternMatchType.Exact => string.Equals(value, pattern, StringComparison.OrdinalIgnoreCase),
-            PatternMatchType.Contains => value.Contains(pattern, StringComparison.OrdinalIgnoreCase),
-            PatternMatchType.Wildcard => Regex.IsMatch(value, "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$", RegexOptions.IgnoreCase),
-            PatternMatchType.Regex => Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase),
-            _ => false
-        };
+            if (mapping.ProcessName != null && mapping.ProcessNameMatchType != null)
+                if (!MatchesString(entry.ProcessName, mapping.ProcessName, mapping.ProcessNameMatchType.Value))
+                    return false;
+
+            if (mapping.ProductName != null && mapping.ProductNameMatchType != null)
+                if (!MatchesString(entry.ProductName, mapping.ProductName, mapping.ProductNameMatchType.Value))
+                    return false;
+
+            if (mapping.WindowTitle != null && mapping.WindowTitleMatchType != null)
+                if (!MatchesString(entry.WindowTitle, mapping.WindowTitle, mapping.WindowTitleMatchType.Value))
+                    return false;
+
+            return true;
+        }
+
+        private bool MatchesString(string? value, string pattern, PatternMatchType matchType)
+        {
+            if (value == null)
+                return false;
+            return matchType switch
+            {
+                PatternMatchType.Exact => string.Equals(value, pattern, StringComparison.OrdinalIgnoreCase),
+                PatternMatchType.Contains => value.Contains(pattern, StringComparison.OrdinalIgnoreCase),
+                PatternMatchType.Wildcard or PatternMatchType.Regex => IsRegexMatch(value, pattern, matchType),
+                _ => false
+            };
+        }
+
+        private bool IsRegexMatch(string value, string pattern, PatternMatchType matchType)
+        {
+            try
+            {
+                return GetRegex(pattern, matchType).IsMatch(value);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return false;
+            }
+        }
+
+        private Regex GetRegex(string pattern, PatternMatchType matchType)
+        {
+            if (compiled.TryGetValue((pattern, matchType), out var regex))
+                return regex;
+
+            var expression = matchType == PatternMatchType.Wildcard
+                ? "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$"
+                : pattern;
+
+            regex = new Regex(expression, RegexOptions.IgnoreCase, MatchTimeout);
+            compiled[(pattern, matchType)] = regex;
+            return regex;
+        }
     }
 }
