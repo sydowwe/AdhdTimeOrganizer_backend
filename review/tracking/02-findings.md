@@ -101,8 +101,28 @@ erasure.
 **Fix:** add a third `ExecuteDeleteAsync` over `AndroidSessionData` on `SessionStartUtc < cutoff` with
 `IgnoreQueryFilters()`, and extend the log line. `MIG-4` covers the first-run blast radius.
 
-`Doc impact: summary.md → Bounded context (Retention bullet); domain-map.md → Infrastructure (retention
-row)`
+**Fixed:** the handler now takes one `cutoffUtc = retention.CutoffUtc()` for the whole run (so the three
+ledgers cannot disagree about where the horizon sits), derives the existing `cutoffDate` from it, and adds
+`Set<AndroidSessionData>().IgnoreQueryFilters().Where(e => e.SessionStartUtc < cutoffUtc)
+.ExecuteDeleteAsync(ct)`. The log line and its guard carry the third count. `CutoffUtc()` is
+`DateTimeKind.Utc` (it is `DateTime.UtcNow.AddYears(-n)`), which is load-bearing against `timestamptz` in
+production for the reason `CQ-1` explains, and the handler comment now says so. Also updated:
+`TrackingScheduledJobsRegistrar.RetentionPurgeRegistration.Description` (it is what the scheduler
+dashboard prints for this job) and `ActivityTrackingRetentionOptions`' XML doc, both of which named two
+ledgers.
+
+Two things deliberately left out of this change:
+
+- **The index.** `android_session_data` is not partitioned, so this predicate is a real cross-user sweep
+  and wants a plain `session_start_utc` index (the "Indexes that should exist" list, and `MIG-4`). That is
+  a migration on the host and is rollout work, not part of the code fix.
+- **A test.** Nothing in the suite *executes* this handler — `RetentionPurgeJob_IsRegisteredAndScheduled`
+  only asserts it was registered — so the new predicate has no row-level guard, exactly like the two that
+  preceded it. `AUDIT-1`'s "log the run unconditionally" is untouched for the same reason.
+
+`Doc impact: done` — `summary.md` → Bounded context (the Retention bullet now names all three ledgers and
+which column each ages on); `domain-map.md` → Infrastructure (retention row) and the `AndroidSessionData`
+entity row, which now says it is the one unpartitioned ledger. `DOC-3` closes with this.
 
 ### SEC-4 🟠 User-authored regexes run un-timed on the ingest thread
 
@@ -452,7 +472,7 @@ wrong**; fixing `CQ-2` makes the sentence true.
 
 `Doc impact: none once CQ-2 is fixed`
 
-### DOC-3 🟠 Retention is described as the slice's GDPR control while one of the three ledgers is outside it
+### DOC-3 🟠 ✅ FIXED 2026-09-03 · Retention is described as the slice's GDPR control while one of the three ledgers is outside it
 
 `docs/summary.md:35-37` and `docs/domain-map.md:227` describe the purge as *the* retention mechanism for
 the slice, naming the two partitioned tables. Both statements are literally accurate, and together they
@@ -460,7 +480,11 @@ let `AndroidSessionData` fall between them — it is listed as a ledger in the E
 retention column at all. **Both sides need a change**: add the purge (`SEC-3`) and say so in the two
 docs.
 
-`Doc impact: summary.md → Bounded context (Retention); domain-map.md → Infrastructure`
+**Fixed:** both sides. The purge covers `AndroidSessionData` (`SEC-3`), and the two docs now say which
+column each of the three ledgers ages on — plus the `AndroidSessionData` row in `domain-map.md`'s Entities
+table, which was the place the omission was actually visible.
+
+`Doc impact: done` — summary.md → Bounded context (Retention); domain-map.md → Infrastructure + Entities
 
 ### DOC-4 🟡 `Program.cs`'s assembly-list comment says 29 endpoints; there are 38
 

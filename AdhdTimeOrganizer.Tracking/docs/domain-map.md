@@ -32,7 +32,7 @@ by storing the verdict on the entry.
 |---|---|---|---|
 | `DesktopActivityEntry` | `desktop_activity_entry` | Per-heartbeat desktop window. **RANGE-partitioned** on `RecordDate`. `ExecutablePath` is an `EncryptedColumn`; `WindowTitle` deliberately is not. | `domain/model/entity/desktop/` |
 | `WebExtensionActivityEntry` | `web_extension_activity_entry` | Per-minute browser window. **RANGE-partitioned** on `RecordDate`; `RecordDate` derives from `WindowStart` in the initializer so the two cannot diverge. `WindowStart` must be minute-aligned — the timeline endpoint stitches windows by `WindowStart == previous.EndedAt`. | `domain/model/entity/` |
-| `AndroidSessionData` | `android_session_data` | Per-session android usage, deduplicated on sync by the unique `(UserId, DeviceId, PackageName, SessionStartUtc)`. The only ledger storing real sessions rather than windows. | `domain/model/entity/` |
+| `AndroidSessionData` | `android_session_data` | Per-session android usage, deduplicated on sync by the unique `(UserId, DeviceId, PackageName, SessionStartUtc)`. The only ledger storing real sessions rather than windows, and the only one that is not RANGE-partitioned — its retention purge ages on `SessionStartUtc`. | `domain/model/entity/` |
 | `TrackerDesktopMappingByPattern` | `tracker_desktop_mapping_by_pattern` | Pattern → `Activity`/`Role`/`Category`, or `IsIgnored`. Matched in-memory by `MatchesPattern`. **Many** patterns to one activity; `activity_id` is `Cascade` with a pinned constraint name. The unique key is the pattern: `(UserId, ProcessName, ProductName, WindowTitle)`, `NULLS NOT DISTINCT`. | `domain/model/entity/desktop/` |
 | `TrackerAndroidMappingByPattern` | `tracker_android_mapping_by_pattern` | Android equivalent; unique on `(UserId, PackageName, AppLabel)`. | `domain/model/entity/android/` |
 
@@ -224,7 +224,7 @@ and is therefore denied to extension clients by the `Program.cs` configurator's 
 
 | Concern | File |
 |---|---|
-| Retention purge (GDPR Art. 5(1)(e)) | `infrastructure/jobs/PurgeExpiredActivityTrackingEntriesJobHandler.cs` — a keyed `IScheduledJobHandler` (**not** a Quartz `IJob`; this slice references no Quartz). `ExecuteDeleteAsync` with `IgnoreQueryFilters`, so it purges every user's rows |
+| Retention purge (GDPR Art. 5(1)(e)) | `infrastructure/jobs/PurgeExpiredActivityTrackingEntriesJobHandler.cs` — a keyed `IScheduledJobHandler` (**not** a Quartz `IJob`; this slice references no Quartz). `ExecuteDeleteAsync` with `IgnoreQueryFilters`, so it purges every user's rows. All three ledgers: `desktop_activity_entry` / `web_extension_activity_entry` on `RecordDate` (partition-pruned), `android_session_data` on `SessionStartUtc` (unpartitioned, so a real sweep) |
 | Its 03:30-daily schedule | `infrastructure/scheduling/TrackingScheduledJobsRegistrar.cs` — pushed to the Scheduler module on every boot through `IScheduler` (the RAM job store drops triggers on restart) |
 | Retention policy | `infrastructure/persistence/retention/ActivityTrackingRetentionOptions.cs` — bound in `Program.cs` |
 | Dev fixture | `infrastructure/persistence/seeder/dev/WebExtensionDataSeeder.cs` — truncates, so it is a dev seeder, not a default one |

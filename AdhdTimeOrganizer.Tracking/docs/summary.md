@@ -34,7 +34,9 @@ Owns:
   `WebExtensionDataFilterRequest`.
 - **Retention** — `PurgeExpiredActivityTrackingEntriesJobHandler` (a keyed `IScheduledJobHandler` on the
   Scheduler module's substrate, so this slice references no Quartz), its `TrackingScheduledJobsRegistrar`
-  and `ActivityTrackingRetentionOptions`.
+  and `ActivityTrackingRetentionOptions`. It covers **all three** ledgers: the two partitioned ones age
+  out on their `RecordDate`, `android_session_data` on `SessionStartUtc` (it is not partitioned, so that
+  sweep cannot prune partitions — see the index note in `review/tracking/02-findings.md`).
 - **The dev `WebExtensionDataSeeder`** (`Order` inside the 600–699 band — see
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md`).
 

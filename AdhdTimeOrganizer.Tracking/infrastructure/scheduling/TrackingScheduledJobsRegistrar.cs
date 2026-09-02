@@ -26,7 +26,7 @@ public sealed class TrackingScheduledJobsRegistrar(
         // other purges already occupy — Notifications 03:15, Scheduler 03:30 monthly, Reminders 03:45 monthly.
         Schedule = ScheduleSpec.FromCron("0 30 3 * * ?"),
         DisallowConcurrent = true,
-        Description = "GDPR Art. 5(1)(e): purge desktop_activity_entry / web_extension_activity_entry rows past retention."
+        Description = "GDPR Art. 5(1)(e): purge desktop_activity_entry / web_extension_activity_entry / android_session_data rows past retention."
     };
 
     public async Task StartAsync(CancellationToken cancellationToken)
