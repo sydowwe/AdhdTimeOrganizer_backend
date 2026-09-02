@@ -23,6 +23,14 @@ public class WebExtensionHeartbeatValidator : Validator<WebExtensionHeartbeatReq
             .WithMessage("WindowStart must be aligned to a whole minute (zero seconds and sub-second component).");
         RuleFor(x => x.Activities).NotNull();
 
+        // A heartbeat covers one minute (WindowMinutes is pinned to 1 above), so the activity count is
+        // bounded by how many domains a tab can visit in that minute — see TrackingIngestLimits.
+        RuleFor(x => x.Activities)
+            .Must(a => a.Count <= TrackingIngestLimits.MaxWebExtensionActivitiesPerHeartbeat)
+            .WithMessage(
+                $"A heartbeat may carry at most {TrackingIngestLimits.MaxWebExtensionActivitiesPerHeartbeat} activities.")
+            .When(x => x.Activities is not null);
+
         RuleForEach(x => x.Activities).ChildRules(a =>
         {
             a.RuleFor(x => x.Domain).NotEmpty().MaximumLength(255);

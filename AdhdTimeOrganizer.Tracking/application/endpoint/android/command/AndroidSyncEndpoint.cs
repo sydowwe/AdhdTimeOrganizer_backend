@@ -5,14 +5,17 @@ using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.andro
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.Tracking.infrastructure.persistence.retention;
 using FastEndpoints;
+using Microsoft.Extensions.Options;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.infrastructure.security;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.android.command;
 
 [AllowExtensionClients]
-public class AndroidSyncEndpoint(DbContext dbContext) : Endpoint<AndroidSyncRequest, AndroidSyncResponse>
+public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingRetentionOptions> retentionOptions)
+    : Endpoint<AndroidSyncRequest, AndroidSyncResponse>
 {
     public override void Configure()
     {
@@ -28,6 +31,16 @@ public class AndroidSyncEndpoint(DbContext dbContext) : Endpoint<AndroidSyncRequ
         var userId = User.GetId();
         var accepted = 0;
         var duplicatesSkipped = 0;
+
+        // SEC-5: the instants come from a phone's clock and are stored permanently, so they are bounded
+        // here — the validator can only bound the stated DurationSeconds, not the span the two strings
+        // actually describe. A session outside these bounds is dropped with the other unusable ones rather
+        // than failing the whole sync: the batch is a backlog upload, and one bad row must not strand the
+        // rest of the device's history.
+        var now = DateTime.UtcNow;
+        var latestAcceptable = now + TrackingIngestLimits.MaxClockSkew;
+        var earliestAcceptable = retentionOptions.Value.CutoffUtc(now);
+        var maxSpan = TimeSpan.FromSeconds(TrackingIngestLimits.MaxAndroidSessionSeconds);
 
         // Parse and validate sessions
         var validSessions = new List<(string PackageName, string AppLabel, DateTime Start, DateTime End, long Duration)>();
@@ -48,6 +61,27 @@ public class AndroidSyncEndpoint(DbContext dbContext) : Endpoint<AndroidSyncRequ
             if (end <= start)
             {
                 Logger.LogWarning("Android sync: skipping session where end <= start. Package={Package}", item.PackageName);
+                continue;
+            }
+
+            if (end - start > maxSpan)
+            {
+                Logger.LogWarning("Android sync: skipping session longer than the {MaxHours}h bound. Package={Package} Seconds={Seconds}",
+                    maxSpan.TotalHours, item.PackageName, (long)(end - start).TotalSeconds);
+                continue;
+            }
+
+            if (start > latestAcceptable || end > latestAcceptable)
+            {
+                Logger.LogWarning("Android sync: skipping session in the future. Package={Package}", item.PackageName);
+                continue;
+            }
+
+            // Past the retention horizon the purge job would delete it on its next run anyway, so storing
+            // it only creates a row that reads as history nobody can explain.
+            if (start < earliestAcceptable)
+            {
+                Logger.LogWarning("Android sync: skipping session older than the retention horizon. Package={Package}", item.PackageName);
                 continue;
             }
 

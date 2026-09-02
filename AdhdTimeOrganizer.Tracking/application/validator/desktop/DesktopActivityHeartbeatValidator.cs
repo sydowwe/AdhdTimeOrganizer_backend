@@ -15,6 +15,13 @@ public class DesktopActivityHeartbeatValidator : Validator<DesktopActivityWindow
 
         RuleFor(x => x.Entries).NotEmpty();
 
+        // A heartbeat covers one minute, so the entry count is bounded by how many windows a person can
+        // touch in that minute — see TrackingIngestLimits.
+        RuleFor(x => x.Entries)
+            .Must(entries => entries.Count <= TrackingIngestLimits.MaxDesktopEntriesPerWindow)
+            .WithMessage($"A heartbeat may carry at most {TrackingIngestLimits.MaxDesktopEntriesPerWindow} entries.")
+            .When(x => x.Entries is not null);
+
         RuleFor(x => x.Entries)
             .Must(entries => entries.All(e => e.ActiveSeconds + e.BackgroundSeconds <= 60))
             .Must(entries => entries.Sum(e => e.ActiveSeconds) <= 60)

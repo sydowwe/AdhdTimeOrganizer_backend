@@ -169,7 +169,7 @@ Compilation stays lazy inside the match, so an invalid user regex still throws a
 
 `Doc impact: summary.md → Gotchas (the "matched in memory, not in SQL" bullet gains the timeout)` — done.
 
-### SEC-5 🟠 No bound on ingest batch size or android session length
+### SEC-5 🟠 ✅ FIXED 2026-09-03 · No bound on ingest batch size or android session length
 
 `application/validator/android/AndroidSyncValidator.cs`,
 `application/validator/desktop/DesktopActivityHeartbeatValidator.cs:16`,
@@ -191,7 +191,32 @@ denial-of-service on the six merged endpoints, with the poison row invisible in 
 `DurationSeconds` to 24h and reject sessions starting more than a small window in the future or before
 the retention floor; defensively clamp `SliceIntoMinutes` regardless.
 
-`Doc impact: domain-map.md → Invariants (an android session is at most one day and is not in the future)`
+**Fixed 2026-09-03.** All four parts, with the caps collected in one place
+(`application/validator/TrackingIngestLimits.cs`) rather than three literals:
+
+- each validator caps its collection — 1000 android sessions per sync (a backlog upload after a long
+  offline stretch, not a day's worth), 200 desktop entries and 200 web-extension activities per
+  heartbeat (both cover a single minute);
+- `AndroidSyncValidator` bounds `DurationSeconds` to 24h above as well as `> 0` below;
+- `AndroidSyncEndpoint` bounds the span the two instant *strings* describe — which the validator cannot
+  see, since it only has the stated `DurationSeconds` — plus a 5-minute future skew and the retention
+  floor (`ActivityTrackingRetentionOptions.CutoffUtc`, injected). Those three join the existing
+  unparseable / `end <= start` / duration-mismatch arms and **drop the offending session with a warning
+  rather than failing the sync**: the batch is a backlog upload, so one bad row must not strand the rest
+  of the device's history. The batch-size and duration caps stay a 400, because a payload that shape is
+  a broken or hostile client, not one bad row.
+- `SliceIntoMinutes` clamps to `24 * 60 + 1` slices regardless, for rows written before the gate.
+
+The retention floor is a deliberate addition beyond the finding: without it a phone can write rows the
+purge job (`SEC-3`) deletes on its next run, which reads as history nobody can explain. `MaxClockSkew` is
+5 minutes rather than zero because device clocks drift and the sync is asynchronous.
+
+Pinned by `TrackingIngestBoundsTests` (8 cases). Five of them assert on **stored rows**, not just the
+status code, because a poison row is invisible in the android dashboards — they render it as one ordinary
+session. One of those five asserts an ordinary session still lands, so the bounds cannot silently eat
+normal traffic.
+
+`Doc impact: domain-map.md → Invariants (an android session is at most one day and is not in the future)` — done, as two bullets (session bounds, payload size).
 
 ---
 

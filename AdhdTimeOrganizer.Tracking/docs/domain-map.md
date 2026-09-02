@@ -57,6 +57,19 @@ dashboards' comparison window (`Last7Days` / `Last30Days` / `SameWeekday` / `All
   count as equal.
 - **One android session per `(user, device, package, start)`.** *DB-enforced* — this is what makes the
   sync endpoint's re-send idempotent.
+- **An android session is at most 24h long, is not in the future, and is not older than the retention
+  horizon.** *App-enforced at the ingest boundary only* (`AndroidSyncValidator` bounds the stated
+  `DurationSeconds` and the batch size, a 400; `AndroidSyncEndpoint` bounds the span the two instant
+  strings actually describe and drops the offending session with a warning, the way it already drops
+  unparseable and duration-mismatched ones). The length bound is load-bearing rather than cosmetic:
+  `UnifiedActivityLoader.SliceIntoMinutes` allocates one `SourceMinute` per minute of a session, so one
+  stored decade-long row would take out every unified dashboard for that user while the android
+  dashboards render it as one ordinary session. The loader clamps to a day's worth of minutes as well,
+  for rows written before this rule.
+- **An ingest payload carries a bounded number of items.** *App-enforced at the ingest boundary* — see
+  `TrackingIngestLimits`, one cap per route (android sessions per sync, desktop entries per window,
+  web-extension activities per heartbeat). All three ledgers are append-only, so an unbounded payload is
+  an unbounded permanent write.
 - **`RecordDate == DateOnly.FromDateTime(WindowStart)`.** *Type-enforced* — the setter is private and
   the value derives in `WindowStart`'s initializer.
 - **A web-extension `WindowStart` is minute-aligned.** *App-enforced at the ingest boundary only*

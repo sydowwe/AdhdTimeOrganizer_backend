@@ -308,6 +308,16 @@ public static class UnifiedActivityLoader
         return runs;
     }
 
+    /// <summary>
+    /// One minute of the day, so a session cannot produce more slices than a day has minutes plus the
+    /// partial one it starts in. The ingest gate (SEC-5) already refuses a session longer than a day, and
+    /// <see cref="LoadAndroidAsync"/> clamps the end to the daily window — but this allocates per minute,
+    /// so a row that predates the gate or slips past a future window change must not be able to spend the
+    /// process's memory. Silently truncating is the right failure here: the caller is a read-only
+    /// dashboard, and a wrong tail beats an unbounded one.
+    /// </summary>
+    private const int MaxSliceMinutes = 24 * 60 + 1;
+
     private static List<(DateTime Minute, double Weight)> SliceIntoMinutes(DateTime start, DateTime end)
     {
         var slices = new List<(DateTime Minute, double Weight)>();
@@ -316,7 +326,7 @@ public static class UnifiedActivityLoader
         if (end <= start)
             return [(minute, 0)];
 
-        while (minute < end)
+        while (minute < end && slices.Count < MaxSliceMinutes)
         {
             var minuteEnd = minute.AddMinutes(1);
             var overlapFrom = start > minute ? start : minute;
