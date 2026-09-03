@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.heartbeat;
+using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
@@ -34,17 +35,20 @@ public class WebExtensionDataHeartbeatEndpoint(DbContext dbContext) : Endpoint<W
         var userId = User.GetId();
         var processedCount = 0;
 
+        // CQ-5: one read for the whole window, keyed by domain, instead of a FirstOrDefaultAsync per
+        // activity inside the loop. This is the highest-frequency write path in the module — once a minute,
+        // per user, per browser — and the round trips were linear in the batch. The unique index
+        // (UserId, WindowStart, Domain, RecordDate) already serves this read, so it costs no new index and
+        // guarantees the dictionary key is unique. Ordinal because that is how Postgres compares the
+        // column; a case-insensitive comparer here would fold two domains the index keeps apart.
+        var byDomain = (await dbContext.Set<WebExtensionActivityEntry>()
+                .Where(x => x.UserId == userId && x.WindowStart == req.WindowStart)
+                .ToListAsync(ct))
+            .ToDictionary(x => x.Domain, StringComparer.Ordinal);
+
         foreach (var activity in req.Activities.Where(activity => activity.ActiveSeconds != 0 || activity.BackgroundSeconds != 0))
         {
-            // Find existing record for this user + window + domain
-            var existing = await dbContext.Set<WebExtensionActivityEntry>()
-                .FirstOrDefaultAsync(x =>
-                        x.UserId == userId &&
-                        x.WindowStart == req.WindowStart &&
-                        x.Domain == activity.Domain,
-                    ct);
-
-            if (existing != null)
+            if (byDomain.TryGetValue(activity.Domain, out var existing))
             {
                 // UPDATE existing record
                 // Take the values from request (extension sends running totals, not deltas)
@@ -74,12 +78,19 @@ public class WebExtensionDataHeartbeatEndpoint(DbContext dbContext) : Endpoint<W
                 };
 
                 dbContext.Set<WebExtensionActivityEntry>().Add(record);
+
+                // Registered before the save, so a domain repeated within one payload updates the row this
+                // loop just added instead of inserting a second one and violating the unique index. The
+                // extension sends running totals, so the last occurrence winning is the same rule the
+                // update branch above already applies across requests.
+                byDomain[record.Domain] = record;
             }
 
             processedCount++;
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        if (!await this.TrySaveIngestBatchAsync(dbContext, ct))
+            return;
 
         await Send.ResponseAsync(processedCount, cancellation: ct);
     }

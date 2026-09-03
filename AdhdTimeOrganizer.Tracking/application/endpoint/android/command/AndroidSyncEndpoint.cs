@@ -2,6 +2,7 @@ using System.Globalization;
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
@@ -42,7 +43,6 @@ public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingR
         var earliestAcceptable = retentionOptions.Value.CutoffUtc(now);
         var maxSpan = TimeSpan.FromSeconds(TrackingIngestLimits.MaxAndroidSessionSeconds);
 
-        // Parse and validate sessions
         // CQ-6: AdjustToUniversal *converts* an offset-bearing instant rather than re-labelling it, and
         // AssumeUniversal reads a naked one as UTC — which is what the field name promises. The previous
         // RoundtripKind preserved the client's offset, so "2026-09-01T10:00:00+02:00" parsed to the local
@@ -53,6 +53,7 @@ public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingR
         // the server's locale has any say over.
         const DateTimeStyles instantStyles = DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal;
 
+        // Parse and validate sessions
         var validSessions = new List<(string PackageName, string AppLabel, DateTime Start, DateTime End, long Duration)>();
 
         foreach (var item in req.Sessions)
@@ -60,10 +61,10 @@ public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingR
             if (!DateTime.TryParse(item.SessionStartUtc, CultureInfo.InvariantCulture, instantStyles, out var start) ||
                 !DateTime.TryParse(item.SessionEndUtc, CultureInfo.InvariantCulture, instantStyles, out var end))
             {
-                Logger.LogWarning("Android sync: skipping session with unparseable dates. Package={Package} Start={Start} End={End}",
                 // CQ-22: the two instants are client-supplied free text and this is the one line that logs
                 // them verbatim. AndroidSyncValidator bounds them to TrackingIngestLimits.MaxInstantStringLength
                 // before the handler runs, so what reaches the log file is length-bounded.
+                Logger.LogWarning("Android sync: skipping session with unparseable dates. Package={Package} Start={Start} End={End}",
                     item.PackageName, item.SessionStartUtc, item.SessionEndUtc);
                 continue;
             }
@@ -161,7 +162,12 @@ public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingR
         if (toInsert.Count > 0)
         {
             dbContext.Set<AndroidSessionData>().AddRange(toInsert);
-            await dbContext.SaveChangesAsync(ct);
+
+            // CQ-11: seenKeys closes the in-batch and already-stored cases, but two syncs from the same
+            // device in flight together can still both pass the read above. That last race is a 409 rather
+            // than a 500 the phone re-posts unchanged — on the retry the rows are stored and skipped.
+            if (!await this.TrySaveIngestBatchAsync(dbContext, ct))
+                return;
         }
 
         await Send.ResponseAsync(new AndroidSyncResponse

@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
@@ -59,10 +60,29 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
             .Where(m => m.UserId == userId && m.IsActive)
             .ToListAsync(ct);
 
+        // CQ-8: what this window already holds. UserId, WindowStart and the derived RecordDate are fixed
+        // for the request, so (ProcessName, WindowTitle) is the rest of the unique index — an agent
+        // re-posting a window that did land gets a 200 with those entries skipped rather than a 23505 it
+        // then retries identically forever. Skipping covers the attribution below with the entry: the
+        // first attempt already attributed those seconds, and re-running the sink would count them twice.
+        var seenKeys = (await dbContext.Set<DesktopActivityEntry>()
+                .AsNoTracking()
+                .Where(x => x.UserId == userId && x.WindowStart == req.WindowStart)
+                .Select(x => new { x.ProcessName, x.WindowTitle })
+                .ToListAsync(ct))
+            .Select(x => (x.ProcessName, x.WindowTitle))
+            .ToHashSet();
+
         var matcher = new PatternMatcher();
 
-        foreach (var entry in req.Entries.Where(e => e.ActiveSeconds != 0 || e.BackgroundSeconds != 0))
+        foreach (var entry in CollapseCollidingEntries(req.Entries))
         {
+            // Seeded from the stored rows and grown as this batch is written, exactly as AndroidSyncEndpoint
+            // keys its own dedup. CollapseCollidingEntries has already folded the in-batch repeats, so what
+            // this rejects is a row a previous attempt committed.
+            if (!seenKeys.Add((entry.ProcessName, entry.WindowTitle)))
+                continue;
+
             var match = mappings.FirstOrDefault(m => matcher.MatchesPattern(m, entry));
 
             if (match?.IsIgnored == true)
@@ -95,12 +115,51 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
 
         // One save for the raw entries and their attribution together, which is the sink's contract —
         // an implementation that saved on its own could leave entries recorded but unattributed.
-        await dbContext.SaveChangesAsync(ct);
+        if (!await this.TrySaveIngestBatchAsync(dbContext, ct))
+            return;
 
         await PublishAttributionAsync(userId, req.WindowStart, attributedActivityIds, ct);
 
         await Send.ResponseAsync(processedCount, cancellation: ct);
     }
+
+    /// <summary>
+    /// Folds the entries that would collide on <c>DesktopActivityEntry</c>'s unique index into one row each,
+    /// summing the seconds — which is what the ledger means by two rows for the same window (CQ-8).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The index is <c>(UserId, WindowStart, RecordDate, ProcessName, WindowTitle)</c> and every entry in a
+    /// heartbeat shares the first three, so two entries naming the same process and the same window title
+    /// collide — which is exactly what one application's two windows on two monitors look like.
+    /// <c>ActiveMonitor</c>, the field that tells them apart and the reason
+    /// <c>DesktopProcessDetailsEndpoint</c> can report a per-monitor breakdown, is not in the key. Before
+    /// this the whole window died with a 500 and the agent re-posted it unchanged.
+    /// </para>
+    /// <para>
+    /// Grouping rather than widening the index: the index is on a partitioned table, so changing it is
+    /// rollout work (<c>MIG-2</c>), and a second row for the same window is not information the dashboards
+    /// have anywhere to put.
+    /// </para>
+    /// <para>
+    /// Only the two second counts are combined. Everything else — including <c>ActiveMonitor</c> and
+    /// <c>ProductName</c>, which the pattern mappings match on but the index does not carry — is taken from
+    /// the busiest of the collided entries, so the row describes where the time actually went. A collision
+    /// whose members disagree about <c>ProductName</c> is pathological (same executable, same window title),
+    /// and the alternative to picking one is a row that cannot be stored at all.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<DesktopActivityEntryDto> CollapseCollidingEntries(List<DesktopActivityEntryDto> entries) =>
+        entries
+            .Where(e => e.ActiveSeconds != 0 || e.BackgroundSeconds != 0)
+            .GroupBy(e => (e.ProcessName, e.WindowTitle))
+            .Select(group => group.Count() == 1
+                ? group.First()
+                : group.OrderByDescending(e => e.ActiveSeconds).First() with
+                {
+                    ActiveSeconds = group.Sum(e => e.ActiveSeconds),
+                    BackgroundSeconds = group.Sum(e => e.BackgroundSeconds)
+                });
 
     /// <summary>
     /// Announces the day totals for every activity this batch touched. Read <em>after</em> the save, so

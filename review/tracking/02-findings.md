@@ -348,7 +348,7 @@ prevent on the merged side.
 
 `Doc impact: none`
 
-### CQ-5 🟠 The web-extension heartbeat is an N+1 read with a lost-update race
+### CQ-5 🟠 ✅ FIXED 2026-09-03 · The web-extension heartbeat is an N+1 read with a lost-update race
 
 `application/endpoint/webExtension/command/WebExtensionDataHeartbeatEndpoint.cs:31-76`
 
@@ -369,7 +369,31 @@ One `FirstOrDefaultAsync` **per activity in the batch**, inside the loop, before
 retry rather than a 500. Since the extension sends running totals, an `ON CONFLICT … DO UPDATE` upsert
 is the honest shape.
 
-`Doc impact: none`
+**Fixed:** as written for the first half — one read for the window, `ToDictionary` by domain, insert/update
+in memory, one save. `StringComparer.Ordinal`, because that is how Postgres compares the column: a
+case-insensitive comparer would fold two domains the index keeps apart, which is the same bug in the
+other direction. The unique index `(UserId, WindowStart, Domain, RecordDate)` already serves the read, so
+this costs no new index — and it is what guarantees `ToDictionary` cannot throw on a duplicate key.
+
+A newly inserted row is registered in the dictionary before the save, which closes a collision the finding
+does not name: **two activities for one domain in a single payload.** Nothing in
+`WebExtensionHeartbeatValidator` prevents it, and both copies used to be `Add`ed. Last-one-wins is the same
+running-totals rule the update branch already applied across requests, not a new one.
+
+`ON CONFLICT … DO UPDATE` was not used: EF has no first-class upsert, and hand-written SQL here would have
+to name the `tracking` schema itself (the finalizing convention only qualifies EF-generated SQL) on a
+partitioned table. The batched read plus the 409 below is the same guarantee without that.
+
+The residual true race — two heartbeats in flight for the same window, both reading no row — is now a 409
+through `IngestBatchSaveExtensions.TrySaveIngestBatchAsync` (`CQ-11`) instead of a 500. The retry finds the
+row and takes the update branch, so it converges rather than looping.
+
+Pinned by two cases in `TrackingIngestConflictTests`: the in-payload repeat folding to one row with the
+later running total, and a second heartbeat for the same window updating the existing domain while
+inserting a new one — the path the per-activity `FirstOrDefaultAsync` used to serve.
+
+`Doc impact: domain-map.md → Invariants (one entry per (user, window, domain), and what the endpoint does
+with a collision)` — done, as one bullet shared with `CQ-8`.
 
 ### CQ-6 🟠 ✅ FIXED 2026-09-03 · Android sync re-labels an offset-bearing timestamp as UTC instead of converting it
 
@@ -439,7 +463,7 @@ another session, so the dedup cannot degrade into dropping the batch around it.
 tuple within a batch, not just against stored rows)` — done. That bullet called the index "what makes the
 sync endpoint's re-send idempotent", which was the sentence the bug hid behind.
 
-### CQ-8 🟠 The desktop heartbeat can violate its own unique index inside one window
+### CQ-8 🟠 ✅ FIXED 2026-09-03 · The desktop heartbeat can violate its own unique index inside one window
 
 `application/endpoint/desktop/command/DesktopActivityHeartbeatEndpoint.cs:69-85`, unique index at
 `infrastructure/persistence/configuration/desktop/DesktopActivityEntryConfiguration.cs:39`
@@ -455,7 +479,38 @@ retries it identically.
 what the ledger means), or widen the index to include `ActiveMonitor`. Grouping is the smaller change
 and does not touch a partitioned table (`MIG-2`).
 
-`Doc impact: none`
+**Fixed** by grouping, the option that stays off the partitioned table. `CollapseCollidingEntries` folds the
+batch on `(ProcessName, WindowTitle)` — `UserId`, `WindowStart` and the derived `RecordDate` are fixed for
+the request, so that pair is the rest of the index — summing both second counts. Everything else, including
+`ActiveMonitor`, comes from the **busiest** of the collided entries rather than the first, so the surviving
+row says where the time actually went.
+
+`ProductName` is the awkward part and is called out in the method's remarks: the pattern mappings match on
+it but the index does not carry it, so a collision whose members disagree about it has its match decided by
+the representative. That shape is pathological — same executable, same window title, different product name
+— and the alternative to picking one is a row that cannot be stored at all.
+
+Two deliberate additions beyond the finding:
+
+- **The cross-request half.** Grouping fixes the collision *inside* a batch; an agent whose heartbeat timed
+  out after it committed re-posts the same window and collides with its own first attempt. The handler now
+  seeds a `seenKeys` set from the rows the window already holds and skips them — the same idiom, and the
+  same variable name, as `AndroidSyncEndpoint` after `CQ-7`. **The skip covers the attribution with the
+  entry**: the first attempt already called `AttributeAsync` for those seconds, so re-running the sink
+  would count them twice. That is the whole reason the skip is in the loop rather than a filter before it.
+- **The residual race** — two heartbeats genuinely in flight — is a 409 rather than a 500, through
+  `CQ-11`'s wrapper.
+
+Pinned by three cases in `TrackingIngestConflictTests`: the two-monitor fold (asserting the summed seconds
+and that the busier entry's monitor survives), a control where the entries differ on an *indexed* field and
+must stay two rows, and a re-posted window that must be a 200 whose seconds are not doubled. The fold case
+discriminates — verified against a variant that groups on `ActiveMonitor` too, which stores 20 seconds
+instead of 50. That variant is worth noting as the trap: with the `seenKeys` skip in place but the group key
+wrong, the second window is *silently dropped* rather than 500ing, so the fold and the skip have to be read
+together.
+
+`Doc impact: domain-map.md → Invariants (one entry per (user, window, process, title), and that a collision
+sums)` — done, as one bullet shared with `CQ-5`.
 
 ### CQ-9 🟠 No length validation anywhere on the write paths
 
@@ -500,7 +555,7 @@ rules into a shared rule set applied to both.
 `Doc impact: domain-map.md → Endpoints (the mappings rows say "create / update / delete"; worth a note
 that update currently cannot change the target until this is fixed)`
 
-### CQ-11 🟠 Unique-pattern collisions surface as 500
+### CQ-11 🟠 ✅ PARTLY MOOT / FIXED 2026-09-03 · Unique-pattern collisions surface as 500
 
 `application/endpoint/desktop/command/CreateTrackerDesktopMappingEndpoint.cs`,
 `UpdateTrackerDesktopMappingEndpoint.cs` (and the android pair)
@@ -514,7 +569,39 @@ Programming" twice is an ordinary mistake. Neither endpoint nor validator checks
 the field). Cheaper alternative: catch `DbUpdateException` with `PostgresException.SqlState == "23505"`
 in the Framework base once, and every slice benefits.
 
-`Doc impact: none`
+**The premise is wrong on the mapping endpoints, and right on the ingest ones.** The finding says
+`BaseCreateEndpoint`/`BaseUpdateEndpoint` do not translate `23505`. They do — both wrap `HandleAsync` in
+`catch (Exception ex) { DbUtils.HandleException(ex, …) }`, and
+`DatabaseExceptionUtils.cs:24-25` maps `PostgresErrorCodes.UniqueViolation` to
+`ResultErrorType.DbUniqueViolationError`, which `EndpointHelper.ToStatusCode` sends as 409. The cheap
+alternative was already in the Framework before this review, and
+`RoutineTimePeriodUniqueIndexTests.Create_DuplicateText_Returns409` has been pinning it from another slice
+all along. All four mapping endpoints derive from those bases, so **a duplicate pattern has always been a
+409 here**, not a 500.
+
+What was genuinely unhandled is the class the rest of this batch is about: the **three ingest endpoints**
+are plain `Endpoint<>`s with no base and no try/catch, so a `23505` on any of them did reach the global
+handler as a 500. That is the version of this finding that matters, because a desktop agent, a browser
+extension and a phone all re-post a rejected batch unchanged.
+
+**Fixed** with `application/endpoint/extensions/IngestBatchSaveExtensions.cs` — one `TrySaveIngestBatchAsync`
+the three ingest saves go through, catching only `23505` and answering with
+`EndpointHelper.ToStatusCode(ResultErrorType.DbUniqueViolationError)` rather than a literal 409, so the
+status stays defined in the one place the CRUD bases already define it. Anything else still propagates: a
+foreign-key or check violation on an ingest path is a bug in this slice, not something a client resolves by
+retrying. It sits in Tracking rather than the Framework because `framework/` is a submodule and nothing
+outside this slice has the shape yet (`CLAUDE.md`, "editing it is a two-repo operation"); if a second slice
+grows unbased command endpoints, that is the moment to lift it.
+
+The named fix — a pre-check returning a 409 that names the offending field — is **still open**. The user
+gets "Unique constraint violation during Create" rather than "you already have a rule for `code.exe`".
+
+Pinned by two cases in `TrackingIngestConflictTests`: the duplicate pattern, and the `NULLS NOT DISTINCT`
+half — two rules that both name only a window title, leaving `ProcessName` and `ProductName` null, which
+under Postgres' default null handling would *not* collide. That second one is the reachable surprise in this
+finding and had no guard anywhere.
+
+`Doc impact: domain-map.md → Invariants + Navigation index (the ingest-save wrapper)` — done.
 
 ### CQ-12 🟠 `PatternMatchType.Regex` means two different things on two surfaces
 
@@ -561,7 +648,8 @@ reject it in the grid validators. Either is better than the silent reinterpretat
   `SessionStartUtc < envelopeTo && SessionEndUtc > envelopeFrom`; only the start side is indexed, so the
   overlap read degenerates to a scan of everything before the envelope's end.
 - **`web_extension_activity_entry (user_id, window_start, domain)`** already exists as the unique index and
-  covers `CQ-5`'s batched lookup once that is rewritten — no new index needed there.
+  covers `CQ-5`'s batched lookup — rewritten 2026-09-03, no new index needed. The desktop equivalent
+  (`CQ-8`'s already-stored read) rides the existing `(user_id, window_start)` index the same way.
 - No index is needed for the purge: both purged tables are RANGE-partitioned on `record_date`, so the
   predicate prunes whole partitions. Adding android to the purge (`SEC-3`) **does** need one — its table
   is not partitioned; `(user_id, session_start_utc)` exists and a plain `session_start_utc` index would

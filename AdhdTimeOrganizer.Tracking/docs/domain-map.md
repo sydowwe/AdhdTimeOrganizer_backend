@@ -85,6 +85,17 @@ dashboards' comparison window (`Last7Days` / `Last30Days` / `SameWeekday` / `All
   table cannot return `xmin` in a `RETURNING` clause.
 - **An attribution write and its raw entries commit together.** *App-enforced* — the sink mutates the
   context and must not call `SaveChanges`; the heartbeat's single save is the transaction.
+- **One desktop entry per `(user, window, process, window title)`; one web-extension entry per
+  `(user, window, domain)`.** *DB-enforced*, and both endpoints key off the same tuple in memory before
+  they write (CQ-5, CQ-8). The desktop heartbeat **sums the seconds** of entries that collide — one
+  application's two windows on two monitors, since `ActiveMonitor` is not in the index — and the
+  web-extension one keeps the **last** running total for a repeated domain. Both also skip what the
+  window already holds, so an agent re-posting a window it did commit gets a 200 with those entries
+  ignored and their seconds attributed once, not twice.
+- **A unique-index collision on an ingest route is a 409, never a 500.** *App-enforced* —
+  `IngestBatchSaveExtensions.TrySaveIngestBatchAsync` wraps all three saves, giving `23505` the same
+  status the CRUD bases' `DbUtils.HandleException` already gives it (CQ-11). The three clients are
+  unattended and retry, so a 500 on a batch that can never succeed is a loop rather than an error.
 
 ## EF configurations
 
@@ -234,6 +245,9 @@ and is therefore denied to extension clients by the `Program.cs` configurator's 
 | `BaseTimelineValidator` · `StackedBarsValidator` · `PieChartValidator` · `SummaryCards`/`FocusMetrics`/`TopDomains`/`DomainDetails` validators | Validators | **One per dashboard, not one per source** — all three sources bind the same request classes | `application/validator/` |
 | `UnifiedDashboardValidators` | Validators | The `sources` rule on top of the shared span rules: non-empty, known members only | `application/validator/unified/UnifiedDashboardValidators.cs` |
 | `DesktopActivityHeartbeatValidator` · `WebExtensionHeartbeatValidator` · `AndroidSyncValidator` | Validators | The ingest boundary — including the minute-alignment rule | `application/validator/{desktop,webExtension,android}/` |
+| `TrackingIngestLimits` | Constants | Every bound the three ingest routes put on an untrusted payload, in one place | `application/validator/TrackingIngestLimits.cs` |
+| `MappingTargetOwnershipExtensions` | Endpoint helper | The activity/role/category ownership guard both mapping create endpoints call from `BeforeMapping` | `application/endpoint/extensions/` |
+| `IngestBatchSaveExtensions` | Endpoint helper | The save all three ingest routes end on — a `23505` becomes a 409 rather than a 500 an unattended client re-posts forever | `application/endpoint/extensions/` |
 | `PurgeExpiredActivityTrackingEntriesJobHandler` | Scheduled job | The retention purge (see Infrastructure below) | `infrastructure/jobs/` |
 
 ## Seams (all declared in `AdhdTimeOrganizer.Core`)

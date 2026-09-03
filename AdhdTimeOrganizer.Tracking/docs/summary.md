@@ -120,6 +120,15 @@ would only make the agent re-send the window. That makes a break here silent;
   rather than an error. There is deliberately no throwing setter — EF would run it while materializing
   rows written before the rule existed.
 
+- **An ingest batch is deduplicated against its own unique index before it is written.** Each of the
+  three routes keys off the tuple the index uses — `(process, window title)` on desktop, `domain` on
+  web-extension, `(package, start)` on android — first against what the window already holds, then
+  against the rest of the batch. Desktop **sums** the seconds of a collision (one application on two
+  monitors is one row, because `ActiveMonitor` is not in the index), web-extension keeps the **last**
+  running total, android counts the repeat as a duplicate. The three clients are unattended and retry, so
+  a batch that can never be stored is a loop, not an error — which is also why the residual in-flight
+  race goes through `IngestBatchSaveExtensions` and comes back as a 409 rather than a 500.
+
 - **`ExecutablePath` is encrypted and write-only; `WindowTitle` is deliberately not.** The title is
   grouped, filtered (Exact/Contains/Wildcard/Regex) and sorted SQL-side, none of which survives
   randomized encryption. Don't "finish the job" by encrypting it.
