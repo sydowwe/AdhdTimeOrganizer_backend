@@ -322,6 +322,31 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
             modelBuilder.Entity<RoutinePeriodCompletion>()
                 .HasQueryFilter(AppQueryFilters.RoutinePeriodCompletionUserScope, c => ScopeUserId == null || c.RoutineTimePeriod.UserId == ScopeUserId);
 
+        // The three Activity*Profile entities are in the same position: BaseTableEntity, not
+        // IEntityWithUser, so ApplyUserQueryFilters never sees them and the archived filter above is the
+        // only thing on them. Every profile route hand-scopes through the Activity, except the one that
+        // could not — BaseGetAllEndpoint has no ApplyUserScoping hook — which is how
+        // GET /api/activity-backlog-profile came to return every user's rows with a 200. That endpoint
+        // now filters too; this is the floor under it, so the next route added here starts scoped.
+        //
+        // Named, and named separately from QueryFilters.UserScope, for the same two reasons as
+        // RoutinePeriodCompletion above: unnamed it would REPLACE the ActivityArchived filter these three
+        // already carry (un-hiding archived profiles, silently), and it walks a navigation rather than a
+        // real UserId column, so it must be liftable on its own. The ScopeUserId == null escape is what
+        // keeps the dev seeders, the merge/repoint seam and the export/erasure paths — all of which read
+        // profiles outside a request — from silently seeing nothing.
+        if (scopingEnabled)
+        {
+            modelBuilder.Entity<ActivityBacklogProfile>()
+                .HasQueryFilter(AppQueryFilters.ActivityProfileUserScope, p => ScopeUserId == null || p.Activity.UserId == ScopeUserId);
+
+            modelBuilder.Entity<ActivityBucketListProfile>()
+                .HasQueryFilter(AppQueryFilters.ActivityProfileUserScope, p => ScopeUserId == null || p.Activity.UserId == ScopeUserId);
+
+            modelBuilder.Entity<ActivityProjectProfile>()
+                .HasQueryFilter(AppQueryFilters.ActivityProfileUserScope, p => ScopeUserId == null || p.Activity.UserId == ScopeUserId);
+        }
+
         OnAppModelCreatingPartial(modelBuilder);
     }
 

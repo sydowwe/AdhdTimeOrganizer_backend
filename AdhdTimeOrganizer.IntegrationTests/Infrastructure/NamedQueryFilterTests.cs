@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -55,6 +56,18 @@ public class NamedQueryFilterTests(AppDbContextFixture fixture) : PostgresTestBa
         typeof(ActivityProjectProfile),
         typeof(PlannerSuggestionFromActivityHistory),
         typeof(PlannerSuggestionFromPlannerTask)
+    ];
+
+    /// <summary>
+    /// The three profile entities carrying the mirrored user-scope concern. None of them is
+    /// IEntityWithUser, so <see cref="EveryUserOwnedEntity_CarriesTheUserScopeFilterName"/> does not
+    /// cover them; this is their equivalent.
+    /// </summary>
+    private static readonly Type[] ProfileUserScopedTypes =
+    [
+        typeof(ActivityBacklogProfile),
+        typeof(ActivityBucketListProfile),
+        typeof(ActivityProjectProfile)
     ];
 
     /// <summary>
@@ -194,6 +207,104 @@ public class NamedQueryFilterTests(AppDbContextFixture fixture) : PostgresTestBa
     }
 
     /// <summary>
+    /// The three Activity*Profile entities carry two concerns each — archival and the mirrored user
+    /// scope — and both must be declared under their own name. Unnamed, the second call would replace
+    /// the first: the exact regression <see cref="Activity_CarriesBothTheUserScopeAndArchivedFilters"/>
+    /// pins on the principal, one join away.
+    /// </summary>
+    [Fact]
+    public void ActivityProfiles_CarryBothTheMirroredUserScopeAndArchivedFilters()
+    {
+        var model = HostModel();
+
+        var missing = ProfileUserScopedTypes
+            .Where(type => model.FindEntityType(type)!
+                .FindDeclaredQueryFilter(AppQueryFilters.ActivityProfileUserScope) is null)
+            .Select(type => type.Name)
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "a profile row carries no UserId of its own, so ApplyUserQueryFilters never sees it -- " +
+            "without this mirrored filter the only thing scoping these tables is whatever each endpoint " +
+            "remembers to write by hand, which is how GET /api/activity-backlog-profile came to return " +
+            "every user's rows");
+
+        var stillArchivalFiltered = ProfileUserScopedTypes
+            .Where(type => model.FindEntityType(type)!
+                .FindDeclaredQueryFilter(AppQueryFilters.ActivityArchived) is null)
+            .Select(type => type.Name)
+            .ToList();
+
+        stillArchivalFiltered.Should().BeEmpty(
+            "the user-scope filter must COEXIST with the archival one -- applied unnamed it would have " +
+            "replaced it, un-hiding archived profiles with no error");
+    }
+
+    /// <summary>
+    /// The behavioural half, asserted on rows: a signed-in caller sees only their own profiles even on
+    /// a query that names no ownership predicate at all, and the seeder/merge/export paths — which run
+    /// with no ambient user — still see everything.
+    /// </summary>
+    [Fact]
+    public async Task ProfileUserScopeFilter_HidesForeignProfiles_AndKeepsTheUnscopedEscape()
+    {
+        var userIdA = await CreateUserAsync("profile-filter-a@test.com");
+        var userIdB = await CreateUserAsync("profile-filter-b@test.com");
+
+        long profileIdA;
+        long profileIdB;
+        await using (var seed = CreateDbContext())
+        {
+            profileIdA = await SeedBacklogProfileAsync(seed, userIdA, $"profile-of-a-{Guid.NewGuid():N}");
+            profileIdB = await SeedBacklogProfileAsync(seed, userIdB, $"profile-of-b-{Guid.NewGuid():N}");
+        }
+
+        using var scope = Fixture.UnauthenticatedFactory.Services.CreateScope();
+        var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+
+        try
+        {
+            accessor.HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(ClaimTypes.NameIdentifier, userIdA.ToString())], "Test"))
+            };
+
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var visible = await db.Set<ActivityBacklogProfile>()
+                .Select(p => p.Id)
+                .ToListAsync(CancellationToken);
+
+            visible.Should().Contain(profileIdA);
+            visible.Should().NotContain(profileIdB,
+                "the query names no ownership predicate -- the global filter is the only thing between " +
+                "this read and every user's profiles");
+        }
+        finally
+        {
+            accessor.HttpContext = null;
+        }
+
+        // The other half -- that a context with no ambient user still sees every row -- cannot be
+        // asserted through this host: FakeLoggedUserService.IsAuthenticated is hard-coded true and its
+        // GetUserId falls back to TestUserId, so ScopeUserId is never null here. Assert the escape on the
+        // predicate instead. Dropping it is what would silently empty the dev seeders, the merge/repoint
+        // seam and the export/erasure paths, none of which run inside a request.
+        var predicate = HostModel().FindEntityType(typeof(ActivityBacklogProfile))!
+            .FindDeclaredQueryFilter(AppQueryFilters.ActivityProfileUserScope)!
+            .Expression.ToString();
+
+        predicate.Should().Contain("null",
+            "without the ScopeUserId == null escape every read that runs outside a request returns " +
+            "nothing -- no error, no log line, just an empty result where the seeders expect rows");
+        predicate.Should().Contain(nameof(AppDbContext.ScopeUserId),
+            "the id must be read off the executing DbContext, not a captured service -- EF folds a " +
+            "member read off a constant into the cached SQL, so the first caller's id would scope " +
+            "every later execution of that query shape, for every user");
+    }
+
+    /// <summary>
     /// The entity that carries a hand-written user filter alongside a second concern. Both must be
     /// declared separately; combined into one predicate, dropping the retention bound for a historical
     /// export would drop user scoping with it.
@@ -215,6 +326,42 @@ public class NamedQueryFilterTests(AppDbContextFixture fixture) : PostgresTestBa
         userFilter!.Expression.ToString().Should().Contain(nameof(WebExtensionActivityEntry.UserId));
         partitionFilter.Expression.ToString().Should().NotContain(nameof(WebExtensionActivityEntry.UserId),
             "the two concerns must be separate filters, not one &&-ed predicate under a single name");
+    }
+
+    /// <summary>
+    /// Seeded through a fixture context, which carries no user filter at all — that is what makes
+    /// writing one profile per user in a single pass possible.
+    /// </summary>
+    private async Task<long> SeedBacklogProfileAsync(DbContext db, long userId, string name)
+    {
+        var role = new ActivityRole { UserId = userId, Name = $"{name} Role", Color = "#112233" };
+        db.Set<ActivityRole>().Add(role);
+        await db.SaveChangesAsync(CancellationToken);
+
+        var activity = new Activity { UserId = userId, Name = name, RoleId = role.Id };
+        db.Set<Activity>().Add(activity);
+
+        var locationType = new ActivityLocationType { UserId = userId, Text = $"{name} Home" };
+        var weatherDependency = new ActivityWeatherDependency { UserId = userId, Text = $"{name} Indoor" };
+        var costTier = new ActivityExpectedCostTier { UserId = userId, Text = $"{name} Free" };
+        db.Set<ActivityLocationType>().Add(locationType);
+        db.Set<ActivityWeatherDependency>().Add(weatherDependency);
+        db.Set<ActivityExpectedCostTier>().Add(costTier);
+        await db.SaveChangesAsync(CancellationToken);
+
+        var profile = new ActivityBacklogProfile
+        {
+            ActivityId = activity.Id,
+            LocationTypeId = locationType.Id,
+            WeatherDependencyId = weatherDependency.Id,
+            ExpectedCostTierId = costTier.Id,
+            EnergyLevel = EnergyLevel.Low,
+            MinParticipants = 1,
+            DurationMinutes = 30
+        };
+        db.Set<ActivityBacklogProfile>().Add(profile);
+        await db.SaveChangesAsync(CancellationToken);
+        return profile.Id;
     }
 
     private async Task SeedArchivedActivityAsync(DbContext db, long userId, string name)

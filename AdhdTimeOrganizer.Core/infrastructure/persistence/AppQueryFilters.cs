@@ -46,4 +46,18 @@ public static class AppQueryFilters
     /// separately makes that impossible.
     /// </summary>
     public const string RoutinePeriodCompletionUserScope = "RoutinePeriodCompletionUserScope";
+
+    /// <summary>
+    /// The hand-rolled scope on the three <c>Activity*Profile</c> entities — mirrored through their
+    /// required <c>Activity</c> navigation, because a profile row carries no <c>UserId</c> of its own
+    /// (<c>BaseTableEntity</c>, not <c>BaseEntityWithUser</c>, so it never reaches
+    /// <c>ApplyUserQueryFilters</c>). Same reasoning as
+    /// <see cref="RoutinePeriodCompletionUserScope"/>, and its own name for the same reason: it walks a
+    /// navigation rather than a real <c>UserId</c> column, and the callers that need unscoped profiles
+    /// (the dev seeders, the merge/repoint seam, export/erasure) must not be able to lift every other
+    /// user filter in the model along with it.
+    /// <para>Ignore it only where a profile genuinely has to be read outside its owner's request — those
+    /// paths run with <c>ScopeUserId == null</c> and are already let through by the filter itself.</para>
+    /// </summary>
+    public const string ActivityProfileUserScope = "ActivityProfileUserScope";
 }

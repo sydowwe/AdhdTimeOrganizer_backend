@@ -31,7 +31,7 @@ generally accurate and unusually good — the drift below is narrow and named in
 
 ## 5. Security & authorization
 
-### SEC-1 🔴 `GET /api/activity-backlog-profile` returns every user's backlog profiles
+### SEC-1 🔴 ✅ FIXED 2026-09-03 · `GET /api/activity-backlog-profile` returns every user's backlog profiles
 
 `AdhdTimeOrganizer.ActivityProfiles/application/endpoint/backlog/query/GetAllActivityBacklogProfileEndpoint.cs:8`
 — the whole class is `: BaseGetAllEndpoint<ActivityBacklogProfile, ActivityBacklogProfileResponse>(dbContext)`
@@ -75,7 +75,35 @@ Then delete the "no global query filter backs this up" half of the comments on t
 would no longer be true, and a comment that overstates the danger is how the next person justifies
 another unscoped read.
 
-`Doc impact: summary.md → gotcha "The three Activity*Profile entities are not IEntityWithUser…" (add the GetAll surface, and the second filter once it exists) · domain-map.md → Endpoints table, backlog row (:97) · testing.md → guard table + Known gaps`
+**Fixed 2026-09-03.** Both halves, as written above.
+
+`GetAllActivityBacklogProfileEndpoint` overrides `Filter` through `p.Activity.UserId == User.GetId()`,
+the same predicate the three grids hand-scope with in `ApplyUserScoping`.
+
+`AppQueryFilters.ActivityProfileUserScope` is the floor under it: one named filter on all three
+`Activity*Profile` entities in `AppDbContext.OnModelCreating`, mirrored through the required `Activity`
+navigation. Copied from `RoutinePeriodCompletion` including the `scopingEnabled` gate, the
+`ScopeUserId == null ||` escape (`MIG-1`) and reading `ScopeUserId` off the executing context rather than
+a captured service. Named, so it coexists with `ActivityArchived` on those three instead of replacing it
+(`MIG-2`); `NamedQueryFilterTests.ActivityProfiles_CarryBothTheMirroredUserScopeAndArchivedFilters`
+asserts both are still declared.
+
+Pinned on rows, not routes — the endpoint answered 200 either way:
+`ActivityProfileGridTests.Backlog_GetAll_OnlyReturnsCallersOwnRows` for the endpoint half, and
+`NamedQueryFilterTests.ProfileUserScopeFilter_HidesForeignProfiles_AndKeepsTheUnscopedEscape` for the
+model half — a foreign profile hidden from a query that names no ownership predicate at all.
+
+**Caveat on the escape's guard.** That the filter lets an *unscoped* context see every row is asserted on
+the predicate, not behaviourally: `FakeLoggedUserService.IsAuthenticated` is hard-coded `true` and
+`GetUserId` falls back to `TestUserId`, so no context reachable from the test host ever has a null
+`ScopeUserId`. The seeder / merge-seam / export half of `MIG-1` therefore still rests on the existing
+suites for those paths, which pass.
+
+**Not in scope, still open:** `CQ-1` — this endpoint keeps its own scoping rather than moving to a base
+that has the hook, because `BaseGetAllEndpoint` has no `ApplyUserScoping` at all and adding one is a
+submodule change (`MIG-8`).
+
+`Doc impact: summary.md → gotcha "The three Activity*Profile entities are not IEntityWithUser…" (add the GetAll surface, and the second filter once it exists) · domain-map.md → Endpoints table, backlog row (:97) · testing.md → guard table + Known gaps` — done.
 
 ### SEC-2 🟠 Profile create and update accept another user's lookup ids
 
@@ -407,7 +435,7 @@ delete branch out of the seam.
 
 `Doc impact: testing.md → guard table (:66) · domain-map.md → entity table (:13-15)`
 
-### DOC-2 🟠 Both docs describe the backlog `GetAll` without mentioning it is unscoped
+### DOC-2 🟠 ✅ FIXED 2026-09-03 · Both docs describe the backlog `GetAll` without mentioning it is unscoped
 
 `domain-map.md:97` describes it as "The only profile family with a `GetAll`, and it uses the **plain**
 `Projection`, so its rows always say 'not done'". `summary.md:60-69` lists the hand-scoped surfaces
@@ -420,7 +448,23 @@ hand **and by what** — the list is now long enough (3 grids + 3 GetById + 3 Up
 BatchDelete + 3 all-options + 2 leisure + 1 GetAll) that "the three profile grids" is no longer a
 useful summary of it.
 
-`Doc impact: summary.md → the IEntityWithUser gotcha · domain-map.md → Endpoints table (:97) · testing.md → Known gaps (:109-111)`
+**Fixed 2026-09-03,** alongside `SEC-1` — the code first, then the docs.
+
+`summary.md`'s `IEntityWithUser` gotcha is rewritten around the split this finding asks for: the global
+half (`AppQueryFilters.ActivityProfileUserScope`, and the warning that the slice cannot see it) and the
+hand-written half, now an actual **table of all 22 surfaces and the mechanism each one uses** — grids via
+`ApplyUserScoping`, the `GetAll` via `Filter`, the 13 single-row routes via their own
+`entity.Activity.UserId != userId` check, the three `all-options` projections, the three create
+validators, and the two leisure endpoints. "The three profile grids" is gone. The bullet says outright
+that the list is the only inventory of that scoping and that a new route is unscoped until it joins it.
+
+`domain-map.md`'s backlog row now says the `GetAll` scopes by overriding `Filter` **because
+`BaseGetAllEndpoint` has no `ApplyUserScoping` hook**, and the sentence under the table names all four
+scoped read surfaces plus the filter beneath them. `testing.md`'s known gap is narrowed to what is
+genuinely still untested — the plain projection's "not done" answer — with the scoping half pointing at
+its new guard.
+
+`Doc impact: summary.md → the IEntityWithUser gotcha · domain-map.md → Endpoints table (:97) · testing.md → Known gaps (:109-111)` — done.
 
 ### DOC-3 🟡 `ComfortZoneStep`: 1–5 everywhere, 1–10 in the validators
 

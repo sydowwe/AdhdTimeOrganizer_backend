@@ -30,8 +30,9 @@ public class GridActivityBacklogProfileEndpoint(DbContext dbContext)
     /// <summary>
     /// Ownership belongs here, not in <see cref="ApplyCustomFiltering"/> — the base only calls that one
     /// when the request carries a filter, so a caller sending <c>useFilter: false</c> would otherwise get
-    /// every user's profiles. ActivityBacklogProfile is not IEntityWithUser, so no global query filter
-    /// backs this up; the owner is reached through the Activity.
+    /// every user's profiles. ActivityBacklogProfile is not IEntityWithUser, so the host's
+    /// AppQueryFilters.ActivityProfileUserScope — not ApplyUserQueryFilters — is what backs this up, and
+    /// this slice cannot see it. The owner is reached through the Activity either way.
     /// </summary>
     protected override Task<IQueryable<ActivityBacklogProfile>> ApplyUserScoping(IQueryable<ActivityBacklogProfile> query, long userId,
         CancellationToken ct = default) =>

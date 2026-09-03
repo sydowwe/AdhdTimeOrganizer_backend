@@ -183,6 +183,28 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         body.Items.Select(i => i.GetProperty("id").GetInt64()).Should().NotContain(profileIdA);
     }
 
+    /// <summary>
+    /// The unfiltered sibling of the grid. BaseGetAllEndpoint has no ApplyUserScoping hook, so this
+    /// route answered 200 with every user's backlog profiles until it overrode Filter; nothing about the
+    /// response shape changed when it did, which is why only a row assertion catches a regression here.
+    /// </summary>
+    [Fact]
+    public async Task Backlog_GetAll_OnlyReturnsCallersOwnRows()
+    {
+        var userIdB = await CreateSecondUserAsync("backlog-getall-b@test.com");
+        await using var db = CreateDbContext();
+        var (_, profileIdA) = await SeedBacklogProfileAsync(db, FakeLoggedUserService.TestUserId, "A's get-all backlog activity");
+        var (_, profileIdB) = await SeedBacklogProfileAsync(db, userIdB, "B's get-all backlog activity");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var response = await factoryB.CreateClient().GetAsync("api/activity-backlog-profile", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOpts, TestContext.Current.CancellationToken);
+        items!.Select(i => i.GetProperty("id").GetInt64()).Should().Contain(profileIdB);
+        items.Select(i => i.GetProperty("id").GetInt64()).Should().NotContain(profileIdA);
+    }
+
     [Fact]
     public async Task Backlog_GetById_ForeignProfile_Returns404()
     {

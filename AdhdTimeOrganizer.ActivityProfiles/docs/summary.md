@@ -57,16 +57,34 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   `HasConstraintName(...)`, which is what makes the `ActivityProfilesSlice` migration empty. Same
   reasoning as `PlannerTaskConfiguration`'s pinned name.
 
-- **The three `Activity*Profile` entities are not `IEntityWithUser` and get NO global query filter.**
-  They are scoped by hand, through `p.Activity.UserId == userId`, in `ApplyUserScoping` on the three
-  profile grids — deliberately in `ApplyUserScoping` and not `ApplyCustomFiltering`, because the base
-  only calls the latter when the request actually carries a filter. That hand-scoping is the only
-  thing keeping other users' profiles out, and `ApplyUserScoping` is a no-op virtual, so deleting the
-  override is silent. `ActivityProfileGridTests` pins it. The four lookups and `MemoryAnchor` *are*
-  `IEntityWithUser` and are covered by the global filter. **The two leisure endpoints scope the same
-  way** — `DrawLeisureSuggestionEndpoint` reaches the owner through `p.Activity.UserId` on all three
-  sources, and `RecordSeenLeisureSuggestionEndpoint` checks ownership of every activity id it was given
-  before writing a row for it. Both are pinned by `LeisureSuggestionTests`.
+- **The three `Activity*Profile` entities are not `IEntityWithUser`,** so `ApplyUserQueryFilters` never
+  sees them and no framework base scopes them for you. Ownership is reached through the required
+  `Activity` navigation, and it is asserted **twice**: once globally, and once by hand on every single
+  route. The four lookups and `MemoryAnchor` *are* `IEntityWithUser` and need none of this.
+
+  **The global half** is the host's `AppQueryFilters.ActivityProfileUserScope` — a *named* filter in
+  `AppDbContext.OnModelCreating` on all three profiles, `ScopeUserId == null || p.Activity.UserId ==
+  ScopeUserId`. Named so it coexists with `ActivityArchived` rather than replacing it; the
+  `ScopeUserId == null` escape is what keeps the dev seeders, the merge/repoint seam and export/erasure
+  reading every row. It is the floor, not the whole story: this slice cannot see it (slices never
+  reference the host), so nothing here may rely on it.
+
+  **The hand-written half — 22 surfaces, no two of them sharing an implementation.** This list is the
+  only inventory of it; a new profile route is not scoped by anything until it appears here:
+
+  | Surfaces | Scoped by |
+  |---|---|
+  | 3 × `Grid*ProfileEndpoint` | an `ApplyUserScoping` override. Deliberately there and not in `ApplyCustomFiltering` — the base only calls that one when the request carries a filter, so `useFilter: false` would bypass it |
+  | `GetAllActivityBacklogProfileEndpoint` (the only `GetAll` in the slice) | a `Filter` override. `BaseGetAllEndpoint` has **no** `ApplyUserScoping` hook at all — an empty subclass body reads the whole table and answers 200, which is exactly what this route did until it was fixed |
+  | 3 × `GetById`, 3 × `Update`, 3 × `Delete`, 3 × `BatchDelete`, `PatchActivityProjectProfileStatus` | `entity.Activity.UserId != userId` → 404, hand-written in each endpoint's own copy of the code |
+  | 3 × `GetSelectOptions` (`/all-options`) | `.Where(p => p.Activity.UserId == userId)` on the projection |
+  | 3 × `Create*ProfileValidator` | the activity is loaded as `a.Id == req.ActivityId && a.UserId == userId`, so a profile cannot be created against someone else's activity in the first place |
+  | `DrawLeisureSuggestionEndpoint`, `RecordSeenLeisureSuggestionEndpoint` | the draw reaches the owner through `p.Activity.UserId` on all three profile sources; `seen` checks ownership of every activity id it was handed before writing a row for it |
+
+  Every one of these is a no-op virtual or a hand-written predicate, so deleting one is silent —
+  `ApplyUserScoping` not overridden still compiles, and the route still answers 200.
+  `ActivityProfileGridTests` pins the profile routes, `LeisureSuggestionTests` the two leisure ones, and
+  `NamedQueryFilterTests` the global filter underneath them.
 
 - **"Done" on the bucket list and the one-time backlog is derived from `MemoryAnchor`, not stored.** A
   bucket-list entry is complete exactly when its activity has an anchor; a backlog entry is complete when

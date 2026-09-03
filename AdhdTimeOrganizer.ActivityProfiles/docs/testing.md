@@ -59,6 +59,8 @@ everyone's profiles — is invisible in a single-user test, which is what you wr
 | Test | Pins |
 |---|---|
 | `ActivityProfileGridTests.{Backlog,BucketList,Project}_Grid_OnlyReturnsCallersOwnRows` | The hand-written `ApplyUserScoping` on the three profile grids. `ApplyUserScoping` is a no-op virtual and the profiles are not `IEntityWithUser`, so deleting an override leaks every user's profiles with nothing going red |
+| `ActivityProfileGridTests.Backlog_GetAll_OnlyReturnsCallersOwnRows` | The `Filter` override on `GetAllActivityBacklogProfileEndpoint`. `BaseGetAllEndpoint` has no `ApplyUserScoping` hook and its `Filter` is the identity function, so an empty subclass body reads the whole table and still answers 200 — which is what this route did |
+| `NamedQueryFilterTests.ActivityProfiles_CarryBothTheMirroredUserScopeAndArchivedFilters` · `…ProfileUserScopeFilter_HidesForeignProfiles_AndKeepsTheUnscopedEscape` | The global floor under all of the above: `AppQueryFilters.ActivityProfileUserScope` on the three profiles, that it is **named** (unnamed it would replace the archival filter these three already carry), and that its `ScopeUserId == null` escape still lets the seeders / merge seam / export read every row |
 | `*_GetById_ForeignProfile_Returns404` · `*_UpdateAndDelete_ForeignProfile_AreRefusedAndRowUnchanged` · `Project_PatchStatus_ForeignProfile_IsRefusedAndRowUnchanged` | The same scoping on the single-row paths, which each check ownership through `p.Activity.UserId` in their own copy of the code |
 | `BucketList_Grid_ReportsAnchoredAndTheLatestAnchorId` · `Backlog_Grid_RepeatableEntry_IsNeverAnchored` · `BucketList_GetById_ReportsTheSameCompletionAsTheGrid` | The derived "done" rule and its three separate copies (grid projection, filter predicate, GetById overlay) saying the same thing. Nothing in the schema records completion, so drift here costs no migration and throws nothing |
 | `BucketList_Grid_SortsByIsAnchored` | That completion is computed **in the projection**. Overlaid after the query it would sort on `false` for every row and the page would come back in an arbitrary order, with no error |
@@ -106,8 +108,9 @@ Real gaps, in decision terms:
 - **The two `MemoryAnchor` check constraints are never reached through the API**, because the validator
   rejects the same values first. Nothing proves the DB would still refuse a month of 13 if the
   validator changed shape.
-- **`GetAllActivityBacklogProfileEndpoint` has no test.** It is the one profile endpoint using the plain
-  `Projection`, which reports "not done" for `IsAnchored` / `MemoryAnchorId` by design — but nothing
+- **`GetAllActivityBacklogProfileEndpoint`'s projection has no test.** Its scoping is now pinned by
+  `Backlog_GetAll_OnlyReturnsCallersOwnRows`, but it is the one profile endpoint using the plain
+  `Projection`, which reports "not done" for `IsAnchored` / `MemoryAnchorId` by design — and nothing
   records that expectation, so a caller adopting it will quietly get the wrong completion.
 - **`OpenMeteoWeatherProvider` itself is untested.** Every weather test stubs `IDailyWeatherProvider`,
   so the geocoding call, the response mapping, the two cache entries and the next-local-midnight expiry

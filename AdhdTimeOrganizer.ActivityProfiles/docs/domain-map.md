@@ -94,14 +94,16 @@ renaming one of those entities moves its route.
 
 | Folder | Count | Routes |
 |---|---|---|
-| `backlog/` | 8 | `/api/activity-backlog-profile*` — explicit routes. The only profile family with a `GetAll`, and it uses the **plain** `Projection`, so its rows always say "not done" |
+| `backlog/` | 8 | `/api/activity-backlog-profile*` — explicit routes. The only profile family with a `GetAll`; it uses the **plain** `Projection`, so its rows always say "not done", and it scopes by overriding `Filter` because `BaseGetAllEndpoint` has no `ApplyUserScoping` hook |
 | `bucketList/` | 7 | `/api/activity-bucket-list-profile*` — explicit routes |
 | `project/` | 8 | `/api/activity-project-profile*` — explicit routes, incl. the status-only `PATCH .../{id}/status` |
 | `memoryAnchor/` | 7 | `/api/memory-anchor/*` — derived |
 | `lookup/{expectedCostTier,experienceType,locationType,weatherDependency}/` | 24 | `/api/activity-*-type/*` etc. — derived |
 | `leisureSuggestion/` | 3 | `POST /api/leisure-suggestion` (the ranked draw), `POST /api/leisure-suggestion/seen` (its outcome, 204) and `GET /api/leisure-weather-fit` (today's matching weather-dependency ids) — explicit routes, hand-written rather than base-derived |
 
-The three `Grid*ProfileEndpoint`s are the ones carrying the hand-written `ApplyUserScoping`; the two
+The three `Grid*ProfileEndpoint`s carry the hand-written `ApplyUserScoping` and
+`GetAllActivityBacklogProfileEndpoint` the equivalent `Filter` override, all four over the host's
+`AppQueryFilters.ActivityProfileUserScope` global filter; the two
 leisure endpoints scope by hand for the same reason and are not built on any CRUD base — the draw is a
 read expressed as a POST body, and `seen` is an upsert keyed on a composite the bases cannot express.
 
