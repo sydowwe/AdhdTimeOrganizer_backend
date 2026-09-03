@@ -26,6 +26,10 @@ public class FetchTableDistinctAndroidEntryValidator
             RuleFor(x => x.Filter!.AppLabelMatchType)
                 .NotNull().When(x => x.Filter!.AppLabel != null)
                 .WithMessage("AppLabelMatchType is required when AppLabel is set");
+
+            // A Regex match type now reaches Postgres as `~*` rather than a LIKE (CQ-12).
+            RuleFor(x => x.Filter!.PackageName).MustBeValidRegexWhenRegexMatch(x => x.Filter!.PackageNameMatchType);
+            RuleFor(x => x.Filter!.AppLabel).MustBeValidRegexWhenRegexMatch(x => x.Filter!.AppLabelMatchType);
         });
     }
 }

@@ -29,6 +29,11 @@ public class FetchTableTrackerDesktopMappingValidator : Validator<BaseFilterSort
             RuleFor(x => x.Filter!.WindowTitleMatchType)
                 .NotNull().When(x => x.Filter!.WindowTitle != null)
                 .WithMessage("WindowTitleMatchType is required when WindowTitle is set");
+
+            // A Regex match type now reaches Postgres as `~*` rather than a LIKE (CQ-12).
+            RuleFor(x => x.Filter!.ProcessName).MustBeValidRegexWhenRegexMatch(x => x.Filter!.ProcessNameMatchType);
+            RuleFor(x => x.Filter!.ProductName).MustBeValidRegexWhenRegexMatch(x => x.Filter!.ProductNameMatchType);
+            RuleFor(x => x.Filter!.WindowTitle).MustBeValidRegexWhenRegexMatch(x => x.Filter!.WindowTitleMatchType);
         });
     }
 }

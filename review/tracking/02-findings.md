@@ -705,7 +705,7 @@ finding and had no guard anywhere.
 `Doc impact: domain-map.md → Invariants + Navigation index (the ingest-save wrapper, and now the
 pattern pre-check on the "one pattern per user" bullet)` — done.
 
-### CQ-12 🟠 `PatternMatchType.Regex` means two different things on two surfaces
+### CQ-12 🟠 ✅ FIXED 2026-09-03 · `PatternMatchType.Regex` means two different things on two surfaces
 
 `application/endpoint/desktop/command/DesktopActivityHeartbeatEndpoint.cs:150` vs
 `framework/Sydowwe.Framework/infrastructure/persistence/QueryableEntityExtensions.cs:170`
@@ -723,6 +723,27 @@ Framework-owned but this slice is its only consumer of the `Regex` member.
 **Fix (framework):** translate `Regex` to Npgsql's `~` operator
 (`EF.Functions.Matches`/`NpgsqlDbFunctionsExtensions`) or drop the member from the filter surface and
 reject it in the grid validators. Either is better than the silent reinterpretation.
+
+**Fixed 2026-09-03.** `ApplyStringMatchFilter` now builds `Regex.IsMatch(field, pattern,
+RegexOptions.IgnoreCase)`, which the Npgsql provider translates to the `~*` operator — case-insensitive
+because that is what the ingest matcher compiles every user pattern with, so `~` would have left the two
+surfaces disagreeing on a narrower set of patterns instead of all of them.
+
+That turns a pattern that does not parse from a harmless LIKE into a Postgres error the endpoints' catch-all
+would report as a 500, so the four grid filter validators (which also cover `FetchCategoriesAndRolesByPattern`
+— it shares the distinct-entries request type and FastEndpoints resolves the validator from it) gained one
+shared rule, `PatternMatchRules.MustBeValidRegexWhenRegexMatch`, beside `MappingTargetRules`.
+
+Pinned by four cases in `TrackingPatternMatchSemanticsTests`, asserting on returned rows for the two
+patterns whose readings disagree — `^chrome-….*\.exe$` matched nothing under the LIKE, `%` matched the whole
+ledger — plus the case parity and the 400.
+
+**Residual, not part of this fix:** the two remaining gaps are the same shape and neither is new.
+`Exact`/`Contains`/`Wildcard` are still case-*sensitive* on the grid and case-*insensitive* at ingest, and
+the mapping create/update validators still accept a pattern that no engine can parse (at ingest that is an
+uncaught `ArgumentException` from `new Regex`, since only `RegexMatchTimeoutException` is handled). A
+.NET-parseable pattern using .NET-only syntax (named groups, `\d` inside a bracket expression) also still
+fails at the database.
 
 `Doc impact: none`
 
