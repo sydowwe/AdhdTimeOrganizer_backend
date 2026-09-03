@@ -168,12 +168,14 @@ public class TrackingIngestConflictTests(AppDbContextFixture fixture) : Postgres
 
     /// <summary>
     /// "Map code.exe to Programming" twice is an ordinary mistake, and the per-user pattern index is the
-    /// most user-reachable constraint in the module. It reaches the user as a 409 through the CRUD bases'
-    /// <c>DbUtils.HandleException</c>, which is what makes this an already-closed half of CQ-11 — pinned
-    /// here because nothing in this slice asserted it.
+    /// most user-reachable constraint in the module. The status has always been right — the CRUD bases'
+    /// <c>DbUtils.HandleException</c> maps <c>23505</c> to a 409 — so what CQ-11's named fix changes is
+    /// the body: the pre-check says which rule the user already has instead of "Unique constraint
+    /// violation during Create". Both halves are asserted here, because a pre-check that stopped running
+    /// would leave the status passing and only the message gone.
     /// </summary>
     [Fact]
-    public async Task CreateDesktopMapping_WithADuplicatePattern_Returns409()
+    public async Task CreateDesktopMapping_WithADuplicatePattern_Returns409NamingThePattern()
     {
         var client = CreateUserRoleClient();
         var body = new { processName = "code.exe", processNameMatchType = "Exact", isActive = true, isIgnored = true };
@@ -185,6 +187,72 @@ public class TrackingIngestConflictTests(AppDbContextFixture fixture) : Postgres
 
         duplicate.StatusCode.Should().Be(HttpStatusCode.Conflict,
             "a repeated pattern is a user mistake, not a server error");
+        (await duplicate.Content.ReadAsStringAsync(CancellationToken))
+            .Should().Contain("code.exe", "the user has to be told which of their rules this collides with");
+    }
+
+    /// <summary>
+    /// The same collision reached through update, which is a route it could not take before CQ-10 — the
+    /// update DTO carried the pattern fields all along, so re-typing a pattern another rule already has
+    /// was a 500 from the index with nothing naming the offender.
+    /// </summary>
+    [Fact]
+    public async Task UpdateDesktopMapping_OntoAnotherRulesPattern_Returns409NamingThePattern()
+    {
+        var client = CreateUserRoleClient();
+
+        (await client.PostAsJsonAsync(
+                DesktopMappingRoute,
+                new { processName = "taken.exe", processNameMatchType = "Exact", isActive = true, isIgnored = true },
+                JsonOpts, CancellationToken))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var second = await client.PostAsJsonAsync(
+            DesktopMappingRoute,
+            new { processName = "mine.exe", processNameMatchType = "Exact", isActive = true, isIgnored = true },
+            JsonOpts, CancellationToken);
+        second.StatusCode.Should().Be(HttpStatusCode.Created);
+        var secondId = await second.Content.ReadFromJsonAsync<long>(CancellationToken);
+
+        var collision = await client.PutAsJsonAsync(
+            $"{DesktopMappingRoute}/{secondId}",
+            new { processName = "taken.exe", processNameMatchType = "Exact", isActive = true, isIgnored = true },
+            JsonOpts, CancellationToken);
+
+        collision.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await collision.Content.ReadAsStringAsync(CancellationToken)).Should().Contain("taken.exe");
+    }
+
+    /// <summary>
+    /// The control the pre-check needs and the index does not: a row must not collide with <b>itself</b>.
+    /// An update that changes only the target leaves the pattern tuple exactly as stored, so a uniqueness
+    /// check that forgot to exclude the row under edit would make every such edit a 409 — a fix that
+    /// breaks the ordinary case while passing the two above.
+    /// </summary>
+    [Fact]
+    public async Task UpdateDesktopMapping_KeepingItsOwnPattern_IsNotAConflict()
+    {
+        var client = CreateUserRoleClient();
+
+        var created = await client.PostAsJsonAsync(
+            DesktopMappingRoute,
+            new { processName = "unchanged.exe", processNameMatchType = "Exact", isActive = true, isIgnored = true },
+            JsonOpts, CancellationToken);
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = await created.Content.ReadFromJsonAsync<long>(CancellationToken);
+
+        var update = await client.PutAsJsonAsync(
+            $"{DesktopMappingRoute}/{id}",
+            new { processName = "unchanged.exe", processNameMatchType = "Exact", isActive = false, isIgnored = true },
+            JsonOpts, CancellationToken);
+
+        update.StatusCode.Should().Be(HttpStatusCode.OK,
+            "editing a rule without touching its pattern is the commonest update there is");
+
+        await using var db = CreateDbContext();
+        var stored = await db.Set<TrackerDesktopMappingByPattern>().IgnoreQueryFilters().AsNoTracking()
+            .FirstAsync(m => m.Id == id, CancellationToken);
+        stored.IsActive.Should().BeFalse("the update has to have landed, not merely avoided the 409");
     }
 
     /// <summary>
@@ -214,6 +282,10 @@ public class TrackingIngestConflictTests(AppDbContextFixture fixture) : Postgres
 
         duplicate.StatusCode.Should().Be(HttpStatusCode.Conflict,
             "NULLS NOT DISTINCT makes two rules that both leave ProcessName null the same pattern");
+        (await duplicate.Content.ReadAsStringAsync(CancellationToken))
+            .Should().Contain("*Slack*",
+                "the pre-check compares nulls the way the index does — a plain == against a null parameter " +
+                "is IS NULL in EF, so this case is also what proves the pre-check catches the null-bearing half");
     }
 
     // ---- helpers ---------------------------------------------------------

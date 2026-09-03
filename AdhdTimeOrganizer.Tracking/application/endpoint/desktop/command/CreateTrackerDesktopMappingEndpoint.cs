@@ -19,9 +19,23 @@ public class CreateTrackerDesktopMappingEndpoint(DbContext dbContext, IReference
     }
 
     /// <summary>
-    /// The validator can only check the shape of the target group; whether the ids in it are the
-    /// caller's own needs the request scope's <c>DbContext</c> and the principal, so it happens here.
+    /// Two checks the validator cannot make, both needing the request scope's <c>DbContext</c> and the
+    /// principal: whether the target ids are the caller's own (SEC-2), and whether the caller already has
+    /// a rule for this pattern (CQ-11). Ownership first — a foreign id is a 404 that must not be
+    /// distinguishable from a missing one, and reporting a duplicate before it would leak that the ids
+    /// exist.
     /// </summary>
-    protected override Task<bool> BeforeMapping(CreateTrackerDesktopMappingRequest req, CancellationToken ct = default) =>
-        this.EnsureOwnsMappingTargetsAsync(ownership, DbContext, req.ActivityId, req.RoleId, req.CategoryId, ct);
+    protected override async Task<bool> BeforeMapping(CreateTrackerDesktopMappingRequest req, CancellationToken ct = default)
+    {
+        if (!await this.EnsureOwnsMappingTargetsAsync(ownership, DbContext, req, ct))
+            return false;
+
+        return await this.EnsureMappingPatternIsUniqueAsync<TrackerDesktopMappingByPattern>(
+            DbContext,
+            e => e.ProcessName == req.ProcessName && e.ProductName == req.ProductName && e.WindowTitle == req.WindowTitle,
+            excludedId: null,
+            MappingPatternUniquenessExtensions.DescribePattern(
+                ("ProcessName", req.ProcessName), ("ProductName", req.ProductName), ("WindowTitle", req.WindowTitle)),
+            ct);
+    }
 }

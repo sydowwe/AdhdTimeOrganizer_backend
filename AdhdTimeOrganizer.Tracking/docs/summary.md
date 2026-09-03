@@ -143,6 +143,9 @@ would only make the agent re-send the window. That makes a break here silent;
   `MatchesPattern` over them per entry — the `PatternMatchType` modes have no SQL translation. The
   `Regex` and `Wildcard` modes run user-authored patterns on the ingest thread, so they are compiled
   once per request and given a 100 ms match timeout; a pattern that times out counts as "no match".
+  **First match wins, and the list is ordered before it is walked** — by pattern columns set, then id,
+  so "ignore GitHub everywhere except in Chrome" resolves to the narrower rule rather than to whatever
+  order the read returned (CQ-16).
 
 - **Seeder `Order` is banded.** Tracking's `WebExtensionDataSeeder` sits at 600. See
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md` before adding a seeder

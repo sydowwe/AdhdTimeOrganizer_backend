@@ -6,7 +6,8 @@ namespace AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.an
 
 public record TrackerAndroidMappingFilter : IFilterRequest
 {
-    public required TrackerDesktopMappingTypeEnum Type { get; set; }
+    /// <summary>The target shape to narrow to, or <c>null</c> for all of them — see the desktop twin (CQ-15).</summary>
+    public TrackerMappingTypeEnum? Type { get; set; }
     public bool? IsActive { get; set; }
 
     public string? PackageName { get; set; }

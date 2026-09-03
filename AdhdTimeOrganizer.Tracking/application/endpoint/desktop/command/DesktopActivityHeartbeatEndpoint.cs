@@ -56,9 +56,9 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
         var processedCount = 0;
         var attributedActivityIds = new HashSet<long>();
 
-        var mappings = await dbContext.Set<TrackerDesktopMappingByPattern>()
+        var mappings = OrderBySpecificity(await dbContext.Set<TrackerDesktopMappingByPattern>()
             .Where(m => m.UserId == userId && m.IsActive)
-            .ToListAsync(ct);
+            .ToListAsync(ct));
 
         // CQ-8: what this window already holds. UserId, WindowStart and the derived RecordDate are fixed
         // for the request, so (ProcessName, WindowTitle) is the rest of the unique index — an agent
@@ -83,6 +83,7 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
             if (!seenKeys.Add((entry.ProcessName, entry.WindowTitle)))
                 continue;
 
+            // First match wins, and the list is ordered so that "first" means something (CQ-16).
             var match = mappings.FirstOrDefault(m => matcher.MatchesPattern(m, entry));
 
             if (match?.IsIgnored == true)
@@ -122,6 +123,35 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
 
         await Send.ResponseAsync(processedCount, cancellation: ct);
     }
+
+    /// <summary>
+    /// Orders the user's rules so that the first one matching an entry is a defined answer rather than
+    /// whatever order Postgres happened to return (CQ-16).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Two rules can match one entry — "any window titled *GitHub*" and "chrome.exe with a window titled
+    /// *GitHub*" are both legitimate, and the second is what the user meant when they wrote it. Nothing
+    /// ordered the list before, so which of them attributed the seconds depended on the plan for an
+    /// unordered read; it was stable in practice and stable for the wrong reason, and an insert or a
+    /// vacuum could change it without anything changing in the user's rules.
+    /// </para>
+    /// <para>
+    /// Specificity first — the number of pattern columns a rule constrains, since a rule naming two
+    /// columns matches a strict subset of what its one-column prefix matches — then the id, so the older
+    /// of two equally specific rules wins. Ordering does not resolve genuinely overlapping rules of the
+    /// same shape (two wildcards on the same column); it makes the winner stable and explicable, which is
+    /// what the user needs to be able to reason about their own list.
+    /// </para>
+    /// </remarks>
+    private static List<TrackerDesktopMappingByPattern> OrderBySpecificity(List<TrackerDesktopMappingByPattern> mappings) =>
+        mappings
+            .OrderByDescending(m =>
+                (m.ProcessName != null ? 1 : 0) +
+                (m.ProductName != null ? 1 : 0) +
+                (m.WindowTitle != null ? 1 : 0))
+            .ThenBy(m => m.Id)
+            .ToList();
 
     /// <summary>
     /// Folds the entries that would collide on <c>DesktopActivityEntry</c>'s unique index into one row each,

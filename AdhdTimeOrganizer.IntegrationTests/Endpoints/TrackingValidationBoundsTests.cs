@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.deskto
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FluentAssertions;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
@@ -160,6 +161,69 @@ public class TrackingValidationBoundsTests(AppDbContextFixture fixture) : Postgr
         ordinary.StatusCode.Should().Be(HttpStatusCode.OK, "the bounds must not cost the grid its normal page");
     }
 
+    // ---- CQ-15: the mapping grids' target-shape filter ---------------------
+
+    /// <summary>
+    /// <c>Type</c> was <c>required</c>, so a page that wanted to narrow on anything else — "show me my
+    /// inactive rules" — had to ask for one target shape at a time and stitch the answers together. Null
+    /// now means "every shape", and the rest of the filter still applies, which is the half that would
+    /// regress silently: a <c>null =&gt; query</c> arm that also skipped the other predicates would return
+    /// a superset nobody would read as a bug.
+    /// </summary>
+    [Fact]
+    public async Task MappingGrid_FiltersWithoutATargetShapeWhenTypeIsOmitted()
+    {
+        var (activeId, inactiveId) = await SeedTwoDesktopMappingsAsync();
+
+        var response = await CreateTrackingClient().PostAsJsonAsync(
+            $"{DesktopMappingRoute}/filtered-table",
+            new
+            {
+                useFilter = true,
+                filter = new { isActive = false },
+                sortBy = Array.Empty<object>(),
+                itemsPerPage = 50,
+                page = 1
+            },
+            Json,
+            CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "a filter without a target shape is now expressible");
+
+        var ids = (await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken))
+            .GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetInt64()).ToList();
+
+        ids.Should().Contain(inactiveId);
+        ids.Should().NotContain(activeId, "IsActive must still narrow when Type does not");
+    }
+
+    /// <summary>
+    /// The other half: an undefined value used to reach the switch's <c>_</c> arm and throw, so the client
+    /// got a 500 for a bad request of its own making. The converter is configured with integer values
+    /// allowed, so a number binds and the validator is what has to reject it.
+    /// </summary>
+    [Fact]
+    public async Task MappingGrid_RejectsAnUndefinedTargetShape()
+    {
+        var response = await CreateTrackingClient().PostAsJsonAsync(
+            $"{DesktopMappingRoute}/filtered-table",
+            new
+            {
+                useFilter = true,
+                filter = new { type = 99 },
+                sortBy = Array.Empty<object>(),
+                itemsPerPage = 50,
+                page = 1
+            },
+            Json,
+            CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "an unmapped target shape is a bad request, not an ArgumentOutOfRangeException");
+        (await response.Content.ReadAsStringAsync(CancellationToken))
+            .Should().Contain("Type", "the 400 has to name the member the client got wrong");
+    }
+
     // ---- PERF-3: the details span cap ------------------------------------
 
     /// <summary>
@@ -254,6 +318,34 @@ public class TrackingValidationBoundsTests(AppDbContextFixture fixture) : Postgr
         itemsPerPage,
         page = 1
     };
+
+    /// <summary>One active rule and one inactive one, differing only in the field the grid case filters on.</summary>
+    private async Task<(long ActiveId, long InactiveId)> SeedTwoDesktopMappingsAsync()
+    {
+        await using var db = CreateDbContext();
+
+        var active = new TrackerDesktopMappingByPattern
+        {
+            UserId = UserId,
+            ProcessName = $"grid-active-{Guid.NewGuid():N}.exe",
+            ProcessNameMatchType = PatternMatchType.Exact,
+            IsActive = true,
+            IsIgnored = true
+        };
+        var inactive = new TrackerDesktopMappingByPattern
+        {
+            UserId = UserId,
+            ProcessName = $"grid-inactive-{Guid.NewGuid():N}.exe",
+            ProcessNameMatchType = PatternMatchType.Exact,
+            IsActive = false,
+            IsIgnored = true
+        };
+
+        db.Set<TrackerDesktopMappingByPattern>().AddRange(active, inactive);
+        await db.SaveChangesAsync(CancellationToken);
+
+        return (active.Id, inactive.Id);
+    }
 
     private async Task SeedEntryAsync(DateTime windowStart)
     {

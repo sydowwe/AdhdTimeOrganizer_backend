@@ -1,10 +1,12 @@
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using Sydowwe.Framework.application.dto.request.@interface;
 using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
 
-public record CreateTrackerDesktopMappingRequest : ICreateRequest<TrackerDesktopMappingByPattern>
+public record CreateTrackerDesktopMappingRequest
+    : ICreateRequest<TrackerDesktopMappingByPattern>, IMappingTargetRequest
 {
     public string? ProcessName { get; init; }
     public PatternMatchType? ProcessNameMatchType { get; init; }

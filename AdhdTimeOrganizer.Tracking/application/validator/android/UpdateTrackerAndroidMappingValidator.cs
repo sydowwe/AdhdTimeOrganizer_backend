@@ -24,5 +24,8 @@ public class UpdateTrackerAndroidMappingValidator : Validator<UpdateTrackerAndro
             .Must(x => x.PackageName != null || x.AppLabel != null)
             .WithMessage("At least one pattern (PackageName or AppLabel) must be provided")
             .OverridePropertyName("Patterns");
+
+        // CQ-10 — see the desktop twin: the target rules follow the target members onto update.
+        this.AddMappingTargetRules();
     }
 }

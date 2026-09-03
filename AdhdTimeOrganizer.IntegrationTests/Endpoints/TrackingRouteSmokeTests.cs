@@ -100,8 +100,9 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     /// <para>
     /// Asserting on <c>OK</c> rather than "not 404" is what makes this case mean anything, and the two
     /// settings rows are why. They previously passed on a <b>400</b>: <c>GridBody</c> sent
-    /// <c>filter: {}</c>, and both mapping filters declare <c>required TrackerDesktopMappingTypeEnum
-    /// Type</c>, which System.Text.Json enforces during deserialization — so the request never reached
+    /// <c>filter: {}</c>, and both mapping filters declared <c>required TrackerDesktopMappingTypeEnum
+    /// Type</c> (optional, and renamed <c>TrackerMappingTypeEnum</c>, as of CQ-15), which
+    /// System.Text.Json enforces during deserialization — so the request never reached
     /// the handler and the case proved only that <em>something</em> was bound to the route, which a
     /// stray 400 from anywhere would equally have satisfied. See <c>GridBody</c> for why the body now
     /// sends <c>filter: null</c>.

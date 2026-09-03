@@ -29,5 +29,11 @@ public class UpdateTrackerDesktopMappingValidator : Validator<UpdateTrackerDeskt
             .Must(x => x.ProcessName != null || x.ProductName != null || x.WindowTitle != null)
             .WithMessage("At least one pattern (ProcessName, ProductName or WindowTitle) must be provided")
             .OverridePropertyName("Patterns");
+
+        // CQ-10: the update DTO carries the target group now, so the same two rules the create validator
+        // has always had apply here. Omitting them was harmless only while update could not write a
+        // target; with the members present, a body naming none of them clears all four columns and hits
+        // the check constraint as a 500.
+        this.AddMappingTargetRules();
     }
 }

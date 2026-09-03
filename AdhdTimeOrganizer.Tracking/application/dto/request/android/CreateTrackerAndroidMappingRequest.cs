@@ -1,10 +1,12 @@
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using Sydowwe.Framework.application.dto.request.@interface;
 using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
 
-public record CreateTrackerAndroidMappingRequest : ICreateRequest<TrackerAndroidMappingByPattern>
+public record CreateTrackerAndroidMappingRequest
+    : ICreateRequest<TrackerAndroidMappingByPattern>, IMappingTargetRequest
 {
     public string? PackageName { get; init; }
     public PatternMatchType? PackageNameMatchType { get; init; }

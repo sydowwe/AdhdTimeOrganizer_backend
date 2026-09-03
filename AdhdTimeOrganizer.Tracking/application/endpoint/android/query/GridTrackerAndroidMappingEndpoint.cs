@@ -22,13 +22,16 @@ public class GridTrackerAndroidMappingEndpoint(DbContext dbContext)
     protected override IQueryable<TrackerAndroidMappingByPattern> ApplyCustomFiltering(
         IQueryable<TrackerAndroidMappingByPattern> query, TrackerAndroidMappingFilter filter)
     {
+        // The same enum as the desktop grid, and now named like it (CQ-15): both mapping tables carry the
+        // same target group, so there is one type rather than a copy per table.
         query = filter.Type switch
         {
-            TrackerDesktopMappingTypeEnum.Ignored => query.Where(e => e.IsIgnored == true),
-            TrackerDesktopMappingTypeEnum.Activity => query.Where(e => e.ActivityId.HasValue),
-            TrackerDesktopMappingTypeEnum.Role => query.Where(e => e.RoleId.HasValue),
-            TrackerDesktopMappingTypeEnum.Category => query.Where(e => e.CategoryId.HasValue),
-            TrackerDesktopMappingTypeEnum.CategoryAndRole => query.Where(e => e.CategoryId.HasValue && e.RoleId.HasValue),
+            null => query,
+            TrackerMappingTypeEnum.Ignored => query.Where(e => e.IsIgnored == true),
+            TrackerMappingTypeEnum.Activity => query.Where(e => e.ActivityId.HasValue),
+            TrackerMappingTypeEnum.Role => query.Where(e => e.RoleId.HasValue),
+            TrackerMappingTypeEnum.Category => query.Where(e => e.CategoryId.HasValue),
+            TrackerMappingTypeEnum.CategoryAndRole => query.Where(e => e.CategoryId.HasValue && e.RoleId.HasValue),
             _ => throw new ArgumentOutOfRangeException(nameof(filter.Type))
         };
 

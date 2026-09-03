@@ -36,25 +36,47 @@ by storing the verdict on the entry.
 | `TrackerDesktopMappingByPattern` | `tracker_desktop_mapping_by_pattern` | Pattern → `Activity`/`Role`/`Category`, or `IsIgnored`. Matched in-memory by `MatchesPattern`. **Many** patterns to one activity; `activity_id` is `Cascade` with a pinned constraint name. The unique key is the pattern: `(UserId, ProcessName, ProductName, WindowTitle)`, `NULLS NOT DISTINCT`. | `domain/model/entity/desktop/` |
 | `TrackerAndroidMappingByPattern` | `tracker_android_mapping_by_pattern` | Android equivalent; unique on `(UserId, PackageName, AppLabel)`. | `domain/model/entity/android/` |
 
-Two enums: `TrackerDesktopMappingTypeEnum` (`domain/model/enum/`) — the mapping's target shape, a DTO
-convenience over the check constraint below — and `BaselineType` (`application/dto/enum/`), the
-dashboards' comparison window (`Last7Days` / `Last30Days` / `SameWeekday` / `AllTime`).
+Two enums: `TrackerMappingTypeEnum` (`domain/model/enum/`) — the mapping's target shape, a filter-side
+convenience over the check constraint below, and **shared by both mapping tables** (it was
+`TrackerDesktopMappingTypeEnum` until CQ-15, which is correct by value on the android grid and misleading
+by name) — and `BaselineType` (`application/dto/enum/`), the dashboards' comparison window (`Last7Days` /
+`Last30Days` / `SameWeekday` / `AllTime`). On both grid filters it is **optional**: null means every
+target shape, and an undefined value is a 400 from the grid validators' `IsInEnum` rather than the switch's
+throw.
 
 ## Invariants
 
 - **Exactly one target group per mapping row** — `IsIgnored = true`, *or* `ActivityId`, *or*
   `RoleId`/`CategoryId` (both allowed together). *DB-enforced*
-  (`CK_Tracker*MappingByPattern_TargetRequired`).
-- **`IsIgnored` is `true` or `NULL`, never `false`.** *DB-enforced* (`…_IsIgnoredOnlyTrue`).
-- **A mapping's `ActivityId` / `RoleId` / `CategoryId` is the author's own.** *App-enforced* on the two
-  create endpoints (`MappingTargetOwnershipExtensions.EnsureOwnsMappingTargetsAsync` from
+  (`CK_Tracker*MappingByPattern_TargetRequired`), and mirrored in one copy by
+  `MappingTargetRules.AddMappingTargetRules` on **all four** mapping validators so the failure is a 400
+  naming the rule rather than a `23514` the user sees as a 500.
+- **`IsIgnored` is `true` or `NULL`, never `false`.** *DB-enforced* (`…_IsIgnoredOnlyTrue`), same shared
+  rule.
+- **A mapping's `ActivityId` / `RoleId` / `CategoryId` is the author's own.** *App-enforced* on all four
+  mapping write endpoints (`MappingTargetOwnershipExtensions.EnsureOwnsMappingTargetsAsync` from
   `BeforeMapping`, over Core's `IReferencedIdOwnershipService`), a 404 per offending field. The FK
   enforces existence only, and a mapping is a standing rule — an unchecked id would attribute time to
   another account's activity on every matching heartbeat, invisibly, because read-back is filtered.
+  Update is the more dangerous half and the one that only got the guard with CQ-10: it can aim a rule
+  that is *already* matching the user's traffic at a stranger's activity, without creating anything.
+- **An update to a mapping is a full replace, target included.** *Type-enforced* — both update DTOs carry
+  `IsIgnored`/`ActivityId`/`RoleId`/`CategoryId` and write all four, so a member left out of the body
+  clears its column. Until CQ-10 they carried none of them and a rule could not be re-pointed through the
+  API at all; deleting and recreating one is not a workaround, because losing a mapping silently stops
+  every future heartbeat matching that pattern from being attributed.
 - **A pattern column implies its match type** (`process_name IS NULL OR process_name_match_type IS NOT
   NULL`, and the same for product name / window title / package name / app label). *DB-enforced*.
 - **One pattern per user.** *DB-enforced*, unique with `NULLS NOT DISTINCT` so two NULL process names
-  count as equal.
+  count as equal — and *pre-checked* by `MappingPatternUniquenessExtensions` on all four write endpoints,
+  which answers the ordinary case with the same 409 the index would while naming the pattern the caller
+  already has (CQ-11). The update side excludes the row under edit, or every edit that leaves the pattern
+  alone would collide with itself.
+- **The most specific matching mapping wins a desktop entry.** *App-enforced* — the heartbeat orders the
+  user's active rules by the number of pattern columns they constrain, then by id, and takes the first
+  match. Nothing ordered the list before CQ-16, so "ignore GitHub everywhere except in Chrome" resolved
+  to whatever order an unordered read returned. Ordering does not resolve two equally specific rules that
+  genuinely overlap; it makes the winner stable and explicable.
 - **One android session per `(user, device, package, start)`.** *DB-enforced* — this is what makes the
   sync endpoint's re-send idempotent. The endpoint keys off the same tuple *within* a batch as well as
   against the stored rows, so a phone that repeats a session inside one payload gets it counted as a
@@ -122,12 +144,12 @@ assuming a path.
 |---|---|---|
 | Desktop ingest | `/activity-tracking/desktop` | `DesktopActivityHeartbeatEndpoint` (`/heartbeat`) — ⚠ ingest only, see `summary.md` |
 | Desktop dashboards | `/activity-tracking/desktop` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, process-details, distinct-processes, `gird` |
-| Desktop mappings | `/activity-tracking/desktop/settings` | create / update / delete / `gird`, plus `fetch-categories-and-roles-by-pattern` |
+| Desktop mappings | `/activity-tracking/desktop/settings` | create / update / delete / `gird`, plus `fetch-categories-and-roles-by-pattern`. Update is a **full replace including the target** (see Invariants) |
 | Web-extension ingest | `/activity-tracking/web-extension` | `WebExtensionDataHeartbeatEndpoint` (`/heartbeat`) |
 | Web-extension dashboards | `/activity-tracking/web-extension` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, domain-details |
 | Android ingest | `/activity-tracking/android` | `AndroidSyncEndpoint` (`/sync`) |
 | Android dashboards | `/activity-tracking/android` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, `gird` |
-| Android mappings | `/activity-tracking/android/settings` | create / update / delete / `gird` |
+| Android mappings | `/activity-tracking/android/settings` | create / update / delete / `gird`; update as above |
 | Unified dashboards | `/activity-tracking/unified` | sources, pie-chart, summary-cards, stacked-bars, timeline, focus-metrics — see **The unified dashboards** below |
 
 **Request shape (all twenty-one dashboards; the six unified ones add `sources` and nothing else):**
@@ -246,7 +268,9 @@ and is therefore denied to extension clients by the `Program.cs` configurator's 
 | `UnifiedDashboardValidators` | Validators | The `sources` rule on top of the shared span rules: non-empty, known members only | `application/validator/unified/UnifiedDashboardValidators.cs` |
 | `DesktopActivityHeartbeatValidator` · `WebExtensionHeartbeatValidator` · `AndroidSyncValidator` | Validators | The ingest boundary — including the minute-alignment rule | `application/validator/{desktop,webExtension,android}/` |
 | `TrackingIngestLimits` | Constants | Every bound the write paths put on an untrusted payload, in one place — batch sizes, the android session length, and the column widths the ingest and mapping validators enforce | `application/validator/TrackingIngestLimits.cs` |
-| `MappingTargetOwnershipExtensions` | Endpoint helper | The activity/role/category ownership guard both mapping create endpoints call from `BeforeMapping` | `application/endpoint/extensions/` |
+| `MappingTargetOwnershipExtensions` | Endpoint helper | The activity/role/category ownership guard all four mapping write endpoints call from `BeforeMapping`, over the `IMappingTargetRequest` all four requests implement | `application/endpoint/extensions/` |
+| `MappingPatternUniquenessExtensions` | Endpoint helper | The duplicate-pattern pre-check beside it — the same 409 the index gives, with the pattern named (CQ-11) | `application/endpoint/extensions/` |
+| `IMappingTargetRequest` · `MappingTargetRules` | DTO contract + validator rules | The mapping target group, and its two shape rules in one copy across the four mapping validators | `application/dto/request/` · `application/validator/` |
 | `IngestBatchSaveExtensions` | Endpoint helper | The save all three ingest routes end on — a `23505` becomes a 409 rather than a 500 an unattended client re-posts forever | `application/endpoint/extensions/` |
 | `PurgeExpiredActivityTrackingEntriesJobHandler` | Scheduled job | The retention purge (see Infrastructure below) | `infrastructure/jobs/` |
 

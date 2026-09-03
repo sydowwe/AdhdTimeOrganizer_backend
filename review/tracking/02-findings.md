@@ -89,11 +89,13 @@ wraps the three checks into one call and is invoked from `BeforeMapping` on
 `BeforeMapping` rather than `AfterMapping`: the ids are the request's, not the entity's, and rejecting
 before the insert keeps the failure off the change tracker. 404 per offending field, with the same
 message for a missing id as for a foreign one — distinguishing them makes the endpoint an existence
-oracle over another account's ids. The update DTOs carry none of the three ids (`CQ-10` is that gap),
-so create is the whole write surface today.
+oracle over another account's ids. ~~The update DTOs carry none of the three ids (`CQ-10` is that gap),
+so create is the whole write surface today.~~ **Superseded 2026-09-03:** `CQ-10` put the three ids on the
+update DTOs, and the guard went onto both update endpoints in the same change — see `CQ-10`.
 
 Pinned by `TrackerMappingTargetOwnershipTests` (5 cases: foreign activity on both endpoints, foreign
-role + category, and an own-activity control on each so the guard cannot degrade into a blanket 404).
+role + category, and an own-activity control on each so the guard cannot degrade into a blanket 404),
+plus the four update cases `CQ-10` added to the same class.
 
 `Doc impact: domain-map.md → Invariants (add "a mapping's activity/role/category is the author's own",
 app-enforced)` — done.
@@ -561,7 +563,7 @@ entry that must still be a 200 — plus one per mapping endpoint.
 `Doc impact: none` (`domain-map.md`'s navigation row for `TrackingIngestLimits` now mentions the widths;
 no rule statement changed)
 
-### CQ-10 🟠 A mapping's target cannot be changed, and update does not re-check the target rule
+### CQ-10 🟠 ✅ FIXED 2026-09-03 · A mapping's target cannot be changed, and update does not re-check the target rule
 
 `application/dto/request/desktop/UpdateTrackerDesktopMappingRequest.cs:20-29`,
 `application/dto/request/android/UpdateTrackerAndroidMappingRequest.cs:19-27`
@@ -580,10 +582,42 @@ users delete one to edit it is the wrong default.
 **Fix:** add the four target members to both update DTOs and lift the create validator's two target
 rules into a shared rule set applied to both.
 
-`Doc impact: domain-map.md → Endpoints (the mappings rows say "create / update / delete"; worth a note
-that update currently cannot change the target until this is fixed)`
+**Fixed as written, and treated as `SEC-2` part two** — which is the whole of the risk here. The four
+members went onto both update DTOs and are written by `UpdateEntity`; the create validators' two target
+rules moved into `MappingTargetRules.AddMappingTargetRules`, an extension over the new
+`IMappingTargetRequest` that all four requests implement, and all four validators call it. Three
+decisions worth stating:
 
-### CQ-11 🟠 ✅ PARTLY MOOT / FIXED 2026-09-03 · Unique-pattern collisions surface as 500
+- **`MappingTargetOwnershipExtensions` went onto both update endpoints in the same change.** Adding the
+  ids without it would have reopened `SEC-2` on a surface that did not exist when it was closed — and the
+  update side is the worse of the two, because it can aim a rule *already matching the user's traffic* at
+  a stranger's activity without creating anything. The guard now takes the request through
+  `IMappingTargetRequest` rather than three loose `long?`s, and hangs off `IEndpoint` rather than
+  `Endpoint<TRequest, long>`, so there is no call site where passing the wrong ids type-checks.
+- **Update is a full replace, target included.** A member left out of the body clears its column, which
+  is PUT's own semantic and what the DTO's shape already implied for the pattern fields. That is exactly
+  why the target rules had to follow the members: a body naming no target clears all four columns and
+  would otherwise die on `CK_Tracker*MappingByPattern_TargetRequired` as a 500. **This is a breaking
+  change for any client that was PUTting without a target** — it now gets a 400 naming the rule instead
+  of a silently-preserved target, which is the correct answer but is not the old one.
+- **The shared rules are an extension method, not an `Include`d validator.** FluentValidation's
+  `Include` overload for a base-type validator would work, but a plain
+  `AbstractValidator<T>.AddMappingTargetRules()` where `T : IMappingTargetRequest` reads at each call
+  site as what it is — two rules added here — and does not depend on which `Include` overload the
+  compiler picks.
+
+Pinned by four cases added to `TrackerMappingTargetOwnershipTests`: a re-point onto a foreign activity
+(404, asserting the row keeps the target it had rather than merely that the response is a 404), the same
+on android, the own-activity re-point that must now **succeed** — CQ-10's own point, and the control that
+stops the guard degrading into a blanket 404 on update — and a body with no target at all, which asserts
+on the message so a 400 from some other rule cannot stand in for it. The two `Seed*UpdatePayload` helpers
+in `TrackingMappingCrudAuthMatrixTests` gained `IsIgnored = true` for the same reason; their doc comment
+said the update DTO carried no targets, which was the fact this finding is about.
+
+`Doc impact: domain-map.md → Invariants (update is a full replace including the target; the ownership
+bullet now says all four endpoints) + Endpoints (both mapping rows) + Navigation index` — done.
+
+### CQ-11 🟠 ✅ PARTLY MOOT / FULLY FIXED 2026-09-03 · Unique-pattern collisions surface as 500
 
 `application/endpoint/desktop/command/CreateTrackerDesktopMappingEndpoint.cs`,
 `UpdateTrackerDesktopMappingEndpoint.cs` (and the android pair)
@@ -621,15 +655,42 @@ retrying. It sits in Tracking rather than the Framework because `framework/` is 
 outside this slice has the shape yet (`CLAUDE.md`, "editing it is a two-repo operation"); if a second slice
 grows unbased command endpoints, that is the moment to lift it.
 
-The named fix — a pre-check returning a 409 that names the offending field — is **still open**. The user
-gets "Unique constraint violation during Create" rather than "you already have a rule for `code.exe`".
+~~The named fix — a pre-check returning a 409 that names the offending field — is **still open**. The user
+gets "Unique constraint violation during Create" rather than "you already have a rule for `code.exe`".~~
+
+**The named fix landed 2026-09-03** as `application/endpoint/extensions/MappingPatternUniquenessExtensions.cs`,
+called from `BeforeMapping` on all four mapping endpoints beside the ownership guard. The user now gets
+"You already have a mapping for ProcessName 'code.exe'." Four things about it:
+
+- **It does not replace the index**, and is not written as though it did: two requests in flight still
+  race past a pre-check, and the base's `DbUtils.HandleException` catches that with the same status. The
+  status itself is `EndpointHelper.ToStatusCode(ResultErrorType.DbUniqueViolationError)` rather than a
+  literal 409, so the pre-check and the index cannot disagree about what a duplicate is worth.
+- **The null comparison is the load-bearing part.** The predicate is a plain `==` against the request's
+  possibly-null values; EF compiles a null-valued parameter into `IS NULL`, which is precisely the
+  `NULLS NOT DISTINCT` semantic the index has. The generated SQL was checked
+  (`… process_name IS NULL AND product_name IS NULL AND window_title = @p`), and the existing
+  null-bearing case now asserts on the message, so an EF change that started parameterising the null
+  would fail a test rather than quietly stop catching half the collisions.
+- **It scopes by `UserId` by hand** as well as riding the global filter — a module read, and the index it
+  mirrors is per user.
+- **Update excludes the row under edit**, off the route id, since the base runs `BeforeMapping` before it
+  loads the row. Without that, every edit that leaves the pattern alone — the commonest update there is —
+  would be a 409.
+
+Pinned by three more cases in `TrackingIngestConflictTests`: the update that collides with another rule,
+the update that keeps its own pattern and must be a 200 whose change actually landed (the control the
+index cannot provide, and the one a naive pre-check fails), and the two existing create cases, which now
+assert the pattern appears in the body — the status was already right, so without that the message half
+has no guard at all.
 
 Pinned by two cases in `TrackingIngestConflictTests`: the duplicate pattern, and the `NULLS NOT DISTINCT`
 half — two rules that both name only a window title, leaving `ProcessName` and `ProductName` null, which
 under Postgres' default null handling would *not* collide. That second one is the reachable surprise in this
 finding and had no guard anywhere.
 
-`Doc impact: domain-map.md → Invariants + Navigation index (the ingest-save wrapper)` — done.
+`Doc impact: domain-map.md → Invariants + Navigation index (the ingest-save wrapper, and now the
+pattern pre-check on the "one pattern per user" bullet)` — done.
 
 ### CQ-12 🟠 `PatternMatchType.Regex` means two different things on two surfaces
 
@@ -800,16 +861,41 @@ sharpened**; the code is deliberate.
   `BaseFilterSortPaginateRequest<TFilter>`, and a validator picked up by request type alone would be a
   silent thing to lose. Pinned by `TrackingValidationBoundsTests.DistinctEntriesGrid_RejectsAPageSizeOutsideItsBounds`,
   a theory over both routes covering zero, 10 000 and an ordinary page. `Doc impact: none`
-- **CQ-15** `GridTrackerDesktopMappingEndpoint.cs:32` / `GridTrackerAndroidMappingEndpoint.cs:32` throw
-  `ArgumentOutOfRangeException` for an unmapped `Type` → 500 rather than 400. Two smaller oddities in the
-  same switch: the filter's `Type` is `required`, so **"all mappings, unfiltered" is unrepresentable**;
-  and the android grid switches on `TrackerDesktopMappingTypeEnum` — correct by value, misleading by
-  name. `Doc impact: domain-map.md → Entities (the enum note says "the mapping's target shape"; worth
-  saying it is shared by both tables)`
-- **CQ-16** `DesktopActivityHeartbeatEndpoint.cs:64` takes `mappings.FirstOrDefault(m => MatchesPattern(...))`
-  with no ordering — which rule wins when two match is whatever order Postgres returned. A specificity
-  order (most pattern columns set first, then id) would make it deterministic and explicable.
-  `Doc impact: domain-map.md → Invariants (state which mapping wins)`
+- **CQ-15** ✅ **FIXED 2026-09-03.** `GridTrackerDesktopMappingEndpoint.cs:32` /
+  `GridTrackerAndroidMappingEndpoint.cs:32` threw `ArgumentOutOfRangeException` for an unmapped `Type` →
+  500 rather than 400. Two smaller oddities in the same switch: the filter's `Type` was `required`, so
+  **"all mappings, unfiltered" was unrepresentable**; and the android grid switched on
+  `TrackerDesktopMappingTypeEnum` — correct by value, misleading by name. All three fixed: `Type` is
+  `TrackerMappingTypeEnum?` (the enum renamed, since both tables share it and a misleading name is how a
+  second copy gets added), `null` is a `null => query` arm meaning "every target shape" so the rest of
+  the filter still narrows, and both grid validators gained `RuleFor(x => x.Filter!.Type).IsInEnum()`.
+  The `_ => throw` arm **stays**, now unreachable for anything a client can send — what is left is an
+  enum member added and not handled here, and a 500 is the right answer to that; the alternative is a
+  page silently unnarrowed. Pinned by two cases in `TrackingValidationBoundsTests`: a filter with no
+  `Type` that must still narrow on `IsActive` (the half that would regress silently — a `null` arm that
+  also skipped the other predicates returns a superset nobody reads as a bug), and `type: 99`, which the
+  string-enum converter admits because integer values are allowed, so the validator is what has to reject
+  it. Two stale test comments describing the `required` member were corrected in
+  `TrackingMappingCrudAuthMatrixTests` and `TrackingRouteSmokeTests`.
+  `Doc impact: domain-map.md → Entities (the enum note now names it, says both tables share it, and says
+  null means every shape)` — done.
+- **CQ-16** ✅ **FIXED 2026-09-03.** `DesktopActivityHeartbeatEndpoint.cs:64` took
+  `mappings.FirstOrDefault(m => MatchesPattern(...))` with no ordering — which rule wins when two match
+  was whatever order Postgres returned. Fixed as the finding suggests: `OrderBySpecificity` sorts the
+  loaded rules by the number of pattern columns they constrain, descending, then by id. Specificity
+  rather than id alone because a rule naming two columns matches a strict subset of what its one-column
+  prefix matches, so it is the one the user meant; id as the tie-break so the older of two equally
+  specific rules wins. **It does not resolve genuinely overlapping rules of the same shape** — two
+  wildcards on one column still have an arbitrary winner — it makes the winner stable and explicable,
+  which is what a user reasoning about their own list needs. Ordering happens once per request on the
+  already-materialised list, not in SQL, so it costs nothing on the once-a-minute path. Pinned by
+  `DesktopHeartbeatMappingPrecedenceTests`, two cases over "ignore anything titled *GitHub*, except in
+  Chrome": the broad rule is **seeded first**, so under the old id-shaped ordering it would win and the
+  entry would be dropped — the case discriminates rather than describing the arrangement it found. The
+  control sends an entry only the broad rule matches and asserts it is still ignored, so "more specific
+  wins" cannot degrade into "the ignore rule never applies". Both assert on stored rows, since the
+  difference between the two outcomes is whether the entry exists at all.
+  `Doc impact: domain-map.md → Invariants (which mapping wins)` — done.
 - **CQ-17** `DesktopPieChartEndpoint.cs:101` counts `x.WindowTitle != null` on a non-nullable column
   (always true) while the list three lines above uses `!string.IsNullOrEmpty`. The totals row therefore
   counts `""` as a distinct title. `Doc impact: none`

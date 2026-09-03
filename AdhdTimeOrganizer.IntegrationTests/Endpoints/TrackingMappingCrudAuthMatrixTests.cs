@@ -122,29 +122,37 @@ file static class Seed
     };
 
     /// <summary>
-    /// The update DTOs carry only the pattern fields and <c>IsActive</c> -- no target fields at all, so
-    /// the "exactly one target" rule is create-only and an update cannot re-point a mapping.
+    /// The update DTOs carry the target group as well as the pattern fields and <c>IsActive</c> (CQ-10),
+    /// so an update is a full replace and the "exactly one target" rule applies to it exactly as it does
+    /// to create -- a body naming no target is a 400, not a row with all four target columns cleared.
     /// </summary>
     public static object DesktopUpdatePayload() => new
     {
         ProcessName = $"updated-{Guid.NewGuid():N}.exe",
         ProcessNameMatchType = PatternMatchType.Exact,
-        IsActive = false
+        IsActive = false,
+        IsIgnored = true
     };
 
     public static object AndroidUpdatePayload() => new
     {
         PackageName = $"com.updated.{Guid.NewGuid():N}",
         PackageNameMatchType = PatternMatchType.Exact,
-        IsActive = false
+        IsActive = false,
+        IsIgnored = true
     };
 
     /// <summary>
-    /// Grid body with <c>filter: null</c> rather than <c>filter: {}</c>. Both mapping filters declare
-    /// <c>required TrackerDesktopMappingTypeEnum Type</c>, and System.Text.Json enforces <c>required</c>
-    /// on deserialization -- so an empty object 400s before the handler runs, while an explicit null
-    /// satisfies the (nullable) property and leaves <c>ApplyCustomFiltering</c> unreached, which is what
-    /// an unfiltered "show me everything" page needs.
+    /// Grid body with <c>filter: null</c> and <c>useFilter: false</c>, which leaves
+    /// <c>ApplyCustomFiltering</c> unreached entirely -- the cheapest "show me everything" page.
+    /// <para>
+    /// It used to be the <b>only</b> one: both mapping filters declared
+    /// <c>required TrackerDesktopMappingTypeEnum Type</c> and System.Text.Json enforces <c>required</c> on
+    /// deserialization, so <c>filter: {}</c> 400ed before the handler ran. <c>Type</c> is optional as of
+    /// CQ-15 (and the enum is <c>TrackerMappingTypeEnum</c>, since both tables share it), so a filter that
+    /// narrows on something other than the target shape is now expressible --
+    /// <c>TrackingValidationBoundsTests</c> pins that.
+    /// </para>
     /// </summary>
     public static object UnfilteredGridBody() => new
     {
@@ -377,9 +385,9 @@ public class TrackerAndroidMappingDeleteTests(AppDbContextFixture fixture) : Bas
 // The two settings grids. GridTrackerDesktopMappingEndpoint / GridTrackerAndroidMappingEndpoint both
 // derive from BaseGridEndpoint, but BaseGridEndpointTests does NOT fit them: its GridBody() is a static
 // helper the tests call with no seam to change, and it sends `filter: {}` -- which both mapping filters
-// reject, because each declares `required TrackerDesktopMappingTypeEnum Type` and System.Text.Json
-// enforces `required` during deserialization. The base's happy path would 400 on a correctly behaving
-// endpoint. Hand-written here with `filter: null` instead.
+// rejected while each declared `required TrackerDesktopMappingTypeEnum Type` and System.Text.Json
+// enforced `required` during deserialization. `Type` is optional as of CQ-15, so that particular 400 is
+// gone; these stay hand-written with `filter: null` because they are also asserting the scoping below.
 //
 // Neither grid overrides ApplyUserScoping, so their scoping is the global IEntityWithUser query filter
 // and nothing else -- which is exactly why the cross-user case below is worth pinning: drop these

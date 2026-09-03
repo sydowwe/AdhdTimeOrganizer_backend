@@ -25,20 +25,7 @@ public class CreateTrackerAndroidMappingValidator : Validator<CreateTrackerAndro
             .WithMessage("At least one pattern (PackageName or AppLabel) must be provided")
             .OverridePropertyName("Patterns");
 
-        RuleFor(x => x)
-            .Must(x =>
-            {
-                var isIgnoredSet = x.IsIgnored == true;
-                var activitySet = x.ActivityId != null;
-                var roleOrCategorySet = x.RoleId != null || x.CategoryId != null;
-                var targetsSet = new[] { isIgnoredSet, activitySet, roleOrCategorySet }.Count(v => v);
-                return targetsSet == 1;
-            })
-            .WithMessage("Exactly one target must be set: IsIgnored=true, ActivityId, or RoleId/CategoryId (not multiple)")
-            .OverridePropertyName("Target");
-
-        RuleFor(x => x.IsIgnored)
-            .Must(v => v == null || v == true)
-            .WithMessage("IsIgnored can only be set to true");
+        // The target group's two rules, shared with the update validator and the desktop pair (CQ-10).
+        this.AddMappingTargetRules();
     }
 }

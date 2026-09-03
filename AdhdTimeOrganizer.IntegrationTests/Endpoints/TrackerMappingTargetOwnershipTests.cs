@@ -6,14 +6,15 @@ using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 /// <summary>
-/// The three target ids a pattern mapping carries — `ActivityId`, `RoleId`, `CategoryId` — on the two
-/// endpoints that write them raw: desktop and android mapping create.
+/// The three target ids a pattern mapping carries — `ActivityId`, `RoleId`, `CategoryId` — on the four
+/// endpoints that write them raw: desktop and android mapping create <b>and update</b>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -25,8 +26,9 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// </para>
 /// <para>
 /// The guard is `MappingTargetOwnershipExtensions.EnsureOwnsMappingTargetsAsync`, called from
-/// `BeforeMapping` on both create endpoints, over `IReferencedIdOwnershipService`. 404 rather than
-/// 403, for the same existence-oracle reason as the activity guard.
+/// `BeforeMapping` on all four endpoints, over `IReferencedIdOwnershipService`. 404 rather than
+/// 403, for the same existence-oracle reason as the activity guard. The update half arrived with the
+/// target members themselves (CQ-10) — the guard had nothing to check there before.
 /// </para>
 /// </remarks>
 [Collection("Postgres")]
@@ -144,7 +146,148 @@ public class TrackerMappingTargetOwnershipTests(AppDbContextFixture fixture) : P
         (await CountMappingsAsync<TrackerAndroidMappingByPattern>("ActivityId", ownActivityId)).Should().Be(1);
     }
 
+    // ---- the update surface (CQ-10) ---------------------------------------------------------------
+
+    /// <summary>
+    /// The half that did not exist when SEC-2 was closed. `UpdateEntity` wrote the pattern fields and
+    /// nothing else, so a mapping could not be re-pointed at all; CQ-10 put the three target ids on the
+    /// update DTOs, and a re-pointing update is the more dangerous of the two writes — it can aim a rule
+    /// that is *already matching the user's traffic* at a stranger's activity, with no create to notice.
+    /// </summary>
+    [Fact(DisplayName = "Re-pointing a desktop mapping onto another user's activity is rejected")]
+    public async Task UpdateDesktopMapping_WithForeignActivityId_IsRejected()
+    {
+        var foreignUserId = await SeedForeignUserAsync();
+        long foreignActivityId, mappingId;
+        await using (var db = CreateDbContext())
+        {
+            foreignActivityId = await PlanningTestSeedHelper.SeedActivityAsync(
+                db, "Foreign update target", foreignUserId, CancellationToken);
+            mappingId = await SeedOwnDesktopMappingAsync(db);
+        }
+
+        var response = await CreateUserRoleClient().PutAsJsonAsync(
+            $"{DesktopRoute}/{mappingId}",
+            new { processName = "repointed.exe", processNameMatchType = "Exact", isActive = true, activityId = foreignActivityId },
+            JsonOpts,
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await using var assertDb = CreateDbContext();
+        var after = await assertDb.Set<TrackerDesktopMappingByPattern>().IgnoreQueryFilters().AsNoTracking()
+            .FirstAsync(m => m.Id == mappingId, CancellationToken);
+        after.ActivityId.Should().BeNull("the guard runs before the mapping, so nothing is written at all");
+        after.IsIgnored.Should().BeTrue("the row must keep the target it had, not lose it to a rejected update");
+    }
+
+    /// <summary>
+    /// The control, and CQ-10's own point: re-pointing to one's own activity is exactly what the update
+    /// route exists for. Before this the user had to delete the rule and write it again — and losing a
+    /// mapping means every future heartbeat matching that pattern silently stops being attributed.
+    /// </summary>
+    [Fact(DisplayName = "Re-pointing a desktop mapping onto the caller's own activity succeeds")]
+    public async Task UpdateDesktopMapping_CanRepointOntoTheCallersOwnActivity()
+    {
+        long ownActivityId, mappingId;
+        await using (var db = CreateDbContext())
+        {
+            ownActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "Own update target", ct: CancellationToken);
+            mappingId = await SeedOwnDesktopMappingAsync(db);
+        }
+
+        var response = await CreateUserRoleClient().PutAsJsonAsync(
+            $"{DesktopRoute}/{mappingId}",
+            new { processName = "repointed.exe", processNameMatchType = "Exact", isActive = true, activityId = ownActivityId },
+            JsonOpts,
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var assertDb = CreateDbContext();
+        var after = await assertDb.Set<TrackerDesktopMappingByPattern>().IgnoreQueryFilters().AsNoTracking()
+            .FirstAsync(m => m.Id == mappingId, CancellationToken);
+        after.ActivityId.Should().Be(ownActivityId);
+        after.IsIgnored.Should().BeNull("the target group is exclusive — taking the activity clears IsIgnored");
+    }
+
+    [Fact(DisplayName = "Re-pointing an android mapping onto another user's activity is rejected")]
+    public async Task UpdateAndroidMapping_WithForeignActivityId_IsRejected()
+    {
+        var foreignUserId = await SeedForeignUserAsync();
+        long foreignActivityId, mappingId;
+        await using (var db = CreateDbContext())
+        {
+            foreignActivityId = await PlanningTestSeedHelper.SeedActivityAsync(
+                db, "Foreign android update target", foreignUserId, CancellationToken);
+            mappingId = await SeedOwnAndroidMappingAsync(db);
+        }
+
+        var response = await CreateUserRoleClient().PutAsJsonAsync(
+            $"{AndroidRoute}/{mappingId}",
+            new { packageName = "com.repointed.app", packageNameMatchType = "Exact", isActive = true, activityId = foreignActivityId },
+            JsonOpts,
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await CountMappingsAsync<TrackerAndroidMappingByPattern>("ActivityId", foreignActivityId)).Should().Be(0);
+    }
+
+    /// <summary>
+    /// The trap CQ-10's text names: the update validator omitted the create validator's target rules
+    /// because update had no targets to check. An update is a full replace, so a body naming no target
+    /// clears all four columns — and <c>CK_TrackerDesktopMappingByPattern_TargetRequired</c> would answer
+    /// that with a 23514 the user sees as a 500. The rules moved onto both validators with the members.
+    /// </summary>
+    [Fact(DisplayName = "An update naming no target at all is a 400, not a check-constraint 500")]
+    public async Task UpdateDesktopMapping_WithNoTarget_IsRejectedByTheValidator()
+    {
+        long mappingId;
+        await using (var db = CreateDbContext())
+            mappingId = await SeedOwnDesktopMappingAsync(db);
+
+        var response = await CreateUserRoleClient().PutAsJsonAsync(
+            $"{DesktopRoute}/{mappingId}",
+            new { processName = "targetless.exe", processNameMatchType = "Exact", isActive = true },
+            JsonOpts,
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync(CancellationToken))
+            .Should().Contain("Exactly one target", "the 400 has to say which rule the body broke");
+    }
+
     // ---- helpers ---------------------------------------------------------------------------------
+
+    private async Task<long> SeedOwnDesktopMappingAsync(DbContext db)
+    {
+        var mapping = new TrackerDesktopMappingByPattern
+        {
+            UserId = FakeLoggedUserService.TestUserId,
+            ProcessName = $"own-{Guid.NewGuid():N}.exe",
+            ProcessNameMatchType = PatternMatchType.Exact,
+            IsActive = true,
+            IsIgnored = true
+        };
+        db.Set<TrackerDesktopMappingByPattern>().Add(mapping);
+        await db.SaveChangesAsync(CancellationToken);
+        return mapping.Id;
+    }
+
+    private async Task<long> SeedOwnAndroidMappingAsync(DbContext db)
+    {
+        var mapping = new TrackerAndroidMappingByPattern
+        {
+            UserId = FakeLoggedUserService.TestUserId,
+            PackageName = $"com.own.{Guid.NewGuid():N}",
+            PackageNameMatchType = PatternMatchType.Exact,
+            IsActive = true,
+            IsIgnored = true
+        };
+        db.Set<TrackerAndroidMappingByPattern>().Add(mapping);
+        await db.SaveChangesAsync(CancellationToken);
+        return mapping.Id;
+    }
 
     private Task<long> SeedForeignUserAsync() =>
         ActivityMergeTestSupport.SecondUserAsync(Fixture, $"tracker-mapping-ownership-{Guid.NewGuid():N}@test.com");

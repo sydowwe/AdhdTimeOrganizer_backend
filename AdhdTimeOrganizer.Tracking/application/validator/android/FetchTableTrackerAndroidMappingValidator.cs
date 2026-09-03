@@ -14,6 +14,9 @@ public class FetchTableTrackerAndroidMappingValidator : Validator<BaseFilterSort
 
         When(x => x.UseFilter && x.Filter != null, () =>
         {
+            // CQ-15 — see the desktop twin.
+            RuleFor(x => x.Filter!.Type).IsInEnum();
+
             RuleFor(x => x.Filter!.PackageNameMatchType)
                 .NotNull().When(x => x.Filter!.PackageName != null)
                 .WithMessage("PackageNameMatchType is required when PackageName is set");

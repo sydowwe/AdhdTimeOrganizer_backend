@@ -18,10 +18,18 @@ public class CreateTrackerAndroidMappingEndpoint(DbContext dbContext, IReference
         Group<ActivityTrackingAndroidSettingsGroup>();
     }
 
-    /// <summary>
-    /// The validator can only check the shape of the target group; whether the ids in it are the
-    /// caller's own needs the request scope's <c>DbContext</c> and the principal, so it happens here.
-    /// </summary>
-    protected override Task<bool> BeforeMapping(CreateTrackerAndroidMappingRequest req, CancellationToken ct = default) =>
-        this.EnsureOwnsMappingTargetsAsync(ownership, DbContext, req.ActivityId, req.RoleId, req.CategoryId, ct);
+    /// <summary>See the desktop twin: target ownership (SEC-2) then pattern uniqueness (CQ-11).</summary>
+    protected override async Task<bool> BeforeMapping(CreateTrackerAndroidMappingRequest req, CancellationToken ct = default)
+    {
+        if (!await this.EnsureOwnsMappingTargetsAsync(ownership, DbContext, req, ct))
+            return false;
+
+        return await this.EnsureMappingPatternIsUniqueAsync<TrackerAndroidMappingByPattern>(
+            DbContext,
+            e => e.PackageName == req.PackageName && e.AppLabel == req.AppLabel,
+            excludedId: null,
+            MappingPatternUniquenessExtensions.DescribePattern(
+                ("PackageName", req.PackageName), ("AppLabel", req.AppLabel)),
+            ct);
+    }
 }

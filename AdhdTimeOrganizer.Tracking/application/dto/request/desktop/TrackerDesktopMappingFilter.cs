@@ -6,7 +6,12 @@ namespace AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.de
 
 public record TrackerDesktopMappingFilter : IFilterRequest
 {
-    public required TrackerDesktopMappingTypeEnum Type { get; set; }
+    /// <summary>
+    /// The target shape to narrow to, or <c>null</c> for all of them. Optional as of CQ-15: it was
+    /// <c>required</c>, which made "every mapping, filtered on something else" unrepresentable — a page
+    /// that wanted only the inactive rules had to ask for one target shape at a time.
+    /// </summary>
+    public TrackerMappingTypeEnum? Type { get; set; }
     public bool? IsActive { get; set; }
 
     public string? ProcessName { get; set; }

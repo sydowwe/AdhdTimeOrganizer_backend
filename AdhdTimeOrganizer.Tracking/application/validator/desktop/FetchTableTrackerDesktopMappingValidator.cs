@@ -14,6 +14,10 @@ public class FetchTableTrackerDesktopMappingValidator : Validator<BaseFilterSort
 
         When(x => x.UseFilter && x.Filter != null, () =>
         {
+            // CQ-15: an undefined enum value used to reach ApplyCustomFiltering's switch and throw, which
+            // the client saw as a 500. Null is allowed and means "every target shape".
+            RuleFor(x => x.Filter!.Type).IsInEnum();
+
             RuleFor(x => x.Filter!.ProcessNameMatchType)
                 .NotNull().When(x => x.Filter!.ProcessName != null)
                 .WithMessage("ProcessNameMatchType is required when ProcessName is set");

@@ -24,11 +24,16 @@ public class GridTrackerDesktopMappingEndpoint(DbContext dbContext)
     {
         query = filter.Type switch
         {
-            TrackerDesktopMappingTypeEnum.Ignored => query.Where(e => e.IsIgnored == true),
-            TrackerDesktopMappingTypeEnum.Activity => query.Where(e => e.ActivityId.HasValue),
-            TrackerDesktopMappingTypeEnum.Role => query.Where(e => e.RoleId.HasValue),
-            TrackerDesktopMappingTypeEnum.Category => query.Where(e => e.CategoryId.HasValue),
-            TrackerDesktopMappingTypeEnum.CategoryAndRole => query.Where(e => e.CategoryId.HasValue && e.RoleId.HasValue),
+            // No target shape asked for: every mapping, still narrowed by whatever else the filter sets.
+            null => query,
+            TrackerMappingTypeEnum.Ignored => query.Where(e => e.IsIgnored == true),
+            TrackerMappingTypeEnum.Activity => query.Where(e => e.ActivityId.HasValue),
+            TrackerMappingTypeEnum.Role => query.Where(e => e.RoleId.HasValue),
+            TrackerMappingTypeEnum.Category => query.Where(e => e.CategoryId.HasValue),
+            TrackerMappingTypeEnum.CategoryAndRole => query.Where(e => e.CategoryId.HasValue && e.RoleId.HasValue),
+            // Unreachable for a value a client can send — the validator's IsInEnum rule makes an undefined
+            // one a 400 (CQ-15). What is left is a member added to the enum and not handled here, and a
+            // 500 is the right answer to that: the alternative is a page silently unnarrowed.
             _ => throw new ArgumentOutOfRangeException(nameof(filter.Type))
         };
 

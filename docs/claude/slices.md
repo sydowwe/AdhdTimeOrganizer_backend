@@ -33,7 +33,7 @@ Core's own or by having two consumers that cannot see each other.** `domain/mode
 (ActivityProfiles, Planning and the host); `application/dto/enum/` has `ActivityDateRangeType`, used
 by Core's own `DateRangeDto`. Everything else went to its owning slice: `PlannerTaskStatus` /
 `RecurrenceType` / `ReminderRecurrence` / `SuggestionSourceType` → Planning,
-`TrackerDesktopMappingTypeEnum` / `BaselineType` → Tracking, `HistoryGroupBy` → History,
+`TrackerMappingTypeEnum` / `BaselineType` → Tracking, `HistoryGroupBy` → History,
 `StreakOutcome` → Routines. Each kept its layer — domain enums under `domain/model/enum/`, DTO enums
 under `application/dto/enum/`. A single-consumer enum parked in Core is drift, not sharing: put it in
 the slice that owns it, and reach for a seam (not a Core enum) if a second slice later needs it.
@@ -119,8 +119,9 @@ The three raw ingest ledgers (`DesktopActivityEntry`, `WebExtensionActivityEntry
 `AndroidSessionData`), the two `Tracker*MappingByPattern` lookups, 29 endpoints
 (desktop/web-extension/android ingest + twelve dashboards + the mapping grids), the five endpoint
 groups, 17 validators, the retention purge job, the dev `WebExtensionDataSeeder` and two enums
-(`TrackerDesktopMappingTypeEnum` in `domain/model/enum/`, `BaselineType` in `application/dto/enum/` —
-note the first is named for desktop but the android mapping grid uses it too). Zero outbound slice
+(`TrackerMappingTypeEnum` in `domain/model/enum/`, `BaselineType` in `application/dto/enum/` — the first
+was `TrackerDesktopMappingTypeEnum` until CQ-15; both mapping grids use it, which is why it is not named
+for one of them). Zero outbound slice
 edges, which the plan said was impossible: its dependencies were **writes**, so no read-side pattern
 could invert them. Two Core seams did.
 
