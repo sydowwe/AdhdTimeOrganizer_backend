@@ -20,8 +20,6 @@ namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.andro
 public class AndroidSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
     : BaseSummaryCardsEndpoint<SummaryCardsRequest, AndroidAppSummaryDto>(timeZones)
 {
-    protected override int DefaultTopN => 4;
-
     public override void Configure() =>
         ConfigureSummaryCards<TopDomainsValidator>(
             "/activity-tracking/android/summary-cards",

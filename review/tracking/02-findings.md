@@ -332,7 +332,7 @@ discriminate: `steady` catches the target weekday (the requested Tuesday opens a
 
 `Doc impact: none`
 
-### CQ-4 🟠 The android pie chart drops slices by default and its parts stop summing to its total
+### CQ-4 🟠 ✅ FIXED 2026-09-03 · The android pie chart drops slices by default and its parts stop summing to its total
 
 `application/endpoint/android/query/AndroidPieChartEndpoint.cs:61-72`
 
@@ -349,6 +349,19 @@ above them"*). This is the same class of arithmetic-identity break that `Seconds
 prevent on the merged side.
 
 **Fix:** drop the `?? 1.0` default and add the `Other` bucket, matching the other three.
+
+**Fixed** as written: `req.MinPercent.HasValue && totalSeconds > 0`, and the tail folded into an `Other`
+slice rather than discarded — `DesktopPieChartEndpoint`'s shape, line for line, so the four pies now
+answer the threshold question the same way.
+
+One thing the finding does not name went with it: `totalApps` counted distinct `AppLabel` while the
+slices group on `(PackageName, AppLabel)`, so two packages shipping the same label drew two slices and
+counted as one app. It is the same identity break one column over — the totals row contradicting the
+chart under it — and it is now counted on the grouping key.
+
+Pinned by two cases in `TrackingDashboardParityTests`: a 0.1% app surviving a request that asked for no
+threshold, and the `Other` row carrying it when one was asked for. Both assert
+`sum(apps.seconds) == totals.totalSeconds`, which is the identity that broke.
 
 `Doc impact: none`
 
@@ -896,9 +909,15 @@ sharpened**; the code is deliberate.
   wins" cannot degrade into "the ignore rule never applies". Both assert on stored rows, since the
   difference between the two outcomes is whether the entry exists at all.
   `Doc impact: domain-map.md → Invariants (which mapping wins)` — done.
-- **CQ-17** `DesktopPieChartEndpoint.cs:101` counts `x.WindowTitle != null` on a non-nullable column
-  (always true) while the list three lines above uses `!string.IsNullOrEmpty`. The totals row therefore
-  counts `""` as a distinct title. `Doc impact: none`
+- **CQ-17** ✅ **FIXED 2026-09-03.** `DesktopPieChartEndpoint.cs:101` counted `x.WindowTitle != null` on a
+  non-nullable column (always true) while the list three lines above used `!string.IsNullOrEmpty`. The
+  totals row therefore counted `""` as a distinct title. Now `IsNullOrEmpty` on both.
+  **`WebExtensionPieChartEndpoint`'s `TotalPages` had the identical slip** and is fixed with it: `Url` is
+  genuinely nullable there, but domain-only tracking — a documented case (`CQ-21`) — stores an empty
+  string, so the null check alone counted it as a page while the `Pages` list beside it excluded it.
+  Fixing one and not the other would have left the batch's own premise ("the sources answer the same")
+  false. Pinned by two cases in `TrackingDashboardParityTests`, each asserting the count against the
+  length of the list it describes rather than against a literal. `Doc impact: none`
 - **CQ-18** ✅ **FIXED 2026-09-03.** The baseline block was transcribed **four** times — three per-source
   summary-cards plus `BaseFocusMetricsEndpoint` — with `UnifiedSummaryCardsEndpoint` a fifth variant.
   `CQ-1`, `CQ-2` and `CQ-3` were each a copy that drifted; the module elsewhere (`TimelineSegmentBuilder`,
@@ -926,8 +945,8 @@ sharpened**; the code is deliberate.
     from the other would need the span read to cover the lookback, which is the unbounded read `CQ-1`
     was about.
 
-  Behaviour is otherwise unchanged, including the per-source default `topN` (5/5/4 — `CQ-23` is still
-  open, and folding it in here would have hidden a UI change inside a refactor). Ties in the top-N order
+  Behaviour is otherwise unchanged, including the per-source default `topN` (5/5/4 — deliberately left
+  alone here so a UI change was not hidden inside a refactor; `CQ-23` closed it afterwards). Ties in the top-N order
   now break on the key rather than on whatever order Postgres returned.
 
   Pinned by `TrackingSummaryCardsBaselineTests` (5 cases across the three routes), which asserts on the
@@ -959,6 +978,12 @@ sharpened**; the code is deliberate.
   plausibly produce" versus "a broken or hostile client", and a multi-kilobyte timestamp is the latter.
   Pinned by `AndroidSyncSessionStorageTests.AndroidSync_RejectsAnInstantStringTooLongToLog`.
   `Doc impact: none`
-- **CQ-23** `AndroidSummaryCardsEndpoint.cs:51` defaults `TopN` to 4 while the desktop and web-extension
-  cards default to 5, and `UnifiedSummaryCardsEndpoint.cs:33` to 4. Harmless, but it is the sort of
-  inconsistency that reaches the screen. `Doc impact: none`
+- **CQ-23** ✅ **FIXED 2026-09-03.** `AndroidSummaryCardsEndpoint` defaulted `TopN` to 4 while the desktop
+  and web-extension cards defaulted to 5, and `UnifiedSummaryCardsEndpoint` to 4. Harmless, but it is the
+  sort of inconsistency that reaches the screen. Now one `SummaryCardsRequest.DefaultTopN = 5` read by all
+  four routes: `BaseSummaryCardsEndpoint`'s abstract `DefaultTopN` and the three overrides are gone, and
+  the unified endpoint's private const with them. Made a constant rather than four agreeing literals
+  because four literals is what this finding is. Five, not four, because it is what two of the three
+  per-source cards already did and the wider page is the one a client is likeliest to have been written
+  against. Pinned by `TrackingDashboardParityTests.SummaryCards_DefaultToTheSameNumberOfCardsOnEverySource`,
+  a theory over all four routes with six items seeded per source. `Doc impact: none`

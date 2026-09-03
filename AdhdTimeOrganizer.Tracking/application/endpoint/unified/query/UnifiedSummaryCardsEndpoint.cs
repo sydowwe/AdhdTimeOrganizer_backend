@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.@enum;
+using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.unified;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.summaryCards;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.unified;
@@ -29,9 +30,6 @@ namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.unifi
 public class UnifiedSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
     : Endpoint<UnifiedSummaryCardsRequest, List<UnifiedSummaryCardDto>>
 {
-    /// <summary>What the unified page asks for when it does not say.</summary>
-    private const int DefaultTopN = 4;
-
     public override void Configure()
     {
         Post("/activity-tracking/unified/summary-cards");
@@ -68,7 +66,7 @@ public class UnifiedSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver tim
             })
             .OrderByDescending(item => item.Active + item.Background)
             .ThenBy(item => item.Label, StringComparer.Ordinal)
-            .Take(req.TopN ?? DefaultTopN)
+            .Take(req.TopN ?? SummaryCardsRequest.DefaultTopN)
             .Select(item =>
             {
                 var hasBaseline = baseline.TryGetValue(item.Label, out var reference);

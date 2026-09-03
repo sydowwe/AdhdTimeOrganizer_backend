@@ -76,12 +76,6 @@ public abstract class BaseSummaryCardsEndpoint<TRequest, TItem>(IUserTimeZoneRes
     where TRequest : SummaryCardsRequest
 {
     /// <summary>
-    /// How many cards a source returns when the client does not say. Per-source because the pages ask
-    /// for different numbers of them.
-    /// </summary>
-    protected abstract int DefaultTopN { get; }
-
-    /// <summary>
     /// This source's rows inside <paramref name="windows"/> — read over the window set's outer envelope
     /// and then put through <see cref="DailyWindowSet.Restrict{T}"/>, because asking the database for
     /// each day separately would be N round trips over a partitioned ledger and asking it for the
@@ -125,7 +119,7 @@ public abstract class BaseSummaryCardsEndpoint<TRequest, TItem>(IUserTimeZoneRes
         var response = Aggregate(current)
             .OrderByDescending(item => item.TotalSeconds)
             .ThenBy(item => item.Key, StringComparer.Ordinal)
-            .Take(req.TopN ?? DefaultTopN)
+            .Take(req.TopN ?? SummaryCardsRequest.DefaultTopN)
             .Select(item => BuildItem(item, baseline.GetValueOrDefault(item.Key)))
             .ToList();
 

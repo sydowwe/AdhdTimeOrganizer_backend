@@ -17,8 +17,6 @@ namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.deskt
 public class DesktopSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
     : BaseSummaryCardsEndpoint<SummaryCardsRequest, DesktopProcessSummaryDto>(timeZones)
 {
-    protected override int DefaultTopN => 5;
-
     public override void Configure() =>
         ConfigureSummaryCards<TopDomainsValidator>(
             "/activity-tracking/desktop/summary-cards",

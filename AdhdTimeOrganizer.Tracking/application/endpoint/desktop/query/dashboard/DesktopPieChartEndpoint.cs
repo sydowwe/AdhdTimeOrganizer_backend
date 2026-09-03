@@ -98,7 +98,13 @@ public class DesktopPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
             ActiveSeconds = periodData.Sum(x => x.ActiveSeconds),
             BackgroundSeconds = periodData.Sum(x => x.BackgroundSeconds),
             TotalProcesses = periodData.Select(x => x.ProcessName).Distinct().Count(),
-            TotalWindowTitles = periodData.Where(x => x.WindowTitle != null).Select(x => x.WindowTitle).Distinct().Count(),
+            // IsNullOrEmpty, matching the per-process WindowTitles list above: the column is non-nullable,
+            // so a null check is always true and counts "" — an untitled window — as a distinct title.
+            TotalWindowTitles = periodData
+                .Where(x => !string.IsNullOrEmpty(x.WindowTitle))
+                .Select(x => x.WindowTitle)
+                .Distinct()
+                .Count(),
             TotalEntries = periodData.Count
         };
 

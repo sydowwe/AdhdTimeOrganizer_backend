@@ -43,7 +43,9 @@ public class AndroidPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
             x => x.SessionStartUtc);
 
         var totalSeconds = periodData.Sum(x => x.DurationSeconds);
-        var totalApps = periodData.Select(x => x.AppLabel).Distinct().Count();
+        // Counted on the key the slices are grouped by, not on the label alone: two packages shipping the
+        // same label draw two slices, so counting one app here would print a total the chart contradicts.
+        var totalApps = periodData.Select(x => (x.PackageName, x.AppLabel)).Distinct().Count();
         var totalSessions = periodData.Count;
 
         var appGroups = periodData
@@ -58,13 +60,27 @@ public class AndroidPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
             .OrderByDescending(a => a.Seconds)
             .ToList();
 
-        var minPercent = req.MinPercent ?? 1.0;
         List<AndroidAppPieData> result;
 
-        if (totalSeconds > 0)
+        // No threshold unless the client asked for one, and what it excludes is folded into an "Other"
+        // slice rather than dropped — the same shape the desktop and web-extension pies take. Discarding
+        // the tail would leave sum(apps.seconds) short of the totals printed above the chart.
+        if (req.MinPercent.HasValue && totalSeconds > 0)
         {
-            var minSeconds = totalSeconds * minPercent / 100.0;
-            result = appGroups.Where(a => a.Seconds >= minSeconds).ToList();
+            var minSeconds = totalSeconds * req.MinPercent.Value / 100.0;
+            var above = appGroups.Where(a => a.Seconds >= minSeconds).ToList();
+            var below = appGroups.Where(a => a.Seconds < minSeconds).ToList();
+
+            result = above;
+
+            if (below.Count > 0)
+                result.Add(new AndroidAppPieData
+                {
+                    PackageName = "Other",
+                    AppLabel = "Other",
+                    Seconds = below.Sum(a => a.Seconds),
+                    TotalSeconds = below.Sum(a => a.Seconds)
+                });
         }
         else
         {

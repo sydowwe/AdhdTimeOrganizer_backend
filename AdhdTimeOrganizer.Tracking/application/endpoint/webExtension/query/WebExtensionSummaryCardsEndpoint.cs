@@ -16,8 +16,6 @@ namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.webEx
 public class WebExtensionSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
     : BaseSummaryCardsEndpoint<SummaryCardsRequest, DomainSummaryDto>(timeZones)
 {
-    protected override int DefaultTopN => 5;
-
     public override void Configure() =>
         ConfigureSummaryCards<TopDomainsValidator>(
             "/activity-tracking/web-extension/summary-cards",
