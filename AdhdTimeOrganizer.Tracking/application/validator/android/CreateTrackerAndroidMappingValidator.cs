@@ -8,6 +8,10 @@ public class CreateTrackerAndroidMappingValidator : Validator<CreateTrackerAndro
 {
     public CreateTrackerAndroidMappingValidator()
     {
+        // Column widths — an over-long pattern is a Postgres 22001 (500) without these (CQ-9).
+        RuleFor(x => x.PackageName).MaximumLength(TrackingIngestLimits.MaxAndroidMappingPatternLength);
+        RuleFor(x => x.AppLabel).MaximumLength(TrackingIngestLimits.MaxAndroidMappingPatternLength);
+
         RuleFor(x => x.PackageNameMatchType)
             .NotNull().When(x => x.PackageName != null)
             .WithMessage("PackageNameMatchType is required when PackageName is set");

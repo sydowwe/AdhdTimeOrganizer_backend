@@ -8,9 +8,7 @@ public class DesktopProcessDetailsValidator : Validator<DesktopProcessDetailsReq
 {
     public DesktopProcessDetailsValidator()
     {
-        RuleFor(x => x.From).NotEmpty();
-        RuleFor(x => x.To).NotEmpty().GreaterThan(x => x.From);
-        RuleFor(x => x.ProcessName).NotEmpty();
-        this.ApplyDailyWindowMaskRules();
+        this.ApplyDetailsDateRangeRules();
+        RuleFor(x => x.ProcessName).NotEmpty().MaximumLength(TrackingIngestLimits.MaxProcessNameLength);
     }
 }

@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
+using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.dto.request.@base.table;
@@ -27,6 +28,7 @@ public class FetchTableDistinctAndroidEntry(DbContext dbContext)
             s.Response<BaseGridResponse<AndroidDistinctEntriesResponse>>(200, "Success");
             s.Response(400, "Bad request");
         });
+        Validator<FetchTableDistinctAndroidEntryValidator>();
         Group<ActivityTrackingAndroidGroup>();
     }
 

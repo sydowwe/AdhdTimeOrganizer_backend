@@ -245,7 +245,7 @@ and is therefore denied to extension clients by the `Program.cs` configurator's 
 | `BaseTimelineValidator` · `StackedBarsValidator` · `PieChartValidator` · `SummaryCards`/`FocusMetrics`/`TopDomains`/`DomainDetails` validators | Validators | **One per dashboard, not one per source** — all three sources bind the same request classes | `application/validator/` |
 | `UnifiedDashboardValidators` | Validators | The `sources` rule on top of the shared span rules: non-empty, known members only | `application/validator/unified/UnifiedDashboardValidators.cs` |
 | `DesktopActivityHeartbeatValidator` · `WebExtensionHeartbeatValidator` · `AndroidSyncValidator` | Validators | The ingest boundary — including the minute-alignment rule | `application/validator/{desktop,webExtension,android}/` |
-| `TrackingIngestLimits` | Constants | Every bound the three ingest routes put on an untrusted payload, in one place | `application/validator/TrackingIngestLimits.cs` |
+| `TrackingIngestLimits` | Constants | Every bound the write paths put on an untrusted payload, in one place — batch sizes, the android session length, and the column widths the ingest and mapping validators enforce | `application/validator/TrackingIngestLimits.cs` |
 | `MappingTargetOwnershipExtensions` | Endpoint helper | The activity/role/category ownership guard both mapping create endpoints call from `BeforeMapping` | `application/endpoint/extensions/` |
 | `IngestBatchSaveExtensions` | Endpoint helper | The save all three ingest routes end on — a `23505` becomes a 409 rather than a 500 an unattended client re-posts forever | `application/endpoint/extensions/` |
 | `PurgeExpiredActivityTrackingEntriesJobHandler` | Scheduled job | The retention purge (see Infrastructure below) | `infrastructure/jobs/` |

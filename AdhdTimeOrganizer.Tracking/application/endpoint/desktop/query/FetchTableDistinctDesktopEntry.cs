@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
+using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FastEndpoints;
 using Sydowwe.Framework.application.dto.request.@base.table;
@@ -27,6 +28,7 @@ public class FetchTableDistinctDesktopEntry(DbContext dbContext)
             s.Response<BaseGridResponse<TrackerDesktopDistinctEntriesResponse>>(200, "Success");
             s.Response(400, "Bad request");
         });
+        Validator<FetchTableDistinctDesktopEntryValidator>();
         Group<ActivityTrackingDesktopGroup>();
     }
 

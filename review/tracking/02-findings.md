@@ -512,7 +512,7 @@ together.
 `Doc impact: domain-map.md → Invariants (one entry per (user, window, process, title), and that a collision
 sums)` — done, as one bullet shared with `CQ-5`.
 
-### CQ-9 🟠 No length validation anywhere on the write paths
+### CQ-9 🟠 ✅ FIXED 2026-09-03 · No length validation anywhere on the write paths
 
 `application/validator/desktop/DesktopActivityHeartbeatValidator.cs:24-33`,
 `application/validator/desktop/CreateTrackerDesktopMappingValidator.cs`,
@@ -531,7 +531,33 @@ with a different error and the same 500.
 **Fix:** add `MaximumLength` to every string rule on both ingest and mapping DTOs, matching the column
 widths; consider truncating `WindowTitle` at ingest to keep it clear of the index limit.
 
-`Doc impact: none`
+**Fixed:** `MaximumLength` on all nine string members across the five validators — the heartbeat's four
+entry columns (`ProcessName`, `WindowTitle`, plus `ProductName` and `ExecutablePath`, which had no rule
+at all) and the three desktop / two android mapping patterns. The widths are constants in
+`TrackingIngestLimits` beside the `SEC-5` caps rather than literals at nine call sites, so a column
+widened in a migration has one place to be widened again. `ExecutablePath`'s column is unbounded — it is
+an `EncryptedColumn`, so `text` holding ciphertext — and is bounded at 1024 anyway, because the value is
+still client-supplied and stored for the account's lifetime.
+
+**The index-tuple edge is a byte rule, not a length rule**, which is why it could not be folded into the
+above: `WindowTitle` is `varchar(1024)` and the column accepts 1024 characters at any width, but 1024
+three-byte characters is ~3 kB against Postgres' ~2704-byte index-tuple limit. `ProcessName` shares that
+tuple, so the bound is on the pair — `Encoding.UTF8.GetByteCount` of both, capped at 2000 to leave room
+for the three fixed columns and the tuple's overhead.
+
+**Rejected rather than truncated**, against the finding's parenthetical. Two window titles cut to the
+same prefix collide under `(UserId, WindowStart, RecordDate, ProcessName, WindowTitle)` and are then
+*summed* by `CQ-8`'s `CollapseCollidingEntries` — so truncating would make a size limit silently merge
+two distinct windows, which is the class of failure this module already spends the most effort avoiding.
+A 400 costs the agent one minute's batch and says why.
+
+Pinned by four cases in `TrackingValidationBoundsTests` — an over-long title, an over-long process name,
+the byte edge (900 characters, inside the column and over the index limit, which asserts both of those
+facts about its own fixture so the case cannot decay into a duplicate of the first), and an ordinary
+entry that must still be a 200 — plus one per mapping endpoint.
+
+`Doc impact: none` (`domain-map.md`'s navigation row for `TrackingIngestLimits` now mentions the widths;
+no rule statement changed)
 
 ### CQ-10 🟠 A mapping's target cannot be changed, and update does not re-check the target rule
 
@@ -632,7 +658,7 @@ reject it in the grid validators. Either is better than the silent reinterpretat
 |---|---|---|---|---|
 | All 15 per-source dashboards, e.g. `DesktopPieChartEndpoint.cs:38-43`, `WebExtensionSummaryCardsEndpoint.cs:91-94` | Every endpoint `ToListAsync()`es the **whole envelope of raw ledger rows** and groups/sums in memory | A 366-day span of per-minute rows is ~500 k entities per source; hundreds of MB of tracked-entity graph per request, GC pressure, and a wire-idle Postgres | Project to the aggregate in SQL (`GroupBy` + `Sum` translate fine for the pie/summary/stacked shapes); keep the in-memory path only where the session algorithm genuinely needs rows (timelines, focus-metrics). Add `AsNoTracking()` everywhere in the meantime — none of these 15 reads needs the change tracker | `PERF-1` |
 | `AndroidStackedBarsEndpoint.cs:63-86` | `foreach (bucket) { sessions.Where(overlap) }` — a linear scan of every session per bucket | 366 days × 96 buckets ≈ 35 k buckets; × 10 k sessions ≈ 350 M comparisons in one request. The other two stacked-bars use `DailyWindowSet.BucketIndexOf`'s binary search | Sort sessions once and sweep, or index sessions by bucket via `BucketIndexOf` on their clamped ranges | `PERF-2` |
-| `application/validator/desktop/DesktopProcessDetailsValidator.cs` | `To > From` and **no maximum range** — its web-extension twin caps at 31 days (`DomainDetailsValidator.cs:13`) | An unbounded read of the partitioned desktop ledger filtered only by process name; no index supports it either (see below) | Add the same 31-day cap, or reuse `DashboardDateRangeRules.MaxSpanDays` | `PERF-3` |
+| ~~`application/validator/desktop/DesktopProcessDetailsValidator.cs`~~ **✅ FIXED 2026-09-03** | `To > From` and **no maximum range** — its web-extension twin capped at 31 days | An unbounded read of the partitioned desktop ledger filtered only by process name; no index supports it either (see below) | Fixed as the 31-day cap, hoisted rather than copied: `DashboardDateRangeRules.MaxDetailsSpanDays` + `ApplyDetailsDateRangeRules`, which both details validators now call for the whole envelope (`From`/`To`/span/daily-window mask). A second literal `31` in the twin is how this drifted the first time. `DesktopProcessDetailsRequest.ProcessName` also gained the column-width bound `CQ-9` added everywhere else | `PERF-3` |
 | `FetchTableDistinctDesktopEntry.cs:44-57`, `FetchTableDistinctAndroidEntry.cs:44-56` | `GROUP BY` over the **entire** ledger with no date predicate, executed twice per page (count + page) | A full partitioned-table scan per grid keystroke; grows without bound because nothing but the purge ever removes rows | Bound the grid to a date range (the settings UI already knows one), or materialise a distinct-entries view refreshed off-request | `PERF-4` |
 | `DesktopPieChartEndpoint.cs:58-62`, `WebExtensionPieChartEndpoint.cs:58-61` | `WindowTitles` / `Pages` are `Distinct()` over the whole span, unbounded, per item | A year of browsing is tens of thousands of distinct URLs serialised into a pie-chart response nobody renders | Cap to the top N by seconds (the details endpoints exist for the full list) | `PERF-5` |
 | ~~Three summary-cards `AllTime` baselines~~ **✅ FIXED 2026-09-03** | Read the entire ledger from the beginning of time. Desktop and android have no partition-date floor (only `WebExtensionActivityEntry` does, `AppDbContext.cs:279`) | Would be the heaviest query in the app — it threw first (`CQ-1`), which is the only reason nobody had noticed | Fixed with `CQ-1` in the shared base: the lookback is floored at `DateFrom - MaxSpanDays`, so the worst `AllTime` read is now a year and a day. The envelope read itself is still row-by-row (`PERF-1`, open) | `PERF-6` |
@@ -643,7 +669,9 @@ reject it in the grid validators. Either is better than the silent reinterpretat
 
 - **`desktop_activity_entry (user_id, process_name, window_start)`** — `DesktopProcessDetailsEndpoint.cs:32-35`
   filters exactly on that triple and today rides `(user_id, window_start)` then filters, reading every
-  process to return one. With `PERF-3` unfixed it is the module's worst read.
+  process to return one. `PERF-3` bounds it at 31 days as of 2026-09-03, so it is no longer the module's
+  worst read — but the index is still the thing that would make it cheap, and this is rollout work
+  (`MIG-4`'s neighbourhood) rather than part of the validator fix.
 - **`android_session_data (user_id, session_end_utc)`** — `AndroidStackedBarsEndpoint.cs:41` predicates on
   `SessionStartUtc < envelopeTo && SessionEndUtc > envelopeFrom`; only the start side is indexed, so the
   overlap read degenerates to a scan of everything before the envelope's end.
@@ -741,10 +769,17 @@ sharpened**; the code is deliberate.
   `FetchCategoriesAndRolesByPattern.cs:34-77`). No other endpoint in the slice does; it also swallows
   `OperationCanceledException`, turning a client disconnect into a logged error. Delete the catch and let
   the global handler answer. `Doc impact: none`
-- **CQ-14** Those same two grids have **no validator**, while the two mapping grids validate
-  `ItemsPerPage ∈ [1,200]`. `ItemsPerPage = 0` gives `(int)Math.Ceiling(n / 0.0)` → a garbage
-  `pageCount`; a large value is an unbounded page. Add a validator mirroring
-  `FetchTableTrackerDesktopMappingValidator`. `Doc impact: none`
+- **CQ-14** ✅ **FIXED 2026-09-03.** Those same two grids had **no validator**, while the two mapping
+  grids validate `ItemsPerPage ∈ [1,200]`. `ItemsPerPage = 0` gives `(int)Math.Ceiling(n / 0.0)` → a
+  garbage `pageCount`; a large value is an unbounded page.
+  `FetchTableDistinct{Desktop,Android}EntryValidator` mirror `FetchTableTrackerDesktopMappingValidator`
+  as the finding says, including its "a filter value needs its match type" rules — the two handlers apply
+  a filter only when both are set, so a value sent without one was silently ignored rather than filtered
+  on. Both are wired with an explicit `Validator<…>()` in `Configure()` the way every other grid here is,
+  rather than left to FastEndpoints' discovery: these bind
+  `BaseFilterSortPaginateRequest<TFilter>`, and a validator picked up by request type alone would be a
+  silent thing to lose. Pinned by `TrackingValidationBoundsTests.DistinctEntriesGrid_RejectsAPageSizeOutsideItsBounds`,
+  a theory over both routes covering zero, 10 000 and an ordinary page. `Doc impact: none`
 - **CQ-15** `GridTrackerDesktopMappingEndpoint.cs:32` / `GridTrackerAndroidMappingEndpoint.cs:32` throw
   `ArgumentOutOfRangeException` for an unmapped `Type` → 500 rather than 400. Two smaller oddities in the
   same switch: the filter's `Type` is `required`, so **"all mappings, unfiltered" is unrepresentable**;
@@ -795,10 +830,16 @@ sharpened**; the code is deliberate.
 - **CQ-19** `AndroidSessionData` carries no `[AuditIgnore]` on `PackageName` / `AppLabel` while both
   other ledgers annotate their sensitive columns. See `AUDIT-2` in
   [`03-risks-rollout.md`](03-risks-rollout.md). `Doc impact: none`
-- **CQ-20** `DesktopActivityHeartbeatValidator.cs:18-22` chains `.Must(…).Must(…).WithMessage(…)` — the
-  message attaches only to the second rule, so the per-entry 60-second cap fails with FluentValidation's
-  default text. Also the message ("Total seconds across all entries") describes the sum of *active*
-  seconds only. `Doc impact: none`
+- **CQ-20** ✅ **FIXED 2026-09-03.** `DesktopActivityHeartbeatValidator` chained
+  `.Must(…).Must(…).WithMessage(…)` — the message attaches only to the second rule, so the per-entry
+  60-second cap failed with FluentValidation's default text. Also the message ("Total seconds across all
+  entries") described the sum of *active* seconds only. Now two separate `RuleFor`s, each with its own
+  message, and the sum's says "Total active seconds". Split rather than given a shared message: they are
+  two different bounds, and one of them names the offending entry's shape while the other names the
+  batch's. Pinned by
+  `TrackingValidationBoundsTests.DesktopHeartbeat_NamesThePerEntryCapItFailedRatherThanTheDefaultText`,
+  which asserts on the response body — the old chain returned a 400 too, just an unactionable one.
+  `Doc impact: none`
 - **CQ-21** `WebExtensionEntryDto.Url` is `required string` while the entity's `Url` is `string?` and the
   handler branches on `string.IsNullOrEmpty` — the DTO should be `string?` to match the documented
   "domain-only tracking is legitimate" case (`WebExtensionActivityEntry.cs:42-45`). `Doc impact: none`

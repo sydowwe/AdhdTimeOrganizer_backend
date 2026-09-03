@@ -8,6 +8,11 @@ public class CreateTrackerDesktopMappingValidator : Validator<CreateTrackerDeskt
 {
     public CreateTrackerDesktopMappingValidator()
     {
+        // Column widths — an over-long pattern is a Postgres 22001 (500) without these (CQ-9).
+        RuleFor(x => x.ProcessName).MaximumLength(TrackingIngestLimits.MaxDesktopMappingPatternLength);
+        RuleFor(x => x.ProductName).MaximumLength(TrackingIngestLimits.MaxDesktopMappingPatternLength);
+        RuleFor(x => x.WindowTitle).MaximumLength(TrackingIngestLimits.MaxDesktopMappingWindowTitleLength);
+
         // Pattern field rules: if value is set, MatchType must be set
         RuleFor(x => x.ProcessNameMatchType)
             .NotNull().When(x => x.ProcessName != null)

@@ -49,6 +49,29 @@ public static class DashboardDateRangeRules
     }
 
     /// <summary>
+    /// The span the two details endpoints accept. Narrower than <see cref="MaxSpanDays"/> because a
+    /// details panel is a drill-down into one dashboard slice, and its read is filtered by a single
+    /// process or domain — a predicate no index supports, so the span is the only thing bounding it.
+    /// </summary>
+    public const int MaxDetailsSpanDays = 31;
+
+    /// <summary>
+    /// The envelope rules both details endpoints share. Hoisted out of the two validators because the
+    /// span cap was on one of them and not the other (<c>PERF-3</c>), which is exactly the drift this
+    /// class exists to stop.
+    /// </summary>
+    public static void ApplyDetailsDateRangeRules<T>(this AbstractValidator<T> validator)
+        where T : DailyWindowMaskRequest
+    {
+        validator.RuleFor(x => x.From).NotEmpty();
+        validator.RuleFor(x => x.To).NotEmpty().GreaterThan(x => x.From);
+        validator.RuleFor(x => x.To)
+            .LessThanOrEqualTo(x => x.From.AddDays(MaxDetailsSpanDays))
+            .WithMessage($"Maximum range is {MaxDetailsSpanDays} days");
+        validator.ApplyDailyWindowMaskRules();
+    }
+
+    /// <summary>
     /// The details endpoints only. The per-day window is optional but not half-optional: one bound
     /// without the other has no reading, and silently ignoring it would put the panel back to
     /// over-counting with no sign that anything was dropped.

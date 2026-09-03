@@ -50,4 +50,52 @@ public static class TrackingIngestLimits
     /// broken or hostile client, not a row a phone could plausibly produce.
     /// </remarks>
     public const int MaxInstantStringLength = 64;
+
+    // ---------------------------------------------------------------------------------------------
+    // Column widths (CQ-9). Every one of these mirrors a HasMaxLength in the entity configuration:
+    // without the rule, an over-long value is a Postgres 22001 the client sees as a 500 instead of a
+    // 400 naming the field. They live here rather than beside each RuleFor so a column widened in a
+    // migration has one place to be widened again.
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>DesktopActivityEntry.ProcessName — <c>varchar(255)</c>.</summary>
+    public const int MaxProcessNameLength = 255;
+
+    /// <summary>DesktopActivityEntry.ProductName — <c>varchar(255)</c>.</summary>
+    public const int MaxProductNameLength = 255;
+
+    /// <summary>DesktopActivityEntry.WindowTitle — <c>varchar(1024)</c>. See also <see cref="MaxIndexedEntryTextBytes"/>.</summary>
+    public const int MaxWindowTitleLength = 1024;
+
+    /// <summary>
+    /// DesktopActivityEntry.ExecutablePath. The column itself is unbounded — it is an encrypted column,
+    /// so it is <c>text</c> holding ciphertext — but the value is still client-supplied and stored
+    /// forever, and a Windows path cannot exceed 32 767 characters even in its long form.
+    /// </summary>
+    public const int MaxExecutablePathLength = 1024;
+
+    /// <summary>
+    /// The combined UTF-8 size of the two entry columns that sit in a btree index —
+    /// <c>(user_id, window_start, record_date, process_name, window_title)</c>.
+    /// </summary>
+    /// <remarks>
+    /// This is the quieter half of CQ-9 and the reason a plain <c>MaximumLength</c> is not enough:
+    /// <c>WindowTitle</c> is <c>varchar(1024)</c>, which the column accepts at any width, but 1024
+    /// three-byte characters is ~3 kB and Postgres refuses an index tuple over ~2704 bytes. That insert
+    /// fails with a different error and the same 500 the length rules exist to prevent. The bound is on
+    /// <em>bytes</em> because the limit is, and it is well under 2704 to leave room for the three fixed
+    /// columns and the tuple's own overhead. The value is rejected rather than truncated: two window
+    /// titles cut to the same prefix would collide under that unique index and be summed together by
+    /// <c>CollapseCollidingEntries</c>, so a size limit would silently merge two distinct windows.
+    /// </remarks>
+    public const int MaxIndexedEntryTextBytes = 2000;
+
+    /// <summary>TrackerDesktopMappingByPattern.ProcessName / ProductName — <c>varchar(200)</c>.</summary>
+    public const int MaxDesktopMappingPatternLength = 200;
+
+    /// <summary>TrackerDesktopMappingByPattern.WindowTitle — <c>varchar(255)</c>.</summary>
+    public const int MaxDesktopMappingWindowTitleLength = 255;
+
+    /// <summary>TrackerAndroidMappingByPattern.PackageName / AppLabel — <c>varchar(255)</c>.</summary>
+    public const int MaxAndroidMappingPatternLength = 255;
 }

@@ -8,6 +8,11 @@ public class UpdateTrackerDesktopMappingValidator : Validator<UpdateTrackerDeskt
 {
     public UpdateTrackerDesktopMappingValidator()
     {
+        // Column widths — an over-long pattern is a Postgres 22001 (500) without these (CQ-9).
+        RuleFor(x => x.ProcessName).MaximumLength(TrackingIngestLimits.MaxDesktopMappingPatternLength);
+        RuleFor(x => x.ProductName).MaximumLength(TrackingIngestLimits.MaxDesktopMappingPatternLength);
+        RuleFor(x => x.WindowTitle).MaximumLength(TrackingIngestLimits.MaxDesktopMappingWindowTitleLength);
+
         RuleFor(x => x.ProcessNameMatchType)
             .NotNull().When(x => x.ProcessName != null)
             .WithMessage("ProcessNameMatchType is required when ProcessName is set");
