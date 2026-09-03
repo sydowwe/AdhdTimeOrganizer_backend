@@ -39,6 +39,12 @@ public class DesktopActivityEntryConfiguration : IEntityTypeConfiguration<Deskto
         builder.HasIndex(x => new { x.UserId, x.WindowStart, x.RecordDate, x.ProcessName, x.WindowTitle }).IsUnique();
         builder.HasIndex(x => new { x.UserId, x.WindowStart });
 
+        // DesktopProcessDetailsEndpoint filters on exactly this triple. Without it the read rides
+        // (user_id, window_start) and then filters, reading every process to return one. Adding it
+        // to a partitioned table propagates to every partition under ACCESS EXCLUSIVE — see MIG-2
+        // in review/tracking/03-risks-rollout.md.
+        builder.HasIndex(x => new { x.UserId, x.ProcessName, x.WindowStart });
+
         builder.IsPartitionedByRange("record_date",
         [
             new PartitionDefinition("desktop_activity_entry_y2026", "2026-01-01", "2027-01-01"),

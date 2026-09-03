@@ -2928,11 +2928,17 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_android_session_data");
 
+                    b.HasIndex("SessionStartUtc")
+                        .HasDatabaseName("ix_android_session_data_session_start_utc");
+
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_android_session_data_user_id");
 
                     b.HasIndex("UserId", "PackageName")
                         .HasDatabaseName("ix_android_session_data_user_id_package_name");
+
+                    b.HasIndex("UserId", "SessionEndUtc")
+                        .HasDatabaseName("ix_android_session_data_user_id_session_end_utc");
 
                     b.HasIndex("UserId", "SessionStartUtc")
                         .HasDatabaseName("ix_android_session_data_user_id_session_start_utc");
@@ -3214,6 +3220,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("UserId", "WindowStart")
                         .HasDatabaseName("ix_desktop_activity_entry_user_id_window_start");
+
+                    b.HasIndex("UserId", "ProcessName", "WindowStart")
+                        .HasDatabaseName("ix_desktop_activity_entry_user_id_process_name_window_start");
 
                     b.HasIndex("UserId", "WindowStart", "RecordDate", "ProcessName", "WindowTitle")
                         .IsUnique()

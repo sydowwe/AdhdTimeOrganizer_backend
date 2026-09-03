@@ -130,7 +130,9 @@ Two things deliberately left out of this change:
 
 - **The index.** `android_session_data` is not partitioned, so this predicate is a real cross-user sweep
   and wants a plain `session_start_utc` index (the "Indexes that should exist" list, and `MIG-4`). That is
-  a migration on the host and is rollout work, not part of the code fix.
+  a migration on the host and is rollout work, not part of the code fix. **Shipped 2026-09-03** in
+  `20260903003933_TrackingLedgerReadIndexes`, batched with the other two indexes this review asked for —
+  see "Indexes that should exist" below.
 - **A test.** Nothing in the suite *executes* this handler — `RetentionPurgeJob_IsRegisteredAndScheduled`
   only asserts it was registered — so the new predicate has no row-level guard, exactly like the two that
   preceded it. `AUDIT-1`'s "log the run unconditionally" is untouched for the same reason.
@@ -657,31 +659,49 @@ reject it in the grid validators. Either is better than the silent reinterpretat
 | Where | Issue | Impact | Mitigation | ID |
 |---|---|---|---|---|
 | All 15 per-source dashboards, e.g. `DesktopPieChartEndpoint.cs:38-43`, `WebExtensionSummaryCardsEndpoint.cs:91-94` | Every endpoint `ToListAsync()`es the **whole envelope of raw ledger rows** and groups/sums in memory | A 366-day span of per-minute rows is ~500 k entities per source; hundreds of MB of tracked-entity graph per request, GC pressure, and a wire-idle Postgres | Project to the aggregate in SQL (`GroupBy` + `Sum` translate fine for the pie/summary/stacked shapes); keep the in-memory path only where the session algorithm genuinely needs rows (timelines, focus-metrics). Add `AsNoTracking()` everywhere in the meantime — none of these 15 reads needs the change tracker | `PERF-1` |
-| `AndroidStackedBarsEndpoint.cs:63-86` | `foreach (bucket) { sessions.Where(overlap) }` — a linear scan of every session per bucket | 366 days × 96 buckets ≈ 35 k buckets; × 10 k sessions ≈ 350 M comparisons in one request. The other two stacked-bars use `DailyWindowSet.BucketIndexOf`'s binary search | Sort sessions once and sweep, or index sessions by bucket via `BucketIndexOf` on their clamped ranges | `PERF-2` |
-| ~~`application/validator/desktop/DesktopProcessDetailsValidator.cs`~~ **✅ FIXED 2026-09-03** | `To > From` and **no maximum range** — its web-extension twin capped at 31 days | An unbounded read of the partitioned desktop ledger filtered only by process name; no index supports it either (see below) | Fixed as the 31-day cap, hoisted rather than copied: `DashboardDateRangeRules.MaxDetailsSpanDays` + `ApplyDetailsDateRangeRules`, which both details validators now call for the whole envelope (`From`/`To`/span/daily-window mask). A second literal `31` in the twin is how this drifted the first time. `DesktopProcessDetailsRequest.ProcessName` also gained the column-width bound `CQ-9` added everywhere else | `PERF-3` |
+| `AndroidStackedBarsEndpoint.cs:63-86` | `foreach (bucket) { sessions.Where(overlap) }` — a linear scan of every session per bucket | 366 days × 96 buckets ≈ 35 k buckets; × 10 k sessions ≈ 350 M comparisons in one request. The other two stacked-bars use `DailyWindowSet.BucketIndexOf`'s binary search | Sort sessions once and sweep, or index sessions by bucket via `BucketIndexOf` on their clamped ranges. **The read** that feeds it got `(user_id, session_end_utc)` on 2026-09-03 (see below); the bucket scan itself is untouched and is the larger half | `PERF-2` |
+| ~~`application/validator/desktop/DesktopProcessDetailsValidator.cs`~~ **✅ FIXED 2026-09-03** | `To > From` and **no maximum range** — its web-extension twin capped at 31 days | An unbounded read of the partitioned desktop ledger filtered only by process name; no index supports it either (see below) | Fixed as the 31-day cap, hoisted rather than copied: `DashboardDateRangeRules.MaxDetailsSpanDays` + `ApplyDetailsDateRangeRules`, which both details validators now call for the whole envelope (`From`/`To`/span/daily-window mask). A second literal `31` in the twin is how this drifted the first time. `DesktopProcessDetailsRequest.ProcessName` also gained the column-width bound `CQ-9` added everywhere else. The `(user_id, process_name, window_start)` index it wanted shipped 2026-09-03 with the other two (see below) | `PERF-3` |
 | `FetchTableDistinctDesktopEntry.cs:44-57`, `FetchTableDistinctAndroidEntry.cs:44-56` | `GROUP BY` over the **entire** ledger with no date predicate, executed twice per page (count + page) | A full partitioned-table scan per grid keystroke; grows without bound because nothing but the purge ever removes rows | Bound the grid to a date range (the settings UI already knows one), or materialise a distinct-entries view refreshed off-request | `PERF-4` |
 | `DesktopPieChartEndpoint.cs:58-62`, `WebExtensionPieChartEndpoint.cs:58-61` | `WindowTitles` / `Pages` are `Distinct()` over the whole span, unbounded, per item | A year of browsing is tens of thousands of distinct URLs serialised into a pie-chart response nobody renders | Cap to the top N by seconds (the details endpoints exist for the full list) | `PERF-5` |
 | ~~Three summary-cards `AllTime` baselines~~ **✅ FIXED 2026-09-03** | Read the entire ledger from the beginning of time. Desktop and android have no partition-date floor (only `WebExtensionActivityEntry` does, `AppDbContext.cs:279`) | Would be the heaviest query in the app — it threw first (`CQ-1`), which is the only reason nobody had noticed | Fixed with `CQ-1` in the shared base: the lookback is floored at `DateFrom - MaxSpanDays`, so the worst `AllTime` read is now a year and a day. The envelope read itself is still row-by-row (`PERF-1`, open) | `PERF-6` |
 | `DesktopActivityHeartbeatEndpoint.cs:115-119` | One `TotalSecondsOnDayAsync` round trip per attributed activity, after the save, on every heartbeat | Small (few activities per window) but it is on the once-a-minute-per-user path | Batch the day totals into one seam call | `PERF-7` |
 | `TimelineSegmentBuilder.AbsorbContextSwitches:196-241` | `do { … } while (merged)` restarts the whole scan after every single merge | O(n²) on a day with many short runs (n ≈ 1440); fine today, quadratic by construction | Single pass with a rebuilt list, or restart at `i` rather than at 0 | `PERF-8` |
 
-### Indexes that should exist
+### Indexes that should exist — ✅ ALL THREE SHIPPED 2026-09-03
+
+**One migration, `20260903003933_TrackingLedgerReadIndexes`**, rather than one per finding. The three
+were raised by `SEC-3`, `PERF-2` and `PERF-3` independently, but they are the same operation on the same
+two tables: three migrations would have meant three deploys and three rollout conversations for one
+maintenance window. The `HasIndex` calls live with their entities
+(`AndroidSessionDataConfiguration`, `DesktopActivityEntryConfiguration`), each carrying a comment naming
+the read it serves, so a later reader can tell an index that earns its write cost from one nobody
+remembers.
 
 - **`desktop_activity_entry (user_id, process_name, window_start)`** — `DesktopProcessDetailsEndpoint.cs:32-35`
   filters exactly on that triple and today rides `(user_id, window_start)` then filters, reading every
   process to return one. `PERF-3` bounds it at 31 days as of 2026-09-03, so it is no longer the module's
   worst read — but the index is still the thing that would make it cheap, and this is rollout work
-  (`MIG-4`'s neighbourhood) rather than part of the validator fix.
+  (`MIG-4`'s neighbourhood) rather than part of the validator fix. **Shipped.** This is the one with a
+  rollout cost: `desktop_activity_entry` is RANGE-partitioned, so `CREATE INDEX` propagates to all six
+  partitions under `ACCESS EXCLUSIVE` and `CONCURRENTLY` is not available on a partitioned parent. That is
+  `MIG-2`'s risk, incurred deliberately — see the note there for the per-partition escape hatch.
 - **`android_session_data (user_id, session_end_utc)`** — `AndroidStackedBarsEndpoint.cs:41` predicates on
   `SessionStartUtc < envelopeTo && SessionEndUtc > envelopeFrom`; only the start side is indexed, so the
-  overlap read degenerates to a scan of everything before the envelope's end.
+  overlap read degenerates to a scan of everything before the envelope's end. **Shipped.** It does not
+  make `PERF-2`'s in-memory bucket scan any less quadratic — that is a separate, still-open fix; it only
+  stops the read that feeds it from scanning.
+- **`android_session_data (session_start_utc)`** — the retention sweep `SEC-3` added. Deliberately *not*
+  user-scoped: the purge has no `user_id` predicate, so the existing `(user_id, session_start_utc)` cannot
+  serve it. **Shipped.**
 - **`web_extension_activity_entry (user_id, window_start, domain)`** already exists as the unique index and
   covers `CQ-5`'s batched lookup — rewritten 2026-09-03, no new index needed. The desktop equivalent
   (`CQ-8`'s already-stored read) rides the existing `(user_id, window_start)` index the same way.
-- No index is needed for the purge: both purged tables are RANGE-partitioned on `record_date`, so the
-  predicate prunes whole partitions. Adding android to the purge (`SEC-3`) **does** need one — its table
-  is not partitioned; `(user_id, session_start_utc)` exists and a plain `session_start_utc` index would
-  serve the cross-user sweep better.
+- No index is needed for the purge on the *partitioned* tables: both are RANGE-partitioned on
+  `record_date`, so the predicate prunes whole partitions.
+
+No test pins these. `PostgresContainerFixture` builds the schema with `EnsureCreated`, so the suite proves
+the indexes are *creatable* (including on the partitioned parent, which rejects some shapes) but nothing
+asserts a plan uses them — an index is a performance fact, and this suite has no vehicle for those.
 
 ---
 
