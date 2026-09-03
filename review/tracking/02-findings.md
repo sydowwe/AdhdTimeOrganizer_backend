@@ -838,15 +838,17 @@ table, which was the place the omission was actually visible.
 
 `Doc impact: done` — summary.md → Bounded context (Retention); domain-map.md → Infrastructure + Entities
 
-### DOC-4 🟡 `Program.cs`'s assembly-list comment says 29 endpoints; there are 38
+### DOC-4 🟡 ✅ FIXED 2026-09-03 · `Program.cs`'s assembly-list comment says 29 endpoints; there are 38
 
 `AdhdTimeOrganizer/Program.cs:257` — *"the 29 ingest / pattern-mapping / dashboard endpoints"*.
 `docs/summary.md:25` says 38, and 38 is correct (14 desktop + 7 web-extension + 11 android + 6 unified).
 The host comment predates the six unified routes. **Fix the host comment.**
 
+**Fixed:** the comment now says 38 and names the unified block alongside the three sources.
+
 `Doc impact: none` (host-side comment, not a module doc)
 
-### DOC-5 🟠 `docs/testing.md` credits a partition guard that does not exist
+### DOC-5 🟠 ✅ FIXED 2026-09-03 · `docs/testing.md` credits a partition guard that does not exist
 
 `docs/testing.md:176` says `TrackingRouteSmokeTests` covers silent failures 1, 4 **and 5** — #5 being
 "Tracking's `ApplyConfigurationsFromAssembly` missing from `AppDbContext` → the two partitioned tables
@@ -860,20 +862,32 @@ So the loudest-documented silent failure in the module has no guard, and the doc
 worst of the two possible errors. **Both sides need a change**: write the test (`TEST-8`) and fix the
 stale `<see cref>`s.
 
-`Doc impact: testing.md → The guards (add the row once the test exists)`
+**Fixed:** both sides. `PartitionedTrackingTables_KeepTheirPartitionKey` now exists (`TEST-8`) as a
+two-case theory asserting the range-partition annotation survives on both entities, and it has its own
+row in `docs/testing.md`'s guards table. The class XML doc's other stale `<see cref>` —
+`WebExtensionActivityEntry_KeepsItsCombinedQueryFilter`, renamed to `…_KeepsBothOfItsQueryFilters` — is
+corrected here and in the two solution docs that repeated the old name (`docs/claude/testing.md`,
+`docs/claude/slices.md`). `summary.md`'s "covers 1, 4 and 5" is now true as written.
 
-### DOC-6 🟡 `summary.md` describes the `WebExtensionActivityEntry` date filter as a partition bound; it is a 2-year retention floor
+`Doc impact: done` — testing.md → The guards
+
+### DOC-6 🟡 ✅ FIXED 2026-09-03 · `summary.md` describes the `WebExtensionActivityEntry` date filter as a partition bound; it is a 2-year retention floor
 
 `docs/summary.md:148-150` calls losing the date half "unbounds the partition read".
 `AppDbContext.cs:41` defines `CurrentPartitionDate` as `today.AddYears(-2)` — which is a *retention*
 horizon, not a partition boundary (the partitions are yearly, 2026-2030 plus a default). The practical
 consequence is worth stating plainly in the doc, because it is surprising: **the web-extension
-dashboards cannot see data older than two years even when the ledger still holds it**, so an `AllTime`
+dashboards cannot see data older than two years even when the ledger 
+still holds it**, so an `AllTime`
 baseline means something different on that source than on the other two. **The doc should be
 sharpened**; the code is deliberate.
 
-`Doc impact: summary.md → Things that fail silently (item 4); domain-map.md → Entities (WebExtensionActivityEntry note)`
+**Fixed:** doc only. Item 4 of "Things that fail silently" now says the date half is a two-year
+*retention floor*, spells out that the partitions are yearly so it is not a partition bound, and states
+the consequence — `AllTime` is narrower on web-extension than on desktop/android. The same correction
+went onto the `WebExtensionActivityEntry` row in `domain-map.md` and the guard row in `testing.md`.
 
+`Doc impact: done` — summary.md → Things that fail silently (item 4); domain-map.md → Entities (WebExtensionActivityEntry); testing.md → The guards
 ---
 
 ## Appendix — 🟡 nits

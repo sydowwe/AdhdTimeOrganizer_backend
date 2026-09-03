@@ -30,7 +30,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// </para>
 /// <para>
 /// Two traps are specific to Tracking, and both are invisible to a route check.
-/// <see cref="WebExtensionActivityEntry_KeepsItsCombinedQueryFilter"/> covers the entity that is
+/// <see cref="WebExtensionActivityEntry_KeepsBothOfItsQueryFilters"/> covers the entity that is
 /// <em>excluded</em> from the automatic per-user filter and hand-given a combined one — the one place
 /// where losing the filter would not be caught by the general <c>IEntityWithUser</c> rule.
 /// <see cref="PartitionedTrackingTables_KeepTheirPartitionKey"/> covers the two partitioned tables,

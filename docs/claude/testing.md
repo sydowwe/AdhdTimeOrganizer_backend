@@ -50,7 +50,7 @@ worth copying the shape of:
 - `SeamWiringTests` — the seam registry (placement, key coverage, no unhandled events).
 - `HistoryRouteSmokeTests.Grid_MembershipFilter_NarrowsThroughTheSeam`.
 - `ActivityTimeAutomationTests` — the event-driven completion rule.
-- `TrackingRouteSmokeTests.WebExtensionActivityEntry_KeepsItsCombinedQueryFilter` — seeds two users and
+- `TrackingRouteSmokeTests.WebExtensionActivityEntry_KeepsBothOfItsQueryFilters` — seeds two users and
   an out-of-range row rather than inspecting metadata.
 - `UserScopingQueryFilterTests` — asserts the generated SQL parameterizes the user id, and that two
   users hitting one endpoint in one process each see only their own rows.

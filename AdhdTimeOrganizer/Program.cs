@@ -254,8 +254,8 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             // deliberately NOT here: the Google integration stayed host-side and is covered by
             // typeof(Program).Assembly above.
             typeof(PlannerTask).Assembly,
-            // AdhdTimeOrganizer.Tracking — the 29 ingest / pattern-mapping / dashboard endpoints for
-            // desktop, web-extension and android. Note the ingest ones carry [AllowExtensionClients]
+            // AdhdTimeOrganizer.Tracking — the 38 ingest / pattern-mapping / dashboard endpoints for
+            // desktop, web-extension, android and the six unified ones. Note the ingest ones carry [AllowExtensionClients]
             // and the ActivityTracking policy: if this entry is missing they 404, but if the attribute
             // were lost in the move they would 403 instead — two different silent failures, so
             // TrackingRouteSmokeTests checks both.

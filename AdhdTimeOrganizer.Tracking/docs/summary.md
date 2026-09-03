@@ -164,7 +164,12 @@ would only make the agent re-send the window. That makes a break here silent;
 4. **`WebExtensionActivityEntry` dropped from `AppDbContext.UserScopingExcludedTypes`, or its
    hand-written filter changed** → it is the one entity the general `IEntityWithUser` rule does not
    cover. Losing the user half leaks every user's browsing history to any signed-in caller; losing the
-   date half unbounds the partition read.
+   date half drops the two-year retention floor.
+   ⚠ That date half is **not** a partition bound — the partitions are yearly (2026-2030 plus a
+   default). `AppDbContext.CurrentPartitionDate` is `today.AddYears(-2)`, so the filter is a *retention
+   horizon*: the web-extension dashboards cannot see rows older than two years even while the ledger
+   still holds them, and an `AllTime` baseline therefore means something narrower on this source than
+   on desktop and android.
 5. **Tracking's `ApplyConfigurationsFromAssembly` call missing from `AppDbContext`** → the two
    partitioned tables quietly become plain tables in the next migration.
 

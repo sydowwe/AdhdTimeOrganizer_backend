@@ -135,7 +135,7 @@ committed — so a break is silent. `ActivityTimeAutomationTests` asserts on row
 listed in `AppDbContext.UserScopingExcludedTypes` and given a hand-written filter combining the user
 check with `RecordDate >= CurrentPartitionDate`; the entity is in the slice, both halves are
 host-side. Losing the user half leaks every user's browsing history to any signed-in caller.
-`TrackingRouteSmokeTests.WebExtensionActivityEntry_KeepsItsCombinedQueryFilter` seeds two users and an
+`TrackingRouteSmokeTests.WebExtensionActivityEntry_KeepsBothOfItsQueryFilters` seeds two users and an
 out-of-range row rather than inspecting metadata.
 
 ## AdhdTimeOrganizer.ActivityProfiles
