@@ -43,20 +43,30 @@ public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingR
         var maxSpan = TimeSpan.FromSeconds(TrackingIngestLimits.MaxAndroidSessionSeconds);
 
         // Parse and validate sessions
+        // CQ-6: AdjustToUniversal *converts* an offset-bearing instant rather than re-labelling it, and
+        // AssumeUniversal reads a naked one as UTC — which is what the field name promises. The previous
+        // RoundtripKind preserved the client's offset, so "2026-09-01T10:00:00+02:00" parsed to the local
+        // 10:00 and the SpecifyKind that followed stamped Utc on it without converting: a client being more
+        // correct than the contract asks had every session stored two hours late, and every dashboard, band
+        // and merged minute for it was silently wrong. Both styles yield a Utc-kind value, so nothing needs
+        // to specify the kind afterwards. Invariant culture because these are a machine contract, not text
+        // the server's locale has any say over.
+        const DateTimeStyles instantStyles = DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal;
+
         var validSessions = new List<(string PackageName, string AppLabel, DateTime Start, DateTime End, long Duration)>();
 
         foreach (var item in req.Sessions)
         {
-            if (!DateTime.TryParse(item.SessionStartUtc, null, DateTimeStyles.RoundtripKind, out var start) ||
-                !DateTime.TryParse(item.SessionEndUtc, null, DateTimeStyles.RoundtripKind, out var end))
+            if (!DateTime.TryParse(item.SessionStartUtc, CultureInfo.InvariantCulture, instantStyles, out var start) ||
+                !DateTime.TryParse(item.SessionEndUtc, CultureInfo.InvariantCulture, instantStyles, out var end))
             {
                 Logger.LogWarning("Android sync: skipping session with unparseable dates. Package={Package} Start={Start} End={End}",
+                // CQ-22: the two instants are client-supplied free text and this is the one line that logs
+                // them verbatim. AndroidSyncValidator bounds them to TrackingIngestLimits.MaxInstantStringLength
+                // before the handler runs, so what reaches the log file is length-bounded.
                     item.PackageName, item.SessionStartUtc, item.SessionEndUtc);
                 continue;
             }
-
-            start = DateTime.SpecifyKind(start, DateTimeKind.Utc);
-            end = DateTime.SpecifyKind(end, DateTimeKind.Utc);
 
             if (end <= start)
             {
@@ -114,14 +124,21 @@ public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingR
             .Select(x => new { x.PackageName, x.SessionStartUtc })
             .ToListAsync(ct);
 
-        var existingSet = existingKeys
+        // Seeded from the stored rows, then grown by this batch — see the Add below.
+        var seenKeys = existingKeys
             .Select(x => (x.PackageName, x.SessionStartUtc))
             .ToHashSet();
 
         var toInsert = new List<AndroidSessionData>();
         foreach (var session in validSessions)
         {
-            if (existingSet.Contains((session.PackageName, session.Start)))
+            // CQ-7: Add returns false for a key already seen, which now covers repeats *within* the batch as
+            // well as rows already stored. UserId and DeviceId are fixed for the request, so (package, start)
+            // is the rest of ix_android_session_data_user_id_device_id_package_name_session_. A phone that
+            // re-uploads its buffer, or reports two rows for one app in the same second, previously put both
+            // copies into AddRange, violated that index and 500ed the whole sync — and then retried the same
+            // batch forever. The endpoint was idempotent across requests and not within one.
+            if (!seenKeys.Add((session.PackageName, session.Start)))
             {
                 duplicatesSkipped++;
                 continue;

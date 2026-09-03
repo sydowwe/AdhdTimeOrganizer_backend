@@ -37,4 +37,17 @@ public static class TrackingIngestLimits
     /// drift and the sync is asynchronous, so a small window is normal; hours are not.
     /// </summary>
     public static readonly TimeSpan MaxClockSkew = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// The longest client-supplied instant <em>string</em> an ingest route accepts (CQ-22). The android sync
+    /// takes its two instants as text and logs them verbatim when they fail to parse, so they are bounded
+    /// before they can reach a log line.
+    /// </summary>
+    /// <remarks>
+    /// An ISO-8601 instant with an offset is 33 characters; this leaves room for any format a client might
+    /// reasonably send and none for a payload. Unlike the session bounds — which drop one row so a backlog
+    /// upload is not stranded by it — this is a 400 for the whole sync: a multi-kilobyte timestamp is a
+    /// broken or hostile client, not a row a phone could plausibly produce.
+    /// </remarks>
+    public const int MaxInstantStringLength = 64;
 }

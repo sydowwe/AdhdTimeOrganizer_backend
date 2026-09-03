@@ -334,7 +334,7 @@ is the honest shape.
 
 `Doc impact: none`
 
-### CQ-6 🟠 Android sync re-labels an offset-bearing timestamp as UTC instead of converting it
+### CQ-6 🟠 ✅ FIXED 2026-09-03 · Android sync re-labels an offset-bearing timestamp as UTC instead of converting it
 
 `application/endpoint/android/command/AndroidSyncEndpoint.cs:37-46`
 
@@ -353,9 +353,26 @@ session is then wrong, silently, and only for clients that send an offset. The f
 **Fix:** parse with `DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal`, which converts
 an offset-bearing value and treats a naked one as UTC — then the `SpecifyKind` call is unnecessary.
 
-`Doc impact: none`
+**Fixed 2026-09-03**, as written, and both `SpecifyKind` lines are gone. The culture argument went from
+`null` (ambient) to `CultureInfo.InvariantCulture` at the same time — these two fields are a machine
+contract and the server's locale has no say over them.
 
-### CQ-7 🟠 Android sync does not de-duplicate within a batch
+Ordering note: this was done **before** the rest of the batch on purpose. `SEC-5` had just added a
+future-skew bound and a retention floor to this same loop, and until this fix those bounds were being
+applied to an instant that could be off by the client's offset.
+
+Pinned by `AndroidSyncSessionStorageTests.AndroidSync_ConvertsAnOffsetBearingInstant_RatherThanRelabellingIt`,
+which posts one instant spelled twice — naked and `+02:00` — and asserts the two stored rows agree, then
+that they agree with the instant the client meant. Verified to fail on the old code (`21:55` stored for a
+`19:55Z` session) before the fix went back in. **The guard cannot fail on a UTC host**: the error is
+exactly the server's own UTC offset, so a UTC CI box would have stored the right value by accident. This
+is a second instance of the `CQ-1` / `MIG-5` pattern — the test environment running a different date-time
+contract than production — and worth remembering if CI ever becomes the only place this suite runs.
+
+`Doc impact: domain-map.md → Invariants (the two android session instants are read as UTC)` — done,
+because "the field is named `SessionStartUtc` so we relabel it" was the reasoning that produced the bug.
+
+### CQ-7 🟠 ✅ FIXED 2026-09-03 · Android sync does not de-duplicate within a batch
 
 `application/endpoint/android/command/AndroidSyncEndpoint.cs:76-114`
 
@@ -371,7 +388,19 @@ idempotent" — the endpoint is idempotent *across* requests and not *within* on
 **Fix:** track the keys added so far in the same `HashSet` and count in-batch repeats as
 `duplicatesSkipped`.
 
-`Doc impact: none`
+**Fixed:** as written — the set is renamed `seenKeys` (it is no longer only the stored ones) and the
+`Contains` + implicit-add pair collapses into `if (!seenKeys.Add(key))`, so a key is recorded by the same
+statement that tests it and the two cannot drift apart. `UserId` and `DeviceId` are fixed for the request,
+so `(package, start)` is the rest of the index. In-batch repeats land in `duplicatesSkipped` alongside
+cross-request ones: the client cannot tell the two apart and does not need to.
+
+Pinned by two cases in `AndroidSyncSessionStorageTests` — the repeat itself (200 rather than 500,
+`accepted: 1`, `duplicatesSkipped: 1`, one stored row) and a control that surrounds the repeat with
+another session, so the dedup cannot degrade into dropping the batch around it.
+
+`Doc impact: domain-map.md → Invariants (the uniqueness bullet now says the endpoint keys off the same
+tuple within a batch, not just against stored rows)` — done. That bullet called the index "what makes the
+sync endpoint's re-send idempotent", which was the sentence the bug hid behind.
 
 ### CQ-8 🟠 The desktop heartbeat can violate its own unique index inside one window
 
@@ -615,9 +644,15 @@ sharpened**; the code is deliberate.
 - **CQ-21** `WebExtensionEntryDto.Url` is `required string` while the entity's `Url` is `string?` and the
   handler branches on `string.IsNullOrEmpty` — the DTO should be `string?` to match the documented
   "domain-only tracking is legitimate" case (`WebExtensionActivityEntry.cs:42-45`). `Doc impact: none`
-- **CQ-22** `AndroidSyncEndpoint.cs:40,50,57` logs client-supplied strings (`item.SessionStartUtc`,
-  `item.SessionEndUtc`) at Warning. Package names and timestamps are not PII under the CLAUDE.md rule,
-  but these are unvalidated free text on a per-request path — bound the length before logging.
+- **CQ-22** ✅ **FIXED 2026-09-03.** `AndroidSyncEndpoint` logged client-supplied strings
+  (`item.SessionStartUtc`, `item.SessionEndUtc`) at Warning. Package names and timestamps are not PII under
+  the CLAUDE.md rule, but these are unvalidated free text on a per-request path. Bounded in
+  `AndroidSyncValidator` via `TrackingIngestLimits.MaxInstantStringLength` (64 — an ISO-8601 instant with an
+  offset is 33), rather than truncating at the log site: the string is then bounded for every consumer, not
+  just the one line that logs it. `PackageName` and `AppLabel` were already capped at 255. This one is a
+  400 for the whole sync rather than a dropped row — the split `SEC-5` set is "a row a phone could
+  plausibly produce" versus "a broken or hostile client", and a multi-kilobyte timestamp is the latter.
+  Pinned by `AndroidSyncSessionStorageTests.AndroidSync_RejectsAnInstantStringTooLongToLog`.
   `Doc impact: none`
 - **CQ-23** `AndroidSummaryCardsEndpoint.cs:51` defaults `TopN` to 4 while the desktop and web-extension
   cards default to 5, and `UnifiedSummaryCardsEndpoint.cs:33` to 4. Harmless, but it is the sort of

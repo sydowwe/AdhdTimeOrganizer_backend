@@ -56,7 +56,12 @@ dashboards' comparison window (`Last7Days` / `Last30Days` / `SameWeekday` / `All
 - **One pattern per user.** *DB-enforced*, unique with `NULLS NOT DISTINCT` so two NULL process names
   count as equal.
 - **One android session per `(user, device, package, start)`.** *DB-enforced* — this is what makes the
-  sync endpoint's re-send idempotent.
+  sync endpoint's re-send idempotent. The endpoint keys off the same tuple *within* a batch as well as
+  against the stored rows, so a phone that repeats a session inside one payload gets it counted as a
+  duplicate rather than taking the whole sync down on the index (CQ-7).
+- **The two android session instants are read as UTC.** *App-enforced* — `AndroidSyncEndpoint` parses them
+  with `AdjustToUniversal | AssumeUniversal`, so an offset a client chose to send is **converted**, not
+  relabelled. A naked instant is read as UTC, which is what the field names promise (CQ-6).
 - **An android session is at most 24h long, is not in the future, and is not older than the retention
   horizon.** *App-enforced at the ingest boundary only* (`AndroidSyncValidator` bounds the stated
   `DurationSeconds` and the batch size, a 400; `AndroidSyncEndpoint` bounds the span the two instant
