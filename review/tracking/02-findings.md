@@ -222,7 +222,7 @@ normal traffic.
 
 ## 6. Code quality
 
-### CQ-1 🟠 `BaselineType.AllTime` throws in production and cannot throw in tests
+### CQ-1 🟠 ✅ FIXED 2026-09-03 · `BaselineType.AllTime` throws in production and cannot throw in tests
 
 `application/endpoint/desktop/query/dashboard/DesktopSummaryCardsEndpoint.cs:97`,
 `application/endpoint/webExtension/query/WebExtensionSummaryCardsEndpoint.cs:125`,
@@ -246,9 +246,27 @@ avoids it by construction (its `AllTime` resolves through `FirstActivityDayAsync
 decide separately whether the legacy switch should be removed from the test fixture (`MIG-5`); until it
 is, no test can prove this class of bug is gone.
 
+**Fixed** in the shared base (`CQ-18`). `AllTime` now resolves to `req.DateFrom.AddDays(-MaxSpanDays)`
+— a `DateOnly` put through `DailyWindowSet.Resolve` on the user's zone, so what reaches EF is a
+zone-derived UTC instant and there is no `Unspecified` `DateTime` on the path at all. That is also
+`PERF-6`'s fix: the read is bounded at a year and a day instead of running from the beginning of time.
+The divisor is still derived from the data actually found, so a user with three days of history is
+still divided by three — the floor changes which rows are eligible, not how the mean day is taken.
+
+`BaseFocusMetricsEndpoint` narrows its equivalent lookback further via `FirstActivityDayAsync`; the
+cards deliberately do not. The start is clamped to the floor either way, and a day earlier than the
+user's first has no rows, so the two produce the same numbers and the cards save a query per request.
+
+**The 500 half is still untestable**, exactly as this finding says: under the fixture's legacy switch
+the old code returned a well-formed 200. What is pinned instead is the floor —
+`TrackingSummaryCardsBaselineTests.AllTimeBaseline_IsFlooredAtTheMaximumSpan_NotAtTheBeginningOfTime`
+asserts on the printed average, which an 18-month-old row moves from 300 to 180. `MIG-5` is untouched
+and is still the only thing that would make the date-time contract itself testable; `CQ-6`'s note about
+this same pattern stands.
+
 `Doc impact: none`
 
-### CQ-2 🟠 The summary-cards baseline ignores the per-day time-of-day window
+### CQ-2 🟠 ✅ FIXED 2026-09-03 · The summary-cards baseline ignores the per-day time-of-day window
 
 `DesktopSummaryCardsEndpoint.cs:113-149`, `WebExtensionSummaryCardsEndpoint.cs:141-190`,
 `AndroidSummaryCardsEndpoint.cs:108-138`
@@ -270,9 +288,18 @@ req.From.ToTimeOnly(), req.To.ToTimeOnly(), timeZone)`) and `Restrict` the basel
 i.e. make these three read the way `BaseFocusMetricsEndpoint` and the unified card already do. See
 `CQ-18`: the real fix is one shared baseline.
 
-`Doc impact: none` (the doc states the intended rule; the code will then match it)
+**Fixed** as one shared baseline (`CQ-18`), which is the option this finding names. The lookback is now
+a `DailyWindowSet` in its own right, and the base calls the source's `LoadAsync` for it — the same
+method, with the same `Restrict`, that reads the span. There is no way to read one through the window
+and the other around it, because there is only one read.
 
-### CQ-3 🟠 The android summary cards fold the weekday and the day span on UTC
+Pinned by `TrackingSummaryCardsBaselineTests.Baseline_IsRestrictedToTheUsersDailyWindow_NotTheWholeEnvelope`,
+a theory over all three routes: 700 seconds inside a 09:00–17:00 window and 7000 in the night beside it,
+asserting the card prints 100 rather than 1100. `DOC-2` closes with this, with no doc edit.
+
+`Doc impact: none` (the doc states the intended rule; the code now matches it)
+
+### CQ-3 🟠 ✅ FIXED 2026-09-03 · The android summary cards fold the weekday and the day span on UTC
 
 `application/endpoint/android/query/AndroidSummaryCardsEndpoint.cs:118,124-126`
 
@@ -288,6 +315,16 @@ that was written for it.
 
 **Fix:** thread `timeZone` into `GetBaselineAverages` and fold through `WallClockZone.FromUtc`, exactly
 as the other two do.
+
+**Fixed** by deletion (`CQ-18`): there is no android `GetBaselineAverages` any more. Both folds happen
+once, in the base, through `WallClockZone.FromUtc`. The target weekday is now `req.DateFrom.DayOfWeek`
+rather than the envelope's — the same value, read off the calendar date the user asked for instead of
+recovered from an instant, which is how `BaseFocusMetricsEndpoint` and the merged card already read it.
+
+Pinned by `TrackingSummaryCardsBaselineTests.AndroidBaseline_MatchesTheSameWeekdayOnTheUsersCalendar_NotUtcs`,
+the android twin of the desktop-only guard this copy drifted out from under. Both sides of the reading
+discriminate: `steady` catches the target weekday (the requested Tuesday opens at 22:00Z on Monday) and
+`midnight` the per-row one (00:30 local Tuesday is still Monday in UTC).
 
 `Doc impact: none`
 
@@ -511,7 +548,7 @@ reject it in the grid validators. Either is better than the silent reinterpretat
 | `application/validator/desktop/DesktopProcessDetailsValidator.cs` | `To > From` and **no maximum range** — its web-extension twin caps at 31 days (`DomainDetailsValidator.cs:13`) | An unbounded read of the partitioned desktop ledger filtered only by process name; no index supports it either (see below) | Add the same 31-day cap, or reuse `DashboardDateRangeRules.MaxSpanDays` | `PERF-3` |
 | `FetchTableDistinctDesktopEntry.cs:44-57`, `FetchTableDistinctAndroidEntry.cs:44-56` | `GROUP BY` over the **entire** ledger with no date predicate, executed twice per page (count + page) | A full partitioned-table scan per grid keystroke; grows without bound because nothing but the purge ever removes rows | Bound the grid to a date range (the settings UI already knows one), or materialise a distinct-entries view refreshed off-request | `PERF-4` |
 | `DesktopPieChartEndpoint.cs:58-62`, `WebExtensionPieChartEndpoint.cs:58-61` | `WindowTitles` / `Pages` are `Distinct()` over the whole span, unbounded, per item | A year of browsing is tens of thousands of distinct URLs serialised into a pie-chart response nobody renders | Cap to the top N by seconds (the details endpoints exist for the full list) | `PERF-5` |
-| Three summary-cards `AllTime` baselines (`DesktopSummaryCardsEndpoint.cs:97` etc.) | Reads the entire ledger from the beginning of time. Desktop and android have no partition-date floor (only `WebExtensionActivityEntry` does, `AppDbContext.cs:279`) | Would be the heaviest query in the app — it currently throws first (`CQ-1`), which is the only reason nobody has noticed | Same fix as `CQ-1`: floor at `MaxSpanDays` | `PERF-6` |
+| ~~Three summary-cards `AllTime` baselines~~ **✅ FIXED 2026-09-03** | Read the entire ledger from the beginning of time. Desktop and android have no partition-date floor (only `WebExtensionActivityEntry` does, `AppDbContext.cs:279`) | Would be the heaviest query in the app — it threw first (`CQ-1`), which is the only reason nobody had noticed | Fixed with `CQ-1` in the shared base: the lookback is floored at `DateFrom - MaxSpanDays`, so the worst `AllTime` read is now a year and a day. The envelope read itself is still row-by-row (`PERF-1`, open) | `PERF-6` |
 | `DesktopActivityHeartbeatEndpoint.cs:115-119` | One `TotalSecondsOnDayAsync` round trip per attributed activity, after the save, on every heartbeat | Small (few activities per window) but it is on the once-a-minute-per-user path | Batch the day totals into one seam call | `PERF-7` |
 | `TimelineSegmentBuilder.AbsorbContextSwitches:196-241` | `do { … } while (merged)` restarts the whole scan after every single merge | O(n²) on a day with many short runs (n ≈ 1440); fine today, quadratic by construction | Single pass with a rebuilt list, or restart at `i` rather than at 0 | `PERF-8` |
 
@@ -542,14 +579,19 @@ reject it in the grid validators. Either is better than the silent reinterpretat
 
 `Doc impact: none once SEC-1 is fixed`
 
-### DOC-2 🟠 The focus-metrics baseline rule claims parity with summary-cards that does not exist
+### DOC-2 🟠 ✅ MOOT 2026-09-03 · The focus-metrics baseline rule claims parity with summary-cards that does not exist
 
 `docs/domain-map.md:138-140` says the two baselines scale the same way and must not disagree. The
 per-source summary-cards baselines do not apply the daily window at all (`CQ-2`), so on any narrowed
 window the two dashboards on one screen disagree by the size of the excluded night. **The code is
 wrong**; fixing `CQ-2` makes the sentence true.
 
-`Doc impact: none once CQ-2 is fixed`
+**Closed with `CQ-2`, with no doc edit** — the sentence at `domain-map.md:161-163` is now a description
+of what the code does. The parity is structural rather than transcribed: the per-source cards and
+`BaseFocusMetricsEndpoint` derive their lookback the same way because they are two bases written to the
+same shape, which is as close as this gets without merging measures that genuinely differ.
+
+`Doc impact: none`
 
 ### DOC-3 🟠 ✅ FIXED 2026-09-03 · Retention is described as the slice's GDPR control while one of the three ledgers is outside it
 
@@ -628,12 +670,40 @@ sharpened**; the code is deliberate.
 - **CQ-17** `DesktopPieChartEndpoint.cs:101` counts `x.WindowTitle != null` on a non-nullable column
   (always true) while the list three lines above uses `!string.IsNullOrEmpty`. The totals row therefore
   counts `""` as a distinct title. `Doc impact: none`
-- **CQ-18** The baseline block is transcribed **four** times — three per-source summary-cards plus
-  `BaseFocusMetricsEndpoint` — with `UnifiedSummaryCardsEndpoint` a fifth variant. `CQ-1`, `CQ-2` and
-  `CQ-3` are each a copy that drifted; the module elsewhere (`TimelineSegmentBuilder`,
-  `UnifiedMinuteMerger`, `DashboardDateRangeRules`) is explicit that one copy is the rule. A
-  `BaseSummaryCardsEndpoint<TRequest, TItem>` in the shape of `BaseFocusMetricsEndpoint` would collapse
-  all three findings into one. `Doc impact: domain-map.md → Navigation index (new base row)`
+- **CQ-18** ✅ **FIXED 2026-09-03.** The baseline block was transcribed **four** times — three per-source
+  summary-cards plus `BaseFocusMetricsEndpoint` — with `UnifiedSummaryCardsEndpoint` a fifth variant.
+  `CQ-1`, `CQ-2` and `CQ-3` were each a copy that drifted; the module elsewhere (`TimelineSegmentBuilder`,
+  `UnifiedMinuteMerger`, `DashboardDateRangeRules`) is explicit that one copy is the rule.
+
+  **Fixed as written:** `application/endpoint/BaseSummaryCardsEndpoint.cs`, in the shape of
+  `BaseFocusMetricsEndpoint` — the one of the five that already got all three right. The three per-source
+  endpoints lost ~120 lines each and now supply exactly two things: `LoadAsync`, their ledger read
+  projected into a shared `SummaryRow`, and `BuildItem`, their DTO. Everything between those two — the
+  lookback arithmetic, the per-day window applied to the lookback (`CQ-2`), the weekday and day-span fold
+  on the user's calendar (`CQ-3`), the `AllTime` floor (`CQ-1`, `PERF-6`) and the scale-to-span — exists
+  once. `DOC-2` closes with it.
+
+  Three deliberate details:
+
+  - **`TRequest, TItem`, not `TRow`.** Sources project into `SummaryRow(Key, Detail, Instant, Active,
+    Background)` after their own read, so the entity type never reaches the base and the merged card
+    could adopt it later without a third parameter. `Detail` is the secondary label a source carries
+    (desktop's product name, android's package name) and is null where there is none.
+  - **Android's duration lands in `ActiveSeconds` with a zero background**, which is what that ledger
+    means — the merged card already says so ("background is always null for an item only android saw").
+    It is why the android DTO has one stat where its siblings have two.
+  - **`LoadAsync` is called twice per request**, once per window set, rather than the span being loaded
+    and the lookback derived from it. Two reads is what the three endpoints already did; deriving one
+    from the other would need the span read to cover the lookback, which is the unbounded read `CQ-1`
+    was about.
+
+  Behaviour is otherwise unchanged, including the per-source default `topN` (5/5/4 — `CQ-23` is still
+  open, and folding it in here would have hidden a UI change inside a refactor). Ties in the top-N order
+  now break on the key rather than on whatever order Postgres returned.
+
+  Pinned by `TrackingSummaryCardsBaselineTests` (5 cases across the three routes), which asserts on the
+  averages the cards print — all three bugs returned a well-formed 200.
+  `Doc impact: domain-map.md → Navigation index (new base row)` — done.
 - **CQ-19** `AndroidSessionData` carries no `[AuditIgnore]` on `PackageName` / `AppLabel` while both
   other ledgers annotate their sensitive columns. See `AUDIT-2` in
   [`03-risks-rollout.md`](03-risks-rollout.md). `Doc impact: none`

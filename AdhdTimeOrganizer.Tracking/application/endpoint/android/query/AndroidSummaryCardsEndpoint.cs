@@ -1,146 +1,62 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
-using AdhdTimeOrganizer.Tracking.application.dto.@enum;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
-using FastEndpoints;
-using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.android.query;
 
-public class AndroidSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones) : Endpoint<SummaryCardsRequest, List<AndroidAppSummaryDto>>
+/// <summary>
+/// Top android apps over the span, each against the user's own recent self. Everything the card means —
+/// the lookback, the per-day window applied to it, the weekday fold and the scaling — is
+/// <see cref="BaseSummaryCardsEndpoint{TRequest,TItem}"/>'s; this class is the session ledger's read and
+/// the android DTO.
+///
+/// <para>A session is a single duration, so it lands in the shared row's active seconds and the
+/// background half stays zero: this ledger records no background time, which is also why the card
+/// carries one stat rather than the two its siblings do.</para>
+/// </summary>
+public class AndroidSummaryCardsEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
+    : BaseSummaryCardsEndpoint<SummaryCardsRequest, AndroidAppSummaryDto>(timeZones)
 {
-    public override void Configure()
+    protected override int DefaultTopN => 4;
+
+    public override void Configure() =>
+        ConfigureSummaryCards<TopDomainsValidator>(
+            "/activity-tracking/android/summary-cards",
+            "Get Android app usage summary cards",
+            "Returns top N apps with current usage and comparison against baseline period");
+
+    protected override async Task<IReadOnlyList<SummaryRow>> LoadAsync(
+        SummaryCardsRequest req, long userId, DailyWindowSet windows, CancellationToken ct)
     {
-        Post("/activity-tracking/android/summary-cards");
-        Summary(s =>
-        {
-            s.Summary = "Get Android app usage summary cards";
-            s.Description = "Returns top N apps with current usage and comparison against baseline period";
-            s.Response<List<AndroidAppSummaryDto>>(200, "Success");
-            s.Response(400, "Bad request");
-        });
-        Validator<TopDomainsValidator>();
-    }
+        var from = windows.EnvelopeFrom;
+        var to = windows.EnvelopeTo;
 
-    public override async Task HandleAsync(SummaryCardsRequest req, CancellationToken ct)
-    {
-        var userId = User.GetId();
-
-        var windows = req.ToDailyWindows(await timeZones.GetAsync(userId, ct));
-
-        // One range predicate over the span's outer envelope, then the gaps between the daily windows
-        // are dropped in memory — an envelope read alone would count every night the window excludes.
-        var envelopeFrom = windows.EnvelopeFrom;
-        var envelopeTo = windows.EnvelopeTo;
-
-        var currentData = windows.Restrict(
-            await db.Set<AndroidSessionData>()
-                .Where(x => x.UserId == userId)
-                .Where(x => x.SessionStartUtc >= envelopeFrom && x.SessionStartUtc < envelopeTo)
-                .ToListAsync(ct),
-            x => x.SessionStartUtc);
-
-        var (baselineFrom, baselineTo, baselineDays) =
-            CalculateBaselineRange(windows.EnvelopeFrom, req.Baseline);
-
-        var baselineAverages = await GetBaselineAverages(
-            userId, baselineFrom, baselineTo, baselineDays, windows.DayCount, req.Baseline, ct);
-
-        var topN = req.TopN ?? 4;
-
-        var topApps = currentData
-            .GroupBy(x => x.AppLabel)
-            .Select(g => new
-            {
-                AppLabel = g.Key,
-                PackageName = g.First().PackageName,
-                TotalSeconds = g.Sum(x => x.DurationSeconds)
-            })
-            .OrderByDescending(x => x.TotalSeconds)
-            .Take(topN)
-            .ToList();
-
-        var response = topApps.Select(app =>
-        {
-            var hasBaseline = baselineAverages.TryGetValue(app.AppLabel, out var baselineAvg);
-            var isNew = !hasBaseline;
-
-            return new AndroidAppSummaryDto
-            {
-                PackageName = app.PackageName,
-                AppLabel = app.AppLabel,
-                IsNew = isNew,
-                Stat = new AndroidActivityStatDto
-                {
-                    Seconds = app.TotalSeconds,
-                    AverageSeconds = isNew ? null : baselineAvg,
-                    PercentChange = isNew || baselineAvg == 0
-                        ? null
-                        : CalculatePercentChange(app.TotalSeconds, baselineAvg)
-                }
-            };
-        }).ToList();
-
-        await Send.ResponseAsync(response, cancellation: ct);
-    }
-
-    private static (DateTime from, DateTime to, int days) CalculateBaselineRange(
-        DateTime currentFrom, BaselineType baseline)
-    {
-        return baseline switch
-        {
-            BaselineType.Last7Days => (currentFrom.AddDays(-7), currentFrom, 7),
-            BaselineType.Last30Days => (currentFrom.AddDays(-30), currentFrom, 30),
-            BaselineType.SameWeekday => (currentFrom.AddDays(-56), currentFrom, 8),
-            BaselineType.AllTime => (DateTime.MinValue, currentFrom, -1),
-            _ => (currentFrom.AddDays(-7), currentFrom, 7)
-        };
-    }
-
-    /// <summary>
-    /// The mean day over the lookback, multiplied by <paramref name="spanDays"/> so it compares like
-    /// with like against a card whose own number is a total over the requested span. Comparing a
-    /// seven-day total against a one-day mean would report every week as up 600%. On a single-day
-    /// request <paramref name="spanDays"/> is 1 and the arithmetic is the unchanged one.
-    /// </summary>
-    private async Task<Dictionary<string, long>> GetBaselineAverages(
-        long userId, DateTime from, DateTime to, int days, int spanDays, BaselineType baseline, CancellationToken ct)
-    {
-        var data = await db.Set<AndroidSessionData>()
+        var rows = await db.Set<AndroidSessionData>()
             .Where(x => x.UserId == userId)
             .Where(x => x.SessionStartUtc >= from && x.SessionStartUtc < to)
             .ToListAsync(ct);
 
-        if (baseline == BaselineType.SameWeekday)
-        {
-            var targetWeekday = from.DayOfWeek;
-            data = data.Where(x => x.SessionStartUtc.DayOfWeek == targetWeekday).ToList();
-        }
-
-        if (days == -1 && data.Count > 0)
-        {
-            var minDate = data.Min(x => x.SessionStartUtc).Date;
-            var maxDate = data.Max(x => x.SessionStartUtc).Date;
-            days = (int)(maxDate - minDate).TotalDays + 1;
-        }
-
-        if (days <= 0)
-            days = 1;
-
-        return data
-            .GroupBy(x => x.AppLabel)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Sum(x => x.DurationSeconds) * spanDays / days
-            );
+        return windows.Restrict(rows, x => x.SessionStartUtc)
+            .Select(x => new SummaryRow(x.AppLabel, x.PackageName, x.SessionStartUtc, x.DurationSeconds, 0))
+            .ToList();
     }
 
-    private static double CalculatePercentChange(long current, long average)
-    {
-        if (average == 0)
-            return current > 0 ? 100.0 : 0.0;
-        return Math.Round((double)(current - average) / average * 100, 1);
-    }
+    protected override AndroidAppSummaryDto BuildItem(SummaryItem current, SummaryBaseline? baseline) =>
+        new()
+        {
+            PackageName = current.Detail ?? current.Key,
+            AppLabel = current.Key,
+            IsNew = baseline is null,
+            Stat = new AndroidActivityStatDto
+            {
+                Seconds = current.ActiveSeconds,
+                AverageSeconds = baseline?.ActiveSeconds,
+                PercentChange = baseline is null || baseline.ActiveSeconds == 0
+                    ? null
+                    : PercentChange(current.ActiveSeconds, baseline.ActiveSeconds)
+            }
+        };
 }
