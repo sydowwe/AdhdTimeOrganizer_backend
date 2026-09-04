@@ -4,6 +4,20 @@ Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first.
 
 Pins **CQ-3 🟠**.
 
+> ✅ **Done 2026-09-04** — `AdhdTimeOrganizer.IntegrationTests/Seeding/DevProfileSeederTests.cs`, 12 tests,
+> landed with the fix. All four scenarios below, plus a registration fact (`CQ-12`) and a
+> `WithoutTheDefaultLookups_…` case for `CQ-4`. It lives in `Seeding/` next to
+> `PerUserDefaultSeederTests` rather than in `Endpoints/`, since nothing about it goes over HTTP.
+>
+> **One thing this prompt could not have known:** `SEC-1`'s structural fix landed first, so
+> `AppQueryFilters.ActivityProfileUserScope` now scopes profile reads — including the seeder's own guard.
+> Every ordinary test context has a non-null `ScopeUserId` (`FakeLoggedUserService.IsAuthenticated` is
+> hard-coded `true`), which hides user A's rows from the guard and makes the bug *undetectable* through
+> the factories the base class hands out. The suite therefore builds its own host with an
+> unauthenticated `ILoggedUserService`, which is what dev seeding runs as in production — and is the
+> first behavioural exercise of the `ScopeUserId == null ||` escape (`MIG-1`), previously asserted only
+> on the predicate.
+
 ## The defect
 
 Three `IPerUserDevSeeder` implementations open with a **global** existence check:
@@ -32,9 +46,9 @@ var seeder = scope.ServiceProvider.GetServices<IPerUserDevSeeder>()
 await seeder.SeedForUser(userId);
 ```
 
-⚠ `ActivityProjectProfileSeeder.SeederName` is **`"ActivityDiyProfile"`**, not
-`"ActivityProjectProfile"` (`CQ-12`). If you rename it as part of the fix, rename it in the test in
-the same commit.
+`ActivityProjectProfileSeeder.SeederName` was `"ActivityDiyProfile"` when this prompt was written;
+`CQ-12` renamed it to **`"ActivityProjectProfile"`** on 2026-09-04, so all three keys now match their
+entity names.
 
 ⚠ These seeders match activities **by name** (`GetActivityId("Gaming Session")` etc.,
 `ActivityBacklogProfileSeeder.cs:75-84`). Your two test users each need activities with those exact

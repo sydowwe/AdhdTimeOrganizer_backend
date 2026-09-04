@@ -20,6 +20,11 @@ public class ActivityWeatherDependencyDevSeeder(
 
     public async Task SeedForUser(long userId)
     {
+        // Deliberately code-less, and deliberately unmatchable: "Rainy" and "Cold" map to none of the four
+        // WeatherDependencyCodes and WeatherDependencyCodes.Infer guesses nothing from either label, so both
+        // rows sit permanently outside the weather signal. That is the point — they stand in for the rows a
+        // user invents themselves, so dev data exercises the "no opinion" path the signal degrades to. The
+        // four codes belong to the userDefault seeder (order 21), which is the only place Code is ever set.
         (string Text, int SortOrder)[] custom =
         [
             ("Rainy", 5),

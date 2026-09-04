@@ -11,10 +11,10 @@ Point-in-time snapshot, 2026-09-01. Synthesis of [02-findings.md](02-findings.md
 | 2 | 🟠 | Profile create **and** update accept another user's lookup ids; the victim can then no longer delete their own lookup row (`Restrict`) | SEC-2 | `application/validator/CreateActivityBacklogProfileValidator.cs:15-44`, `UpdateActivityBacklogProfileValidator.cs:9-14` |
 | 3 | 🟠 ✅ fixed 2026-09-04 | `PUT /memory-anchor/{id}` repoints the anchor onto any activity in the database, past both create-time rules | SEC-3 | `application/dto/request/MemoryAnchorRequest.cs:18` |
 | 4 | 🟠 | A forecast with an empty `daily` block is read as a calm dry day and paints a "dry" badge — a wrong opinion where the contract promises none | CQ-5 | `infrastructure/extService/weather/OpenMeteoWeatherProvider.cs:132` |
-| 5 | 🟠 | Three dev seeders gate on a global row count, so only the first user is ever seeded | CQ-3 | `infrastructure/persistence/seeder/dev/ActivityBacklogProfileSeeder.cs:26` (+2) |
+| 5 | 🟠 ✅ fixed 2026-09-04 | Three dev seeders gate on a global row count, so only the first user is ever seeded | CQ-3 | `infrastructure/persistence/seeder/dev/ActivityBacklogProfileSeeder.cs:26` (+2) |
 | 6 | 🟠 | Concurrency conflicts on every custom profile write are flattened to 400 instead of 409 | CQ-2 | `application/endpoint/backlog/command/UpdateActivityBacklogProfileEndpoint.cs:50-55` (+11) |
 | 7 | 🟠 | 18 hand-written profile endpoints re-implement bases that already have the `AuthorizeAsync` hook — the root cause of #1, #6 and #9 | CQ-1 | `application/endpoint/{backlog,bucketList,project}/**` |
-| 8 | 🟠 | Dev seeders re-declare the lookup defaults and can create weather rows with no `Code` | CQ-4 | `.../dev/ActivityBacklogProfileSeeder.cs:39-44,92-113` |
+| 8 | 🟠 ✅ fixed 2026-09-04 | Dev seeders re-declare the lookup defaults and can create weather rows with no `Code` | CQ-4 | `.../dev/ActivityBacklogProfileSeeder.cs:39-44,92-113` |
 | 9 | 🟠 | Batch delete is one query per id, each `Include`-ing the whole activity | PERF-2 | `application/endpoint/backlog/command/BatchDeleteActivityBacklogProfileEndpoint.cs:31-45` (+2) |
 | 10 | 🟠 | A draw costs up to nine sequential round trips | PERF-1 | `application/endpoint/leisureSuggestion/DrawLeisureSuggestionEndpoint.cs:61-107` |
 | 11 | 🟠 | `testing.md` denies the unique index the merge seam's collision rule is built on | DOC-1 | `docs/testing.md:66` |
@@ -24,8 +24,8 @@ Point-in-time snapshot, 2026-09-01. Synthesis of [02-findings.md](02-findings.md
 | 15 | 🟡 | Every `DbUpdateException` is treated as the unique-index race; a real failure becomes a misleading 500 | CQ-7 | `.../RecordSeenLeisureSuggestionEndpoint.cs:126` |
 | 16 | 🟡 | Shared static response instance on the no-signal paths | CQ-8 | `application/endpoint/leisureSuggestion/GetLeisureWeatherFitEndpoint.cs:38` |
 | 17 | 🟡 | `Infer` matches four-character substrings in free user text | CQ-10 | `domain/model/WeatherDependencyCodes.cs:47-54` |
-| 18 | 🟡 | Dev seeder pinned to `2026-05-19` | CQ-11 | `.../dev/MemoryAnchorSeeder.cs:57` |
-| 19 | 🟡 | Seeder registry key still says `ActivityDiyProfile` | CQ-12 | `.../dev/ActivityProjectProfileSeeder.cs:15` |
+| 18 | 🟡 ✅ fixed 2026-09-04 | Dev seeder pinned to `2026-05-19` | CQ-11 | `.../dev/MemoryAnchorSeeder.cs:57` |
+| 19 | 🟡 ✅ fixed 2026-09-04 | Seeder registry key still says `ActivityDiyProfile` | CQ-12 | `.../dev/ActivityProjectProfileSeeder.cs:15` |
 | 20 | 🟡 | Dead clamp in the staleness signal | CQ-9 | `domain/service/LeisureDrawRanker.cs:230` |
 | 21 | 🟡 | Endpoint count: the smoke test says 53, the tree and both docs say 57 | DOC-4 | `AdhdTimeOrganizer.IntegrationTests/Endpoints/ActivityProfilesRouteSmokeTests.cs:25,27` |
 

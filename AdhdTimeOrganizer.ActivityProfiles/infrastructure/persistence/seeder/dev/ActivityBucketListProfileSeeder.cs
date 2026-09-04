@@ -22,7 +22,7 @@ public class ActivityBucketListProfileSeeder(
 
     public async Task SeedForUser(long userId)
     {
-        if (await dbContext.Set<ActivityBucketListProfile>().AnyAsync())
+        if (await dbContext.Set<ActivityBucketListProfile>().AnyAsync(p => p.Activity.UserId == userId))
             return;
 
         var activities = await dbContext.Set<Activity>()
@@ -35,8 +35,11 @@ public class ActivityBucketListProfileSeeder(
             return;
         }
 
-        var experienceIds = await EnsureLookups<ActivityExperienceType>(userId,
-            [("Adrenaline", 1), ("Travel", 2), ("Skill", 3), ("Culinary", 4), ("Cultural", 5)]);
+        var experienceIds = await LoadLookups<ActivityExperienceType>(userId,
+            ["Adrenaline", "Travel", "Skill", "Culinary", "Cultural"]);
+
+        if (experienceIds == null)
+            return;
 
         long? GetActivityId(string name)
         {
@@ -88,26 +91,25 @@ public class ActivityBucketListProfileSeeder(
         logger.LogInformation("Seeded {Count} bucket list profiles for user {UserId}", profiles.Count, userId);
     }
 
-    private async Task<Dictionary<string, long>> EnsureLookups<T>(long userId, (string Text, int SortOrder)[] entries)
+    /// <summary>
+    /// Reads the lookup rows the <c>userDefault/</c> seeders own (order 23, which runs before this one at 52).
+    /// It never creates them — inventing a row here would bypass whatever columns those seeders set — and
+    /// returns <c>null</c> when anything is missing, which means the default seeders did not run.
+    /// </summary>
+    private async Task<Dictionary<string, long>?> LoadLookups<T>(long userId, string[] texts)
         where T : BaseLookupWithUser
     {
         var existing = await dbContext.Set<T>()
-            .Where(l => l.UserId == userId)
+            .Where(l => l.UserId == userId && texts.Contains(l.Text))
             .ToDictionaryAsync(l => l.Text, l => l.Id);
 
-        foreach (var (text, sortOrder) in entries)
-        {
-            if (existing.ContainsKey(text))
-                continue;
-            var entity = (T)Activator.CreateInstance(typeof(T))!;
-            entity.Text = text;
-            entity.SortOrder = sortOrder;
-            entity.UserId = userId;
-            dbContext.Set<T>().Add(entity);
-            await dbContext.SaveChangesAsync();
-            existing[text] = entity.Id;
-        }
+        var missing = texts.Where(t => !existing.ContainsKey(t)).ToList();
+        if (missing.Count == 0)
+            return existing;
 
-        return existing;
+        logger.LogWarning(
+            "Missing {Lookup} defaults {Missing} for user {UserId}, skipping ActivityBucketListProfile seeding",
+            typeof(T).Name, string.Join(", ", missing), userId);
+        return null;
     }
 }

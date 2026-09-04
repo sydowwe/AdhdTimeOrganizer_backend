@@ -54,7 +54,7 @@ public class MemoryAnchorSeeder(
         }
 
         var random = new Random(42);
-        var today = new DateTime(2026, 5, 19);
+        var today = DateTime.UtcNow.Date;
         var used = new HashSet<(long, int, int)>();
 
         string[] notes =

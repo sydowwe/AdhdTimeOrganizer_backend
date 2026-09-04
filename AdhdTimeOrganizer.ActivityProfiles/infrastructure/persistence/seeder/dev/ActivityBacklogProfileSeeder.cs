@@ -23,7 +23,7 @@ public class ActivityBacklogProfileSeeder(
 
     public async Task SeedForUser(long userId)
     {
-        if (await dbContext.Set<ActivityBacklogProfile>().AnyAsync())
+        if (await dbContext.Set<ActivityBacklogProfile>().AnyAsync(p => p.Activity.UserId == userId))
             return;
 
         var activities = await dbContext.Set<Activity>()
@@ -36,12 +36,12 @@ public class ActivityBacklogProfileSeeder(
             return;
         }
 
-        var locationIds = await EnsureLookups<ActivityLocationType>(userId,
-            [("Indoor", 1), ("Outdoor", 2), ("Any", 3)]);
-        var weatherIds = await EnsureLookups<ActivityWeatherDependency>(userId,
-            [("None", 1), ("Sunny", 2), ("Dry", 3), ("Snow", 4)]);
-        var costIds = await EnsureLookups<ActivityExpectedCostTier>(userId,
-            [("Free", 1), ("Cheap", 2), ("Moderate", 3), ("Expensive", 4)]);
+        var locationIds = await LoadLookups<ActivityLocationType>(userId, ["Indoor", "Outdoor", "Any"]);
+        var weatherIds = await LoadLookups<ActivityWeatherDependency>(userId, ["None", "Sunny", "Dry", "Snow"]);
+        var costIds = await LoadLookups<ActivityExpectedCostTier>(userId, ["Free", "Cheap", "Moderate", "Expensive"]);
+
+        if (locationIds == null || weatherIds == null || costIds == null)
+            return;
 
         long? GetActivityId(string name)
         {
@@ -89,26 +89,26 @@ public class ActivityBacklogProfileSeeder(
         logger.LogInformation("Seeded {Count} backlog profiles for user {UserId}", profiles.Count, userId);
     }
 
-    private async Task<Dictionary<string, long>> EnsureLookups<T>(long userId, (string Text, int SortOrder)[] entries)
+    /// <summary>
+    /// Reads the lookup rows the <c>userDefault/</c> seeders own (orders 20-23, which run before this one at 50).
+    /// It never creates them: those seeders set columns this one cannot see — <c>ActivityWeatherDependency.Code</c>
+    /// above all — so a row invented here would be a subtly broken copy. Returns <c>null</c> when anything is
+    /// missing, which means the default seeders did not run and there is nothing sane to seed against.
+    /// </summary>
+    private async Task<Dictionary<string, long>?> LoadLookups<T>(long userId, string[] texts)
         where T : BaseLookupWithUser
     {
         var existing = await dbContext.Set<T>()
-            .Where(l => l.UserId == userId)
+            .Where(l => l.UserId == userId && texts.Contains(l.Text))
             .ToDictionaryAsync(l => l.Text, l => l.Id);
 
-        foreach (var (text, sortOrder) in entries)
-        {
-            if (existing.ContainsKey(text))
-                continue;
-            var entity = (T)Activator.CreateInstance(typeof(T))!;
-            entity.Text = text;
-            entity.SortOrder = sortOrder;
-            entity.UserId = userId;
-            dbContext.Set<T>().Add(entity);
-            await dbContext.SaveChangesAsync();
-            existing[text] = entity.Id;
-        }
+        var missing = texts.Where(t => !existing.ContainsKey(t)).ToList();
+        if (missing.Count == 0)
+            return existing;
 
-        return existing;
+        logger.LogWarning(
+            "Missing {Lookup} defaults {Missing} for user {UserId}, skipping ActivityBacklogProfile seeding",
+            typeof(T).Name, string.Join(", ", missing), userId);
+        return null;
     }
 }

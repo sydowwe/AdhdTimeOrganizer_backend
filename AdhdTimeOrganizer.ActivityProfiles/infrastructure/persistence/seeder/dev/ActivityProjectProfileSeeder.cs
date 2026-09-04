@@ -12,7 +12,7 @@ public class ActivityProjectProfileSeeder(
     DbContext dbContext,
     ILogger<ActivityProjectProfileSeeder> logger) : IPerUserDevSeeder, IScopedService
 {
-    public string SeederName => "ActivityDiyProfile";
+    public string SeederName => "ActivityProjectProfile";
     public int Order => 51;
 
     public async Task TruncateTable()
@@ -22,7 +22,7 @@ public class ActivityProjectProfileSeeder(
 
     public async Task SeedForUser(long userId)
     {
-        if (await dbContext.Set<ActivityProjectProfile>().AnyAsync())
+        if (await dbContext.Set<ActivityProjectProfile>().AnyAsync(p => p.Activity.UserId == userId))
             return;
 
         var activities = await dbContext.Set<Activity>()
@@ -31,7 +31,7 @@ public class ActivityProjectProfileSeeder(
 
         if (activities.Count == 0)
         {
-            logger.LogWarning("No activities found for user {UserId}, skipping ActivityDiyProfile seeding", userId);
+            logger.LogWarning("No activities found for user {UserId}, skipping ActivityProjectProfile seeding", userId);
             return;
         }
 
@@ -102,6 +102,6 @@ public class ActivityProjectProfileSeeder(
         await dbContext.Set<ActivityProjectProfile>().AddRangeAsync(profiles);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("Seeded {Count} DIY profiles for user {UserId}", profiles.Count, userId);
+        logger.LogInformation("Seeded {Count} project profiles for user {UserId}", profiles.Count, userId);
     }
 }

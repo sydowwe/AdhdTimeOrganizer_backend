@@ -306,7 +306,7 @@ or delete the endpoints in favour of the bases (`CQ-1`). `TEST-7` pins the behav
 
 `Doc impact: none`
 
-### CQ-3 🟠 Three dev seeders gate on a global row count, so only the first user is ever seeded
+### CQ-3 🟠 ✅ FIXED 2026-09-04 · Three dev seeders gate on a global row count, so only the first user is ever seeded
 
 - `infrastructure/persistence/seeder/dev/ActivityBacklogProfileSeeder.cs:26` —
   `if (await dbContext.Set<ActivityBacklogProfile>().AnyAsync()) return;`
@@ -323,9 +323,14 @@ exactly the shape of database in which a cross-user scoping bug (`SEC-1`) looks 
 **Fix.** `AnyAsync(p => p.Activity.UserId == userId)` — the entities are not `IEntityWithUser`, so
 the traversal is needed here too.
 
+**Fixed 2026-09-04.** As prescribed, on all three seeders. `MemoryAnchorSeeder` was already correct.
+Pinned by `Seeding/DevProfileSeederTests` (`TEST-8`), which fails on the old guard — see the note there
+about why it has to build a host with **no** ambient user: under `ActivityProfileUserScope` an ordinary
+test context hides user A's rows from the guard and the bug disappears.
+
 `Doc impact: none`
 
-### CQ-4 🟠 The dev profile seeders re-declare the lookup defaults, and seed weather rows with no `Code`
+### CQ-4 🟠 ✅ FIXED 2026-09-04 · The dev profile seeders re-declare the lookup defaults, and seed weather rows with no `Code`
 
 `ActivityBacklogProfileSeeder.cs:39-44` hard-codes `Indoor/Outdoor/Any`, `None/Sunny/Dry/Snow`,
 `Free/Cheap/Moderate/Expensive`; `ActivityBucketListProfileSeeder.cs:38-39` hard-codes the five
@@ -345,6 +350,14 @@ row.
 missing (the ordering guarantees they are not), rather than re-creating them. If the fallback must
 stay, make `ActivityWeatherDependency` a special case that sets `Code`, and hoist the `SaveChanges`
 out of the loop.
+
+**Fixed 2026-09-04.** The first way: `EnsureLookups<T>` is gone from both seeders, replaced by a
+read-only `LoadLookups<T>(userId, texts)` that returns `null` and logs which texts were missing, on
+which the caller returns before seeding. The insert path is what carried the code-less
+`ActivityWeatherDependency` rows and the per-row `SaveChangesAsync`, so both went with it; the
+hard-coded `SortOrder`s went too, since nothing writes them any more.
+`DevProfileSeederTests.WithoutTheDefaultLookups_TheSeederWritesNothingAtAll` pins it from the missing-row
+side: no profiles, and no invented lookups of any of the four kinds.
 
 `Doc impact: none`
 
@@ -427,7 +440,7 @@ word-boundary match for the needles shorter than five characters, or drop `"such
 
 `Doc impact: none`
 
-### CQ-11 🟡 A dev seeder pinned to a wall-clock date
+### CQ-11 🟡 ✅ FIXED 2026-09-04 · A dev seeder pinned to a wall-clock date
 
 `infrastructure/persistence/seeder/dev/MemoryAnchorSeeder.cs:57` — `var today = new DateTime(2026, 5, 19);`,
 from which every anchor's month is counted back. A dev database seeded next year gets anchors that
@@ -435,14 +448,20 @@ are all 12+ months old, which quietly changes what the "n of m experienced" read
 anchored-completion surfaces look like in manual testing. `DateTime.UtcNow.Date` with the existing
 `Random(42)` keeps the run reproducible within a day, which is all the fixed seed was buying.
 
+**Fixed 2026-09-04.** `DateTime.UtcNow.Date`, as prescribed; `Random(42)` stays.
+
 `Doc impact: none`
 
-### CQ-12 🟡 A seeder still carries the entity's old name
+### CQ-12 🟡 ✅ FIXED 2026-09-04 · A seeder still carries the entity's old name
 
 `ActivityProjectProfileSeeder.cs:15` — `public string SeederName => "ActivityDiyProfile";`, plus
 "DIY profiles" in the two log lines (`:34`, `:105`). `SeederName` is the registry key operators see
 and filter on; the entity has been `ActivityProjectProfile` since the extraction. Rename it and the
 log text together.
+
+**Fixed 2026-09-04.** `SeederName` is `"ActivityProjectProfile"` and both log lines say "project
+profiles". Nothing outside the class read the old key — the only other mention was the ⚠ note in
+`testingPrompts/DevSeederSecondUser.md`, updated with it.
 
 `Doc impact: none`
 
@@ -466,7 +485,7 @@ question.
 | `BatchDeleteActivityBacklogProfileEndpoint:31-45` + the two siblings | **One query per id**, each with `Include(p => p.Activity)` materialising the whole activity | A 50-id batch is 50 round trips and 50 activity rows | One `Where(p => ids.Contains(p.Id))` read with a scalar ownership projection, then compare counts — which is what `BaseBatchDeleteEndpoint:42-50` already does | PERF-2 |
 | `DrawLeisureSuggestionEndpoint.ReadHistoryAsync:300-311` | Reads the caller's **whole** `LeisureSuggestionRecord` table per draw | Bounded by the 90-day sweep, so a few hundred rows worst case | Acceptable as-is; the comment at `:296-299` states the trade-off correctly. Revisit only if the sweep is ever moved to a job | PERF-3 |
 | `ActivityBacklogProfileResponse.ProjectionWithAnchors:73-101` (and the bucket-list twin) | Two correlated subqueries per row — `EXISTS` plus an ordered `TOP 1` — over the anchors | One grid page = 2 × page size subqueries; small today, quadratic-ish with anchor count | Keep the shape (it must stay sortable — see `summary.md:80-87`), but add the index below | PERF-4 |
-| `ActivityBacklogProfileSeeder.EnsureLookups:99-110` | `SaveChangesAsync` inside the loop | Dev only | See `CQ-4` | PERF-5 |
+| ✅ fixed 2026-09-04 · `ActivityBacklogProfileSeeder.EnsureLookups:99-110` | `SaveChangesAsync` inside the loop | Dev only | See `CQ-4` — the method is gone, and with it the loop; the replacement `LoadLookups<T>` writes nothing | PERF-5 |
 
 ### Indexes that should exist
 
@@ -562,9 +581,11 @@ it sits next to the assertion.
   be shorter than the explanation.
 - `LeisureSuggestionTests` (685 lines) carries two Planning tests (`:478`, `:513`) — see
   [01-testing.md](01-testing.md).
-- `ActivityWeatherDependencyDevSeeder.cs:24-26` seeds "Rainy" and "Cold", neither of which maps to any
-  of the four `WeatherDependencyCodes` nor infers one, so both rows are permanently invisible to the
-  weather signal. Fine as a dev fixture — worth a one-line comment saying it is deliberate, since the
-  next reader will file it as a bug.
+- ✅ FIXED 2026-09-04 · `ActivityWeatherDependencyDevSeeder.cs:24-26` seeds "Rainy" and "Cold", neither
+  of which maps to any of the four `WeatherDependencyCodes` nor infers one, so both rows are
+  permanently invisible to the weather signal. Fine as a dev fixture — worth a one-line comment saying
+  it is deliberate, since the next reader will file it as a bug. *Commented at `:21-26`: the two rows
+  stand in for user-invented ones and exist to exercise the "no opinion" path; `Code` stays the
+  `userDefault` seeder's alone.*
 - `LeisureDrawRanker.Draw:271-295` allocates `chosenKeys` before the relaxation pass needs it; the
   first loop's `chosenKeys.Add` result is discarded. Cosmetic.

@@ -149,7 +149,7 @@ or anonymous refusal. Counts are test methods that touch the route.
 | `WeatherFitRule` + `WeatherDependencyCodes.Infer` | 8 | `Services/WeatherFitRuleTests` |
 | `ActivityProfileActivityReferenceSource` (merge/repoint) | via `ActivityMergeTests` | `Endpoints/ActivityMergeTests` |
 | 4 per-user default seeders | via `PerUserDefaultSeederTests` + `ActivityProfilesSeeders_AreRegisteredExactlyOnce` | `Seeding/`, `ActivityProfilesRouteSmokeTests:71` |
-| 8 dev seeders | **0 behavioural** — registration only **TEST-8** | — |
+| 8 dev seeders | the 3 profile ones: 12 tests (`TEST-8`, done). The other 5: registration only | `Seeding/DevProfileSeederTests`, `ActivityProfilesRouteSmokeTests:71` |
 | `OpenMeteoWeatherProvider` | **0** — *previously known* (`docs/testing.md`) **TEST-9** | — |
 | `LeisureWeather:Enabled` switch | **0** — *previously known* | — |
 | Wiring (routes, single registration, dependency direction) | 5 | `ActivityProfilesRouteSmokeTests` |
@@ -180,7 +180,7 @@ Every prompt is self-contained; they share `testingPrompts/_SHARED-CONTEXT.md`.
 | TEST-5 | Profile create/update accept another user's lookup ids | 🟠 | [ProfileForeignLookupIds.md](testingPrompts/ProfileForeignLookupIds.md) |
 | TEST-6 | The four lookups' `GetAll` routes — registered and user-scoped | 🟡 | [LookupGetAllRoutes.md](testingPrompts/LookupGetAllRoutes.md) |
 | TEST-7 | A stale `row_version` on a profile `PUT` answers 400, not 409 | 🟠 | [ProfileUpdateConcurrency.md](testingPrompts/ProfileUpdateConcurrency.md) |
-| TEST-8 | Dev profile seeders skip every user after the first | 🟠 | [DevSeederSecondUser.md](testingPrompts/DevSeederSecondUser.md) |
+| ~~TEST-8~~ ✅ done 2026-09-04 | Dev profile seeders skip every user after the first | 🟠 | [DevSeederSecondUser.md](testingPrompts/DevSeederSecondUser.md) → `Seeding/DevProfileSeederTests` (12 tests), landed with the `CQ-3` / `CQ-4` fix |
 | TEST-9 | A forecast with an empty `daily` block becomes a "dry" badge instead of no signal | 🟠 | [WeatherProviderEmptyDaily.md](testingPrompts/WeatherProviderEmptyDaily.md) |
 
 **Previously known, not re-flagged** (all from `docs/testing.md` → *Known gaps*): `MemoryAnchor`,
