@@ -9,7 +9,7 @@ Point-in-time snapshot, 2026-09-01. Synthesis of [02-findings.md](02-findings.md
 |---|---|---|---|---|
 | 1 | 🔴 | `GET /api/activity-backlog-profile` returns every user's backlog profiles — no user scoping anywhere on the path, and no test | SEC-1 | `application/endpoint/backlog/query/GetAllActivityBacklogProfileEndpoint.cs:8` |
 | 2 | 🟠 | Profile create **and** update accept another user's lookup ids; the victim can then no longer delete their own lookup row (`Restrict`) | SEC-2 | `application/validator/CreateActivityBacklogProfileValidator.cs:15-44`, `UpdateActivityBacklogProfileValidator.cs:9-14` |
-| 3 | 🟠 | `PUT /memory-anchor/{id}` repoints the anchor onto any activity in the database, past both create-time rules | SEC-3 | `application/dto/request/MemoryAnchorRequest.cs:18` |
+| 3 | 🟠 ✅ fixed 2026-09-04 | `PUT /memory-anchor/{id}` repoints the anchor onto any activity in the database, past both create-time rules | SEC-3 | `application/dto/request/MemoryAnchorRequest.cs:18` |
 | 4 | 🟠 | A forecast with an empty `daily` block is read as a calm dry day and paints a "dry" badge — a wrong opinion where the contract promises none | CQ-5 | `infrastructure/extService/weather/OpenMeteoWeatherProvider.cs:132` |
 | 5 | 🟠 | Three dev seeders gate on a global row count, so only the first user is ever seeded | CQ-3 | `infrastructure/persistence/seeder/dev/ActivityBacklogProfileSeeder.cs:26` (+2) |
 | 6 | 🟠 | Concurrency conflicts on every custom profile write are flattened to 400 instead of 409 | CQ-2 | `application/endpoint/backlog/command/UpdateActivityBacklogProfileEndpoint.cs:50-55` (+11) |

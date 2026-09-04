@@ -214,7 +214,8 @@ public class ActivityIdOwnershipTests(AppDbContextFixture fixture) : PostgresTes
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound,
             "UpdateMemoryAnchorValidator has no ownership rule -- unlike the create one, this path has "
-            + "only the endpoint guard");
+            + "only the endpoint guard, which refuses a foreign activityId outright rather than letting "
+            + "MemoryAnchorRequest.UpdateEntity silently ignore it (see MemoryAnchorUpdateRulesTests)");
 
         await using var check = CreateDbContext();
         (await check.Set<MemoryAnchor>().SingleAsync(a => a.Id == anchorId, CancellationToken))

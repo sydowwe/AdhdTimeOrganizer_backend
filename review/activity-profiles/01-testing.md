@@ -129,7 +129,7 @@ or anonymous refusal. Counts are test methods that touch the route.
 | `GET /activity-project-profile/all-options` | ❌ | ❌ | ❌ **TEST-3** | — |
 | `POST /activity-project-profile/grid` | ✅ 1 | ❌ | ✅ 1 | `ActivityProfileGridTests:361` |
 | `POST /memory-anchor` | ✅ | ❌ **TEST-4** | ✅ | `ActivityEndpointTests:415` (base) |
-| `PUT /memory-anchor/{id}` | ✅ | ❌ **TEST-4** | ✅ | `ActivityEndpointTests:450` (base) |
+| `PUT /memory-anchor/{id}` | ✅ | ✅ | ✅ | `ActivityEndpointTests:450` (base), `MemoryAnchorUpdateRulesTests` |
 | `DELETE /memory-anchor/{id}` | ✅ | — | ✅ | `ActivityEndpointTests:471` (base) |
 | `POST /memory-anchor/batch-delete` | ✅ | ✅ | ✅ | `ActivityEndpointTests:500` (base) |
 | `GET /memory-anchor/{id}` | ✅ | — | ✅ | `ActivityEndpointTests:392` (base) |
@@ -176,7 +176,7 @@ Every prompt is self-contained; they share `testingPrompts/_SHARED-CONTEXT.md`.
 | TEST-1 | `GET /activity-backlog-profile` returns every user's profiles — no scoping, no test | 🔴 | [GetAllBacklogProfileScoping.md](testingPrompts/GetAllBacklogProfileScoping.md) |
 | TEST-2 | The three profile `batch-delete` routes: ownership + all-or-nothing | 🟠 | [ProfileBatchDelete.md](testingPrompts/ProfileBatchDelete.md) |
 | TEST-3 | `all-options` scoping on bucket-list and project (backlog's is pinned, siblings' are not) | 🟠 | [ProfileSelectOptionsScoping.md](testingPrompts/ProfileSelectOptionsScoping.md) |
-| TEST-4 | `PUT /memory-anchor/{id}` repoints `ActivityId` past both create-time rules | 🟠 | [MemoryAnchorUpdateRepoint.md](testingPrompts/MemoryAnchorUpdateRepoint.md) |
+| ~~TEST-4~~ ✅ done 2026-09-04 | `PUT /memory-anchor/{id}` repoints `ActivityId` past both create-time rules | 🟠 | [MemoryAnchorUpdateRepoint.md](testingPrompts/MemoryAnchorUpdateRepoint.md) → `MemoryAnchorUpdateRulesTests` |
 | TEST-5 | Profile create/update accept another user's lookup ids | 🟠 | [ProfileForeignLookupIds.md](testingPrompts/ProfileForeignLookupIds.md) |
 | TEST-6 | The four lookups' `GetAll` routes — registered and user-scoped | 🟡 | [LookupGetAllRoutes.md](testingPrompts/LookupGetAllRoutes.md) |
 | TEST-7 | A stale `row_version` on a profile `PUT` answers 400, not 409 | 🟠 | [ProfileUpdateConcurrency.md](testingPrompts/ProfileUpdateConcurrency.md) |

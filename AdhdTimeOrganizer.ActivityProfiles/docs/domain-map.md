@@ -17,7 +17,7 @@ three namespaces and bought nothing once they were alone in a project.
 | `ActivityWeatherDependency` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. **The one lookup with a second column**: nullable `Code` (`WeatherDependencyCodes`), written by the seeder and never by the CRUD endpoints, which is what ties a renameable row to a weather condition. |
 | `ActivityExpectedCostTier` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. |
 | `ActivityExperienceType` | `BaseLookupWithUser` | user | Per-user lookup. Bucket list only. |
-| `MemoryAnchor` | `BaseEntityWithActivity` | user + `Activity` | Month/year/rating/note. Two check constraints, max 2 per activity per month (validator, not DB). |
+| `MemoryAnchor` | `BaseEntityWithActivity` | user + `Activity` | Month/year/rating/note. Two check constraints, max 2 per activity per month (application code, not DB — `CreateMemoryAnchorValidator` on create, `UpdateMemoryAnchorEndpoint.AfterMapping` on a month/year edit). `ActivityId` is set on create and never rewritten: `MemoryAnchorRequest.UpdateEntity` leaves it alone. |
 | `LeisureSuggestionRecord` | `BaseEntityWithActivity` | user + `Activity` | The leisure draw's memory: source + last-shown instant + outcome, unique on `(user_id, source, activity_id)`. Both FKs cascade, so a deleted activity takes its history with it. Swept after 90 days. |
 
 ⚠ The three profiles are **not** `IEntityWithUser`; the lookups and `MemoryAnchor` are. That single

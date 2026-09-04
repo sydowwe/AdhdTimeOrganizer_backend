@@ -174,7 +174,7 @@ are validators, and moving the endpoints to bases would not have changed a line 
 
 `Doc impact: domain-map.md → Validators section (:129-138 — the create validators enforce more than "one profile per activity"; the update validators become DB-touching)` — done, plus a guard row in testing.md.
 
-### SEC-3 🟠 `PUT /api/memory-anchor/{id}` repoints the anchor onto any activity in the database
+### SEC-3 🟠 ✅ FIXED 2026-09-04 · `PUT /api/memory-anchor/{id}` repoints the anchor onto any activity in the database
 
 `application/dto/request/MemoryAnchorRequest.cs:18` (`e.ActivityId = ActivityId;` inside
 `UpdateEntity`), reached by `UpdateMemoryAnchorEndpoint` →
@@ -205,7 +205,46 @@ the rules are checked. If it must stay editable, `UpdateMemoryAnchorValidator` n
 `CustomAsync` projection `CreateMemoryAnchorValidator` runs, including the `ExistingCount >= 2` rule
 (which must then exclude the row being edited).
 
-`Doc impact: domain-map.md → entity table, MemoryAnchor row (:20 — "max 2 per activity per month (validator, not DB)" holds only for create today) · testing.md → Known gaps (the untested-create-rules bullet gains an update half)`
+**Fixed 2026-09-04.** The preferred way: `e.ActivityId = ActivityId;` is gone from
+`MemoryAnchorRequest.UpdateEntity`, which now matches the three profile request DTOs. The column is
+written on create and never again.
+
+The cross-user half was already closed ahead of this, by the `EnsureOwnsActivityAsync` guard
+`UpdateMemoryAnchorEndpoint.BeforeMapping` gained with the `ActivityId`-ownership family (pinned by
+`ActivityIdOwnershipTests.UpdateMemoryAnchor_WithForeignActivityId_IsRejected`). **The guard stays** even
+though the field is now ignored: a body naming an activity that is not the caller's is refused outright
+rather than silently accepted, and it answers the same 404 for a foreign id as for a non-existent one, so
+scenario 2's oracle closes with it. Its doc comment was rewritten — it claimed `UpdateEntity` writes the
+column.
+
+Immutability alone does not finish the job: the two-per-month ceiling could still be crossed by editing
+`anchorMonth` / `anchorYear` onto a period that is already full. That check is now
+`UpdateMemoryAnchorEndpoint.AfterMapping` — **not** the validator, because the rule is about the row's
+*stored* activity and a FastEndpoints validator sees neither the route id nor the loaded entity, while
+`AfterMapping` has both. It counts siblings excluding the edited row, and only runs when the period
+actually changed (compared against `OriginalValue`, not `IsModified` — nothing has run a `DetectChanges`
+pass at that point), or a note-only edit of an anchor that is itself one of two in its month would be
+refused by the ceiling it occupies.
+
+The profile rule ("must have a backlog or bucket-list profile") is deliberately **not** mirrored onto the
+update path: with `ActivityId` immutable it was already checked at create, and re-checking it would make
+deleting a profile silently freeze the notes on its anchors. `MIG-6` holds — no DB constraint was
+attempted.
+
+`TEST-4` landed as `MemoryAnchorUpdateRulesTests`, asserting rows rather than status codes:
+`UpdateMemoryAnchor_WithOwnOtherActivityId_DoesNotRepoint` (200, `ActivityId` unmoved, rest of the body
+applied — scenario 3, in its ignored-not-refused shape),
+`UpdateMemoryAnchor_WithUnknownActivityId_IsRefused` (scenario 2),
+`UpdateMemoryAnchor_IntoAFullMonth_IsRefused` (scenario 4 on the year/month path, as the prompt's
+parenthetical prescribes), plus `UpdateMemoryAnchor_IntoAMonthWithRoom_IsAllowed` and
+`UpdateMemoryAnchor_NoteOnlyInAFullMonth_IsAllowed` so the ceiling cannot degrade into a blanket
+rejection (scenario 5).
+
+**Not in scope, still open:** the *create* half of the same two rules is still untested — `docs/testing.md`
+keeps that bullet, now narrowed to create. `CQ-1` is untouched: this endpoint already is a
+`BaseUpdateEndpoint`.
+
+`Doc impact: domain-map.md → entity table, MemoryAnchor row (:20 — "max 2 per activity per month (validator, not DB)" holds only for create today) · testing.md → Known gaps (the untested-create-rules bullet gains an update half)` — done, plus a suite row in testing.md.
 
 ## 6. Code quality
 

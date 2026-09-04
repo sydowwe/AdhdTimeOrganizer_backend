@@ -14,6 +14,7 @@ ActivityProfiles has **no test project of its own**. Everything lives in
 | `Endpoints/LeisureWeatherFitTests` | Postgres | The weather route: code-matching survives a rename, the never-throws contract in all three failure shapes, per-user scoping, and the location round-tripping through the preferences endpoint. |
 | `Endpoints/ActivityProfilesRouteSmokeTests` | Postgres | Wiring: one route per endpoint family, single registration of the 12 seeders and of the weather provider, and the Core-must-not-reference-this assertion. |
 | `Endpoints/ActivityEndpointTests` | Postgres | The lookup and memory-anchor CRUD, through the Framework base test classes (see below). |
+| `Endpoints/MemoryAnchorUpdateRulesTests` | Postgres | `PUT /memory-anchor/{id}`: that `ActivityId` is immutable (the body's is accepted and ignored, an unowned or unknown one is a 404), and that the two-per-month ceiling survives a month/year edit without blocking a note-only one. |
 
 Infrastructure comes from `Sydowwe.Framework.Testing`: `PostgresTestBase` over the `"Postgres"`
 collection (`AppDbContextFixture`, a real container), and `UserRoleTestAuthHandler` for role and
@@ -102,10 +103,12 @@ Real gaps, in decision terms:
   exported rows name by id. Adding a new user-scoped entity to this project fails that test until it
   is classified one way or the other — intended, not a flake. Erasure is unaffected: everything here
   cascades from `User` or `Activity`.
-- **`CreateMemoryAnchorValidator`'s two business rules are untested** — "at most 2 anchors per activity
-  per month" and "the activity must have a backlog or bucket-list profile to be anchored". The base
-  `MemoryAnchorCreateTests` only exercises the happy path, so both rules could be dropped in a refactor
-  of the subquery projection without a failure.
+- **`CreateMemoryAnchorValidator`'s two business rules are untested on the *create* path** — "at most 2
+  anchors per activity per month" and "the activity must have a backlog or bucket-list profile to be
+  anchored". The base `MemoryAnchorCreateTests` only exercises the happy path, so both rules could be
+  dropped in a refactor of the subquery projection without a failure. The **update** path is covered:
+  `MemoryAnchorUpdateRulesTests` pins that `ActivityId` does not move and that the ceiling holds across
+  a month/year edit.
 - **The two `MemoryAnchor` check constraints are never reached through the API**, because the validator
   rejects the same values first. Nothing proves the DB would still refuse a month of 13 if the
   validator changed shape.
