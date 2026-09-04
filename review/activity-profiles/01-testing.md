@@ -108,7 +108,7 @@ or anonymous refusal. Counts are test methods that touch the route.
 | `POST /activity-backlog-profile` | ✅ 1 | ✅ 1 | ✅ 1 | `ActivityProfileGridTests:250` |
 | `PUT /activity-backlog-profile/{id}` | ❌ **TEST-7** | ❌ | ✅ 1 | `ActivityProfileGridTests:200` |
 | `DELETE /activity-backlog-profile/{id}` | ✅ 1 | — | ✅ 1 | `ActivityProfileGridTests:200,684` |
-| `POST /activity-backlog-profile/batch-delete` | ❌ | ❌ | ❌ **TEST-2** | — |
+| `POST /activity-backlog-profile/batch-delete` | ✅ 1 | — | ✅ 1 | `ActivityProfileGridTests.Backlog_BatchDelete_*` |
 | `GET /activity-backlog-profile` (GetAll) | ❌ | ❌ | ❌ **TEST-1 🔴** | — |
 | `GET /activity-backlog-profile/{id}` | ✅ 2 | ✅ 1 | ✅ 1 | `ActivityProfileGridTests:187,663` |
 | `GET /activity-backlog-profile/all-options` | ✅ 1 | — | ✅ 1 | `ActivityProfileGridTests:233` |
@@ -116,7 +116,7 @@ or anonymous refusal. Counts are test methods that touch the route.
 | `POST /activity-bucket-list-profile` | ✅ 1 | ✅ 1 | ✅ 1 | `ActivityProfileGridTests:338` |
 | `PUT /activity-bucket-list-profile/{id}` | ❌ **TEST-7** | ❌ | ✅ 1 | `ActivityProfileGridTests:308` |
 | `DELETE /activity-bucket-list-profile/{id}` | ✅ 1 | — | ✅ 1 | `ActivityProfileGridTests:308,684` |
-| `POST /activity-bucket-list-profile/batch-delete` | ❌ | ❌ | ❌ **TEST-2** | — |
+| `POST /activity-bucket-list-profile/batch-delete` | ❌ | ❌ | ✅ 1 | `ActivityProfileGridTests.BucketList_BatchDelete_WithAForeignId_DeletesNothing` |
 | `GET /activity-bucket-list-profile/{id}` | ✅ 2 | — | ✅ 1 | `ActivityProfileGridTests:295,663` |
 | `GET /activity-bucket-list-profile/all-options` | ❌ | ❌ | ❌ **TEST-3** | — |
 | `POST /activity-bucket-list-profile/grid` | ✅ 4 | ✅ 4 | ✅ 2 | `ActivityProfileGridTests:278,494,521,546,643` |
@@ -124,7 +124,7 @@ or anonymous refusal. Counts are test methods that touch the route.
 | `PUT /activity-project-profile/{id}` | ❌ **TEST-7** | ❌ | ✅ 1 | `ActivityProfileGridTests:391` |
 | `PATCH /activity-project-profile/{id}/status` | ✅ 1 | ✅ 1 | ✅ 1 | `ActivityProfileGridTests:424,445` |
 | `DELETE /activity-project-profile/{id}` | ✅ 1 | — | ✅ 1 | `ActivityProfileGridTests:391,684` |
-| `POST /activity-project-profile/batch-delete` | ❌ | ❌ | ❌ **TEST-2** | — |
+| `POST /activity-project-profile/batch-delete` | ❌ | ❌ | ✅ 1 | `ActivityProfileGridTests.Project_BatchDelete_WithAForeignId_DeletesNothing` |
 | `GET /activity-project-profile/{id}` | ✅ 1 | — | ✅ 1 | `ActivityProfileGridTests:378` |
 | `GET /activity-project-profile/all-options` | ❌ | ❌ | ❌ **TEST-3** | — |
 | `POST /activity-project-profile/grid` | ✅ 1 | ❌ | ✅ 1 | `ActivityProfileGridTests:361` |
@@ -163,8 +163,8 @@ slice.
 
 **The riskiest gaps are all reads and all on the profile families**, in this order: the unscoped
 backlog `GetAll` (`TEST-1` / `SEC-1` — every user's rows, today, with nothing red), the three
-batch-delete paths whose ownership loop nothing exercises (`TEST-2`), and the two select-options
-routes whose sibling *is* pinned (`TEST-3`). After those, the write-side invariants that exist only
+batch-delete paths whose ownership loop nothing exercises (`TEST-2` — since closed), and the two
+select-options routes whose sibling *is* pinned (`TEST-3`). After those, the write-side invariants that exist only
 in a create validator and are silently absent from the update path (`TEST-4`, `TEST-5`).
 
 ## 12. Missing tests — backlog
@@ -174,7 +174,7 @@ Every prompt is self-contained; they share `testingPrompts/_SHARED-CONTEXT.md`.
 | ID | Gap | Severity | Prompt |
 |---|---|---|---|
 | TEST-1 | `GET /activity-backlog-profile` returns every user's profiles — no scoping, no test | 🔴 | [GetAllBacklogProfileScoping.md](testingPrompts/GetAllBacklogProfileScoping.md) |
-| TEST-2 | The three profile `batch-delete` routes: ownership + all-or-nothing | 🟠 | [ProfileBatchDelete.md](testingPrompts/ProfileBatchDelete.md) |
+| ~~TEST-2~~ ✅ done 2026-09-04 | The three profile `batch-delete` routes: ownership + all-or-nothing | 🟠 | [ProfileBatchDelete.md](testingPrompts/ProfileBatchDelete.md) → the four `*_BatchDelete_*` tests in `ActivityProfileGridTests`, written ahead of `CQ-1`'s migration to the bases |
 | TEST-3 | `all-options` scoping on bucket-list and project (backlog's is pinned, siblings' are not) | 🟠 | [ProfileSelectOptionsScoping.md](testingPrompts/ProfileSelectOptionsScoping.md) |
 | ~~TEST-4~~ ✅ done 2026-09-04 | `PUT /memory-anchor/{id}` repoints `ActivityId` past both create-time rules | 🟠 | [MemoryAnchorUpdateRepoint.md](testingPrompts/MemoryAnchorUpdateRepoint.md) → `MemoryAnchorUpdateRulesTests` |
 | TEST-5 | Profile create/update accept another user's lookup ids | 🟠 | [ProfileForeignLookupIds.md](testingPrompts/ProfileForeignLookupIds.md) |

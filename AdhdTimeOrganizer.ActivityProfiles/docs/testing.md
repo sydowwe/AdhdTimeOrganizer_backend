@@ -9,7 +9,7 @@ ActivityProfiles has **no test project of its own**. Everything lives in
 |---|---|---|
 | `Services/LeisureDrawRankerTests` | Nothing — plain xUnit | The whole ranking rule against hand-built `LeisureCandidate`s: what is excluded rather than penalised, seed reproducibility, row-order independence, the recency and effort-contrast signals, the source caps and the slot arithmetic. |
 | `Services/WeatherFitRuleTests` | Nothing — plain xUnit | Which of the four `WeatherDependencyCodes` a day fits, and the label-inference fallback for a row the user invented. |
-| `Endpoints/ActivityProfileGridTests` | Postgres | The three profile grids' hand-written user scoping, the derived-completion rule (`IsAnchored` / `MemoryAnchorId`) on the bucket-list and backlog surfaces, the tri-state filter, sorting on the derived field, the status patch, and the activity-delete cascade. |
+| `Endpoints/ActivityProfileGridTests` | Postgres | The three profile grids' hand-written user scoping, the same ownership on every single-row and batch write path, the derived-completion rule (`IsAnchored` / `MemoryAnchorId`) on the bucket-list and backlog surfaces, the tri-state filter, sorting on the derived field, the status patch, and the activity-delete cascade. |
 | `Endpoints/LeisureSuggestionTests` | Postgres | The draw and the `seen` upsert end to end: card shape per source, both empty states, ownership on both routes, the 90-day sweep, the cascade, validation, and that rejecting a draw changes the next one at the same seed. |
 | `Endpoints/LeisureWeatherFitTests` | Postgres | The weather route: code-matching survives a rename, the never-throws contract in all three failure shapes, per-user scoping, and the location round-tripping through the preferences endpoint. |
 | `Endpoints/ActivityProfilesRouteSmokeTests` | Postgres | Wiring: one route per endpoint family, single registration of the 12 seeders and of the weather provider, and the Core-must-not-reference-this assertion. |
@@ -43,8 +43,9 @@ cheap unit test. Don't push those into Postgres.
 **Lookup and anchor CRUD goes through the Framework base test classes.** The four lookups and
 `MemoryAnchor` each have a `Base{GetById,Grid,Create,Update,Delete,BatchDelete,GetSelectOptions}EndpointTests`
 subclass in `ActivityEndpointTests.cs`; a new lookup gets the same treatment rather than hand-written
-tests. The three **profiles** have no base-class subclasses — their bases can't know about the
-hand-written scoping or the derived completion, so `ActivityProfileGridTests` covers them by hand.
+tests. The three **profiles** now run on the same bases but still have no base-class test subclasses —
+the bases can't know about the ownership override or the derived completion, so
+`ActivityProfileGridTests` covers them by hand.
 
 **Assert on rows, not on routes.** Everything load-bearing here fails silently: a deleted
 `ApplyUserScoping` override still answers 200, a lost `HasConstraintName` still migrates, a lifetime
@@ -62,7 +63,8 @@ everyone's profiles — is invisible in a single-user test, which is what you wr
 | `ActivityProfileGridTests.{Backlog,BucketList,Project}_Grid_OnlyReturnsCallersOwnRows` | The hand-written `ApplyUserScoping` on the three profile grids. `ApplyUserScoping` is a no-op virtual and the profiles are not `IEntityWithUser`, so deleting an override leaks every user's profiles with nothing going red |
 | `ActivityProfileGridTests.Backlog_GetAll_OnlyReturnsCallersOwnRows` | The `Filter` override on `GetAllActivityBacklogProfileEndpoint`. `BaseGetAllEndpoint` has no `ApplyUserScoping` hook and its `Filter` is the identity function, so an empty subclass body reads the whole table and still answers 200 — which is what this route did |
 | `NamedQueryFilterTests.ActivityProfiles_CarryBothTheMirroredUserScopeAndArchivedFilters` · `…ProfileUserScopeFilter_HidesForeignProfiles_AndKeepsTheUnscopedEscape` | The global floor under all of the above: `AppQueryFilters.ActivityProfileUserScope` on the three profiles, that it is **named** (unnamed it would replace the archival filter these three already carry), and that its `ScopeUserId == null` escape still lets the seeders / merge seam / export read every row |
-| `*_GetById_ForeignProfile_Returns404` · `*_UpdateAndDelete_ForeignProfile_AreRefusedAndRowUnchanged` · `Project_PatchStatus_ForeignProfile_IsRefusedAndRowUnchanged` | The same scoping on the single-row paths, which each check ownership through `p.Activity.UserId` in their own copy of the code |
+| `*_GetById_ForeignProfile_Returns404` · `*_UpdateAndDelete_ForeignProfile_AreRefusedAndRowUnchanged` · `Project_PatchStatus_ForeignProfile_IsRefusedAndRowUnchanged` | The same scoping on the single-row paths, which reach the owner through the row's `ActivityId` in an `AuthorizeAsync` override. The override is a no-op virtual on every base, so deleting one compiles and leaves the route relying on the host filter alone |
+| `{Backlog,BucketList,Project}_BatchDelete_WithAForeignId_DeletesNothing` · `Backlog_BatchDelete_OfOwnRows_RemovesThemAll` | `BaseBatchDeleteEndpoint` calls `AuthorizeAsync` **per row** and refuses the whole batch on the first failure — so a batch mixing one's own ids with a stranger's must delete nothing at all, not just the caller's share. The positive case is there so the check cannot degrade into a blanket rejection |
 | `BucketList_Grid_ReportsAnchoredAndTheLatestAnchorId` · `Backlog_Grid_RepeatableEntry_IsNeverAnchored` · `BucketList_GetById_ReportsTheSameCompletionAsTheGrid` | The derived "done" rule and its three separate copies (grid projection, filter predicate, GetById overlay) saying the same thing. Nothing in the schema records completion, so drift here costs no migration and throws nothing |
 | `BucketList_Grid_SortsByIsAnchored` | That completion is computed **in the projection**. Overlaid after the query it would sort on `false` for every row and the page would come back in an arbitrary order, with no error |
 | `BucketList_Grid_AnotherUsersAnchorDoesNotMarkTheEntryDone` | The anchor set the projection is handed is scoped too — otherwise a stranger's anchor completes your bucket list |

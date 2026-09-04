@@ -3,40 +3,20 @@ using AdhdTimeOrganizer.ActivityProfiles.application.validator;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
-using Sydowwe.Framework.infrastructure.persistence;
+using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.project.command;
 
+/// <summary>
+/// No <c>BeforeMapping</c> ownership guard — <see cref="CreateActivityProjectProfileValidator"/> already
+/// establishes it. See <c>CreateActivityBacklogProfileEndpoint</c>.
+/// </summary>
 public class CreateActivityProjectProfileEndpoint(DbContext dbContext)
-    : Endpoint<ActivityProjectProfileRequest, long>
+    : BaseCreateEndpoint<ActivityProjectProfile, ActivityProjectProfileRequest>(dbContext)
 {
     public override void Configure()
     {
-        Post("/activity-project-profile");
+        base.Configure();
         Validator<CreateActivityProjectProfileValidator>();
-        Summary(s =>
-        {
-            s.Summary = "Create ActivityProjectProfile";
-            s.Response<long>(201, "Created");
-            s.Response(400, "Bad request");
-            s.Response(404, "Activity not found");
-        });
-    }
-
-    public override async Task HandleAsync(ActivityProjectProfileRequest req, CancellationToken ct)
-    {
-        try
-        {
-            var entity = req.ToEntity;
-            await dbContext.Set<ActivityProjectProfile>().AddAsync(entity, ct);
-            await dbContext.SaveChangesAsync(ct);
-            await Send.ResponseAsync(entity.Id, 201, ct);
-        }
-        catch (Exception ex)
-        {
-            var result = DbUtils.HandleException(ex, nameof(HandleAsync));
-            AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
-        }
     }
 }

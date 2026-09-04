@@ -1,57 +1,24 @@
 using AdhdTimeOrganizer.ActivityProfiles.application.dto.request;
 using AdhdTimeOrganizer.ActivityProfiles.application.validator;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.endpoint.@base.command;
 using Sydowwe.Framework.application.extensions;
-using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.project.command;
 
-public class UpdateActivityProjectProfileEndpoint(DbContext dbContext)
-    : Endpoint<ActivityProjectProfileRequest>
+public class UpdateActivityProjectProfileEndpoint(DbContext dbContext, IReferencedIdOwnershipService ownership)
+    : BaseUpdateEndpoint<ActivityProjectProfile, ActivityProjectProfileRequest>(dbContext)
 {
     public override void Configure()
     {
-        Put("/activity-project-profile/{id:long:required}");
+        base.Configure();
         Validator<UpdateActivityProjectProfileValidator>();
-        Summary(s =>
-        {
-            s.Summary = "Update ActivityProjectProfile";
-            s.Response(204, "Success");
-            s.Response(404, "Not found");
-            s.Response(400, "Bad request");
-        });
     }
 
-    public override async Task HandleAsync(ActivityProjectProfileRequest req, CancellationToken ct)
-    {
-        try
-        {
-            var id = Route<long>("id");
-            var userId = User.GetId();
-
-            var entity = await dbContext.Set<ActivityProjectProfile>()
-                .Include(p => p.Activity)
-                .FirstOrDefaultAsync(p => p.Id == id, ct);
-
-            if (entity is null || entity.Activity.UserId != userId)
-            {
-                AddError("ActivityProjectProfile not found.");
-                await Send.ErrorsAsync(404, ct);
-                return;
-            }
-
-            req.UpdateEntity(entity);
-            dbContext.Set<ActivityProjectProfile>().Update(entity);
-            await dbContext.SaveChangesAsync(ct);
-            await Send.NoContentAsync(ct);
-        }
-        catch (Exception ex)
-        {
-            var result = DbUtils.HandleException(ex, nameof(HandleAsync));
-            AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
-        }
-    }
+    /// <summary>Ownership through the Activity — see <c>UpdateActivityBacklogProfileEndpoint</c>.</summary>
+    protected override Task<bool> AuthorizeAsync(ActivityProjectProfile entity, CancellationToken ct = default) =>
+        ownership.OwnsActivityAsync(DbContext, User.GetId(), entity.ActivityId, ct);
 }

@@ -3,40 +3,22 @@ using AdhdTimeOrganizer.ActivityProfiles.application.validator;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
-using Sydowwe.Framework.infrastructure.persistence;
+using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.backlog.command;
 
+/// <summary>
+/// No <c>BeforeMapping</c> ownership guard, for the same reason <c>CreateMemoryAnchorEndpoint</c> has
+/// none: <see cref="CreateActivityBacklogProfileValidator"/> already roots its round-trip at
+/// <c>a.Id == req.ActivityId &amp;&amp; a.UserId == userId</c> and answers "Activity not found." for a
+/// foreign id, so a guard here would be a second round trip for a fact the request has established.
+/// </summary>
 public class CreateActivityBacklogProfileEndpoint(DbContext dbContext)
-    : Endpoint<ActivityBacklogProfileRequest, long>
+    : BaseCreateEndpoint<ActivityBacklogProfile, ActivityBacklogProfileRequest>(dbContext)
 {
     public override void Configure()
     {
-        Post("/activity-backlog-profile");
+        base.Configure();
         Validator<CreateActivityBacklogProfileValidator>();
-        Summary(s =>
-        {
-            s.Summary = "Create ActivityBacklogProfile";
-            s.Response<long>(201, "Created");
-            s.Response(400, "Bad request");
-            s.Response(404, "Activity not found");
-        });
-    }
-
-    public override async Task HandleAsync(ActivityBacklogProfileRequest req, CancellationToken ct)
-    {
-        try
-        {
-            var entity = req.ToEntity;
-            await dbContext.Set<ActivityBacklogProfile>().AddAsync(entity, ct);
-            await dbContext.SaveChangesAsync(ct);
-            await Send.ResponseAsync(entity.Id, 201, ct);
-        }
-        catch (Exception ex)
-        {
-            var result = DbUtils.HandleException(ex, nameof(HandleAsync));
-            AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
-        }
     }
 }

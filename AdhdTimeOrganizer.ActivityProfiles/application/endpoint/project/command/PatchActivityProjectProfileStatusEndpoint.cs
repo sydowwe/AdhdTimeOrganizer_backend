@@ -1,19 +1,27 @@
 using AdhdTimeOrganizer.ActivityProfiles.application.dto.request;
 using AdhdTimeOrganizer.ActivityProfiles.application.validator;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.endpoint.@base.command;
 using Sydowwe.Framework.application.extensions;
-using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.project.command;
 
-public class PatchActivityProjectProfileStatusEndpoint(DbContext dbContext)
-    : Endpoint<PatchActivityProjectProfileStatusRequest>
+public class PatchActivityProjectProfileStatusEndpoint(DbContext dbContext, IReferencedIdOwnershipService ownership)
+    : BasePatchEndpoint<ActivityProjectProfile, PatchActivityProjectProfileStatusRequest>(dbContext)
 {
+    private readonly DbContext _dbContext = dbContext;
+
+    /// <summary>
+    /// Re-routes off the base's <c>/{id}</c> onto <c>/{id}/status</c>: the readiness board flips one enum
+    /// per click, so this sits beside the full update rather than replacing it.
+    /// </summary>
     public override void Configure()
     {
-        Patch("/activity-project-profile/{id:long:required}/status");
+        base.Configure();
+        Patch("/activity-project-profile/{id:long}/status");
         Validator<PatchActivityProjectProfileStatusValidator>();
         Summary(s =>
         {
@@ -25,35 +33,10 @@ public class PatchActivityProjectProfileStatusEndpoint(DbContext dbContext)
         });
     }
 
-    public override async Task HandleAsync(PatchActivityProjectProfileStatusRequest req, CancellationToken ct)
-    {
-        try
-        {
-            var id = Route<long>("id");
-            var userId = User.GetId();
+    protected override void Mapping(ActivityProjectProfile entity, PatchActivityProjectProfileStatusRequest req) =>
+        entity.ReadinessStatus = req.ReadinessStatus;
 
-            // ActivityProjectProfile is not IEntityWithUser and has no global query filter, so the
-            // ownership check through Activity is the only thing keeping another user's row out.
-            var entity = await dbContext.Set<ActivityProjectProfile>()
-                .Include(p => p.Activity)
-                .FirstOrDefaultAsync(p => p.Id == id, ct);
-
-            if (entity is null || entity.Activity.UserId != userId)
-            {
-                AddError("ActivityProjectProfile not found.");
-                await Send.ErrorsAsync(404, ct);
-                return;
-            }
-
-            entity.ReadinessStatus = req.ReadinessStatus;
-            await dbContext.SaveChangesAsync(ct);
-            await Send.NoContentAsync(ct);
-        }
-        catch (Exception ex)
-        {
-            var result = DbUtils.HandleException(ex, nameof(HandleAsync));
-            AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
-        }
-    }
+    /// <summary>Ownership through the Activity — see <c>UpdateActivityBacklogProfileEndpoint</c>.</summary>
+    protected override Task<bool> AuthorizeAsync(ActivityProjectProfile entity, CancellationToken ct = default) =>
+        ownership.OwnsActivityAsync(_dbContext, User.GetId(), entity.ActivityId, ct);
 }

@@ -867,11 +867,103 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
 
         var response = await CreateClient().PutAsJsonAsync($"api/activity-bucket-list-profile/{profileId}", payload, JsonOpts, TestContext.Current.CancellationToken);
 
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent, "the ownership check must not degrade into a blanket rejection");
+        // 200 with the id, not 204: the update runs on BaseUpdateEndpoint like the rest of the family.
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "the ownership check must not degrade into a blanket rejection");
 
         await using var assertDb = CreateDbContext();
         var updated = await assertDb.Set<ActivityBucketListProfile>().AsNoTracking().FirstAsync(p => p.Id == profileId, CancellationToken);
         updated.ExperienceTypeId.Should().Be(ownExperienceTypeId);
+    }
+
+    // ---- Batch delete: ownership holds per id, and one foreign id voids the whole batch ----------
+    //
+    // The batch routes are the one write surface the rest of this suite did not reach. They answer 204 on
+    // success either way, so only a row assertion notices the per-id ownership check going missing.
+
+    [Fact]
+    public async Task Backlog_BatchDelete_WithAForeignId_DeletesNothing()
+    {
+        var userIdB = await CreateSecondUserAsync("backlog-batch-b@test.com");
+        await using var db = CreateDbContext();
+        var (_, ownProfileId) = await SeedBacklogProfileAsync(db, userIdB, "B's batch backlog activity");
+        var (_, foreignProfileId) = await SeedBacklogProfileAsync(db, FakeLoggedUserService.TestUserId, "A's batch backlog activity");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var response = await factoryB.CreateClient().PostAsJsonAsync(
+            "api/activity-backlog-profile/batch-delete",
+            new { Ids = new[] { ownProfileId, foreignProfileId } },
+            JsonOpts, TestContext.Current.CancellationToken);
+
+        response.IsSuccessStatusCode.Should().BeFalse();
+
+        await using var assertDb = CreateDbContext();
+        var surviving = await assertDb.Set<ActivityBacklogProfile>().AsNoTracking()
+            .CountAsync(p => p.Id == ownProfileId || p.Id == foreignProfileId, CancellationToken);
+        surviving.Should().Be(2, "a batch carrying an id that is not the caller's must delete nothing at all");
+    }
+
+    [Fact]
+    public async Task BucketList_BatchDelete_WithAForeignId_DeletesNothing()
+    {
+        var userIdB = await CreateSecondUserAsync("bucket-batch-b@test.com");
+        await using var db = CreateDbContext();
+        var (_, ownProfileId) = await SeedBucketListProfileAsync(db, userIdB, "B's batch bucket activity");
+        var (_, foreignProfileId) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId, "A's batch bucket activity");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var response = await factoryB.CreateClient().PostAsJsonAsync(
+            "api/activity-bucket-list-profile/batch-delete",
+            new { Ids = new[] { ownProfileId, foreignProfileId } },
+            JsonOpts, TestContext.Current.CancellationToken);
+
+        response.IsSuccessStatusCode.Should().BeFalse();
+
+        await using var assertDb = CreateDbContext();
+        var surviving = await assertDb.Set<ActivityBucketListProfile>().AsNoTracking()
+            .CountAsync(p => p.Id == ownProfileId || p.Id == foreignProfileId, CancellationToken);
+        surviving.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Project_BatchDelete_WithAForeignId_DeletesNothing()
+    {
+        var userIdB = await CreateSecondUserAsync("project-batch-b@test.com");
+        await using var db = CreateDbContext();
+        var (_, ownProfileId) = await SeedProjectProfileAsync(db, userIdB, "B's batch project activity");
+        var (_, foreignProfileId) = await SeedProjectProfileAsync(db, FakeLoggedUserService.TestUserId, "A's batch project activity");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var response = await factoryB.CreateClient().PostAsJsonAsync(
+            "api/activity-project-profile/batch-delete",
+            new { Ids = new[] { ownProfileId, foreignProfileId } },
+            JsonOpts, TestContext.Current.CancellationToken);
+
+        response.IsSuccessStatusCode.Should().BeFalse();
+
+        await using var assertDb = CreateDbContext();
+        var surviving = await assertDb.Set<ActivityProjectProfile>().AsNoTracking()
+            .CountAsync(p => p.Id == ownProfileId || p.Id == foreignProfileId, CancellationToken);
+        surviving.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Backlog_BatchDelete_OfOwnRows_RemovesThemAll()
+    {
+        await using var db = CreateDbContext();
+        var (_, firstProfileId) = await SeedBacklogProfileAsync(db, FakeLoggedUserService.TestUserId, "First batch-deletable activity");
+        var (_, secondProfileId) = await SeedBacklogProfileAsync(db, FakeLoggedUserService.TestUserId, "Second batch-deletable activity");
+
+        var response = await CreateClient().PostAsJsonAsync(
+            "api/activity-backlog-profile/batch-delete",
+            new { Ids = new[] { firstProfileId, secondProfileId } },
+            JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent, "the ownership check must not degrade into a blanket rejection");
+
+        await using var assertDb = CreateDbContext();
+        var surviving = await assertDb.Set<ActivityBacklogProfile>().AsNoTracking()
+            .CountAsync(p => p.Id == firstProfileId || p.Id == secondProfileId, CancellationToken);
+        surviving.Should().Be(0);
     }
 
     // ---- Cascade: deleting the Activity removes its profiles, no orphan survives -----------------

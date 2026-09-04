@@ -248,7 +248,7 @@ keeps that bullet, now narrowed to create. `CQ-1` is untouched: this endpoint al
 
 ## 6. Code quality
 
-### CQ-1 🟠 Eighteen hand-written profile endpoints re-implement bases that already have the hook they need
+### CQ-1 🟠 ✅ FIXED 2026-09-04 · Eighteen hand-written profile endpoints re-implement bases that already have the hook they need
 
 `application/endpoint/{backlog,bucketList,project}/**` — six `Create`/`Update`/`Delete` pairs, three
 `BatchDelete`, three `GetById`, three `all-options`, all written out longhand against
@@ -280,9 +280,27 @@ load the `Activity` navigation, so the ownership check needs its own scalar read
 change with `ActivityProfileGridTests` green throughout — it already pins every ownership path except
 the batch deletes (`TEST-2`, write those first).
 
-`Doc impact: domain-map.md → Endpoints section (:89-106 — the "hand-written rather than base-derived" note would apply only to the leisure trio afterwards)`
+**Fixed.** All 18 now derive from the bases, plus `PatchActivityProjectProfileStatusEndpoint` (19), which
+re-routes off `BasePatchEndpoint`'s `/{id}` onto `/{id}/status` in its `Configure`. Ownership is one
+`AuthorizeAsync` override per endpoint calling `IReferencedIdOwnershipService.OwnsActivityAsync` on the
+loaded row's `ActivityId` — the service rather than a hand-written join, because it lifts
+`AppQueryFilters.ActivityArchived`, so an archived activity's profile stays editable. Belt and braces over
+the host's `ActivityProfileUserScope` filter, which already 404s a foreign row before the hook is reached.
+The three `GetById`s set `NotFoundWhenUnauthorized` to keep the 404 and moved their anchor overlay to
+`PostProcessAsync`; the three `all-options` are `BaseGetSelectOptionsEndpoint` with `Filter` / `Sort` /
+`Map` overrides. This closed `CQ-2` (the bases map the error type to a status code) and `PERF-2` (the batch
+deletes are one read again).
 
-### CQ-2 🟠 Every custom profile endpoint maps a concurrency conflict to 400
+Two behaviour changes, both `MIG-7`: `PUT` answers **200 with the id** instead of 204, matching
+`UpdateMemoryAnchorEndpoint` and every other update in the solution —
+`BucketList_Update_WithOwnExperienceType_Succeeds` asserts it now, and a client checking for 204 has to be
+adjusted. And a foreign id on a `batch-delete` would answer **403** rather than 404 in a host without the
+global profile filter; in this host the count mismatch still makes it a 404. `TEST-2` landed first, as four
+tests in `ActivityProfileGridTests`.
+
+`Doc impact: domain-map.md → Endpoints section (:89-106 — the "hand-written rather than base-derived" note would apply only to the leisure trio afterwards)` — done, plus the ownership inventory in summary.md and a suite row and two guard rows in testing.md.
+
+### CQ-2 🟠 ✅ FIXED 2026-09-04 · Every custom profile endpoint maps a concurrency conflict to 400
 
 `UpdateActivityBacklogProfileEndpoint.cs:50-55` (and the same six-line `catch` in all 12 custom
 command endpoints):
@@ -303,6 +321,10 @@ validation error instead and gives up. The same flattening hides FK and unique-v
 
 **Fix.** Replace the literal `400` with `EndpointHelper.ToStatusCode(result.ErrorType)` in all 12,
 or delete the endpoints in favour of the bases (`CQ-1`). `TEST-7` pins the behaviour.
+
+**Fixed** by the second route: the 12 hand-written `catch` blocks are gone with the endpoints (`CQ-1`), so
+every profile command now answers through `EndpointHelper.ToStatusCode`. `TEST-7` is still unwritten — the
+409 is inherited, not pinned here.
 
 `Doc impact: none`
 
@@ -482,7 +504,7 @@ question.
 | Where | Issue | Impact | Mitigation | ID |
 |---|---|---|---|---|
 | `DrawLeisureSuggestionEndpoint.HandleAsync:61-107` | Up to **9 sequential round trips** per draw: 3 `Count` (`:128-131`), a cost-tier lookup (`:161-164`), 3 source reads, history (`:302-305`), last-committed-effort (`:320-333`, itself 2 queries), then the activity read | Every "I'm bored" click; the three counts alone are three full table scans of the user's profiles | Fold `CountPoolAsync` into one query (three `Count` subqueries in a single `Select`), and fold `ReadLastCommittedEffortAsync`'s second query into the first with a join on the backlog | PERF-1 |
-| `BatchDeleteActivityBacklogProfileEndpoint:31-45` + the two siblings | **One query per id**, each with `Include(p => p.Activity)` materialising the whole activity | A 50-id batch is 50 round trips and 50 activity rows | One `Where(p => ids.Contains(p.Id))` read with a scalar ownership projection, then compare counts — which is what `BaseBatchDeleteEndpoint:42-50` already does | PERF-2 |
+| ✅ fixed 2026-09-04 · `BatchDeleteActivityBacklogProfileEndpoint:31-45` + the two siblings | **One query per id**, each with `Include(p => p.Activity)` materialising the whole activity | A 50-id batch is 50 round trips and 50 activity rows | See `CQ-1` — the three now derive from `BaseBatchDeleteEndpoint`, so the rows come back in one `Where(p => ids.Contains(p.Id))` read. Ownership is still per row, but as a scalar `EXISTS` rather than a fetch | PERF-2 |
 | `DrawLeisureSuggestionEndpoint.ReadHistoryAsync:300-311` | Reads the caller's **whole** `LeisureSuggestionRecord` table per draw | Bounded by the 90-day sweep, so a few hundred rows worst case | Acceptable as-is; the comment at `:296-299` states the trade-off correctly. Revisit only if the sweep is ever moved to a job | PERF-3 |
 | `ActivityBacklogProfileResponse.ProjectionWithAnchors:73-101` (and the bucket-list twin) | Two correlated subqueries per row — `EXISTS` plus an ordered `TOP 1` — over the anchors | One grid page = 2 × page size subqueries; small today, quadratic-ish with anchor count | Keep the shape (it must stay sortable — see `summary.md:80-87`), but add the index below | PERF-4 |
 | ✅ fixed 2026-09-04 · `ActivityBacklogProfileSeeder.EnsureLookups:99-110` | `SaveChangesAsync` inside the loop | Dev only | See `CQ-4` — the method is gone, and with it the loop; the replacement `LoadLookups<T>` writes nothing | PERF-5 |

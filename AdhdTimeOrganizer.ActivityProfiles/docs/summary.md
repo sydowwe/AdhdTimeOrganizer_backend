@@ -76,13 +76,13 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   |---|---|
   | 3 × `Grid*ProfileEndpoint` | an `ApplyUserScoping` override. Deliberately there and not in `ApplyCustomFiltering` — the base only calls that one when the request carries a filter, so `useFilter: false` would bypass it |
   | `GetAllActivityBacklogProfileEndpoint` (the only `GetAll` in the slice) | a `Filter` override. `BaseGetAllEndpoint` has **no** `ApplyUserScoping` hook at all — an empty subclass body reads the whole table and answers 200, which is exactly what this route did until it was fixed |
-  | 3 × `GetById`, 3 × `Update`, 3 × `Delete`, 3 × `BatchDelete`, `PatchActivityProjectProfileStatus` | `entity.Activity.UserId != userId` → 404, hand-written in each endpoint's own copy of the code |
+  | 3 × `GetById`, 3 × `Update`, 3 × `Delete`, 3 × `BatchDelete`, `PatchActivityProjectProfileStatus` | an `AuthorizeAsync` override calling `IReferencedIdOwnershipService.OwnsActivityAsync` on the loaded row's `ActivityId`. The three `GetById`s also set `NotFoundWhenUnauthorized`, so a foreign id answers 404 rather than a 403 that confirms it exists; the write bases already 404 through the global filter before the hook is reached |
   | 3 × `GetSelectOptions` (`/all-options`) | `.Where(p => p.Activity.UserId == userId)` on the projection |
   | 3 × `Create*ProfileValidator` | the activity is loaded as `a.Id == req.ActivityId && a.UserId == userId`, so a profile cannot be created against someone else's activity in the first place |
   | `DrawLeisureSuggestionEndpoint`, `RecordSeenLeisureSuggestionEndpoint` | the draw reaches the owner through `p.Activity.UserId` on all three profile sources; `seen` checks ownership of every activity id it was handed before writing a row for it |
 
   Every one of these is a no-op virtual or a hand-written predicate, so deleting one is silent —
-  `ApplyUserScoping` not overridden still compiles, and the route still answers 200.
+  `ApplyUserScoping` and `AuthorizeAsync` not overridden still compile, and the route still answers 200.
   `ActivityProfileGridTests` pins the profile routes, `LeisureSuggestionTests` the two leisure ones, and
   `NamedQueryFilterTests` the global filter underneath them.
 

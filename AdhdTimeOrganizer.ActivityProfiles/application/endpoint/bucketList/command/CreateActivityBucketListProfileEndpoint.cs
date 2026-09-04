@@ -3,40 +3,20 @@ using AdhdTimeOrganizer.ActivityProfiles.application.validator;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
-using Sydowwe.Framework.infrastructure.persistence;
+using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.bucketList.command;
 
+/// <summary>
+/// No <c>BeforeMapping</c> ownership guard — <see cref="CreateActivityBucketListProfileValidator"/>
+/// already establishes it. See <c>CreateActivityBacklogProfileEndpoint</c>.
+/// </summary>
 public class CreateActivityBucketListProfileEndpoint(DbContext dbContext)
-    : Endpoint<ActivityBucketListProfileRequest, long>
+    : BaseCreateEndpoint<ActivityBucketListProfile, ActivityBucketListProfileRequest>(dbContext)
 {
     public override void Configure()
     {
-        Post("/activity-bucket-list-profile");
+        base.Configure();
         Validator<CreateActivityBucketListProfileValidator>();
-        Summary(s =>
-        {
-            s.Summary = "Create ActivityBucketListProfile";
-            s.Response<long>(201, "Created");
-            s.Response(400, "Bad request");
-            s.Response(404, "Activity not found");
-        });
-    }
-
-    public override async Task HandleAsync(ActivityBucketListProfileRequest req, CancellationToken ct)
-    {
-        try
-        {
-            var entity = req.ToEntity;
-            await dbContext.Set<ActivityBucketListProfile>().AddAsync(entity, ct);
-            await dbContext.SaveChangesAsync(ct);
-            await Send.ResponseAsync(entity.Id, 201, ct);
-        }
-        catch (Exception ex)
-        {
-            var result = DbUtils.HandleException(ex, nameof(HandleAsync));
-            AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
-        }
     }
 }

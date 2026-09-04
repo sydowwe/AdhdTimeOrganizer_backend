@@ -88,24 +88,29 @@ instead of inheriting it (its `Configure` is not virtual) so it can add the `Cod
 
 ## Endpoints — `application/endpoint/`
 
-57 total, in six families. None of them declare an endpoint group; the lookup and anchor routes come
-from `BaseGridEndpoint`'s `EntityName.Kebaberize()` convention rather than a literal string, so
-renaming one of those entities moves its route.
+57 total, in six families. None of them declare an endpoint group; every route except the three
+leisure ones now comes from a base's `EntityName.Kebaberize()` convention rather than a literal
+string, so renaming one of those entities moves its route.
 
 | Folder | Count | Routes |
 |---|---|---|
-| `backlog/` | 8 | `/api/activity-backlog-profile*` — explicit routes. The only profile family with a `GetAll`; it uses the **plain** `Projection`, so its rows always say "not done", and it scopes by overriding `Filter` because `BaseGetAllEndpoint` has no `ApplyUserScoping` hook |
-| `bucketList/` | 7 | `/api/activity-bucket-list-profile*` — explicit routes |
-| `project/` | 8 | `/api/activity-project-profile*` — explicit routes, incl. the status-only `PATCH .../{id}/status` |
+| `backlog/` | 8 | `/api/activity-backlog-profile*` — derived. The only profile family with a `GetAll`; it uses the **plain** `Projection`, so its rows always say "not done", and it scopes by overriding `Filter` because `BaseGetAllEndpoint` has no `ApplyUserScoping` hook |
+| `bucketList/` | 7 | `/api/activity-bucket-list-profile*` — derived |
+| `project/` | 8 | `/api/activity-project-profile*` — derived, except the status-only `PATCH .../{id}/status`, which re-routes off `BasePatchEndpoint`'s `/{id}` in its `Configure` |
 | `memoryAnchor/` | 7 | `/api/memory-anchor/*` — derived |
 | `lookup/{expectedCostTier,experienceType,locationType,weatherDependency}/` | 24 | `/api/activity-*-type/*` etc. — derived |
 | `leisureSuggestion/` | 3 | `POST /api/leisure-suggestion` (the ranked draw), `POST /api/leisure-suggestion/seen` (its outcome, 204) and `GET /api/leisure-weather-fit` (today's matching weather-dependency ids) — explicit routes, hand-written rather than base-derived |
 
-The three `Grid*ProfileEndpoint`s carry the hand-written `ApplyUserScoping` and
-`GetAllActivityBacklogProfileEndpoint` the equivalent `Filter` override, all four over the host's
-`AppQueryFilters.ActivityProfileUserScope` global filter; the two
-leisure endpoints scope by hand for the same reason and are not built on any CRUD base — the draw is a
-read expressed as a POST body, and `seen` is an upsert keyed on a composite the bases cannot express.
+Every profile endpoint is built on a Framework base and states its ownership through the base's own
+hook: the three `Grid*ProfileEndpoint`s override `ApplyUserScoping`, `GetAll…` and the three
+`GetSelectOptions…` override `Filter`, and the command endpoints plus the three `GetById`s override
+`AuthorizeAsync` — the write side through `IReferencedIdOwnershipService.OwnsActivityAsync`, which
+lifts `AppQueryFilters.ActivityArchived` so an archived activity's profile is still editable. All of
+it sits over the host's `AppQueryFilters.ActivityProfileUserScope` global filter, which this slice
+cannot see and deliberately does not depend on. The three `GetById`s set
+`NotFoundWhenUnauthorized`, so a foreign id is a 404 rather than a 403 that would confirm it exists.
+The two leisure endpoints scope by hand and are not built on any CRUD base — the draw is a read
+expressed as a POST body, and `seen` is an upsert keyed on a composite the bases cannot express.
 
 ## DTOs — `application/dto/`
 
