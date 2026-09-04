@@ -44,18 +44,51 @@ public static class WeatherDependencyCodes
             return null;
 
         // Order matters: "no snow required" would match Snow first if Snow were tested before None.
-        if (ContainsAny(text, "none", "any", "irrelevant", "indoor", "žiadn", "ziadn", "hociak", "vnútor", "vnutor"))
+        if (ContainsAny(text, "none", "any", "anything", "irrelevant", "indoor",
+                "žiadn", "ziadn", "hociak", "vnútor", "vnutor", "vnútri", "vnutri"))
             return None;
-        if (ContainsAny(text, "sun", "clear", "nice", "warm", "slnk", "slneč", "slnec", "jasno"))
+        if (ContainsAny(text, "sun", "sunny", "sunshine", "clear", "nice", "warm",
+                "slnko", "slneč", "slnec", "jasno"))
             return Sunny;
-        if (ContainsAny(text, "snow", "sneh", "snez", "snež", "zim"))
+        if (ContainsAny(text, "snow", "snowy", "sneh", "snež", "sneží", "snezi",
+                "zima", "zimný", "zimny", "zimné", "zimne"))
             return Snow;
-        if (ContainsAny(text, "dry", "no rain", "such", "bez dažďa", "bez dazda"))
+        if (ContainsAny(text, "dry", "no rain", "sucho", "suché", "suche", "suchý", "suchy",
+                "bez dažďa", "bez dazda"))
             return Dry;
 
         return null;
     }
 
+    /// <summary>
+    /// Every needle has to start where a word starts, and the short ones have to <b>be</b> the word.
+    ///
+    /// <para>A plain <c>Contains</c> read "Any<b>thing</b> such as a walk" as <i>dry</i> and "<b>Sun</b>day only"
+    /// as <i>sunny</i> — a confident wrong badge on someone's own row, which is worse than the "no opinion" an
+    /// unrecognised label gets. Five characters is the line because that is where the Slovak stems start being
+    /// unambiguous (<c>slneč-</c>, <c>such-é</c>), so they can still match an inflected ending, while <c>sun</c>,
+    /// <c>any</c> and <c>dry</c> only match standing alone. Longer forms of the short words are listed
+    /// explicitly above rather than reached by prefix.</para>
+    /// </summary>
     private static bool ContainsAny(string text, params string[] needles) =>
-        needles.Any(needle => text.Contains(needle, StringComparison.OrdinalIgnoreCase));
+        needles.Any(needle => Matches(text, needle));
+
+    private static bool Matches(string text, string needle)
+    {
+        var mustBeWholeWord = needle.Length < 5;
+
+        for (var index = text.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+             index >= 0;
+             index = text.IndexOf(needle, index + 1, StringComparison.OrdinalIgnoreCase))
+        {
+            if (index > 0 && char.IsLetter(text[index - 1]))
+                continue;
+
+            var end = index + needle.Length;
+            if (!mustBeWholeWord || end == text.Length || !char.IsLetter(text[end]))
+                return true;
+        }
+
+        return false;
+    }
 }

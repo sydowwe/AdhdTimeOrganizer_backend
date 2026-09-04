@@ -383,7 +383,7 @@ side: no profiles, and no invented lookups of any of the four kinds.
 
 `Doc impact: none`
 
-### CQ-5 🟠 A forecast whose `daily` block is present but empty becomes a "dry, cold, sunless day" — a wrong opinion, not no opinion
+### CQ-5 🟠 ✅ FIXED 2026-09-04 · A forecast whose `daily` block is present but empty becomes a "dry, cold, sunless day" — a wrong opinion, not no opinion
 
 `infrastructure/extService/weather/OpenMeteoWeatherProvider.cs:132`:
 `private static double First(double[]? values) => values is { Length: > 0 } ? values[0] : 0;`
@@ -402,6 +402,13 @@ it is not, because `Dry` is the default-true code.
 partial response is a failed lookup. Do not cache that null (the existing code only caches a
 materialised `DailyWeather`, so this is a one-line guard before the `new DailyWeather(...)`).
 `TEST-9` pins it.
+
+**Fixed as described.** `First` became `TryFirst(double[]?, out double)`; `ForecastAsync` returns
+`null` unless all four arrays yield a value, before the `new DailyWeather(...)`, so nothing partial is
+cached. Pinned by the new `Services/OpenMeteoWeatherProviderTests` (13 tests — the provider's first
+coverage, which also closes the *previously known* `LeisureWeather:Enabled` gap), plus one endpoint
+test in `LeisureWeatherFitTests` recording *why* it has to be the provider that refuses: a real
+all-zero day genuinely is `Dry` to the rule, so nothing downstream can tell the two apart.
 
 `Doc impact: none` (the contract is already documented correctly; the code is what disagrees)
 
@@ -460,7 +467,7 @@ reader look for the negative-days case that the line above already removed.
 
 `Doc impact: none`
 
-### CQ-10 🟡 `WeatherDependencyCodes.Infer` matches very short substrings
+### CQ-10 🟡 ✅ FIXED 2026-09-04 · `WeatherDependencyCodes.Infer` matches very short substrings
 
 `domain/model/WeatherDependencyCodes.cs:47-54` — the needle lists include `"such"` (Slovak *suchý*),
 `"nice"`, `"warm"`, `"zim"`, `"sun"`. `Contains(…, OrdinalIgnoreCase)` over free user text means an
@@ -470,6 +477,13 @@ Low blast radius by design — the signal only ever ranks up and paints a badge,
 says so — but the guess is re-run on every read and shown as a badge on someone's own row. Prefer a
 word-boundary match for the needles shorter than five characters, or drop `"such"`/`"zim"` and accept
 "no opinion" for those labels, which is what the doc says an unrecognised row gets anyway.
+
+**Fixed with the word-boundary rule.** `ContainsAny` now matches only where a word starts, and a needle
+shorter than five characters must *be* the word — so `sun`, `any`, `dry`, `such` no longer fire from
+inside *Sunday*, *Company*, *Laundry* or *such as*, while the five-plus Slovak stems (`slneč-`,
+`žiadn-`, `such-é`) still reach an inflected ending. The forms that used to be reached by substring are
+listed explicitly instead (`anything`, `sunny`, `sunshine`, `snowy`, `sneží`, `zima`/`zimný`,
+`sucho`/`suchý`). Five new cases in `WeatherFitRuleTests` pin both halves.
 
 `Doc impact: none`
 

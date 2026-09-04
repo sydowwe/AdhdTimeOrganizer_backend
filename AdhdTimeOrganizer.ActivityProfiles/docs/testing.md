@@ -80,6 +80,7 @@ everyone's profiles — is invisible in a single-user test, which is what you wr
 | `AnotherUsersProfiles_AreNeverDrawn` · `AKeyNamingAnotherUsersActivity_RecordsNothing` | Ownership on both leisure routes, which are hand-written and sit on no CRUD base |
 | `LeisureWeatherFitTests.ARenamedRow_StillMatchesOnItsCode` | Matching is on `Code`, not `Text`. The lookup is per-user and editable, so label matching breaks on the first rename and never works in a second locale |
 | `ARowTheUserInvented_MatchesOnWhatItsLabelSays` | The `WeatherDependencyCodes.Infer` fallback, which is deliberately *not* persisted |
+| `WeatherFitRuleTests.ALabelThatMerelyContainsAShortNeedle_GuessesNothing` · `SuchAsIsNotSuchý` | That the inference needs a word, not a syllable. A needle under five characters has to be the whole word, or "Sunday" reads as *sunny* and "such as" as *dry* — a confident wrong badge, where an unrecognised label is meant to get no opinion |
 | `WithNoLocationSet_...` · `WhenTheProviderHasNothing_...` · `AProviderThatThrows_StillAnswers200WithNoSignal` | The never-fail contract: every failure shape is "no weather opinion", never an error and never an exclusion |
 | `ActivityProfilesRouteSmokeTests.Core_DoesNotReferenceActivityProfiles` | The direction of the dependency. Re-adding one of the deleted `Activity` / `User` navigations compiles fine and inverts the edge every slice depends on |
 | `ActivityProfilesSeeders_AreRegisteredExactlyOnce` | This assembly is in `ModuleAssemblies` **and** reachable by the `AppDomain` sweep — double registration makes the dev seeders truncate and reseed twice and the per-user defaults double-insert |
@@ -118,9 +119,11 @@ Real gaps, in decision terms:
   `Backlog_GetAll_OnlyReturnsCallersOwnRows`, but it is the one profile endpoint using the plain
   `Projection`, which reports "not done" for `IsAnchored` / `MemoryAnchorId` by design — and nothing
   records that expectation, so a caller adopting it will quietly get the wrong completion.
-- **`OpenMeteoWeatherProvider` itself is untested.** Every weather test stubs `IDailyWeatherProvider`,
-  so the geocoding call, the response mapping, the two cache entries and the next-local-midnight expiry
-  cap have no coverage at all. A provider that silently returns null for every real location looks
-  exactly like a user with no location set.
-- **Nothing asserts the `LeisureWeather:Enabled` switch actually suppresses the outbound calls** — only
-  that a provider with nothing to say produces an empty set.
+- ~~**`OpenMeteoWeatherProvider` itself is untested.**~~ Closed 2026-09-04 by
+  `Services/OpenMeteoWeatherProviderTests`, which drives the real provider against a stubbed
+  `HttpMessageHandler`: the geocoding call and its cached miss, the response mapping (including the
+  seconds→hours division and the four fields landing in the right `DailyWeather` positions), the
+  next-local-midnight expiry cap, and every failure shape — outage, 500, malformed JSON, cancellation,
+  and a `daily` block that is present but empty or partial, which used to become a confident "dry day".
+- ~~**Nothing asserts the `LeisureWeather:Enabled` switch actually suppresses the outbound calls.**~~
+  Closed with the same suite: disabled means null *and* zero HTTP calls.

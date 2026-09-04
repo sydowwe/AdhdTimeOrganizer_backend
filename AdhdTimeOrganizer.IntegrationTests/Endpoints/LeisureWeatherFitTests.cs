@@ -195,6 +195,25 @@ public class LeisureWeatherFitTests(AppDbContextFixture fixture) : PostgresTestB
             .MatchingWeatherDependencyIds.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// The user-visible half of the empty-forecast problem, stated where it belongs: a day of all zeroes really
+    /// is dry to the rule, so nothing downstream can tell "no data" from "a calm cold day" — which is exactly why
+    /// the provider must never hand one over for the other. That guard lives in
+    /// <c>OpenMeteoWeatherProviderTests</c>; here it is only visible as the badge it would produce.
+    /// </summary>
+    [Fact]
+    public async Task AZeroedForecast_ReadsAsARealDryDay_WhichIsWhyTheProviderMustNotInventOne()
+    {
+        await using var db = CreateDbContext();
+        await SetLocationAsync(db, "Bratislava, SK");
+        var dryId = await SeedDependencyAsync(db, "Dry", WeatherDependencyCodes.Dry);
+
+        var fit = await GetFitAsync(new DailyWeather(0, 0, 0, 0));
+
+        fit.MatchingWeatherDependencyIds.Should().Contain(dryId,
+            "the endpoint cannot distinguish an empty forecast from a dry one — the provider returns null instead");
+    }
+
     [Fact]
     public async Task AnAnonymousCaller_IsRefused()
     {

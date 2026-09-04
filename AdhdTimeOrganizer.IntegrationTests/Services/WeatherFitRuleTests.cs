@@ -86,6 +86,10 @@ public class WeatherFitRuleTests
     [InlineData("None", WeatherDependencyCodes.None)]
     [InlineData("Žiadna", WeatherDependencyCodes.None)]
     [InlineData("Indoors", WeatherDependencyCodes.None)]
+    [InlineData("Anything at all", WeatherDependencyCodes.None)]
+    [InlineData("Suché počasie", WeatherDependencyCodes.Dry)]
+    [InlineData("Keď sneží", WeatherDependencyCodes.Snow)]
+    [InlineData("Zima", WeatherDependencyCodes.Snow)]
     public void ARowWithNoCode_HasOneGuessedFromItsLabel(string text, string expected) =>
         WeatherDependencyCodes.Infer(text).Should().Be(expected,
             "a row the user typed themselves carries no code, and dropping it silently would be worse than a guess");
@@ -98,4 +102,26 @@ public class WeatherFitRuleTests
     public void ALabelThatMeansNothingKnown_GuessesNothing(string? text) =>
         WeatherDependencyCodes.Infer(text).Should().BeNull(
             "an unrecognised row takes no part in the day's set, which reads as \"no opinion\" rather than as a wrong badge");
+
+    /// <summary>
+    /// The short needles are the dangerous ones: <c>sun</c>, <c>any</c>, <c>dry</c> and the Slovak stems all sit
+    /// inside perfectly ordinary words. The guess is re-run on every read and drawn as a badge on the user's own
+    /// row, so a wrong opinion here is worse than none — "no opinion" is a documented outcome, "sunny, because
+    /// you wrote Sunday" is not.
+    /// </summary>
+    [Theory]
+    [InlineData("Sunday only")]
+    [InlineData("Company outing")]
+    [InlineData("Laundry day")]
+    [InlineData("Insunny")]
+    public void ALabelThatMerelyContainsAShortNeedle_GuessesNothing(string text) =>
+        WeatherDependencyCodes.Infer(text).Should().BeNull(
+            "a needle shorter than five characters has to be the whole word, not a syllable inside one");
+
+    [Fact]
+    public void SuchAsIsNotSuchý() =>
+        // "such" used to be the Slovak stem's needle, so an English label reading "anything such as a walk" came
+        // back as Dry — the code the rule already says yes to by default.
+        WeatherDependencyCodes.Infer("Anything such as a walk with the dog")
+            .Should().Be(WeatherDependencyCodes.None, "the label says any weather, and nothing about rain");
 }
