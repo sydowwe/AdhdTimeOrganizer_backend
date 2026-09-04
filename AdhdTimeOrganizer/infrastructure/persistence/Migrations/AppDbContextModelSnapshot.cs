@@ -598,6 +598,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_memory_anchor_user_id");
 
+                    b.HasIndex("UserId", "ActivityId")
+                        .HasDatabaseName("ix_memory_anchor_user_id_activity_id");
+
                     b.HasIndex("ActivityId", "AnchorYear", "AnchorMonth")
                         .HasDatabaseName("ix_memory_anchor_activity_id_anchor_year_anchor_month");
 

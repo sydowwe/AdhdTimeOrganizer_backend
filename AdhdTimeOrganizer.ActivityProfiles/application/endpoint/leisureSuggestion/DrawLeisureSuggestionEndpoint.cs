@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.ActivityProfiles.domain.service;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.extensions;
@@ -125,10 +126,31 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
         ContextLabel = row.ContextLabel
     };
 
-    private async Task<int> CountPoolAsync(long userId, CancellationToken ct) =>
-        await BacklogOf(userId).CountAsync(ct)
-        + await ProjectsOf(userId).CountAsync(ct)
-        + await BucketListOf(userId).CountAsync(ct);
+    /// <summary>
+    /// The three source counts in one round trip, as three subqueries rooted on the caller's own <c>User</c>
+    /// row — the same shape the create validators use to fold their checks together.
+    ///
+    /// <para>The predicates are written out rather than reached through <see cref="BacklogOf"/> and its two
+    /// siblings: EF cannot translate a helper method invocation inside a projection, and the failure is a
+    /// runtime one. They must stay in step with those three by hand.</para>
+    ///
+    /// <para>A null result means the <c>User</c> row is gone mid-request, which is an empty pool rather than an
+    /// error — this count only decides whether the picker says "you have nothing filed yet".</para>
+    /// </summary>
+    private async Task<int> CountPoolAsync(long userId, CancellationToken ct)
+    {
+        var counts = await dbContext.Set<User>()
+            .Where(u => u.Id == userId)
+            .Select(u => new
+            {
+                Backlog = dbContext.Set<ActivityBacklogProfile>().Count(p => p.Activity.UserId == userId),
+                Projects = dbContext.Set<ActivityProjectProfile>().Count(p => p.Activity.UserId == userId),
+                BucketList = dbContext.Set<ActivityBucketListProfile>().Count(p => p.Activity.UserId == userId)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        return counts is null ? 0 : counts.Backlog + counts.Projects + counts.BucketList;
+    }
 
     // ─── the three sources ───────────────────────────────────────────────────────────────────────────
     //
@@ -314,23 +336,29 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
     /// The effort type of the last suggestion the user actually committed to — what the variety bonus varies
     /// away from. Only the backlog records an effort type, so committing to a project or a bucket-list entry
     /// legitimately resets this to null, and so does committing to a backlog row that records none.
+    ///
+    /// <para>One round trip: the backlog lookup rides along as a correlated subquery on the same row rather
+    /// than a second query keyed on what the first one returned. It is still read for a non-backlog winner —
+    /// the <c>Source</c> check below is what discards it, so an activity carrying both a backlog and a
+    /// bucket-list profile cannot leak the backlog's effort type into a bucket-list commitment.</para>
     /// </summary>
     private async Task<EffortType?> ReadLastCommittedEffortAsync(long userId, CancellationToken ct)
     {
         var lastCommitted = await dbContext.Set<LeisureSuggestionRecord>()
             .Where(r => r.UserId == userId && r.LastOutcome == LeisureSuggestionOutcome.Committed)
             .OrderByDescending(r => r.LastSuggestedAt)
-            .Select(r => new { r.Source, r.ActivityId })
+            .Select(r => new
+            {
+                r.Source,
+                // Written out rather than through BacklogOf for the reason given on CountPoolAsync.
+                EffortType = dbContext.Set<ActivityBacklogProfile>()
+                    .Where(p => p.Activity.UserId == userId && p.ActivityId == r.ActivityId)
+                    .Select(p => p.EffortType)
+                    .FirstOrDefault()
+            })
             .FirstOrDefaultAsync(ct);
 
-        if (lastCommitted is not { Source: LeisureSuggestionSource.Backlog })
-            return null;
-
-        var committedActivityId = lastCommitted.ActivityId;
-        return await BacklogOf(userId)
-            .Where(p => p.ActivityId == committedActivityId)
-            .Select(p => p.EffortType)
-            .FirstOrDefaultAsync(ct);
+        return lastCommitted is { Source: LeisureSuggestionSource.Backlog } ? lastCommitted.EffortType : null;
     }
 
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;

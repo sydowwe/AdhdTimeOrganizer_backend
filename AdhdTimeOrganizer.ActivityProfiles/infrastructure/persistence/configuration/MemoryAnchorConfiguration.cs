@@ -32,5 +32,11 @@ public class MemoryAnchorConfiguration : IEntityTypeConfiguration<MemoryAnchor>
         });
 
         builder.HasIndex(a => new { a.ActivityId, a.AnchorYear, a.AnchorMonth });
+
+        // Every anchored-completion read filters user_id first and then correlates on activity_id: both
+        // grids' ScopedAnchors, both ProjectionWithAnchors subqueries, both GetById overlays and the
+        // IsAnchored filter predicates. The composite above leads with the wrong column for all of them,
+        // and the user_id FK index alone leaves the correlation to a filter step (PERF-4).
+        builder.HasIndex(a => new { a.UserId, a.ActivityId });
     }
 }
