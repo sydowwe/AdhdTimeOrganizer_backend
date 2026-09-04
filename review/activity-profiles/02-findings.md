@@ -458,12 +458,16 @@ instance.
 
 `Doc impact: none`
 
-### CQ-9 🟡 Dead clamp in the staleness signal
+### CQ-9 🟡 ✅ FIXED 2026-09-04 · Dead clamp in the staleness signal
 
 `domain/service/LeisureDrawRanker.cs:230` —
 `Math.Min(Math.Max(StalenessFloor + days, StalenessFloor), StalenessCeiling)`. `days` is
 `Math.Max(0, …)` on the line above, so the inner `Math.Max` can never bind. Harmless; it makes the
 reader look for the negative-days case that the line above already removed.
+
+**Fixed:** the inner `Math.Max` is gone — `Math.Min(StalenessFloor + days, StalenessCeiling)` — with a
+comment saying why the floor needs no clamp. No behaviour change; `LeisureDrawRankerTests` is unchanged
+and green.
 
 `Doc impact: none`
 
@@ -512,7 +516,7 @@ profiles". Nothing outside the class read the old key — the only other mention
 
 `Doc impact: none`
 
-### CQ-13 🟡 `ComfortZoneStep` is validated 1–10 and scored as if it were 1–5
+### CQ-13 🟡 ✅ FIXED 2026-09-04 · `ComfortZoneStep` is validated 1–10 and scored as if it were 1–5
 
 `CreateActivityBucketListProfileValidator.cs:15` / `UpdateActivityBucketListProfileValidator.cs:11` —
 `InclusiveBetween(1, 10)`. Everything downstream assumes 1–5:
@@ -522,7 +526,29 @@ and `ComfortStepAsEnergy:136-141` saturates at `High` above 3. The DTO
 "1–5". Tighten the validator to `InclusiveBetween(1, 5)`; see `DOC-3` and `MIG-2` for the existing-row
 question.
 
-`Doc impact: domain-map.md → nothing to change once the code agrees with it`
+**Fixed 2026-09-04.** `InclusiveBetween(1, 5)` on both bucket-list validators, the create one carrying the
+comment that says *why* the ceiling is 5 (the `(6 - step)` term and `ComfortStepAsEnergy`'s saturation) so
+the next reader does not widen it back.
+
+**No DB check constraint**, per `MIG-4` — the range stays an application rule, and rows already stored in
+6–10 keep loading and updating on every other field. The clamp-the-existing-rows data pass `MIG-4`
+prescribes is still owed before deploy; nothing in this change touches stored values. The dev seeder was
+already inside 1–5 (steps 1-5 across its five rows), and so is every other fixture except three test
+payloads.
+
+Pinned by `ActivityProfileGridTests.BucketList_ComfortZoneStepAboveFive_IsRejectedOnBothWritePaths` — a 6
+refused on create *and* update, asserted on rows (nothing written, the stored 5 unmoved), because the column
+is a plain `int` and an out-of-range row throws nowhere: it just scores negatively and sinks out of every
+draw. `BucketList_Update_WithOwnExperienceType_Succeeds` (now step 4) is the positive side, so the rule
+cannot degrade into a blanket rejection.
+
+Three test payloads carried a 9 or a 7. The two that expect a rejection (`BucketList_UpdateAndDelete_
+ForeignProfile_AreRefusedAndRowUnchanged`, `BucketList_Update_WithAnotherUsersExperienceType_
+IsRejectedAndRowUnchanged`) were moved to 3 — they would still have passed, but on the range rule instead
+of the ownership rule they exist to pin.
+
+`Doc impact: domain-map.md → nothing to change once the code agrees with it` — the entity row now states the
+range and that only the validators enforce it, since that is the half a reader cannot get from the schema.
 
 ## 9. Performance hotspots
 
@@ -550,7 +576,7 @@ question.
 
 ## Code/doc drift
 
-### DOC-1 🟠 `testing.md` says there is no unique index behind "one profile per activity" — there is
+### DOC-1 🟠 ✅ FIXED 2026-09-04 · `testing.md` says there is no unique index behind "one profile per activity" — there is
 
 `AdhdTimeOrganizer.ActivityProfiles/docs/testing.md:66`:
 > `*_SecondProfileForSameActivity_IsRejected` (×3) | One profile per activity, enforced by the create
@@ -570,7 +596,13 @@ delete branch out of the seam.
 **Fix.** Correct the guard row, and add the unique index to the `domain-map.md` entity table
 (`:13-15`) where the three profiles are described as 1:1 without saying what enforces it.
 
-`Doc impact: testing.md → guard table (:66) · domain-map.md → entity table (:13-15)`
+**Fixed 2026-09-04.** The `testing.md` guard row now says the index is the floor and the create validators'
+subqueries are the 400 in front of it, and names `RepointUniqueProfileAsync` as the second consumer — the
+merge branch this finding says a reader would otherwise "simplify" away. `domain-map.md` gained a sentence
+under the entity table saying the same thing (under the table, not in a Notes cell, because it is true of
+all three rows and the merge-collision consequence does not fit one).
+
+`Doc impact: testing.md → guard table (:66) · domain-map.md → entity table (:13-15)` — done.
 
 ### DOC-2 🟠 ✅ FIXED 2026-09-03 · Both docs describe the backlog `GetAll` without mentioning it is unscoped
 
@@ -603,20 +635,25 @@ its new guard.
 
 `Doc impact: summary.md → the IEntityWithUser gotcha · domain-map.md → Endpoints table (:97) · testing.md → Known gaps (:109-111)` — done.
 
-### DOC-3 🟡 `ComfortZoneStep`: 1–5 everywhere, 1–10 in the validators
+### DOC-3 🟡 ✅ FIXED 2026-09-04 · `ComfortZoneStep`: 1–5 everywhere, 1–10 in the validators
 
 See `CQ-13`. `domain-map.md` does not state the range itself, but `LeisureCandidate.cs:29` and
 `LeisureSuggestionDrawResponse.cs:52-53` both say "1–5" and the ranking arithmetic assumes it.
 **The code is wrong, not the doc** — the validator is the outlier.
 
+**Closed by `CQ-13`:** the validators now say 1–5, so nothing disagrees. `domain-map.md` picked the range up
+anyway, since it was the one doc that did not state it.
+
 `Doc impact: none once CQ-13 lands`
 
-### DOC-4 🟡 The endpoint count disagrees with itself
+### DOC-4 🟡 ✅ FIXED 2026-09-04 · The endpoint count disagrees with itself
 
 `ActivityProfilesRouteSmokeTests.cs:25,27` says "**53** endpoints" twice; `summary.md:18` and
 `domain-map.md:90` say **57**. Counting the tree: 8 backlog + 7 bucket list + 8 project + 7 anchor +
 24 lookup + 3 leisure = **57**. The test comment is stale; it is the one a reader trusts most, since
 it sits next to the assertion.
+
+**Fixed:** both occurrences in the test comment now say 57, matching the two docs and the tree.
 
 `Doc impact: none` (the drift is in a test comment — fix it there)
 
@@ -630,12 +667,19 @@ it sits next to the assertion.
   overlay survives in `PostProcessAsync` and has to: the anchors are not reachable by navigation from a
   profile, which is the whole reason `Projection` cannot fill them.
 - `LeisureSuggestionTests` (685 lines) carries two Planning tests (`:478`, `:513`) — see
-  [01-testing.md](01-testing.md).
+  [01-testing.md](01-testing.md). *Not moved: both drive `/api/planner-task` off the backlog fixture that
+  lives in this file, so relocating them means duplicating `SeedBacklogAsync`/`FindCalendarAsync` into a
+  Planning file — a trade the testing pass should make, not this one. The discoverability half is closed in
+  place: the section comment above them says outright that they are Planning coverage and will not be found
+  by file name.*
 - ✅ FIXED 2026-09-04 · `ActivityWeatherDependencyDevSeeder.cs:24-26` seeds "Rainy" and "Cold", neither
   of which maps to any of the four `WeatherDependencyCodes` nor infers one, so both rows are
   permanently invisible to the weather signal. Fine as a dev fixture — worth a one-line comment saying
   it is deliberate, since the next reader will file it as a bug. *Commented at `:21-26`: the two rows
   stand in for user-invented ones and exist to exercise the "no opinion" path; `Code` stays the
   `userDefault` seeder's alone.*
-- `LeisureDrawRanker.Draw:271-295` allocates `chosenKeys` before the relaxation pass needs it; the
-  first loop's `chosenKeys.Add` result is discarded. Cosmetic.
+- ✅ FIXED 2026-09-04 · `LeisureDrawRanker.Draw:271-295` allocates `chosenKeys` before the relaxation pass
+  needs it; the first loop's `chosenKeys.Add` result is discarded. Cosmetic. *The set is now built from
+  `chosen` between the two loops (`chosen.Select(c => c.Key).ToHashSet(Ordinal)`), so the capped pass no
+  longer maintains a collection it never reads and the `Add` that matters — the relaxation pass's
+  dedupe — is the only one left.*

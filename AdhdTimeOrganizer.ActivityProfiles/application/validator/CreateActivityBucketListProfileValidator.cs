@@ -12,7 +12,10 @@ public class CreateActivityBucketListProfileValidator : Validator<ActivityBucket
 {
     public CreateActivityBucketListProfileValidator(IServiceScopeFactory scopeFactory, IHttpContextAccessor http)
     {
-        RuleFor(x => x.ComfortZoneStep).InclusiveBetween(1, 10);
+        // 1–5, the range LeisureDrawRanker.Score and ComfortStepAsEnergy assume: (6 - step) goes
+        // negative from 6 up, and the energy mapping saturates above 3. No DB check constraint —
+        // rows already stored in 6–10 are clamped by a data pass, not rejected by the schema.
+        RuleFor(x => x.ComfortZoneStep).InclusiveBetween(1, 5);
         RuleFor(x => x.InspirationSource).NotEmpty().MaximumLength(500);
         RuleFor(x => x.FinancialGoal).GreaterThan(0).When(x => x.FinancialGoal.HasValue);
 

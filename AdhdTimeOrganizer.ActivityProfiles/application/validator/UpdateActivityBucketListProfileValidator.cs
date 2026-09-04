@@ -11,7 +11,8 @@ public class UpdateActivityBucketListProfileValidator : Validator<ActivityBucket
 {
     public UpdateActivityBucketListProfileValidator(IServiceScopeFactory scopeFactory, IHttpContextAccessor http)
     {
-        RuleFor(x => x.ComfortZoneStep).InclusiveBetween(1, 10);
+        // 1–5 — see CreateActivityBucketListProfileValidator for why the ranker needs the ceiling.
+        RuleFor(x => x.ComfortZoneStep).InclusiveBetween(1, 5);
         RuleFor(x => x.InspirationSource).NotEmpty().MaximumLength(500);
         RuleFor(x => x.FinancialGoal).GreaterThan(0).When(x => x.FinancialGoal.HasValue);
 

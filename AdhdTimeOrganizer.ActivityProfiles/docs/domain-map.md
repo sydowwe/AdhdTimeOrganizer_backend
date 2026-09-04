@@ -12,7 +12,7 @@ three namespaces and bought nothing once they were alone in a project.
 |---|---|---|---|
 | `ActivityBacklogProfile` | `BaseTableEntity` | `Activity` (1:1) | Energy/effort, participants, cost tier, duration, repeatable. FKs three lookups `Restrict`. |
 | `ActivityProjectProfile` | `BaseTableEntity` | `Activity` (1:1) | Difficulty, project area, estimated hours, messy, `jsonb` materials + tools, readiness. No lookup FKs. |
-| `ActivityBucketListProfile` | `BaseTableEntity` | `Activity` (1:1) | Experience type, comfort-zone step, travel, financial goal, inspiration source. |
+| `ActivityBucketListProfile` | `BaseTableEntity` | `Activity` (1:1) | Experience type, comfort-zone step (**1–5**, enforced by the two validators only — no check constraint), travel, financial goal, inspiration source. |
 | `ActivityLocationType` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. |
 | `ActivityWeatherDependency` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. **The one lookup with a second column**: nullable `Code` (`WeatherDependencyCodes`), written by the seeder and never by the CRUD endpoints, which is what ties a renameable row to a weather condition. |
 | `ActivityExpectedCostTier` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. |
@@ -22,6 +22,11 @@ three namespaces and bought nothing once they were alone in a project.
 
 ⚠ The three profiles are **not** `IEntityWithUser`; the lookups and `MemoryAnchor` are. That single
 line decides which reads are scoped for you and which are not — see `summary.md`.
+
+The three 1:1s are each a **unique index on `ActivityId`** in the configuration, not a validator rule:
+the create validators' "already has a profile" subquery is the friendly 400 in front of it, and
+`ActivityProfileActivityReferenceSource.RepointUniqueProfileAsync` deletes rather than repoints a
+colliding profile precisely because the index would otherwise refuse the merge.
 
 ## Enums — `domain/model/enum/`
 

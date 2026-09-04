@@ -468,6 +468,11 @@ public class LeisureSuggestionTests(AppDbContextFixture fixture) : PostgresTestB
     }
 
     // ─── the commit path the card drives ────────────────────────────────────────────────────────────
+    //
+    // ⚠ The next two tests POST to Planning's /api/planner-task and assert on PlannerTask/Calendar rows —
+    // they are Planning coverage living in an ActivityProfiles file, because the flow they pin starts at a
+    // leisure card and the backlog fixture is here. Anyone auditing Planning's planner-task rules will not
+    // find them by file name; keep this note with them if they ever move.
 
     /// <summary>
     /// "Do it now" on a day that has never been planned — which is exactly what "I'm bored, give me something"

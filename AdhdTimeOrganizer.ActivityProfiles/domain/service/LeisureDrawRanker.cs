@@ -227,7 +227,8 @@ public static class LeisureDrawRanker
 
         var days = Math.Max(0, (context.Now - at).TotalDays);
         // One point per day back from the floor: shown today is buried, a week ago is as good as new.
-        return Math.Min(Math.Max(StalenessFloor + days, StalenessFloor), StalenessCeiling);
+        // Only the ceiling needs clamping — days is already non-negative, so the floor is the minimum.
+        return Math.Min(StalenessFloor + days, StalenessCeiling);
     }
 
     public static double Score(LeisureCandidate candidate, LeisureRankingContext context)
@@ -269,7 +270,6 @@ public static class LeisureDrawRanker
             .ToList();
 
         var chosen = new List<LeisureCandidate>(count);
-        var chosenKeys = new HashSet<string>(StringComparer.Ordinal);
         var usedPerSource = new Dictionary<LeisureSuggestionSource, int>();
 
         foreach (var (candidate, _) in ranked)
@@ -283,8 +283,10 @@ public static class LeisureDrawRanker
 
             usedPerSource[candidate.Source] = used + 1;
             chosen.Add(candidate);
-            chosenKeys.Add(candidate.Key);
         }
+
+        // Only the relaxation pass needs the keys, and only to avoid re-adding what the capped pass took.
+        var chosenKeys = chosen.Select(candidate => candidate.Key).ToHashSet(StringComparer.Ordinal);
 
         foreach (var (candidate, _) in ranked)
         {

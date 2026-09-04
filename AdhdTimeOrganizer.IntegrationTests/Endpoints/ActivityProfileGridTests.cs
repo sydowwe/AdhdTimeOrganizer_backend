@@ -340,7 +340,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         {
             ActivityId = activityIdA,
             ExperienceTypeId = 0L,
-            ComfortZoneStep = 9,
+            ComfortZoneStep = 3,
             RequiresTravel = true,
             InspirationSource = "Hijacked"
         };
@@ -834,7 +834,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         {
             ActivityId = activityId,
             ExperienceTypeId = foreignExperienceTypeId,
-            ComfortZoneStep = 9,
+            ComfortZoneStep = 3,
             RequiresTravel = true,
             InspirationSource = "Repointed"
         };
@@ -860,7 +860,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         {
             ActivityId = activityId,
             ExperienceTypeId = ownExperienceTypeId,
-            ComfortZoneStep = 7,
+            ComfortZoneStep = 4,
             RequiresTravel = true,
             InspirationSource = "A podcast"
         };
@@ -873,6 +873,44 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         await using var assertDb = CreateDbContext();
         var updated = await assertDb.Set<ActivityBucketListProfile>().AsNoTracking().FirstAsync(p => p.Id == profileId, CancellationToken);
         updated.ExperienceTypeId.Should().Be(ownExperienceTypeId);
+    }
+
+    /// <summary>
+    /// The comfort-zone range is 1–5 on both write paths. Nothing in the schema says so — the column is a
+    /// plain <c>int</c> — and a 6+ row does not throw anywhere either: it just scores negatively in
+    /// <c>LeisureDrawRanker.Score</c> (<c>(6 - step)</c>) and quietly sinks below every other candidate in
+    /// the draw. Only the validators stand between the two, so only a rejected write notices them going.
+    /// </summary>
+    [Fact]
+    public async Task BucketList_ComfortZoneStepAboveFive_IsRejectedOnBothWritePaths()
+    {
+        await using var db = CreateDbContext();
+        var (activityId, profileId) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId, "Comfort range activity");
+        var freshActivityId = await SeedActivityAsync(db, FakeLoggedUserService.TestUserId, "Wants an out-of-range profile");
+        var experienceTypeId = await SeedLookupAsync<ActivityExperienceType>(db, FakeLoggedUserService.TestUserId, "Range Adventure");
+
+        object Payload(long forActivityId, int step) => new
+        {
+            ActivityId = forActivityId,
+            ExperienceTypeId = experienceTypeId,
+            ComfortZoneStep = step,
+            RequiresTravel = false,
+            InspirationSource = "Out of range"
+        };
+
+        var client = CreateClient();
+
+        var createResponse = await client.PostAsJsonAsync("api/activity-bucket-list-profile", Payload(freshActivityId, 6), JsonOpts, TestContext.Current.CancellationToken);
+        createResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var updateResponse = await client.PutAsJsonAsync($"api/activity-bucket-list-profile/{profileId}", Payload(activityId, 6), JsonOpts, TestContext.Current.CancellationToken);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var assertDb = CreateDbContext();
+        var created = await assertDb.Set<ActivityBucketListProfile>().AsNoTracking().AnyAsync(p => p.ActivityId == freshActivityId, CancellationToken);
+        created.Should().BeFalse();
+        var stillThere = await assertDb.Set<ActivityBucketListProfile>().AsNoTracking().FirstAsync(p => p.Id == profileId, CancellationToken);
+        stillThere.ComfortZoneStep.Should().Be(5, "the top of the range is still a valid stored value");
     }
 
     // ---- Batch delete: ownership holds per id, and one foreign id voids the whole batch ----------
