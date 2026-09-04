@@ -105,7 +105,7 @@ submodule change (`MIG-8`).
 
 `Doc impact: summary.md → gotcha "The three Activity*Profile entities are not IEntityWithUser…" (add the GetAll surface, and the second filter once it exists) · domain-map.md → Endpoints table, backlog row (:97) · testing.md → guard table + Known gaps` — done.
 
-### SEC-2 🟠 Profile create and update accept another user's lookup ids
+### SEC-2 🟠 ✅ FIXED 2026-09-03 · Profile create and update accept another user's lookup ids
 
 - `application/validator/CreateActivityBacklogProfileValidator.cs:15-44` — checks `MinParticipants`,
   `MaxParticipants`, `DurationMinutes` and the activity, and **nothing** about `LocationTypeId`,
@@ -140,7 +140,39 @@ round trip (a single projection can carry all three `bool`s, as the existing one
 `HasBacklogProfile`). The update validators do no DB work today and need the same block; that is the
 reason they are separate classes from the create ones, so the shape is already there.
 
-`Doc impact: domain-map.md → Validators section (:129-138 — the create validators enforce more than "one profile per activity"; the update validators become DB-touching)`
+**Fixed 2026-09-03.** As prescribed, on all four validators.
+
+The two **create** validators fold the ownership checks into the `Activity` round-trip they were already
+making — three extra `bool`s on the backlog projection beside `HasBacklogProfile`, one on the bucket-list
+one — each an `Any` over `db.Set<TLookup>()` with an explicit `l.UserId == userId`, not a reliance on the
+global filter (the same choice the existing `a.UserId == userId` on the root already makes).
+
+The two **update** validators gained the block they had no DB work for at all. They cannot copy the
+create root: `UpdateEntity` deliberately does **not** rewrite `ActivityId`, so the request's `ActivityId`
+is not what the row will point at and using it as the query root would be checking against the wrong
+thing. They root at the caller instead — still one round-trip.
+
+`LookupOwnership` holds only the failure half (field names + message), because EF cannot translate a
+helper method inside a projection and each call site's query belongs to the round-trip it joins. The
+message is deliberately identical for "does not exist" and "is not yours" — the anti-oracle rule Tracking
+`SEC-2` already follows.
+
+`ActivityProjectProfile` has no lookup FKs, so its two validators are unchanged.
+
+Pinned on rows, not status codes, in `ActivityProfileGridTests`:
+`Backlog_Create_WithAnotherUsersLookupIds_IsRejectedAndWritesNothing`,
+`Backlog_Update_WithAnotherUsersLookupIds_IsRejectedAndRowUnchanged` (which also asserts the *own* ids in
+the same rejected payload did not land — a rejected update writes nothing at all),
+`BucketList_Create_WithAnotherUsersExperienceType_IsRejectedAndWritesNothing`,
+`BucketList_Update_WithAnotherUsersExperienceType_IsRejectedAndRowUnchanged`, plus
+`Backlog_Create_WithOwnLookupIds_Succeeds` and `BucketList_Update_WithOwnExperienceType_Succeeds` so the
+guard cannot degrade into a blanket rejection.
+
+**Not in scope, still open:** `SEC-3` (the `MemoryAnchor` activity repoint) is the same class of defect on
+a different column and is fixed separately; `CQ-1` (the eighteen longhand endpoints) is untouched — these
+are validators, and moving the endpoints to bases would not have changed a line of this fix.
+
+`Doc impact: domain-map.md → Validators section (:129-138 — the create validators enforce more than "one profile per activity"; the update validators become DB-touching)` — done, plus a guard row in testing.md.
 
 ### SEC-3 🟠 `PUT /api/memory-anchor/{id}` repoints the anchor onto any activity in the database
 

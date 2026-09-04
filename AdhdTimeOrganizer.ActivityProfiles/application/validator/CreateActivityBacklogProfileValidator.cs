@@ -29,7 +29,12 @@ public class CreateActivityBacklogProfileValidator : Validator<ActivityBacklogPr
                 // found/not yours" (info is null) from "already profiled".
                 .Select(a => new
                 {
-                    HasBacklogProfile = db.Set<ActivityBacklogProfile>().Any(p => p.ActivityId == a.Id)
+                    HasBacklogProfile = db.Set<ActivityBacklogProfile>().Any(p => p.ActivityId == a.Id),
+                    // The three lookup ids ride the same round-trip. See LookupOwnership for why they
+                    // have to be checked at all.
+                    OwnsLocationType = db.Set<ActivityLocationType>().Any(l => l.Id == req.LocationTypeId && l.UserId == userId),
+                    OwnsWeatherDependency = db.Set<ActivityWeatherDependency>().Any(w => w.Id == req.WeatherDependencyId && w.UserId == userId),
+                    OwnsExpectedCostTier = db.Set<ActivityExpectedCostTier>().Any(c => c.Id == req.ExpectedCostTierId && c.UserId == userId)
                 })
                 .FirstOrDefaultAsync(ct);
 
@@ -41,6 +46,8 @@ public class CreateActivityBacklogProfileValidator : Validator<ActivityBacklogPr
 
             if (info.HasBacklogProfile)
                 ctx.AddFailure(nameof(req.ActivityId), "Activity already has a backlog profile.");
+
+            LookupOwnership.AddBacklogFailures(ctx, info.OwnsLocationType, info.OwnsWeatherDependency, info.OwnsExpectedCostTier);
         });
     }
 }

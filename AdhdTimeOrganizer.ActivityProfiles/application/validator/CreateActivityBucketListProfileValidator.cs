@@ -27,7 +27,10 @@ public class CreateActivityBucketListProfileValidator : Validator<ActivityBucket
                 // Subquery rather than a.BucketListProfile — see CreateActivityBacklogProfileValidator.
                 .Select(a => new
                 {
-                    HasBucketListProfile = db.Set<ActivityBucketListProfile>().Any(p => p.ActivityId == a.Id)
+                    HasBucketListProfile = db.Set<ActivityBucketListProfile>().Any(p => p.ActivityId == a.Id),
+                    // The lookup id rides the same round-trip. See LookupOwnership for why it has to be
+                    // checked at all.
+                    OwnsExperienceType = db.Set<ActivityExperienceType>().Any(e => e.Id == req.ExperienceTypeId && e.UserId == userId)
                 })
                 .FirstOrDefaultAsync(ct);
 
@@ -39,6 +42,8 @@ public class CreateActivityBucketListProfileValidator : Validator<ActivityBucket
 
             if (info.HasBucketListProfile)
                 ctx.AddFailure(nameof(req.ActivityId), "Activity already has a bucket list profile.");
+
+            LookupOwnership.AddBucketListFailures(ctx, info.OwnsExperienceType);
         });
     }
 }

@@ -697,6 +697,183 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         item.GetProperty("memoryAnchorId").GetInt64().Should().Be(anchorId);
     }
 
+    // ---- Lookup ownership on the write surface ---------------------------------------------------
+    //
+    // The four Activity* lookups are per-user, but a profile stores them as raw long FK columns and is
+    // not IEntityWithUser. The FK proves the row exists, not that it is the caller's, so before these
+    // guards a create/update naming a stranger's sequential id inserted cleanly -- and read back with a
+    // null label, since the navigation is user-filtered. Row assertions, because both halves answer
+    // 400/201 the same way whether or not the check is there.
+
+    [Fact]
+    public async Task Backlog_Create_WithAnotherUsersLookupIds_IsRejectedAndWritesNothing()
+    {
+        var userIdB = await CreateSecondUserAsync("backlog-lookup-create-b@test.com");
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, FakeLoggedUserService.TestUserId, "Wants a backlog profile");
+        var foreignLocationTypeId = await SeedLookupAsync<ActivityLocationType>(db, userIdB, "B's Home");
+        var foreignWeatherId = await SeedLookupAsync<ActivityWeatherDependency>(db, userIdB, "B's Indoor");
+        var foreignCostTierId = await SeedLookupAsync<ActivityExpectedCostTier>(db, userIdB, "B's Free");
+
+        var payload = new
+        {
+            ActivityId = activityId,
+            LocationTypeId = foreignLocationTypeId,
+            WeatherDependencyId = foreignWeatherId,
+            EnergyLevel = "Medium",
+            MinParticipants = 1,
+            ExpectedCostTierId = foreignCostTierId,
+            DurationMinutes = 15,
+            IsRepeatable = false
+        };
+
+        var response = await CreateClient().PostAsJsonAsync("api/activity-backlog-profile", payload, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var assertDb = CreateDbContext();
+        var written = await assertDb.Set<ActivityBacklogProfile>().AsNoTracking().AnyAsync(p => p.ActivityId == activityId, CancellationToken);
+        written.Should().BeFalse("the row would pin three lookups its owner could then never delete -- all three FKs are Restrict");
+    }
+
+    [Fact]
+    public async Task Backlog_Create_WithOwnLookupIds_Succeeds()
+    {
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, FakeLoggedUserService.TestUserId, "Wants a backlog profile too");
+        var locationTypeId = await SeedLookupAsync<ActivityLocationType>(db, FakeLoggedUserService.TestUserId, "Own Home");
+        var weatherId = await SeedLookupAsync<ActivityWeatherDependency>(db, FakeLoggedUserService.TestUserId, "Own Indoor");
+        var costTierId = await SeedLookupAsync<ActivityExpectedCostTier>(db, FakeLoggedUserService.TestUserId, "Own Free");
+
+        var payload = new
+        {
+            ActivityId = activityId,
+            LocationTypeId = locationTypeId,
+            WeatherDependencyId = weatherId,
+            EnergyLevel = "Medium",
+            MinParticipants = 1,
+            ExpectedCostTierId = costTierId,
+            DurationMinutes = 15,
+            IsRepeatable = false
+        };
+
+        var response = await CreateClient().PostAsJsonAsync("api/activity-backlog-profile", payload, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created, "the ownership check must not degrade into a blanket rejection");
+    }
+
+    [Fact]
+    public async Task Backlog_Update_WithAnotherUsersLookupIds_IsRejectedAndRowUnchanged()
+    {
+        var userIdB = await CreateSecondUserAsync("backlog-lookup-update-b@test.com");
+        await using var db = CreateDbContext();
+        var (activityId, profileId) = await SeedBacklogProfileAsync(db, FakeLoggedUserService.TestUserId, "Owned backlog activity");
+        var ownLocationTypeId = await SeedLookupAsync<ActivityLocationType>(db, FakeLoggedUserService.TestUserId, "Own update Home");
+        var ownCostTierId = await SeedLookupAsync<ActivityExpectedCostTier>(db, FakeLoggedUserService.TestUserId, "Own update Free");
+        var foreignWeatherId = await SeedLookupAsync<ActivityWeatherDependency>(db, userIdB, "B's update Indoor");
+
+        var payload = new
+        {
+            ActivityId = activityId,
+            LocationTypeId = ownLocationTypeId,
+            WeatherDependencyId = foreignWeatherId,
+            EnergyLevel = "High",
+            MinParticipants = 2,
+            ExpectedCostTierId = ownCostTierId,
+            DurationMinutes = 999,
+            IsRepeatable = true
+        };
+
+        var response = await CreateClient().PutAsJsonAsync($"api/activity-backlog-profile/{profileId}", payload, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "UpdateEntity rewrites all three FKs, so update is as much of a write surface for them as create -- one foreign id out of three is enough");
+
+        await using var assertDb = CreateDbContext();
+        var stillThere = await assertDb.Set<ActivityBacklogProfile>().AsNoTracking().FirstAsync(p => p.Id == profileId, CancellationToken);
+        stillThere.WeatherDependencyId.Should().NotBe(foreignWeatherId);
+        stillThere.LocationTypeId.Should().NotBe(ownLocationTypeId, "a rejected update writes nothing at all, not just the offending column");
+        stillThere.DurationMinutes.Should().Be(30);
+    }
+
+    [Fact]
+    public async Task BucketList_Create_WithAnotherUsersExperienceType_IsRejectedAndWritesNothing()
+    {
+        var userIdB = await CreateSecondUserAsync("bucket-lookup-create-b@test.com");
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, FakeLoggedUserService.TestUserId, "Wants a bucket list profile");
+        var foreignExperienceTypeId = await SeedLookupAsync<ActivityExperienceType>(db, userIdB, "B's Adventure");
+
+        var payload = new
+        {
+            ActivityId = activityId,
+            ExperienceTypeId = foreignExperienceTypeId,
+            ComfortZoneStep = 3,
+            RequiresTravel = false,
+            InspirationSource = "Someone else's list"
+        };
+
+        var response = await CreateClient().PostAsJsonAsync("api/activity-bucket-list-profile", payload, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var assertDb = CreateDbContext();
+        var written = await assertDb.Set<ActivityBucketListProfile>().AsNoTracking().AnyAsync(p => p.ActivityId == activityId, CancellationToken);
+        written.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task BucketList_Update_WithAnotherUsersExperienceType_IsRejectedAndRowUnchanged()
+    {
+        var userIdB = await CreateSecondUserAsync("bucket-lookup-update-b@test.com");
+        await using var db = CreateDbContext();
+        var (activityId, profileId) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId, "Owned bucket activity");
+        var foreignExperienceTypeId = await SeedLookupAsync<ActivityExperienceType>(db, userIdB, "B's update Adventure");
+
+        var payload = new
+        {
+            ActivityId = activityId,
+            ExperienceTypeId = foreignExperienceTypeId,
+            ComfortZoneStep = 9,
+            RequiresTravel = true,
+            InspirationSource = "Repointed"
+        };
+
+        var response = await CreateClient().PutAsJsonAsync($"api/activity-bucket-list-profile/{profileId}", payload, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var assertDb = CreateDbContext();
+        var stillThere = await assertDb.Set<ActivityBucketListProfile>().AsNoTracking().FirstAsync(p => p.Id == profileId, CancellationToken);
+        stillThere.ExperienceTypeId.Should().NotBe(foreignExperienceTypeId);
+        stillThere.ComfortZoneStep.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task BucketList_Update_WithOwnExperienceType_Succeeds()
+    {
+        await using var db = CreateDbContext();
+        var (activityId, profileId) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId, "Editable bucket activity");
+        var ownExperienceTypeId = await SeedLookupAsync<ActivityExperienceType>(db, FakeLoggedUserService.TestUserId, "Own Adventure");
+
+        var payload = new
+        {
+            ActivityId = activityId,
+            ExperienceTypeId = ownExperienceTypeId,
+            ComfortZoneStep = 7,
+            RequiresTravel = true,
+            InspirationSource = "A podcast"
+        };
+
+        var response = await CreateClient().PutAsJsonAsync($"api/activity-bucket-list-profile/{profileId}", payload, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent, "the ownership check must not degrade into a blanket rejection");
+
+        await using var assertDb = CreateDbContext();
+        var updated = await assertDb.Set<ActivityBucketListProfile>().AsNoTracking().FirstAsync(p => p.Id == profileId, CancellationToken);
+        updated.ExperienceTypeId.Should().Be(ownExperienceTypeId);
+    }
+
     // ---- Cascade: deleting the Activity removes its profiles, no orphan survives -----------------
 
     [Theory]

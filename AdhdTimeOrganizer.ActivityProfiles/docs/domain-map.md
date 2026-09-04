@@ -139,6 +139,17 @@ validators are the ones that were rewritten to use `db.Set<T>()` subqueries inst
 navigations. The lookups have no validators here — they use Core's shared
 `NameTextColorIconValidator`.
 
+**Lookup ownership is enforced here and nowhere else.** A profile stores its lookups as raw `long` FK
+columns, and the FK proves only that the row exists — not that it is the caller's. So the backlog
+validators check `LocationTypeId` / `WeatherDependencyId` / `ExpectedCostTierId` and the bucket-list
+ones check `ExperienceTypeId`, against `UserId`, on **both** create and update: `UpdateEntity` rewrites
+every one of those columns, so update is as much of a write surface for them as create is. The create
+validators fold the checks into the round-trip they were already making off the caller's `Activity`;
+the update validators cannot use that root (`UpdateEntity` deliberately leaves `ActivityId` alone) and
+root at the caller instead. `LookupOwnership` holds the failure half so the message — the same one for
+"does not exist" and for "is not yours", or the route becomes an existence oracle — cannot drift between
+the two. `ActivityProjectProfile` has no lookups and needs none of this.
+
 ## Seeders — `infrastructure/persistence/seeder/`
 
 - `userDefault/` — 4 per-user default seeders, one per lookup, all subclassing
