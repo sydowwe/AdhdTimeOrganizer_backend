@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.helper;
 
@@ -77,8 +78,11 @@ public class RecordSeenLeisureSuggestionEndpoint(DbContext dbContext, ILogger<Re
 
         if (owned.Count > 0)
         {
+            // ownedIds, not activityIds: the ids the check above rejected have no business in this read
+            // either. r.UserId == userId already makes it safe, but reading by the unfiltered list makes
+            // the ownership check above look decorative.
             var existing = await dbContext.Set<LeisureSuggestionRecord>()
-                .Where(r => r.UserId == userId && activityIds.Contains(r.ActivityId))
+                .Where(r => r.UserId == userId && ownedIds.Contains(r.ActivityId))
                 .ToListAsync(ct);
 
             var added = new List<LeisureSuggestionRecord>();
@@ -102,7 +106,7 @@ public class RecordSeenLeisureSuggestionEndpoint(DbContext dbContext, ILogger<Re
                 record.LastOutcome = outcome;
             }
 
-            await SaveAsync(userId, activityIds, added, now, outcome, ct);
+            await SaveAsync(userId, ownedIds, added, now, outcome, ct);
         }
 
         await PruneAsync(userId, now, ct);
@@ -115,7 +119,7 @@ public class RecordSeenLeisureSuggestionEndpoint(DbContext dbContext, ILogger<Re
     /// now exists, so the loser stamps that one instead of failing a write the user has every right to make.
     /// Both writes were recording the same fact, so the winner's value is the right one either way.
     /// </summary>
-    private async Task SaveAsync(long userId, List<long> activityIds, List<LeisureSuggestionRecord> added,
+    private async Task SaveAsync(long userId, List<long> ownedIds, List<LeisureSuggestionRecord> added,
         DateTime now, LeisureSuggestionOutcome outcome, CancellationToken ct)
     {
         try
@@ -123,7 +127,10 @@ public class RecordSeenLeisureSuggestionEndpoint(DbContext dbContext, ILogger<Re
             await dbContext.SaveChangesAsync(ct);
             return;
         }
-        catch (DbUpdateException)
+        // Only 23505 is the race this method knows how to finish. Anything else — an FK, a check
+        // constraint, a connection fault mid-save — used to land here too, find no winning row, and throw
+        // "lost the race but the winning row is not there": a 500 describing something that did not happen.
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             // A failed insert stays Added on the tracker and would be retried by the next SaveChanges.
             foreach (var record in added)
@@ -131,7 +138,7 @@ public class RecordSeenLeisureSuggestionEndpoint(DbContext dbContext, ILogger<Re
         }
 
         var winners = await dbContext.Set<LeisureSuggestionRecord>()
-            .Where(r => r.UserId == userId && activityIds.Contains(r.ActivityId))
+            .Where(r => r.UserId == userId && ownedIds.Contains(r.ActivityId))
             .ToListAsync(ct);
 
         foreach (var record in added)

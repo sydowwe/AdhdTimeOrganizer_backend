@@ -35,7 +35,12 @@ public class GetLeisureWeatherFitEndpoint(
     ILogger<GetLeisureWeatherFitEndpoint> logger)
     : EndpointWithoutRequest<LeisureWeatherFitResponse>
 {
-    private static readonly LeisureWeatherFitResponse NoSignal = new() { MatchingWeatherDependencyIds = [] };
+    /// <summary>
+    /// A fresh instance per call, not a shared static one: this DTO leaves the endpoint on both empty paths
+    /// and a single instance handed to every caller is one <c>PostProcess</c> hook away from one request
+    /// mutating another's response. The paths that use it make no DB call at all, so the allocation is free.
+    /// </summary>
+    private static LeisureWeatherFitResponse NoSignal() => new() { MatchingWeatherDependencyIds = [] };
 
     public override void Configure()
     {
@@ -63,7 +68,7 @@ public class GetLeisureWeatherFitEndpoint(
 
         if (string.IsNullOrWhiteSpace(location))
         {
-            await Send.OkAsync(NoSignal, ct);
+            await Send.OkAsync(NoSignal(), ct);
             return;
         }
 
@@ -85,7 +90,7 @@ public class GetLeisureWeatherFitEndpoint(
 
         if (weather is null)
         {
-            await Send.OkAsync(NoSignal, ct);
+            await Send.OkAsync(NoSignal(), ct);
             return;
         }
 

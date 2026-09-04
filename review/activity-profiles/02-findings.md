@@ -405,7 +405,7 @@ materialised `DailyWeather`, so this is a one-line guard before the `new DailyWe
 
 `Doc impact: none` (the contract is already documented correctly; the code is what disagrees)
 
-### CQ-6 🟡 `RecordSeen…` reads the existing records by the unowned id list
+### CQ-6 🟡 ✅ FIXED 2026-09-04 · `RecordSeen…` reads the existing records by the unowned id list
 
 `application/endpoint/leisureSuggestion/RecordSeenLeisureSuggestionEndpoint.cs:80-82` filters on
 `activityIds` — every id the caller sent, including the ones the ownership read at `:70-73` just
@@ -414,9 +414,13 @@ rejected — instead of `ownedIds`. `SaveAsync:133-135` repeats it.
 Safe **only** because both queries also carry `r.UserId == userId`. It reads as though the ownership
 filter above it were decorative. Use `ownedIds` (`owned.Select(t => t.ActivityId)`) in both places.
 
+**Fixed.** Both queries read `ownedIds` now, and `SaveAsync`'s parameter is named for what it carries. No
+behaviour change — `r.UserId == userId` was already doing the work; the point is that the next reader can
+see the ownership check has a consumer.
+
 `Doc impact: none`
 
-### CQ-7 🟡 Every `DbUpdateException` is treated as the unique-index race
+### CQ-7 🟡 ✅ FIXED 2026-09-04 · Every `DbUpdateException` is treated as the unique-index race
 
 `RecordSeenLeisureSuggestionEndpoint.cs:126` catches `DbUpdateException` bare and assumes the row it
 tried to insert lost a race. A genuine failure (FK, check constraint, a connection fault mid-save)
@@ -427,9 +431,13 @@ row is not there", which is not what happened.
 Narrow the catch to the constraint that is actually raced:
 `catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505" })`.
 
+**Fixed** with the solution's existing spelling of that filter — `PostgresErrorCodes.UniqueViolation`, as
+in `IngestBatchSaveExtensions:42` and `ScheduledJobDispatcher:308` — so anything that is not the raced
+constraint now propagates as itself instead of being re-described as a race that did not happen.
+
 `Doc impact: none`
 
-### CQ-8 🟡 A shared static response instance
+### CQ-8 🟡 ✅ FIXED 2026-09-04 · A shared static response instance
 
 `GetLeisureWeatherFitEndpoint.cs:38` —
 `private static readonly LeisureWeatherFitResponse NoSignal = new() { MatchingWeatherDependencyIds = [] };`
@@ -437,6 +445,9 @@ returned to every caller of the two empty paths. The record's member is `IReadOn
 nothing mutates it today, so this is a smell rather than a bug — but a shared cross-request DTO
 instance is one `PostProcess` hook away from being one. A `static` factory method returning a fresh
 empty response costs nothing on a path that already made zero DB calls.
+
+**Fixed:** `NoSignal` is a static factory method, so each of the two empty paths answers with its own
+instance.
 
 `Doc impact: none`
 

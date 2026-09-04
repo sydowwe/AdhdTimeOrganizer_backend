@@ -109,12 +109,21 @@ public class OpenMeteoWeatherProvider(
         if (daily is null)
             return null;
 
+        // A partial answer is a failed lookup, not a calm cold day. Zeroes here would sail through
+        // WeatherFitRule.MatchingCodes as "dry" — the one code that is true by default — and badge every
+        // dry-weather activity off a response that told us nothing. Nothing is cached on this path either.
+        if (!TryFirst(daily.PrecipitationSum, out var precipitation)
+            || !TryFirst(daily.SnowfallSum, out var snowfall)
+            || !TryFirst(daily.Temperature2mMax, out var maxTemperature)
+            || !TryFirst(daily.SunshineDuration, out var sunshineSeconds))
+            return null;
+
         var weather = new DailyWeather(
-            First(daily.PrecipitationSum),
-            First(daily.SnowfallSum),
-            First(daily.Temperature2mMax),
+            precipitation,
+            snowfall,
+            maxTemperature,
             // The API reports sunshine in seconds; the rule thinks in hours, as a person would.
-            First(daily.SunshineDuration) / 3600d);
+            sunshineSeconds / 3600d);
 
         cache.Set(key, weather, CacheDuration(settings, response!.UtcOffsetSeconds));
         return weather;
@@ -128,8 +137,18 @@ public class OpenMeteoWeatherProvider(
         return untilLocalMidnight < configured ? untilLocalMidnight : configured;
     }
 
-    /// <summary>A missing or empty daily array reads as zero, which the rule treats as a calm, cold, sunless day.</summary>
-    private static double First(double[]? values) => values is { Length: > 0 } ? values[0] : 0;
+    /// <summary>False for a missing or empty daily array, which makes the whole forecast "no opinion".</summary>
+    private static bool TryFirst(double[]? values, out double first)
+    {
+        if (values is { Length: > 0 })
+        {
+            first = values[0];
+            return true;
+        }
+
+        first = 0;
+        return false;
+    }
 
     private async Task<T?> GetJsonAsync<T>(string url, CancellationToken ct) where T : class
     {
