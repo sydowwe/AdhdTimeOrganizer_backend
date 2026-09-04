@@ -514,15 +514,15 @@ question.
 
 | Where | Issue | Impact | Mitigation | ID |
 |---|---|---|---|---|
-| `DrawLeisureSuggestionEndpoint.HandleAsync:61-107` | Up to **9 sequential round trips** per draw: 3 `Count` (`:128-131`), a cost-tier lookup (`:161-164`), 3 source reads, history (`:302-305`), last-committed-effort (`:320-333`, itself 2 queries), then the activity read | Every "I'm bored" click; the three counts alone are three full table scans of the user's profiles | Fold `CountPoolAsync` into one query (three `Count` subqueries in a single `Select`), and fold `ReadLastCommittedEffortAsync`'s second query into the first with a join on the backlog | PERF-1 |
+| ✅ fixed 2026-09-04 · `DrawLeisureSuggestionEndpoint.HandleAsync:61-107` | Up to **9 sequential round trips** per draw: 3 `Count` (`:128-131`), a cost-tier lookup (`:161-164`), 3 source reads, history (`:302-305`), last-committed-effort (`:320-333`, itself 2 queries), then the activity read | Every "I'm bored" click; the three counts alone are three full table scans of the user's profiles | Both folds done, 9 → 6: `CountPoolAsync` is three `Count` subqueries rooted on the caller's `User` row (the create validators' shape), and `ReadLastCommittedEffortAsync` carries the backlog lookup as a correlated subquery on the same row. Both write their predicates out rather than calling `BacklogOf` and friends — EF cannot translate a helper method inside a projection, so those three have to be kept in step by hand | PERF-1 |
 | ✅ fixed 2026-09-04 · `BatchDeleteActivityBacklogProfileEndpoint:31-45` + the two siblings | **One query per id**, each with `Include(p => p.Activity)` materialising the whole activity | A 50-id batch is 50 round trips and 50 activity rows | See `CQ-1` — the three now derive from `BaseBatchDeleteEndpoint`, so the rows come back in one `Where(p => ids.Contains(p.Id))` read. Ownership is still per row, but as a scalar `EXISTS` rather than a fetch | PERF-2 |
 | `DrawLeisureSuggestionEndpoint.ReadHistoryAsync:300-311` | Reads the caller's **whole** `LeisureSuggestionRecord` table per draw | Bounded by the 90-day sweep, so a few hundred rows worst case | Acceptable as-is; the comment at `:296-299` states the trade-off correctly. Revisit only if the sweep is ever moved to a job | PERF-3 |
-| `ActivityBacklogProfileResponse.ProjectionWithAnchors:73-101` (and the bucket-list twin) | Two correlated subqueries per row — `EXISTS` plus an ordered `TOP 1` — over the anchors | One grid page = 2 × page size subqueries; small today, quadratic-ish with anchor count | Keep the shape (it must stay sortable — see `summary.md:80-87`), but add the index below | PERF-4 |
+| ✅ fixed 2026-09-04 · `ActivityBacklogProfileResponse.ProjectionWithAnchors:73-101` (and the bucket-list twin) | Two correlated subqueries per row — `EXISTS` plus an ordered `TOP 1` — over the anchors | One grid page = 2 × page size subqueries; small today, quadratic-ish with anchor count | Shape kept, index added: `MemoryAnchorConfiguration` gains `(UserId, ActivityId)` and migration `20260904005748_MemoryAnchorUserActivityIndex` creates it. Plain `CreateIndex`, same as `TrackingLedgerReadIndexes` | PERF-4 |
 | ✅ fixed 2026-09-04 · `ActivityBacklogProfileSeeder.EnsureLookups:99-110` | `SaveChangesAsync` inside the loop | Dev only | See `CQ-4` — the method is gone, and with it the loop; the replacement `LoadLookups<T>` writes nothing | PERF-5 |
 
 ### Indexes that should exist
 
-- **`memory_anchor (user_id, activity_id)`** — every anchored-completion read filters `user_id`
+- ✅ **added 2026-09-04** · **`memory_anchor (user_id, activity_id)`** — every anchored-completion read filters `user_id`
   first and then correlates on `activity_id`: `GridActivityBacklogProfileEndpoint.ScopedAnchors():21`
   and its bucket-list twin, both `ProjectionWithAnchors` subqueries, both `GetById` overlays
   (`GetByIdActivityBacklogProfileEndpoint.cs:44-50`), and the `IsAnchored` filter predicates. The
@@ -608,10 +608,13 @@ it sits next to the assertion.
 
 ## 🟡 Nits appendix
 
-- `GetByIdActivityBacklogProfileEndpoint.cs:52` and its bucket-list twin build a queryable over
-  `new[] { entity }.AsQueryable()` purely to reuse the static `Projection`, then `with`-copy two
-  fields onto the result. It works and the comment explains why, but a plain mapping expression would
-  be shorter than the explanation.
+- ✅ FIXED 2026-09-04 · `GetByIdActivityBacklogProfileEndpoint.cs:52` and its bucket-list twin build a
+  queryable over `new[] { entity }.AsQueryable()` purely to reuse the static `Projection`, then
+  `with`-copy two fields onto the result. It works and the comment explains why, but a plain mapping
+  expression would be shorter than the explanation. — gone with `CQ-1`: `BaseGetByIdEndpoint` runs
+  `TResponse.Projection` over the real queryable, so the row is projected in SQL. The two-field `with`
+  overlay survives in `PostProcessAsync` and has to: the anchors are not reachable by navigation from a
+  profile, which is the whole reason `Projection` cannot fill them.
 - `LeisureSuggestionTests` (685 lines) carries two Planning tests (`:478`, `:513`) — see
   [01-testing.md](01-testing.md).
 - ✅ FIXED 2026-09-04 · `ActivityWeatherDependencyDevSeeder.cs:24-26` seeds "Rainy" and "Cold", neither
