@@ -88,23 +88,28 @@ public class GetAllGroupedRoutineTodoListEndpoint(
         foreach (var (period, result) in reset)
             await notifier.NotifyPeriodEndedAsync(period, result.Completion, result.Outcome, ct);
 
-        var periodIds = periods.Select(p => p.Id).ToList();
-        var completions = await dbContext.Set<RoutinePeriodCompletion>()
-            .Where(c => periodIds.Contains(c.TimePeriodId))
-            .OrderBy(c => c.TimePeriodId)
-            .ThenByDescending(c => c.PeriodStart)
-            .ToListAsync(ct);
+        // Only the newest HistoryDepth rows per period, trimmed by the database rather than after the fact: the
+        // history grows one row per cycle forever, so fetching it whole to render 16 rows scales with account
+        // age on the module's most-hit read. Take is a constant per query, so the periods are grouped by depth —
+        // in practice one or two groups — and each group runs one LATERAL-per-period query.
+        var completionsByPeriod = new Dictionary<long, List<RoutinePeriodCompletion>>();
+        foreach (var depthGroup in periods.GroupBy(p => p.HistoryDepth))
+        {
+            var depth = depthGroup.Key;
+            var periodIds = depthGroup.Select(p => p.Id).ToList();
 
-        var completionsByPeriod = completions
-            .GroupBy(c => c.TimePeriodId)
-            .ToDictionary(
-                g => g.Key,
-                g =>
-                {
-                    var depth = periods.First(p => p.Id == g.Key).HistoryDepth;
-                    return g.Take(depth).Reverse().ToList();
-                }
-            );
+            var completions = await dbContext.Set<RoutineTimePeriod>()
+                .Where(p => periodIds.Contains(p.Id))
+                .SelectMany(p => p.CompletionHistoryColl
+                    .OrderByDescending(c => c.PeriodStart)
+                    .Take(depth))
+                .ToListAsync(ct);
+
+            // The per-period order the subquery applied does not survive the join, so re-sort here — oldest
+            // first, which is what RoutineTimePeriodResponse.From documents it takes.
+            foreach (var g in completions.GroupBy(c => c.TimePeriodId))
+                completionsByPeriod[g.Key] = g.OrderBy(c => c.PeriodStart).ToList();
+        }
 
         var data = periods
             .Select(tp => new RoutineTodoListGroupedResponse
@@ -115,7 +120,7 @@ public class GetAllGroupedRoutineTodoListEndpoint(
                     now),
                 Items = tp.RoutineTodoListColl
                     .OrderBy(e => e.IsDone).ThenBy(e => e.DisplayOrder)
-                    .Select(e => RoutineTodoListResponse.Projection(new[] { e }.AsQueryable()).Single())
+                    .Select(RoutineTodoListResponse.From)
                     .ToList()
             })
             .ToList();

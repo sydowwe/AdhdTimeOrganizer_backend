@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using Sydowwe.Framework.application.dto.response;
@@ -48,7 +49,7 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
         RoutineTimePeriod period,
         IEnumerable<RoutinePeriodCompletion> historyAsc,
         DateTime now) =>
-        Projection(new[] { period }.AsQueryable()).Single() with
+        Map(period) with
         {
             NextResetAt = RoutineResetService.ComputeNextReset(period, now),
             CompletionHistory = historyAsc.Select(PeriodCompletionRecord.From).ToList()
@@ -56,7 +57,11 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
 
     public static IQueryable<RoutineTimePeriodResponse> Projection(IQueryable<RoutineTimePeriod> query)
     {
-        return query.Select(entity => new RoutineTimePeriodResponse
+        return query.Select(ProjectionExpression);
+    }
+
+    private static readonly Expression<Func<RoutineTimePeriod, RoutineTimePeriodResponse>> ProjectionExpression =
+        entity => new RoutineTimePeriodResponse
         {
             Id = entity.Id,
             Text = entity.Text,
@@ -74,6 +79,13 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
             FreezesRemaining = entity.FreezesRemaining,
             FreezeBudget = entity.FreezeBudget,
             FreezeBudgetResetsAt = entity.FreezeBudgetResetsAt
-        });
-    }
+        };
+
+    /// <summary>
+    /// The same mapping, compiled once and reused — <see cref="From"/> runs it as a delegate against an
+    /// already loaded entity instead of interpreting the expression tree per row through a one-element
+    /// <c>IQueryable</c>. Declared after <see cref="ProjectionExpression"/> on purpose: static field
+    /// initializers run in textual order, so compiling above it would capture a null expression.
+    /// </summary>
+    private static readonly Func<RoutineTimePeriod, RoutineTimePeriodResponse> Map = ProjectionExpression.Compile();
 }

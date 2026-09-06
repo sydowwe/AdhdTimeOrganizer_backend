@@ -775,11 +775,55 @@ control — re-deriving on every save would silently undo whatever the reorder e
 
 | Where | Issue | Impact | Mitigation | ID |
 |---|---|---|---|---|
-| `GetAllGroupedRoutineTodoListEndpoint.cs:76-91` | Loads the **entire** completion history for every period, then trims to `HistoryDepth` in memory (`:89`) | History grows one row per period per cycle forever; a two-year-old daily routine is ~730 rows fetched to render 16. Grows unboundedly with account age, on the module's most-hit read | `PARTITION BY … ORDER BY period_start DESC` in SQL, or a per-period `Take(HistoryDepth)` — the pattern `GetCompletionHistoryRoutineTimePeriodEndpoint.cs:42-47` already uses correctly | `PERF-1` |
-| `GetAllGroupedRoutineTodoListEndpoint.cs:102` | `RoutineTodoListResponse.Projection(new[] { e }.AsQueryable()).Single()` — **per item** | Builds and interprets the whole projection expression tree once per item via LINQ-to-Objects, on a request that already holds the materialised graph | Project the list once outside the loop, or map with a plain function. The expression is only needed for the `IQueryable` path | `PERF-2` |
+| `GetAllGroupedRoutineTodoListEndpoint.cs:76-91` | Loads the **entire** completion history for every period, then trims to `HistoryDepth` in memory (`:89`) | History grows one row per period per cycle forever; a two-year-old daily routine is ~730 rows fetched to render 16. Grows unboundedly with account age, on the module's most-hit read | `PARTITION BY … ORDER BY period_start DESC` in SQL, or a per-period `Take(HistoryDepth)` — the pattern `GetCompletionHistoryRoutineTimePeriodEndpoint.cs:42-47` already uses correctly | `PERF-1` ✅ |
+| `GetAllGroupedRoutineTodoListEndpoint.cs:102` | `RoutineTodoListResponse.Projection(new[] { e }.AsQueryable()).Single()` — **per item** | Builds and interprets the whole projection expression tree once per item via LINQ-to-Objects, on a request that already holds the materialised graph | Project the list once outside the loop, or map with a plain function. The expression is only needed for the `IQueryable` path | `PERF-2` ✅ |
 | `RoutineTodoListResetJobHandler.cs:34-37` | Loads every user's periods with `RoutineTodoListColl` + `Steps` into memory in one go | Whole-table materialisation with two levels of collection include; memory scales with total users × routines × steps. Also makes the single `SaveChangesAsync` at `:68` an all-or-nothing batch — see `SEC-3` | Page by user id and commit per page | `PERF-3` ✅ |
 | `RoutinePeriodNudgeJobHandler.cs:40-43` | Same shape, plus `Where(p => !p.IsHidden)` with no supporting index | Sequential scan of `routine_time_period` daily. Small today; the sequential-notify loop below it is deliberate and documented (`:49-53`), so this is the only part worth changing | Page by user; see index note below | `PERF-4` ✅ |
 | `RoutineStreakFreezeService.RecomputeStreak` via `SpendStreakFreezeRoutineTimePeriodEndpoint.cs:77-80` | Loads the complete history to recompute | **Deliberate and correct** — a truncated history under-counts the run, and the code says so at `:75-76`. Listed only so it is not "found" again later; its growth is bounded by fixing `PERF-1`, not this | none | — |
+
+#### `PERF-1` ✅ FIXED 2026-09-07 — the history is trimmed by the database
+
+The grouped read now fetches only the newest `HistoryDepth` completions per period, through one limited
+subquery per period (`SelectMany` over `CompletionHistoryColl` with `OrderByDescending(PeriodStart).Take(depth)`,
+which Npgsql renders as a LATERAL join) instead of the whole history plus an in-memory `Take`. The cost stops
+growing with account age; the number of rows crossing the wire is now what the client renders.
+
+`Take` has to be a constant per query, and `HistoryDepth` is per period, so the periods are **grouped by
+depth** and each group runs one query — one or two in practice, since the column has a default and is rarely
+edited. Not a windowed `PARTITION BY`, as the finding also offered: LINQ has no `ROW_NUMBER` and the raw SQL
+would have to name the schema by hand (see CLAUDE.md), for a plan Postgres reaches the same way.
+
+The per-period ordering does not survive the join, so the rows are re-sorted ascending after materialisation —
+`RoutineTimePeriodResponse.From` documents that it takes the history oldest-first, and serving it reversed is a
+heatmap drawn backwards, not an error.
+
+Pinned by `RoutineGroupedReadAndMoveItemTests.GroupedRead_PeriodsWithDifferentHistoryDepths_EachTrimmedToItsOwnDepth`:
+two periods with **different** depths (2 and 4), five completions each, asserted on the exact `PeriodStart`
+sequence served. One depth would pass even if the code applied one period's depth to every period, and a count
+assertion would pass on the oldest rows or on a reversed list.
+
+`Doc impact: none`
+
+#### `PERF-2` ✅ FIXED 2026-09-07 — one compiled mapping, not one interpreted tree per row
+
+`RoutineTodoListResponse` and `RoutineTimePeriodResponse` now hold their projection as a static
+`Expression<Func<TEntity, TResponse>>`. `Projection` passes it to `Select` unchanged; the new
+`RoutineTodoListResponse.From` and the existing `RoutineTimePeriodResponse.From` run `.Compile()`d **once** in a
+static field, so an already-materialised entity costs a delegate call rather than a one-element `IQueryable`
+whose expression tree is re-interpreted per row. Same expression on both paths, so the SQL and in-memory shapes
+cannot drift — which is why this is not a hand-written second mapper.
+
+`RoutineTimePeriodResponse.From` was doing the same thing once per **period** on the same read (and on the flat
+reads), so it was fixed with it; it is one construct, not two findings.
+
+The compiled field is declared **after** the expression field in both files, with a comment saying why: static
+field initializers run in textual order, so compiling above it captures a null and throws a
+`NullReferenceException` on first use — a type-initializer failure on the module's most-hit read.
+
+Covered by the existing grouped and flat read suites, which assert on the served field values; a mapping that
+lost a field fails them.
+
+`Doc impact: none`
 
 #### `PERF-3` + `PERF-4` ✅ FIXED 2026-09-06 — both sweeps page by user
 
@@ -811,8 +855,9 @@ was owed here.
 
 - `routine_period_completion (time_period_id, period_start DESC)` — the unique index on
   `(time_period_id, period_start)` already serves ordered lookups by period, so this is only worth
-  adding if `PERF-1` is fixed with a windowed query that wants the descending order. **Probably no
-  action.**
+  adding if `PERF-1` is fixed with a windowed query that wants the descending order. **No action** —
+  `PERF-1` landed as an ordered `LIMIT` per period, which walks that same unique index backwards. A btree
+  reads in either direction, so a `DESC` copy would only duplicate it.
 - ~~`routine_time_period (is_hidden)`, or a partial index `WHERE NOT is_hidden`~~ — ✅ **added 2026-09-06**
   with `PERF-3`'s paging, as this note asked. Landed as `ix_routine_time_period_user_id_visible`: keyed on
   `user_id` with `HasFilter("NOT is_hidden")`, because after the paging fix both of the nudge sweep's queries

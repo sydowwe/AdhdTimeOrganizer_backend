@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
@@ -19,7 +20,18 @@ public record RoutineTodoListResponse : BaseTodoListResponse,
 
     public static IQueryable<RoutineTodoListResponse> Projection(IQueryable<RoutineTodoList> q)
     {
-        return q.Select(e => new RoutineTodoListResponse
+        return q.Select(ProjectionExpression);
+    }
+
+    /// <summary>
+    /// Maps an entity the caller already holds — the grouped read materialises the whole graph, so it must not
+    /// pay for the expression tree to be interpreted once per item. Requires <c>Activity</c>, its <c>Role</c>
+    /// and <c>Steps</c> to be loaded; <see cref="Projection"/> is the path for anything still in the database.
+    /// </summary>
+    public static RoutineTodoListResponse From(RoutineTodoList entity) => Map(entity);
+
+    private static readonly Expression<Func<RoutineTodoList, RoutineTodoListResponse>> ProjectionExpression =
+        e => new RoutineTodoListResponse
         {
             Id = e.Id,
             Activity = new ActivityResponse
@@ -91,6 +103,11 @@ public record RoutineTodoListResponse : BaseTodoListResponse,
             SuggestedTime = e.SuggestedTime,
             SuggestedDays = e.SuggestedDays,
             SuggestedDayOfMonth = e.SuggestedDayOfMonth
-        });
-    }
+        };
+
+    /// <summary>
+    /// The same expression compiled once, behind <see cref="From"/>. Declared after
+    /// <see cref="ProjectionExpression"/> because static field initializers run in textual order.
+    /// </summary>
+    private static readonly Func<RoutineTodoList, RoutineTodoListResponse> Map = ProjectionExpression.Compile();
 }

@@ -139,6 +139,51 @@ public class RoutineGroupedReadAndMoveItemTests(AppDbContextFixture fixture) : P
         storedPeriod.Streak.Should().Be(0, "the three cycles after it went untouched, so the run is broken");
     }
 
+    /// <summary>
+    /// PERF-1. The grouped read used to fetch every completion row a period had ever produced and trim to
+    /// <c>HistoryDepth</c> in memory; it now trims in SQL, one limited subquery per period, with the periods
+    /// grouped by depth because the limit has to be a constant per query. Two periods with *different* depths
+    /// are what makes that grouping load-bearing — one depth would pass even if the code applied a single
+    /// period's depth to all of them. Asserted on the rows served, not on the query count, so it also pins the
+    /// re-sort: the per-period order does not survive the join, and the response contract is oldest-first.
+    /// </summary>
+    [Fact(DisplayName = "Grouped read trims each period's history to that period's own HistoryDepth, newest rows, oldest-first")]
+    public async Task GroupedRead_PeriodsWithDifferentHistoryDepths_EachTrimmedToItsOwnDepth()
+    {
+        var firstStart = new DateOnly(2026, 1, 1);
+        long shallowId, deepId;
+        await using (var db = CreateDbContext())
+        {
+            shallowId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(
+                db, text: "history-depth-shallow", lengthInDays: 30, resetAnchorDay: 0, historyDepth: 2, ct: CancellationToken);
+            deepId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(
+                db, text: "history-depth-deep", lengthInDays: 45, resetAnchorDay: 0, historyDepth: 4, ct: CancellationToken);
+
+            // Five rows against each, so both depths are a real trim rather than "everything there is".
+            foreach (var periodId in new[] { shallowId, deepId })
+                for (var i = 0; i < 5; i++)
+                {
+                    var start = firstStart.AddDays(i * 7);
+                    await TodoListTestSeedHelper.SeedRoutinePeriodCompletionAsync(
+                        db, periodId, start, start.AddDays(7), completedCount: 3, totalCount: 3, ct: CancellationToken);
+                }
+        }
+
+        var response = await CreateClient().GetAsync("api/routine-todo-list/grouped-by-time-period", CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var groups = (await response.Content
+            .ReadFromJsonAsync<List<RoutineTodoListGroupedResponse>>(JsonOpts, CancellationToken))!;
+
+        var shallow = groups.Single(g => g.RoutineTimePeriod.Id == shallowId);
+        shallow.RoutineTimePeriod.CompletionHistory.Select(c => c.PeriodStart).Should().Equal(
+            firstStart.AddDays(21), firstStart.AddDays(28));
+
+        var deep = groups.Single(g => g.RoutineTimePeriod.Id == deepId);
+        deep.RoutineTimePeriod.CompletionHistory.Select(c => c.PeriodStart).Should().Equal(
+            firstStart.AddDays(7), firstStart.AddDays(14), firstStart.AddDays(21), firstStart.AddDays(28));
+    }
+
     // ---- MoveTodoListItemEndpoint ----------------------------------------------------------------------
 
     /// <summary>
