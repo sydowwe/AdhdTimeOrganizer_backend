@@ -297,7 +297,7 @@ from the request. `UpdateRoutineTodoListValidator` already models steps as havin
 
 `Doc impact: none`
 
-### `CQ-5` 🟠 The flat read endpoints serve a malformed `RoutineTimePeriodResponse`, and refresh nothing
+### `CQ-5` 🟠 ✅ FIXED 2026-09-06 · The flat read endpoints serve a malformed `RoutineTimePeriodResponse`, and refresh nothing
 
 `application/dto/response/RoutineTimePeriodResponse.cs:47-78` ·
 `application/dto/response/RoutineToDoListResponse.cs:63-79` ·
@@ -331,7 +331,39 @@ hand-write these two the way the grouped read already is. Separately, add the fo
 nested projection in `RoutineToDoListResponse`, or cut the nested period down to the identifying fields
 the client actually uses there.
 
-`Doc impact: domain-map.md → Invariants (9) — no doc edit needed once the code is fixed, which is the point of fixing the code`
+**Fixed 2026-09-06, all three consequences, on all four endpoints.** The re-derivation lives once, in
+`application/service/RoutineTimePeriodReadRefresher.cs`: it loads the periods tracked, runs `CheckGrace`
+and `RefreshFreezeBudget`, **persists** them (projecting alone would hand out a fresh budget on every
+read and re-break the same streak), then renders through the shared `From(period, history, now)` with
+the history trimmed to `HistoryDepth` and handed back oldest-first.
+
+The four endpoints keep their framework bases and call it from the hooks the finding named —
+`PostProcessItemsAsync` on the two `BaseGetAllEndpoint`s, `PostProcessAsync` on the two
+`BaseGetByIdEndpoint`s. Keeping the bases costs a second read of rows the projection already touched;
+that buys the route, the roles, `Sort` and the 404 semantics, and these are not the hot path (the
+grouped read is). `PostProcess*` receives the response, not the entity, exactly as the finding warned,
+which is why the helper re-reads by id. The two to-do-list reads swap only the **nested** period, so
+the item's own projected fields are untouched. Order is preserved by mapping over the base's list
+rather than over the helper's dictionary.
+
+Point 2 is fixed at the projection as well, not just papered over by the hook: `ReminderLeadDays`,
+`FreezesRemaining`, `FreezeBudget` and `FreezeBudgetResetsAt` are now selected in
+`RoutineToDoListResponse`'s nested period. Cutting the nested period down to identifying fields — the
+finding's other option — would have changed the wire shape for a SPA that is not in this repo, so the
+non-breaking half was taken. `NextResetAt` / `CompletionHistory` stay out of the projection with a
+comment saying who is expected to fill them, because neither is computable in SQL.
+
+Deliberately **no reset** in the helper. A reset scores the cycle from the period's items, and a flat
+read never loads them; resetting there would write a completion row from a list it never saw. The three
+reset sites are unchanged.
+
+Pinned in `AdhdTimeOrganizer.IntegrationTests/Endpoints/RoutineFlatPeriodReadTests.cs` (7 cases): the
+two derived members on both period reads, the budget refill and the grace break asserted **on rows as
+well as on the response**, the nested period on `GET /routine-todo-list`, and — the other half of the
+pin — that an *open* budget window and an *open* grace window are left alone, since an over-eager
+refresh makes the budget infinite and grace worthless.
+
+`Doc impact: domain-map.md → Invariants (9) — no doc edit needed once the code is fixed, which is the point of fixing the code` — the invariant now also names the surfaces, and the Grace rule, the two navigation rows and `summary.md`'s freeze gotcha name the helper. See `DOC-4` / `DOC-7`.
 
 ### `CQ-6` 🟠 The grace warning is marked as sent even when it failed
 
@@ -441,7 +473,7 @@ multi-cycle case is the new test beside it.
 
 `Doc impact: done — domain-map.md's Domain services table gains a TryResetCatchUp row, the TryReset list row says "closes one cycle", and the Reset rule spells out the catch-up`
 
-### `CQ-13` 🟠 Spending a freeze does not check grace first, so a lapsed window can zero the streak the freeze just bought
+### `CQ-13` 🟠 ✅ FIXED 2026-09-06 · Spending a freeze does not check grace first, so a lapsed window can zero the streak the freeze just bought
 
 `application/endpoint/routineTimePeriod/command/SpendStreakFreezeRoutineTimePeriodEndpoint.cs:48-98` ·
 `domain/service/RoutineStreakFreezeService.cs:99-107`
@@ -465,7 +497,16 @@ window — but it is real, and the failure is exactly the one the whole feature 
 Ordering is right — `CheckGrace` zeroes `Streak`, then `RecomputeStreak` raises it back from the
 history including the newly frozen entry.
 
-`Doc impact: domain-map.md → Business rules (Grace) — restate the rule as "before TryReset **and before Apply**", i.e. on every access, which is what it already says and what the code will then do`
+**Fixed 2026-09-06.** One line, exactly where the finding put it: `RoutineResetService.CheckGrace(period, now);`
+immediately before the `Apply` call, with the ordering argument written down next to it so it is not
+"tidied" to after.
+
+Pinned by `RoutineStreakFreezeGraceTests.SpendFreeze_WithALapsedGraceWindow_ClearsIt_SoTheNextReadKeepsTheRestoredStreak`.
+The assertion runs through a **second** request — a grouped read after the freeze — because the freeze
+response was never the thing that was wrong. It reported the restored streak correctly both before and
+after the fix; what changed is whether the next page load keeps it.
+
+`Doc impact: domain-map.md → Business rules (Grace) — restate the rule as "before TryReset **and before Apply**", i.e. on every access, which is what it already says and what the code will then do` — done, together with `DOC-7`.
 
 ### `CQ-9` 🟡 `RoutinePeriodCompletion` is the one routines table outside the entity-base convention — and it shows in the schema
 
@@ -567,7 +608,7 @@ an id from the request.
 
 `Doc impact: none`
 
-### `CQ-14` 🟡 A freeze can be spent on a period that had no items
+### `CQ-14` 🟡 ✅ FIXED 2026-09-06 · A freeze can be spent on a period that had no items
 
 `domain/service/RoutineStreakFreezeService.cs:65-67,88`
 
@@ -582,7 +623,17 @@ knowable from the request body" (`StreakFreezeRejection.cs:5-9`).
 **Fix.** Treat `TotalCount == 0` as `NotAMiss`: `if (entry.TotalCount == 0 || IsSuccess(entry, …))`. The
 enum member's summary ("there is no miss to cover") already describes the right answer.
 
-`Doc impact: none`
+**Fixed 2026-09-06**, as prescribed — the guard in `Apply` is now
+`if (entry.TotalCount == 0 || IsSuccess(entry, period.StreakThreshold))`, with a comment saying why
+`IsSuccess` returning false is not the same question as "is this a miss". Left in `Apply` rather than
+folded into `IsSuccess`: `IsSuccess` is also what `RecomputeStreak` asks, and there the false answer is
+already correct — an item-less row is skipped before the call.
+
+Pinned by `RoutineStreakFreezeGraceTests.SpendFreeze_OnAPeriodThatElapsedWithNoItems_Refuses_AndChargesNothing`,
+which asserts the budget is untouched and the row unfrozen, not just the 400.
+
+`Doc impact: none` — but the `Apply` row in `domain-map.md`'s domain-services table now states the rule,
+since it is a refusal the client cannot predict.
 
 ### `CQ-15` 🟡 An item can be moved to another period without re-deriving its display order
 
@@ -645,7 +696,7 @@ into whatever collision rule is chosen.
 
 `Doc impact: domain-map.md → Invariants (new merge-collision rule)`
 
-### `DOC-4` 🟠 Invariant 9 does not hold — there is a fourth surface that shows the freeze budget
+### `DOC-4` 🟠 ✅ FIXED 2026-09-06 · Invariant 9 does not hold — there is a fourth surface that shows the freeze budget
 
 `domain-map.md` → Invariants, row 9 ("The freeze budget is refilled by whoever reads it, not by a job")
 and `summary.md`'s freeze gotcha, which names the three sites that do call `RefreshFreezeBudget`: the
@@ -656,6 +707,14 @@ grouped read, the nightly reset job, and `Apply` itself.
 all three (`:74-76`) — and refresh nothing. So does anything reading the nested period on
 `GET /routine-todo-list` / `{id}`, except that one serves a hard `0` instead (`CQ-5`). The invariant is
 the right rule; the code is what is wrong.
+
+**Fixed 2026-09-06 in the code, as the finding argued** — all four surfaces now refresh, through
+`RoutineTimePeriodReadRefresher` (`CQ-5`). The invariant was right and stands.
+
+The doc did get one edit anyway, and it is not a retreat: invariant 9 and `summary.md`'s freeze gotcha
+both **enumerated** the calling sites, so leaving them at "three sites do today" would have been stale
+the moment the fourth landed. Both now name the grouped read, the nightly job, `Apply` and the four
+flat reads via the helper, without a count to go stale next time.
 
 `Doc impact: domain-map.md → Invariants (9) — no edit once CQ-5 is fixed, which is the argument for fixing the code rather than the doc`
 
@@ -686,7 +745,7 @@ doc row reads as though the delete always succeeds.
 
 `Doc impact: domain-map.md → Navigation index (DeleteRoutineTimePeriodEndpoint row: "completions cascade, items Restrict — a period with items is a 409")`
 
-### `DOC-7` 🟡 "CheckGrace before every access" is asserted as a rule and violated by three sites
+### `DOC-7` 🟡 ✅ FIXED 2026-09-06 · "CheckGrace before every access" is asserted as a rule and violated by three sites
 
 `domain-map.md` → Business rules, **Grace**: "`CheckGrace` must run before `TryReset` on *every*
 access — a lapsed window breaks the streak, and if only the reset job checked it, a streak would survive
@@ -697,7 +756,17 @@ serve `Streak` from a lapsed window — `CQ-5`), and `SpendStreakFreezeRoutineTi
 skipping it is actively harmful (`CQ-13`). The rule is right; fix the code, and while doing so restate
 the rule as "before `TryReset` **and before `Apply`**" so the freeze path is named rather than implied.
 
-`Doc impact: domain-map.md → Business rules (Grace) — name Apply alongside TryReset`
+**Fixed 2026-09-06, code first.** All three sites now call `CheckGrace`: the two period reads through
+`RoutineTimePeriodReadRefresher` (`CQ-5`), the freeze endpoint directly (`CQ-13`). The two flat
+to-do-list reads were a fourth and fifth surface serving `Streak` on a nested period, and they go
+through the same helper.
+
+The rule itself is restated as the finding asked — "before `TryReset` **and before `Apply`**" — and
+`Apply` is now named rather than implied, with the freeze-specific failure spelled out, because that is
+the one case where skipping the check is actively harmful rather than merely stale. The
+`CheckGrace` row in the domain-services table carries the same wording.
+
+`Doc impact: domain-map.md → Business rules (Grace) — name Apply alongside TryReset` — done.
 
 ---
 

@@ -87,6 +87,14 @@ public class SpendStreakFreezeRoutineTimePeriodEndpoint(DbContext dbContext)
             return;
         }
 
+        // Before Apply, not after, and not skippable: a grace window that has already lapsed but has not been
+        // observed yet still sets Streak = 0 on the next read. Without this, freezing an *older* miss leaves the
+        // window standing, RecomputeStreak raises the streak back, the response shows it restored — and the very
+        // next grouped read zeroes it. The user would spend a budgeted resource and watch it evaporate.
+        // CheckGrace first, then Apply: the zeroing happens before RecomputeStreak raises the streak back out of
+        // the history that now includes the frozen entry.
+        RoutineResetService.CheckGrace(period, now);
+
         var rejection = RoutineStreakFreezeService.Apply(period, history, entry, now);
         if (rejection != StreakFreezeRejection.None)
         {

@@ -73,9 +73,17 @@ public record RoutineTodoListResponse : BaseTodoListResponse,
                 Streak = e.RoutineTimePeriod.Streak,
                 BestStreak = e.RoutineTimePeriod.BestStreak,
                 LastResetAt = e.RoutineTimePeriod.LastResetAt,
-                HistoryDepth = e.RoutineTimePeriod.HistoryDepth
-                // NextResetAt omitted (computed, not on entity)
-                // CompletionHistory omitted
+                HistoryDepth = e.RoutineTimePeriod.HistoryDepth,
+                // Every column RoutineTimePeriodResponse holds, or the nested period lies rather than being
+                // merely incomplete: the freeze fields default to 0, and 0 is a real value the client reads as
+                // "no freezes left" — see the contract on RoutineTimePeriodResponse.FreezesRemaining.
+                ReminderLeadDays = e.RoutineTimePeriod.ReminderLeadDays,
+                FreezesRemaining = e.RoutineTimePeriod.FreezesRemaining,
+                FreezeBudget = e.RoutineTimePeriod.FreezeBudget,
+                FreezeBudgetResetsAt = e.RoutineTimePeriod.FreezeBudgetResetsAt
+                // NextResetAt and CompletionHistory stay omitted — neither is computable in SQL. A caller that
+                // serves this nested period on its own must fill them through
+                // RoutineTimePeriodReadRefresher, which is what the two flat reads do.
             },
             Streak = e.Streak,
             BestStreak = e.BestStreak,

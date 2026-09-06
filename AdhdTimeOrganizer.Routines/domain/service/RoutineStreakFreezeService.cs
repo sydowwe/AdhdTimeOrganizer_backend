@@ -85,7 +85,10 @@ public static class RoutineStreakFreezeService
 
         // Nothing to cover. Allowing it would burn a freeze for no effect, and the client only ever offers the
         // action on a miss — so reaching here means a stale view, which deserves an error rather than a charge.
-        if (IsSuccess(entry, period.StreakThreshold))
+        // An empty period is not a miss either, even though IsSuccess says false for it: RecomputeStreak skips
+        // TotalCount == 0 rows outright and TryReset leaves the streak NotEvaluated, so such a period already
+        // carries the run for free and a freeze on it would be charged for nothing.
+        if (entry.TotalCount == 0 || IsSuccess(entry, period.StreakThreshold))
             return StreakFreezeRejection.NotAMiss;
 
         RefreshFreezeBudget(period, now);

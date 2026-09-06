@@ -61,9 +61,17 @@ that has been away for a month a month stale. The catch-up writes a completion r
 (capped at `HistoryDepth` — older rows would fall straight off the heatmap) but hands back one
 `Latest` result, so a dormancy costs the user one notification rather than one per missed cycle.
 
-**Grace.** `CheckGrace` must run before `TryReset` on *every* access — a lapsed window breaks the
-streak, and if only the reset job checked it, a streak would survive indefinitely as long as nobody's
-period rolled over.
+**Grace.** `CheckGrace` must run before `TryReset` **and before `Apply`** — i.e. on *every* access, read
+or write. A lapsed window breaks the streak, and if only the reset job checked it, a streak would
+survive indefinitely as long as nobody's period rolled over. `Apply` is named explicitly because
+skipping it there is worse than serving a stale number: `Apply` clears the window only when the frozen
+entry is the newest one, so freezing an *older* miss against a lapsed window leaves it standing,
+`RecomputeStreak` raises the streak back, the response shows it restored — and the next read zeroes it.
+The user would spend a budgeted resource and watch it evaporate on the following page load.
+
+The flat period reads sit on the framework projection bases, which serve `Projection` straight and can
+run neither this nor the freeze refill; `RoutineTimePeriodReadRefresher`, called from their
+`PostProcess` hooks, is what puts both back. Both mutations are **persisted**, not just projected.
 
 **Freezes.** Budget refills to `FreezeBudget` at midnight UTC on the first of the next calendar month,
 **lazily** — whoever reads or spends it calls `RefreshFreezeBudget` first; there is no job.
@@ -107,7 +115,7 @@ owned by users in different zones must produce identical results.
 | 6 | `IsFrozen` and `FrozenAt` are written together | **DB** — `ck_routine_period_completion_frozen_at_matches_is_frozen` |
 | 7 | Ranges: anchor day, length, non-negative streaks, threshold, grace, history depth, reminder lead, budget `0..MaxFreezeBudget`, remaining `0..budget` | **DB** — nine CHECKs on `RoutineTimePeriod`, mirrored by `RoutineTimePeriodValidator` for a 400 instead of a 500 |
 | 8 | Both seam sources are resolved by string key | **Nothing** — a rename without updating both sides is silent. `SeamWiringTests` is the only guard |
-| 9 | The freeze budget is refilled by whoever reads it, not by a job | **App-enforced by convention only** — forgetting it is silent |
+| 9 | The freeze budget is refilled by whoever reads it, not by a job — *every* surface that shows or spends `FreezesRemaining`, today: the grouped read, the nightly reset job, `Apply`, and the four flat reads through `RoutineTimePeriodReadRefresher` | **App-enforced by convention only** — forgetting it is silent. `RoutineFlatPeriodReadTests` guards the projection-base surfaces |
 | 10 | Class names are table names | `BaseEntityConfigure`. Renaming a type is a migration; moving it is not |
 | 11 | A routine item may only name a `TimePeriodId` the caller owns | **App-enforced only** — `RoutineTodoListPeriodRules`, from both write validators. The FK proves the period exists, not whose it is, and the row is stamped with the caller's own `UserId`, so the global filter never sees a mismatch. The reset job then runs with the filter inert and counts the foreign item inside the victim's period |
 
@@ -123,9 +131,9 @@ owned by users in different zones must produce identical results.
 | `UpdateRoutineTimePeriodEndpoint` | `BaseUpdateEndpoint` | Update a period (an anchor/length edit re-derives the next reset, and correctly earns a fresh nudge) | `routineTimePeriod/command/UpdateRoutineTimePeriodEndpoint.cs` |
 | `DeleteRoutineTimePeriodEndpoint` | `BaseDeleteEndpoint` | Delete a period; completions cascade | `routineTimePeriod/command/DeleteRoutineTimePeriodEndpoint.cs` |
 | `ToggleIsHiddenRoutineTimePeriodEndpoint` | `BaseToggleIsHiddenEndpoint` | Hide a period — hidden periods are skipped by the nudge sweep | `routineTimePeriod/command/ToggleIsHiddenRoutineTimePeriodEndpoint.cs` |
-| `SpendStreakFreezeRoutineTimePeriodEndpoint` | Endpoint | Spend a freeze on a missed period. ⚠ Routes to **`POST /routine-todo-list/time-period/{timePeriodId}/streak-freeze`**, not under `/routine-time-period` like its folder neighbours — that is the shipped frontend contract, don't "correct" it. Returns the whole `RoutineTimePeriodResponse` via the shared `From(...)`, so it can't drift from the grouped read | `routineTimePeriod/command/SpendStreakFreezeRoutineTimePeriodEndpoint.cs` |
-| `GetAllRoutineTimePeriodEndpoint` | `BaseGetAllEndpoint` | List periods | `routineTimePeriod/query/GetAllRoutineTimePeriodEndpoint.cs` |
-| `GetByIdRoutineTimePeriodEndpoint` | `BaseGetByIdEndpoint` | One period | `routineTimePeriod/query/GetByIdRoutineTimePeriodEndpoint.cs` |
+| `SpendStreakFreezeRoutineTimePeriodEndpoint` | Endpoint | Spend a freeze on a missed period. ⚠ Routes to **`POST /routine-todo-list/time-period/{timePeriodId}/streak-freeze`**, not under `/routine-time-period` like its folder neighbours — that is the shipped frontend contract, don't "correct" it. Returns the whole `RoutineTimePeriodResponse` via the shared `From(...)`, so it can't drift from the grouped read. Runs `CheckGrace` **before** `Apply` — see the Grace rule | `routineTimePeriod/command/SpendStreakFreezeRoutineTimePeriodEndpoint.cs` |
+| `GetAllRoutineTimePeriodEndpoint` | `BaseGetAllEndpoint` | List periods. Overrides `PostProcessItemsAsync` to re-derive through `RoutineTimePeriodReadRefresher` — the base serves `Projection` straight, which has no `NextResetAt`, no history and neither lazy refresh | `routineTimePeriod/query/GetAllRoutineTimePeriodEndpoint.cs` |
+| `GetByIdRoutineTimePeriodEndpoint` | `BaseGetByIdEndpoint` | One period. Same re-derivation, via `PostProcessAsync` | `routineTimePeriod/query/GetByIdRoutineTimePeriodEndpoint.cs` |
 | `GetSelectOptionsRoutineTimePeriodEndpoint` | `BaseGetSelectOptionsEndpoint` | Period picker | `routineTimePeriod/query/GetSelectOptionsRoutineTimePeriodEndpoint.cs` |
 | `GetCompletionHistoryRoutineTimePeriodEndpoint` | Endpoint | `GET /routine-time-period/{id}/completion-history`. Caps to the newest `HistoryDepth` rows, then renders oldest-first | `routineTimePeriod/query/GetCompletionHistoryRoutineTimePeriodEndpoint.cs` |
 | `CreateRoutineTodoListEndpoint` | `BaseCreateEndpoint` | Create a routine item (+ its steps) | `routineTodoList/command/CreateRoutineTodoListEndpoint.cs` |
@@ -135,7 +143,7 @@ owned by users in different zones must produce identical results.
 | `ToggleStepIsDoneRoutineTodoListEndpoint` | `BaseToggleStepIsDoneEndpoint` | Tick a step; uses the **single-item** `TryReset` (no streak scoring — see `summary.md`) | `routineTodoList/command/ToggleStepIsDoneRoutineTodoListEndpoint.cs` |
 | `ChangeDisplayOrderRoutineTodoListEndpoint` | `BaseChangeDisplayOrderTodoListEndpoint` | Reorder within a period (`GroupFilterExpression => TimePeriodId`) | `routineTodoList/command/ChangeDisplayOrderRoutineTodoListEndpoint.cs` |
 | `GetAllGroupedRoutineTodoListEndpoint` | Endpoint | `GET /routine-todo-list/grouped-by-time-period` — the main screen. **Reset-on-read**: refreshes the freeze budget, checks grace and applies `TryReset` before projecting | `routineTodoList/query/GetAllGroupedRoutineTodoListEndpoint.cs` |
-| `GetAllRoutineTodoListEndpoint` · `GetByIdRoutineTodoListEndpoint` | `BaseGetAll` / `BaseGetById` | Flat reads | `routineTodoList/query/` |
+| `GetAllRoutineTodoListEndpoint` · `GetByIdRoutineTodoListEndpoint` | `BaseGetAll` / `BaseGetById` | Flat reads. Both swap the item's **nested** period for a refreshed one through `RoutineTimePeriodReadRefresher`, for the same reason as the two above | `routineTodoList/query/` |
 | `CreateStepRoutineTodoListEndpoint` · `UpdateStepRoutineTodoListEndpoint` · `DeleteStepRoutineTodoListEndpoint` | `Base*StepEndpoint<RoutineTodoList>` | Step CRUD, all three from TodoLists' base family | `routineTodoList/steps/` |
 
 ### Domain services — `domain/service/`
@@ -146,14 +154,14 @@ transaction that read the period.
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `RoutineResetService.ComputeNextReset` | Static fn | The boundary closing the cycle `LastResetAt` opened, from length + anchor. Derived from `LastResetAt`, **not** from `now` — the instant may be in the past, and that is what "due" means. Also feeds `RoutineTimePeriodResponse.NextResetAt` | `RoutineResetService.cs` |
-| `RoutineResetService.CheckGrace` | Static fn | Breaks a lapsed streak grace window. Call before `TryReset` on **every** read/write site | `RoutineResetService.cs` |
+| `RoutineResetService.CheckGrace` | Static fn | Breaks a lapsed streak grace window. Call before `TryReset` **and before `Apply`**, on **every** read/write site | `RoutineResetService.cs` |
 | `RoutineResetService.TryReset(period, item, now)` | Static fn | Single-item overload — step toggle only. Does **not** advance `LastResetAt`, write a completion, or score the streak | `RoutineResetService.cs` |
 | `RoutineResetService.TryReset(period, items, now)` | Static fn | List overload. Closes **one** cycle: advances the streak, returns the `RoutinePeriodCompletion` + `StreakOutcome`, clears `EndingSoonNotifiedFor`. Call it directly only when one cycle is what you mean | `RoutineResetService.cs` |
 | `RoutineResetService.TryResetCatchUp(period, items, now)` | Static fn | What the reset job, the grouped read and the bulk toggle actually call. Loops the list overload until the period is current (capped at 1200 cycles), returns the newest `HistoryDepth` completions plus one `Latest` result to notify on. A grace window opened by one closed cycle is checked against the *next* boundary, not against `now` | `RoutineResetService.cs` |
 | `RoutineResetService.EvaluateEndingSoon` / `ShouldWarnGraceExpiring` | Static fn | The two nudge conditions — nudge job only | `RoutineResetService.cs` |
 | `RoutineResetService.UpdateItemStreak` | Static fn | Item-level streak after a completing toggle | `RoutineResetService.cs` |
 | `RoutineStreakFreezeService.RefreshFreezeBudget` | Static fn | Lazy monthly refill. **Nothing else refills the budget** — there is no job | `RoutineStreakFreezeService.cs` |
-| `RoutineStreakFreezeService.Apply` | Static fn | Spend a freeze; returns `StreakFreezeRejection` — anything but `None` means nothing was written | `RoutineStreakFreezeService.cs` |
+| `RoutineStreakFreezeService.Apply` | Static fn | Spend a freeze; returns `StreakFreezeRejection` — anything but `None` means nothing was written. Refuses a `TotalCount == 0` entry as `NotAMiss`: `RecomputeStreak` skips item-less periods outright, so the run already carries across one for free. Caller must have run `CheckGrace` first | `RoutineStreakFreezeService.cs` |
 | `RoutineStreakFreezeService.RecomputeStreak` | Static fn | Walks the **complete** history oldest-first — a trimmed list under-counts the run | `RoutineStreakFreezeService.cs` |
 | `RoutineStreakFreezeService.IsSuccess` / `NextBudgetReset` | Static fn | Threshold test and the next window boundary | `RoutineStreakFreezeService.cs` |
 
@@ -162,6 +170,7 @@ transaction that read the period.
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `IRoutinePeriodNotificationService` | Contract | The three routine notifications. `NotifyEndingSoonAsync` returns `bool` — **that return is the idempotency marker's gate**: the caller marks only when something actually went out | `domain/serviceContract/IRoutinePeriodNotificationService.cs` |
+| `RoutineTimePeriodReadRefresher` | Static fn | `CheckGrace` + `RefreshFreezeBudget` (persisted) then render through `RoutineTimePeriodResponse.From`, for the four reads that sit on the framework projection bases. Deliberately does **not** reset — a reset needs the period's items, which a flat read never loads | `application/service/RoutineTimePeriodReadRefresher.cs` |
 | `RoutinePeriodNotificationService` | Service | Maps the three events onto `Sydowwe.Framework.Contracts.notification` payloads (`RoutinePeriodEndedPayload`, `RoutinePeriodEndingSoonPayload`, `RoutineStreakGraceExpiringPayload`). Every method is best-effort — catches and logs, never throws — because a notification failure must never roll back a reset that already committed. Does not consult preferences; the Notifications module owns that | `application/service/RoutinePeriodNotificationService.cs` |
 
 ### Jobs and scheduling — `infrastructure/jobs/`, `infrastructure/scheduling/`

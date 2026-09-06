@@ -74,10 +74,12 @@ has no knowledge of Planning at all.
 
 - **The freeze budget refills lazily, and nothing sweeps it.** There is no job behind
   `RoutineStreakFreezeService.RefreshFreezeBudget` — every surface that *shows* or *spends*
-  `FreezesRemaining` has to call it first. Three sites do today: the grouped read, the nightly reset
-  job, and `Apply` itself. A new read path that forgets it serves a stale count and refuses a freeze
-  the user is owed, with an ordinary 400 and nothing in the logs. The window is a **calendar month**,
-  not one period length — "two per period" would hand a daily routine two skips a day.
+  `FreezesRemaining` has to call it first: the grouped read, the nightly reset job, `Apply` itself, and
+  the four flat reads — those last go through `RoutineTimePeriodReadRefresher`, because they sit on the
+  framework projection bases and an expression tree can neither refill a budget nor compute
+  `NextResetAt`. A new read path that forgets it serves a stale count and refuses a freeze the user is
+  owed, with an ordinary 400 and nothing in the logs. The window is a **calendar month**, not one
+  period length — "two per period" would hand a daily routine two skips a day.
 
 - **A freeze carries the run; it does not extend it.** `RecomputeStreak` walks the whole completion
   history oldest-first: a met period increments, an unfrozen miss zeroes, and a frozen one — like an
@@ -90,7 +92,9 @@ has no knowledge of Planning at all.
   time-based (finish late, keep the run) and expires on its own; a freeze is budgeted (skip entirely,
   keep the run). `Apply` clears `StreakGraceUntil` / `GraceNotifiedFor` **only** when the frozen entry
   is the newest one, because only that entry can own the open window — freezing an older miss leaves a
-  live window alone.
+  live window alone. Which is exactly why the endpoint runs `CheckGrace` first: a window that has
+  already *lapsed* is not live, and leaving it standing would let the next read zero the very streak
+  the freeze just bought.
 
 - **The counts on a frozen completion row are left exactly as recorded.** A freeze changes how a period
   is *scored*, not what happened in it, so the completion rate stays honest and only the streak walk
