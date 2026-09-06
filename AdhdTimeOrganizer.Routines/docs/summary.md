@@ -47,7 +47,10 @@ has no knowledge of Planning at all.
   - `RoutineTodoListActivityReferenceSource` (`IActivityReferenceSource`) exposes the `ActivityId`
     column to Core's activity-merge/delete machinery and repoints it on merge. **Streaks are carried
     across a merge untouched** — two routines on two duplicate activities stay two routines; merging
-    says the activities were the same thing, not that the habits were.
+    says the activities were the same thing, not that the habits were. ⚠ Except **in the same time
+    period**, where `(UserId, TimePeriodId, ActivityId)` is unique and two cannot both point at the
+    survivor: the survivor's own routine wins and the duplicate's row (and its streak) is deleted. Where
+    the survivor has no routine there, the oldest merged one is repointed instead.
   - `RoutineTodoListOwnedReferenceVerifier` (`IUserOwnedReferenceVerifier`) answers "is this routine
     item id the caller's?" for slices that store the id on their own rows — History's recordings
     today. It filters on the user id it is handed, not the ambient query filter, because this is a

@@ -131,6 +131,8 @@ owned by users in different zones must produce identical results.
 | 9 | The freeze budget is refilled by whoever reads it, not by a job — *every* surface that shows or spends `FreezesRemaining`, today: the grouped read, the nightly reset job, `Apply`, and the four flat reads through `RoutineTimePeriodReadRefresher` | **App-enforced by convention only** — forgetting it is silent. `RoutineFlatPeriodReadTests` guards the projection-base surfaces |
 | 10 | Class names are table names | `BaseEntityConfigure`. Renaming a type is a migration; moving it is not |
 | 11 | A routine item may only name a `TimePeriodId` the caller owns | **App-enforced only** — `RoutineTodoListPeriodRules`, from both write validators. The FK proves the period exists, not whose it is, and the row is stamped with the caller's own `UserId`, so the global filter never sees a mismatch. The reset job then runs with the filter inert and counts the foreign item inside the victim's period |
+| 12 | `(UserId, TimePeriodId, ActivityId)` is unique — one routine per activity per period | **DB** — unique index on `RoutineTodoList` |
+| 13 | An activity merge therefore leaves **at most one routine per period** on the survivor: the survivor's own routine wins, or — where it has none in that period — the oldest merged one is repointed, and the rest are deleted along with their streaks. Across *different* periods everything is repointed and nothing is folded | **App-enforced** — `RoutineTodoListActivityReferenceSource.RepointAsync`. Not silent, but the failure mode is the whole six-slice merge rolling back on the index in 12, not the routine part. `ActivityMergeTests.Merge_TwoRoutinesInTheSamePeriod_ResolvesTheCollision` and its different-periods control are the guards |
 
 ## Navigation index
 
@@ -206,7 +208,7 @@ They are picked up by the `IScopedService` marker scan like any other service, t
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `RoutineTodoListActivityMembershipSource` | `IActivityMembershipSource` | "This activity is on a routine to-do list", faceted by `TimePeriodId`. Applies no user scoping — the query is composed into the caller's | `RoutineTodoListActivityMembershipSource.cs` |
-| `RoutineTodoListActivityReferenceSource` | `IActivityReferenceSource` | Exposes and repoints `RoutineTodoList.ActivityId` for activity merge/delete. Streaks carry across a merge untouched | `RoutineTodoListActivityReferenceSource.cs` |
+| `RoutineTodoListActivityReferenceSource` | `IActivityReferenceSource` | Exposes and repoints `RoutineTodoList.ActivityId` for activity merge/delete. Streaks carry across a merge untouched, except where two routines collide in one period — see invariant 13 | `RoutineTodoListActivityReferenceSource.cs` |
 | `RoutineTodoListOwnedReferenceVerifier` | `IUserOwnedReferenceVerifier` | "Is this `RoutineTodoList` id the caller's?", for slices that store the id on their own rows. Filters on the supplied user id, not the ambient filter | `RoutineTodoListOwnedReferenceVerifier.cs` |
 
 ### Persistence — `infrastructure/persistence/`

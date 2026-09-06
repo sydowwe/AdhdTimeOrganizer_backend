@@ -313,7 +313,7 @@ file only ever exercised the branch that worked.
 
 `Doc impact: done — domain-map.md's ComputeNextReset row and the Reset-and-streak-scoring rule both state that the instant is derived from LastResetAt and may be in the past`
 
-### `CQ-2` 🟠 Activity merge throws when two routines collide in the same period
+### `CQ-2` 🟠 ✅ FIXED 2026-09-07 · Activity merge throws when two routines collide in the same period
 
 `application/seam/RoutineTodoListActivityReferenceSource.cs:35-45` ·
 `infrastructure/persistence/configuration/RoutineTodoListConfiguration.cs:53-54`
@@ -339,7 +339,29 @@ routine in that period, delete the duplicate's row and keep the survivor's — i
 user has been looking at — and say so in the remark. Detect it by grouping the loaded rows on
 `(UserId, TimePeriodId)` before assigning.
 
-`Doc impact: domain-map.md → Invariants (add the merge collision rule); and fix the XML remark on RoutineTodoListActivityReferenceSource`
+**Fixed 2026-09-07**, with the rule the finding proposed and in the shape
+`ActivityProfileActivityReferenceSource.RepointUniqueProfileAsync` already uses one slice over — the
+merge's other collision rule, and the reason `RepointAsync` is a seam method the owning slice implements
+rather than a generic FK rewrite. `RepointAsync` loads the merged rows ordered by id, groups them on
+`(UserId, TimePeriodId)`, and per group keeps the survivor's routine if it has one and deletes the rest.
+
+One addition the finding did not spell out: **where the survivor has no routine in that period**, the
+oldest merged row is repointed and survives rather than everything being dropped — folding a
+long-running duplicate into a survivor that never had the habit should keep the streak. Ordered by id so
+that with several merged activities in one period the answer is "the habit kept longest", not whichever
+row Postgres returned first. Deleted rows still count as repointed, per the seam's own remark.
+
+Nothing else is lost with the deleted row: its steps are owned `ToJson` (they live in the row), and
+`ActivityHistory.RoutineTodoListId` is `SetNull` while the history's own `ActivityId` is repointed by
+History's source in the same transaction.
+
+Pinned in `ActivityMergeTests`: `Merge_TwoRoutinesInTheSamePeriod_ResolvesTheCollision` (asserting the
+surviving row's `Streak` is the survivor's 7, not just that one row survived — keeping the *wrong* one
+looks identical to a count assertion) and `Merge_TwoRoutinesInDifferentPeriods_KeepsBothAndRepointsBoth`
+as the control, which is the case the seam's remark describes and which the collision rule must not
+swallow. `SeedRoutineTodoListAsync` gained a `streak` parameter so the two rows are distinguishable.
+
+`Doc impact: domain-map.md → Invariants (add the merge collision rule); and fix the XML remark on RoutineTodoListActivityReferenceSource` — done, as invariants 12 (the unique index it rests on) and 13, plus the seam row in the navigation index, `summary.md`'s seam bullet, and the remark itself (`DOC-3`).
 
 ### `CQ-3` 🟠 `RoutineTimePeriodValidator` does not mirror two of its DB constraints
 
@@ -878,13 +900,19 @@ was owed here.
 
 ### `DOC-2` — **resolved since the first pass.** `summary.md` now says "the 23 routine endpoints", which matches the tree (2 settings + 5 time-period commands + 4 time-period queries + 6 to-do commands + 3 to-do queries + 3 step endpoints).
 
-### `DOC-3` 🟠 The merge remark asserts behaviour the schema forbids
+### `DOC-3` 🟠 ✅ FIXED 2026-09-07 · The merge remark asserts behaviour the schema forbids
 
 `application/seam/RoutineTodoListActivityReferenceSource.cs:18-22` — see `CQ-2`. Both the code and the
 comment need changing; the comment's *reasoning* (don't invent a streak-folding rule) should survive
 into whatever collision rule is chosen.
 
-`Doc impact: domain-map.md → Invariants (new merge-collision rule)`
+**Fixed 2026-09-07 with `CQ-2`.** The remark keeps its reasoning verbatim — nothing is folded, and the
+losing streak is dropped rather than maxed or summed — and now bounds the claim it was making: two
+routines stay two routines *while they sit in different time periods*, which is the schema's call, not
+the seam's. The collision rule itself is documented on `RepointAsync` rather than on the type, beside
+the code that applies it.
+
+`Doc impact: domain-map.md → Invariants (new merge-collision rule)` — done, as invariants 12 and 13.
 
 ### `DOC-4` 🟠 ✅ FIXED 2026-09-06 · Invariant 9 does not hold — there is a fourth surface that shows the freeze budget
 

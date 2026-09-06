@@ -103,7 +103,7 @@ public static class TodoListTestSeedHelper
 
     public static async Task<long> SeedRoutineTodoListAsync(
         DbContext db, long activityId, long timePeriodId, long userId = TestUserId,
-        int? totalCount = null, int? doneCount = null, bool isDone = false,
+        int? totalCount = null, int? doneCount = null, bool isDone = false, int streak = 0,
         List<TodoListStep>? steps = null, CancellationToken ct = default)
     {
         var entity = new RoutineTodoList
@@ -114,6 +114,8 @@ public static class TodoListTestSeedHelper
             TotalCount = totalCount,
             DoneCount = doneCount,
             IsDone = isDone,
+            Streak = streak,
+            BestStreak = streak,
             DisplayOrder = 1000,
             Steps = steps ?? []
         };

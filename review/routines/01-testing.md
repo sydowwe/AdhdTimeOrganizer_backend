@@ -164,7 +164,7 @@ user's row or an unauthenticated/role-restricted caller.
 | `RoutineTimePeriodSeeder` | 2+ | `RoutineTimePeriodUniqueIndexTests.Seeder_SetupDefaults_…`, plus `PerUserDefaultSeederTests` / `PerUserDefaultMatcherTests` |
 | `RoutineTodoListSeeder` (dev) | 0 | → `TEST-13` |
 | `RoutineTodoListActivityMembershipSource` | ✅ | `SeamWiringTests.ActivityMembershipSources_CoverEveryKey_Exactly` + History's grid tests |
-| `RoutineTodoListActivityReferenceSource` | 1 | `ActivityMergeTests` — single-routine repoint only; the same-period collision is untested → `TEST-2`, `CQ-2` |
+| `RoutineTodoListActivityReferenceSource` | 3 | `ActivityMergeTests` — the single-routine repoint, plus the same-period collision and its different-periods control (`TEST-2`, added with the `CQ-2` fix) |
 | `RoutinesScheduledJobsRegistrar` | 2 | `ModuleWiringTests` `:151-152` and `:348-352`. **Covered** — the first pass was wrong about this |
 | `RoutineTodoListExtensions` | indirect | Only through `CreateRoutineTodoListEndpoint`'s create-path tests |
 | Schema / export classification | ✅ | `ModuleSchemaTests` (all four tables → `routines`), `UserDataExportAndDeletionTests` (two entities on the documented `KnownGaps` list) |
@@ -198,7 +198,7 @@ and assumes only `_SHARED-CONTEXT.md`.
 | ID | Gap | Prompt file |
 |---|---|---|
 | `TEST-1` ✅ | **Written 2026-09-06** with the `CQ-1` / `CQ-8` fix — both pure-domain and sweep-level, plus six `TryResetCatchUp_*` cases the prompt did not anticipate | `ComputeNextResetCatchUp.md` |
-| `TEST-2` | Activity merge with two routines colliding on `(UserId, TimePeriodId, ActivityId)` — `CQ-2` | `ActivityMergeRoutineCollision.md` |
+| `TEST-2` ✅ | **Written 2026-09-07** with the `CQ-2` fix — the collision case plus the different-periods control the prompt asked for | `ActivityMergeRoutineCollision.md` |
 | `TEST-3` | Create/Update a routine item with a **foreign** `TimePeriodId` — `SEC-1` | `RoutineTodoListCrud.md` (§1) |
 | `TEST-4` | Range tests cannot distinguish FluentValidation from a DB check violation — `CQ-3` | `ValidatorVsDbConstraint.md` (§1) |
 | `TEST-5` | `PUT /routine-todo-list` flipping `IsDone`: no event, no streak, steps re-keyed — `SEC-2`, `CQ-4` | `RoutineTodoListCrud.md` (§2, §3) |

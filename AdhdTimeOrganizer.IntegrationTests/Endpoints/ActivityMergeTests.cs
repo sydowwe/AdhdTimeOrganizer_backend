@@ -328,6 +328,82 @@ public class ActivityMergeTests(AppDbContextFixture fixture) : PostgresTestBase(
             "both pattern rules are the user's, and an activity may be the target of any number of them");
     }
 
+    /// <summary>
+    /// `CQ-2` — <c>RoutineTodoList</c> is unique on <c>(UserId, TimePeriodId, ActivityId)</c>, so two
+    /// routines in the <b>same</b> period cannot both end up on the survivor. The survivor's own routine
+    /// wins and the duplicate's row is deleted.
+    /// </summary>
+    /// <remarks>
+    /// Left unhandled this is not a routines-shaped failure: the merge is one transaction fanning out
+    /// across six slices, so the index rejects the save and the <em>whole</em> merge fails on an
+    /// irreversible action the user already confirmed. Asserting on the surviving row's <c>Streak</c>
+    /// rather than on the count, because "one routine survived" is also what a merge that kept the wrong
+    /// one looks like — and a streak is the thing no re-created activity brings back.
+    /// </remarks>
+    [Fact]
+    public async Task Merge_TwoRoutinesInTheSamePeriod_ResolvesTheCollision()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Routine Survivor");
+        var duplicateId = await SeedActivityAsync(db, "Routine Duplicate");
+
+        var periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, ct: CancellationToken);
+        var survivorRoutineId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(
+            db, survivorId, periodId, streak: 7, ct: CancellationToken);
+        var duplicateRoutineId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(
+            db, duplicateId, periodId, streak: 2, ct: CancellationToken);
+
+        var response = await MergeAsync(survivorId, duplicateId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "the whole merge must not fail on a unique index");
+
+        await using var assertDb = CreateDbContext();
+        var routines = await assertDb.Set<RoutineTodoList>()
+            .Where(r => r.TimePeriodId == periodId)
+            .ToListAsync(CancellationToken);
+
+        routines.Should().ContainSingle("(UserId, TimePeriodId, ActivityId) is unique — two cannot survive in one period");
+        routines[0].Id.Should().Be(survivorRoutineId, "the survivor is the row the user chose to keep");
+        routines[0].ActivityId.Should().Be(survivorId);
+        routines[0].Streak.Should().Be(7, "the survivor's streak is the one the user has been looking at");
+
+        (await assertDb.Set<RoutineTodoList>().AnyAsync(r => r.Id == duplicateRoutineId, CancellationToken))
+            .Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The control the collision rule must not swallow: two routines on the two activities in
+    /// <em>different</em> periods are two different habits, and both survive with their streaks intact.
+    /// This is the case the seam's remark describes.
+    /// </summary>
+    [Fact]
+    public async Task Merge_TwoRoutinesInDifferentPeriods_KeepsBothAndRepointsBoth()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Two-Period Survivor");
+        var duplicateId = await SeedActivityAsync(db, "Two-Period Duplicate");
+
+        // (UserId, LengthInDays) is unique on a period, so the second one has to be a different length.
+        var dailyPeriodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, lengthInDays: 1, resetAnchorDay: 0, ct: CancellationToken);
+        var weeklyPeriodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, lengthInDays: 7, ct: CancellationToken);
+
+        var survivorRoutineId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(
+            db, survivorId, dailyPeriodId, streak: 7, ct: CancellationToken);
+        var duplicateRoutineId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(
+            db, duplicateId, weeklyPeriodId, streak: 2, ct: CancellationToken);
+
+        var response = await MergeAsync(survivorId, duplicateId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var assertDb = CreateDbContext();
+        var survivorRoutine = await assertDb.Set<RoutineTodoList>().FirstAsync(r => r.Id == survivorRoutineId, CancellationToken);
+        var duplicateRoutine = await assertDb.Set<RoutineTodoList>().FirstAsync(r => r.Id == duplicateRoutineId, CancellationToken);
+
+        survivorRoutine.ActivityId.Should().Be(survivorId);
+        survivorRoutine.Streak.Should().Be(7);
+        duplicateRoutine.ActivityId.Should().Be(survivorId, "nothing collides across periods, so it is repointed rather than dropped");
+        duplicateRoutine.Streak.Should().Be(2, "merging says the activities were the same thing, not that the habits were");
+    }
+
     // ---- the permitted-but-worth-stating cases ---------------------------------------------------
 
     /// <summary>
