@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.Routines.domain.serviceContract;
+using AdhdTimeOrganizer.Routines.infrastructure.persistence;
 using AdhdTimeOrganizer.TodoLists.application.endpoint.todoList;
 using FastEndpoints;
 
@@ -30,15 +31,12 @@ public class RoutineToggleIsDoneTodoListEndpoint(
         if (timePeriodIds.Count == 0)
             return [];
 
-        var periods = await _dbContext.Set<RoutineTimePeriod>()
-            .Where(tp => timePeriodIds.Contains(tp.Id))
-            .Include(tp => tp.RoutineTodoListColl)
-            .ThenInclude(i => i.Steps)
-            .ToListAsync(ct);
+        var periods = await LoadPeriodsAsync(timePeriodIds, ct);
 
+        var changed = false;
         foreach (var period in periods)
         {
-            RoutineResetService.CheckGrace(period, now);
+            changed |= RoutineResetService.CheckGrace(period, now);
             // Catch-up, not a single cycle: a toggle can be the first thing to notice a period that rolled over
             // several times, and it must leave that period current.
             var result = RoutineResetService.TryResetCatchUp(period, period.RoutineTodoListColl.ToList(), now);
@@ -46,6 +44,28 @@ public class RoutineToggleIsDoneTodoListEndpoint(
             {
                 _dbContext.Set<RoutinePeriodCompletion>().AddRange(r.Completions);
                 _reset.Add((period, r.Latest));
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            try
+            {
+                // Committed on its own, ahead of the toggle, because it is the only part of this request that
+                // can lose a race: three call sites apply the same lazy reset and none of them locks. Splitting
+                // it off keeps the recovery below from having to reconstruct the toggle as well.
+                await _dbContext.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (RoutineResetConflict.IsLostRace(ex))
+            {
+                // Another caller closed the cycle first, writing what we were about to (see
+                // RoutineResetConflict). Discard our copy and re-read, so the toggle below lands on the
+                // committed state rather than on a change set the database has already rejected.
+                _dbContext.ChangeTracker.Clear();
+                // The winner announces the reset; we only toggle.
+                _reset.Clear();
+                periods = await LoadPeriodsAsync(timePeriodIds, ct);
             }
         }
 
@@ -53,6 +73,13 @@ public class RoutineToggleIsDoneTodoListEndpoint(
                 .SelectMany(p => p.RoutineTodoListColl), i => ids.Contains(i.Id))
             .ToList();
     }
+
+    private Task<List<RoutineTimePeriod>> LoadPeriodsAsync(List<long> timePeriodIds, CancellationToken ct) =>
+        _dbContext.Set<RoutineTimePeriod>()
+            .Where(tp => timePeriodIds.Contains(tp.Id))
+            .Include(tp => tp.RoutineTodoListColl)
+            .ThenInclude(i => i.Steps)
+            .ToListAsync(ct);
 
     protected override void AfterItemToggled(RoutineTodoList entity, DateTime now)
     {

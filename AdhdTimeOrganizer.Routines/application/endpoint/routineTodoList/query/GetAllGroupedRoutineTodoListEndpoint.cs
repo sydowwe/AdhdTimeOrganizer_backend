@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Routines.application.dto.response.todoList;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.Routines.domain.serviceContract;
+using AdhdTimeOrganizer.Routines.infrastructure.persistence;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
 
@@ -65,7 +66,20 @@ public class GetAllGroupedRoutineTodoListEndpoint(
         if (changed)
         {
             dbContext.Set<RoutinePeriodCompletion>().AddRange(newCompletions);
-            await dbContext.SaveChangesAsync(ct);
+            try
+            {
+                await dbContext.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (RoutineResetConflict.IsLostRace(ex))
+            {
+                // A second tab, or the nightly sweep mid-flight, closed the same cycle a moment earlier. Drop
+                // our copy rather than 500 on the module's most-hit screen: the winner wrote the same values
+                // (see RoutineResetConflict), so the in-memory periods rendered below still match the row.
+                dbContext.ChangeTracker.Clear();
+                // And say nothing — the winner is the one that owes the end-of-period summary, and two
+                // requests announcing the same reset is the same bug pointed the other way.
+                reset.Clear();
+            }
         }
 
         // This read applies resets lazily, so it is a real reset site and owes the same summary the nightly job

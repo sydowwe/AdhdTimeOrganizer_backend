@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.Routines.domain.serviceContract;
+using AdhdTimeOrganizer.Routines.infrastructure.persistence;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.Contracts.scheduling;
 
@@ -39,23 +40,48 @@ public class RoutineTodoListResetJobHandler(
         var now = DateTime.UtcNow;
         var totalReset = 0;
         var periodsChanged = false;
-        var completionRecords = new List<RoutinePeriodCompletion>();
         var reset = new List<(RoutineTimePeriod Period, RoutineResetService.RoutinePeriodReset Result)>();
 
         foreach (var period in periods)
         {
             var items = period.RoutineTodoListColl.ToList();
-            periodsChanged |= RoutineResetService.CheckGrace(period, now);
+            var changed = RoutineResetService.CheckGrace(period, now);
             // The freeze budget refills lazily, so the nightly sweep is the one thing that brings a period the
             // user has not opened in a month back to a full budget before they look at it.
-            periodsChanged |= RoutineStreakFreezeService.RefreshFreezeBudget(period, now);
+            changed |= RoutineStreakFreezeService.RefreshFreezeBudget(period, now);
             // Catch-up, not a single cycle: a period nobody opened for two months is closed out in this one run
             // and announced once, rather than dripping one retroactive miss per nightly run for two months.
             var result = RoutineResetService.TryResetCatchUp(period, items, now);
             if (result is { } r)
             {
-                completionRecords.AddRange(r.Completions);
-                reset.Add((period, r.Latest));
+                dbContext.Set<RoutinePeriodCompletion>().AddRange(r.Completions);
+                changed = true;
+            }
+
+            if (!changed)
+                continue;
+
+            try
+            {
+                // One save per period, not one for the whole sweep. A request that closed the same cycle a
+                // moment earlier collides here (see RoutineResetConflict); batched, that single collision
+                // aborted every period still to come and took the grace mutations already accumulated in the
+                // change tracker with it. DisallowConcurrent guards job-vs-job, not job-vs-request.
+                await dbContext.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (RoutineResetConflict.IsLostRace(ex))
+            {
+                logger.LogInformation(
+                    "Period {PeriodId} was closed by a concurrent request; skipping it and continuing the sweep",
+                    period.Id);
+                await DiscardAsync(period, items, result?.Completions, ct);
+                continue;
+            }
+
+            periodsChanged = true;
+            if (result is { } committed)
+            {
+                reset.Add((period, committed.Latest));
                 totalReset += items.Count;
             }
         }
@@ -66,8 +92,6 @@ public class RoutineTodoListResetJobHandler(
             return;
         }
 
-        dbContext.Set<RoutinePeriodCompletion>().AddRange(completionRecords);
-        await dbContext.SaveChangesAsync(ct);
         logger.LogInformation("Reset {Count} routine todo list items", totalReset);
 
         // After the commit, deliberately: the summary announces a reset that has happened, and a notification
@@ -75,5 +99,27 @@ public class RoutineTodoListResetJobHandler(
         // the part that makes that safe).
         foreach (var (period, result) in reset)
             await notifier.NotifyPeriodEndedAsync(period, result.Completion, result.Outcome, ct);
+    }
+
+    /// <summary>
+    /// Rolls one period's rejected attempt out of the change tracker, leaving every period still to come
+    /// tracked. <c>ChangeTracker.Clear()</c> is what a request does here — it can afford to, because it is
+    /// about to end — but in a sweep it would detach the periods not yet visited and their later saves would
+    /// silently write nothing.
+    /// </summary>
+    private async Task DiscardAsync(
+        RoutineTimePeriod period,
+        List<RoutineTodoList> items,
+        IReadOnlyList<RoutinePeriodCompletion>? completions,
+        CancellationToken ct)
+    {
+        foreach (var completion in completions ?? [])
+            dbContext.Entry(completion).State = EntityState.Detached;
+
+        // Reload rather than detach: these carry the winner's committed values now, including the row_version
+        // the failed save was checked against.
+        await dbContext.Entry(period).ReloadAsync(ct);
+        foreach (var item in items)
+            await dbContext.Entry(item).ReloadAsync(ct);
     }
 }

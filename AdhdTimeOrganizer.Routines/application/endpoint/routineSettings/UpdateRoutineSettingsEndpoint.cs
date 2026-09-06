@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Routines.application.dto.request.todoList;
 using AdhdTimeOrganizer.Routines.application.validator;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using FastEndpoints;
+using Npgsql;
 using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Routines.application.endpoint.todoList.routineSettings;
@@ -40,14 +41,29 @@ public class UpdateRoutineSettingsEndpoint(DbContext dbContext)
             // UserId explicitly: this is the only insert path, and it must not depend on the ambient user.
             settings = new UserRoutineSettings { UserId = userId, RoutineReviewDismissedForWeekStart = weekStart };
             await dbContext.Set<UserRoutineSettings>().AddAsync(settings, ct);
+
+            try
+            {
+                await dbContext.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                // Two concurrent first writes both found no row and both inserted against the unique user_id
+                // index. Detach and update the winning row — same shape as UpdateReminderKindPreferenceEndpoint,
+                // which upserts the same per-user settings row one module over.
+                dbContext.ChangeTracker.Clear();
+                settings = await dbContext.Set<UserRoutineSettings>().FirstAsync(s => s.UserId == userId, ct);
+                settings.RoutineReviewDismissedForWeekStart = weekStart;
+                await dbContext.SaveChangesAsync(ct);
+            }
         }
         else
         {
             settings.RoutineReviewDismissedForWeekStart = weekStart;
             dbContext.Set<UserRoutineSettings>().Update(settings);
+            await dbContext.SaveChangesAsync(ct);
         }
 
-        await dbContext.SaveChangesAsync(ct);
         await Send.NoContentAsync(ct);
     }
 }

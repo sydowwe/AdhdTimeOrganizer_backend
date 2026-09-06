@@ -139,7 +139,7 @@ the endpoint refusing everything) and `UpdateRoutineTodoList_LoweringTotalCount_
 
 `Doc impact: domain-map.md → Business rules (state that IsDone/DoneCount/DisplayOrder on a routine item are server-owned, and why)` — done, as the "Completion is server-owned" paragraph, plus a guard row in testing.md.
 
-### `SEC-3` 🟠 Three reset sites race on the unique `(TimePeriodId, PeriodStart)` index, and none of the three handles the collision
+### `SEC-3` 🟠 ✅ FIXED 2026-09-06 · Three reset sites race on the unique `(TimePeriodId, PeriodStart)` index, and none of the three handles the collision
 
 `application/endpoint/routineTodoList/query/GetAllGroupedRoutineTodoListEndpoint.cs:63-67` ·
 `application/endpoint/routineTodoList/command/RoutineToggleIsDoneTodoListEndpoint.cs:45` ·
@@ -173,11 +173,50 @@ and `RetryDbConcurrencyHelper.IsUniqueViolation` (`:108`) for the retrying varia
 the job's inserts per-period rather than one batched `SaveChanges` stops one collision taking the sweep
 down — that part is worth doing on its own regardless.
 
-`Doc impact: none`
+**Fixed 2026-09-06, all three sites**, including the per-period `SaveChanges` in the job.
+
+One correction to the finding, which widens the fix rather than changing it. A unique violation is only
+**half** the race. `RoutineTimePeriod` carries a `row_version` concurrency token (every table through
+`BaseEntityConfigure` does), and the reset updates the period as well as inserting the completion — so the
+loser surfaces as a `DbUpdateConcurrencyException` whenever EF's batch happens to execute the period update
+before the insert. Catching only `PostgresErrorCodes.UniqueViolation`, as the four cited precedents do,
+would have left roughly half the collisions 500ing. Both shapes mean the same thing and are recognised
+together in `infrastructure/persistence/RoutineResetConflict.cs`, whose remark records why — and warns that
+it may only wrap a save whose entire change set *is* the reset, since an unrelated unique violation in the
+same batch is indistinguishable from here.
+
+Swallowing is correct for the reason the finding gives — every value the reset writes is derived from the
+period and the clock alone, so the winner wrote exactly what the loser was about to — but *what to do with
+the loser's uncommitted work* differs per site, and none of the three could simply ignore the exception:
+
+- **Grouped read** — `ChangeTracker.Clear()` and carry on rendering from the in-memory periods, which hold
+  the same values the winner committed. The `reset` list is cleared too: the winner owes the
+  end-of-period summary, and two requests announcing one reset is the same bug pointed the other way.
+- **Toggle** — the reset is now committed **on its own, ahead of the toggle**, in `FetchAndPrepare`. That is
+  the change that makes recovery possible at all: the reset is the only part of the request that can lose
+  the race, so on a collision the tracker is cleared and the periods re-read, and the user's tick then
+  lands on the committed state instead of on a change set the database has already rejected. Splitting the
+  transaction is deliberate — the reset is idempotent and independent of whether the toggle succeeds.
+- **Nightly job** — one `SaveChangesAsync` per period, as the finding asked. The recovery here cannot use
+  `ChangeTracker.Clear()`: it would detach the periods not yet visited and their later saves would silently
+  write nothing. `DiscardAsync` instead detaches just the added completions and reloads that period and its
+  items, so the rest of the sweep proceeds untouched. A skipped period logs at Information and is picked up
+  by the next access.
+
+Pinned in `AdhdTimeOrganizer.IntegrationTests/Routines/RoutineResetConcurrencyTests.cs` (4 cases for this
+finding). The loser is **simulated, not raced**: the test seeds the completion row the winner's transaction
+would have written for exactly the cycle the site is about to close — the one row that can collide — so
+every case is deterministic where a real race would be timing-dependent. `GroupedRead_WithNoCollision_…` is
+half the pin, because "catch and carry on" could otherwise degrade into "never write anything" and the
+other cases would still pass. The sweep case asserts on the **other** period's rows, which is the part the
+batched save used to lose.
+
+`Doc impact: none` — a guard row was added to `testing.md` anyway, since this is exactly the kind of
+mechanism that breaks without an error.
 
 ### `SEC-4` — **withdrawn.** See Corrections to the first pass.
 
-### `SEC-5` 🟡 Concurrent first-time `PUT /routine/settings` 500s
+### `SEC-5` 🟡 ✅ FIXED 2026-09-06 · Concurrent first-time `PUT /routine/settings` 500s
 
 `application/endpoint/routineSettings/UpdateRoutineSettingsEndpoint.cs:36-43`
 
@@ -187,6 +226,26 @@ Two concurrent first writes both find no row and both insert against the unique 
 dismissal click), listed because the fix is three lines and the framework already ships the shape at
 `UpdateReminderKindPreferenceEndpoint.cs:51`, which is the same "upsert a single per-user settings row"
 endpoint one module over.
+
+**Fixed 2026-09-06**, as the finding prescribed and in the precedent's exact shape: the insert branch gets
+its own `SaveChangesAsync`, and a `23505` on `ix_user_routine_settings_user_id` clears the tracker, re-reads
+the winning row and updates it. The `SaveChangesAsync` moved into both branches, since only one of them
+needs wrapping. Unlike `SEC-3` this catches the unique violation **only** — there is no concurrency-token
+half here, because the loser of a first-write race updates a row it has just read fresh.
+
+Pinned by `RoutineResetConcurrencyTests.FirstTimeSettingsWrite_UnderConcurrency_AllSucceed_AndLeaveOneRow`,
+which races two writes on an account with no row and asserts both `204`s and a single row. This one is
+genuinely raced rather than simulated: the recovery branch needs the row absent at read time and present at
+insert time, which nothing can arrange from outside. Two writers is both the scenario the finding describes
+and the shape the recovery is written for; in the rare run where they do not overlap the test passes
+vacuously rather than flaking.
+
+**One residual, deliberately left.** Two concurrent writes to a settings row that *already exists* still
+collide on `row_version` and 500 — the `else` branch, untouched by this fix, and the same for all four
+framework precedents. A five-way version of the test above surfaced it (the losers all recover, then contend
+with each other on the update). It is a different finding from this one, which is about the first write, and
+fixing it means either a bounded retry loop or an `ExecuteUpdate`-based upsert — a shape no endpoint in the
+solution uses today. Worth raising on its own rather than smuggling in here.
 
 `Doc impact: none`
 

@@ -9,7 +9,7 @@ Routines has **no test project of its own**. Everything lives in
 |---|---|---|
 | `Services/` | Nothing — plain xUnit | `RoutineResetServiceTests`, `RoutineStreakFreezeServiceTests`. Both domain services are static and pure, so the streak arithmetic is unit-tested against hand-built objects with an injected `now`. |
 | `Endpoints/` | Postgres | `RoutineGroupedReadAndMoveItemTests`, `RoutinePeriodCompletionHistoryTests`, `RoutineTimePeriodRangeConstraintTests`, `RoutineTimePeriodUniqueIndexTests`, `RoutineStreakFreezeTests`, `UserRoutineSettingsTests`. |
-| `Routines/` | Postgres | The two job sweeps and the notification mapping: `RoutineTodoListResetJobHandlerTests`, `RoutinePeriodNudgeJobTests`, `RoutineNotificationTests`. |
+| `Routines/` | Postgres | The two job sweeps, the notification mapping and the write races: `RoutineTodoListResetJobHandlerTests`, `RoutinePeriodNudgeJobTests`, `RoutineNotificationTests`, `RoutineStreakFreezeGraceTests`, `RoutineResetConcurrencyTests`. |
 
 Infrastructure comes from `Sydowwe.Framework.Testing`: `PostgresTestBase` over the `"Postgres"`
 collection (`AppDbContextFixture`, a real container), and `UserRoleTestAuthHandler` for role and
@@ -78,6 +78,7 @@ default.
 | `RoutineStreakFreezeGraceTests.SpendFreeze_WithALapsedGraceWindow_ClearsIt_SoTheNextReadKeepsTheRestoredStreak` | `CheckGrace` runs **before** `Apply`. `Apply` clears the window only for the newest entry, so freezing an older miss against a lapsed window leaves it standing; `RecomputeStreak` only ever raises, so the response is correct and the *next* read zeroes the streak. Asserted through a second request for exactly that reason |
 | `RoutineStreakFreezeGraceTests.SpendFreeze_OnAPeriodThatElapsedWithNoItems_Refuses_AndChargesNothing` | `TotalCount == 0` is `NotAMiss`. `IsSuccess` says false for an item-less period, but `RecomputeStreak` skips those rows and `TryReset` leaves the streak `NotEvaluated` — so the run already carries across it and a freeze would be charged for a no-op |
 | `RoutineTodoListPeriodRulesTests` (create + update, foreign `TimePeriodId`) | Invariant 11, asserted on rows. A routine item pinned into another user's period is stamped with the attacker's own `UserId`, so nothing errors and no read of theirs shows it — the only visible effect is the victim's streak breaking. Deleting the validators' `p.UserId == userId` re-opens it silently |
+| `RoutineResetConcurrencyTests` (5 cases) | Three sites close a cycle and none locks, so the completion insert's unique `(TimePeriodId, PeriodStart)` is where two callers meet. The loser is simulated by seeding the row the winner would have written, which is deterministic where a real race is not. Pins that the grouped read still serves 200, the toggle still applies the user's tick, and — the one that used to hurt most — that a collision on one period no longer aborts the rest of the nightly sweep. The no-collision control is half the pin: "catch and carry on" must not degrade into "never write anything". The last case races two first-time `PUT /routine/settings` writes, which is the only way to reach that endpoint's recovery branch |
 
 Owned elsewhere but load-bearing for this module: `SeamWiringTests` (both keyed source families cover
 every key exactly once — a renamed `ActivityMembershipSourceKeys.RoutineTodoList` is otherwise
