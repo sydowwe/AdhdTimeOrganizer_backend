@@ -167,7 +167,7 @@ endpoint one module over.
 
 ## 6. Code quality
 
-### `CQ-1` 🔴 Monthly and yearly anchored periods never reset — and every user has two
+### `CQ-1` 🔴 ✅ FIXED 2026-09-06 · Monthly and yearly anchored periods never reset — and every user has two
 
 `domain/service/RoutineResetService.cs:36-76`
 
@@ -207,7 +207,25 @@ caller's `now < nextReset` comparison decide whether it is due. That is exactly 
 does. Note this makes catch-up one cycle per invocation, same as the weekly path — see `CQ-8`; the two
 want fixing together. Pair with `TEST-1`, whose absence is what let this ship.
 
-`Doc impact: domain-map.md → Domain services (ComputeNextReset row: state that the returned instant is derived from LastResetAt and may be in the past — being in the past is what makes a period due)`
+**Fixed 2026-09-06**, together with `CQ-8` — the two were coupled exactly as the finding said. Both
+`while (candidate < now)` loops are gone; the monthly and yearly branches now return the first
+candidate after `lastReset` and nothing else, which is what the weekly branch always did. The returned
+instant is therefore allowed to be in the past, and `ComputeNextReset`'s `now` argument no longer moves
+the answer at all — it is kept only for symmetry with the rest of the service, and the XML doc says so.
+
+The catch-up the loops were reaching for lives in `TryResetCatchUp` (`CQ-8`), where it can advance
+`LastResetAt` and write the completion rows rather than silently skipping cycles.
+
+Pinned by `ComputeNextReset_MonthlyPeriod_WhenTheBoundaryHasPassed_ReturnsThatBoundary_NotTheNextOne`
+and its yearly twin, `TryReset_Batch_MonthlyPeriodPastItsAnchor_Resets` (the assertion that matters —
+`ComputeNextReset` is only interesting through its callers), the negative control
+`TryReset_Batch_MonthlyPeriodBeforeItsAnchor_DoesNotReset` so the fix cannot degrade into "always
+return a past boundary", and at sweep level by
+`ResetSweep_MonthlyAnchoredPeriod_ResetsWhenItsAnchorHasPassed`. That last one needed
+`SeedPeriodAsync` to stop hard-coding `ResetAnchorDay = 0`, which is why every existing test in the
+file only ever exercised the branch that worked.
+
+`Doc impact: done — domain-map.md's ComputeNextReset row and the Reset-and-streak-scoring rule both state that the instant is derived from LastResetAt and may be in the past`
 
 ### `CQ-2` 🟠 Activity merge throws when two routines collide in the same period
 
@@ -366,7 +384,7 @@ or the caller needs to make the decision.
 
 `Doc impact: domain-map.md → Domain services (UpdateItemStreak row: note it is once-per-cycle, not once-per-toggle)`
 
-### `CQ-8` 🟠 A dormant period catches up one cycle per invocation
+### `CQ-8` 🟠 ✅ FIXED 2026-09-06 · A dormant period catches up one cycle per invocation
 
 `domain/service/RoutineResetService.cs:236`
 
@@ -388,7 +406,40 @@ and jump `LastResetAt` forward past the remainder — and collapse the skipped c
 notification. The completion rows for skipped cycles are arguably worth writing (the heatmap should show
 the gap); the notifications are not.
 
-`Doc impact: domain-map.md → Domain services (TryReset list overload: document the catch-up semantics)`
+**Fixed 2026-09-06**, with `CQ-1`. `TryReset` keeps its one-cycle contract — the single-item overload's
+whole design depends on it, and a caller that means one cycle should be able to say so — and the loop
+lives in a new `RoutineResetService.TryResetCatchUp(period, items, now)` that all three reset sites now
+call instead.
+
+Departures from the finding's prescription, both deliberate:
+
+- **The cap is not `HistoryDepth`, and nothing is jumped past.** Capping the *walk* at `HistoryDepth`
+  would stop scoring cycles that really happened; the streak is meant to reflect all of them. The walk
+  runs to completion (hard stop at 1200 cycles, ~three years of daily dormancy, purely as a guard
+  against a clock-skewed `LastResetAt`) and it is the **completion rows** that are trimmed to the
+  newest `HistoryDepth` before persisting — those are the only ones any read ever returns, so writing
+  the rest is churn. The heatmap still shows the gap; it just does not show rows that fell off it.
+- **`CheckGrace` runs inside the loop**, against the boundary being closed rather than against `now`.
+  The old drip got this for free (each nightly run called `CheckGrace` with that day's `now`), so
+  collapsing the cycles without it would have let a streak survive a grace window that lapsed two
+  cycles ago.
+
+Notifications collapse: the catch-up returns one `Latest` result and the three call sites notify on
+that, so two months away is one summary, not sixty.
+
+Pinned by six `TryResetCatchUp_*` unit cases (all cycles closed in one pass; nothing due → null;
+completions trimmed to `HistoryDepth` and it is the *newest* that survive; `Latest` is the most
+recently closed cycle; a lapsed grace from an earlier cycle breaks the streak; every cycle scored, not
+just the first), and end-to-end by `ResetSweep_PeriodDormantForSeveralCycles_ClosesThemAllInOneRun`
+plus `GroupedRead_PeriodDormantForSeveralCycles_CatchesThemAllUpInOneRead`.
+
+`GroupedRead_ElapsedPeriod_TriggersResetAndStreakEvaluation` moved from a 30-day-old `LastResetAt` to
+an 8-day one. It asserted `Streak == 1` and a single completion row on a 7-day period that had been
+dormant for four cycles — true under the drip, wrong under the catch-up, where three of those four
+cycles are genuine misses. The single-cycle case it was written for is what it pins now; the
+multi-cycle case is the new test beside it.
+
+`Doc impact: done — domain-map.md's Domain services table gains a TryResetCatchUp row, the TryReset list row says "closes one cycle", and the Reset rule spells out the catch-up`
 
 ### `CQ-13` 🟠 Spending a freeze does not check grace first, so a lapsed window can zero the streak the freeze just bought
 

@@ -39,11 +39,13 @@ public class RoutineToggleIsDoneTodoListEndpoint(
         foreach (var period in periods)
         {
             RoutineResetService.CheckGrace(period, now);
-            var result = RoutineResetService.TryReset(period, period.RoutineTodoListColl.ToList(), now);
+            // Catch-up, not a single cycle: a toggle can be the first thing to notice a period that rolled over
+            // several times, and it must leave that period current.
+            var result = RoutineResetService.TryResetCatchUp(period, period.RoutineTodoListColl.ToList(), now);
             if (result is { } r)
             {
-                _dbContext.Set<RoutinePeriodCompletion>().Add(r.Completion);
-                _reset.Add((period, r));
+                _dbContext.Set<RoutinePeriodCompletion>().AddRange(r.Completions);
+                _reset.Add((period, r.Latest));
             }
         }
 

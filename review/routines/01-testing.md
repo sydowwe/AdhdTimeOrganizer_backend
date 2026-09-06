@@ -197,7 +197,7 @@ and assumes only `_SHARED-CONTEXT.md`.
 
 | ID | Gap | Prompt file |
 |---|---|---|
-| `TEST-1` | `ComputeNextReset` never tested with `now` past the computed candidate — hides `CQ-1` | `ComputeNextResetCatchUp.md` |
+| `TEST-1` ✅ | **Written 2026-09-06** with the `CQ-1` / `CQ-8` fix — both pure-domain and sweep-level, plus six `TryResetCatchUp_*` cases the prompt did not anticipate | `ComputeNextResetCatchUp.md` |
 | `TEST-2` | Activity merge with two routines colliding on `(UserId, TimePeriodId, ActivityId)` — `CQ-2` | `ActivityMergeRoutineCollision.md` |
 | `TEST-3` | Create/Update a routine item with a **foreign** `TimePeriodId` — `SEC-1` | `RoutineTodoListCrud.md` (§1) |
 | `TEST-4` | Range tests cannot distinguish FluentValidation from a DB check violation — `CQ-3` | `ValidatorVsDbConstraint.md` (§1) |

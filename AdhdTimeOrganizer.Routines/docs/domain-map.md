@@ -51,6 +51,16 @@ Met → `Extended`, streak increments. Missed with `StreakGraceDays > 0` → `On
 `NotEvaluated`**, streak untouched: completion says nothing about a routine with nothing in it. Either
 way a `RoutinePeriodCompletion` row is written and the items un-tick.
 
+`ComputeNextReset` is derived from `LastResetAt` alone — its `now` argument does not move the answer,
+and **the instant it returns is allowed to be in the past**: being in the past is exactly what makes a
+period due, which is what every caller's `now < nextReset` gate reads. One `TryReset` closes one cycle,
+so dormancy is caught up by `TryResetCatchUp`, which loops it until the period is current. All three
+reset sites (the nightly job, the grouped read, the bulk toggle) call the catch-up, never the single
+`TryReset` — a site that calls `TryReset` directly resolves one cycle per request and leaves a period
+that has been away for a month a month stale. The catch-up writes a completion row per closed cycle
+(capped at `HistoryDepth` — older rows would fall straight off the heatmap) but hands back one
+`Latest` result, so a dormancy costs the user one notification rather than one per missed cycle.
+
 **Grace.** `CheckGrace` must run before `TryReset` on *every* access — a lapsed window breaks the
 streak, and if only the reset job checked it, a streak would survive indefinitely as long as nobody's
 period rolled over.
@@ -135,10 +145,11 @@ transaction that read the period.
 
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
-| `RoutineResetService.ComputeNextReset` | Static fn | Next reset instant from length + anchor. Also feeds `RoutineTimePeriodResponse.NextResetAt` | `RoutineResetService.cs` |
+| `RoutineResetService.ComputeNextReset` | Static fn | The boundary closing the cycle `LastResetAt` opened, from length + anchor. Derived from `LastResetAt`, **not** from `now` — the instant may be in the past, and that is what "due" means. Also feeds `RoutineTimePeriodResponse.NextResetAt` | `RoutineResetService.cs` |
 | `RoutineResetService.CheckGrace` | Static fn | Breaks a lapsed streak grace window. Call before `TryReset` on **every** read/write site | `RoutineResetService.cs` |
 | `RoutineResetService.TryReset(period, item, now)` | Static fn | Single-item overload — step toggle only. Does **not** advance `LastResetAt`, write a completion, or score the streak | `RoutineResetService.cs` |
-| `RoutineResetService.TryReset(period, items, now)` | Static fn | List overload — the reset job, the grouped read, the bulk toggle. Advances the streak, returns the `RoutinePeriodCompletion` + `StreakOutcome`, clears `EndingSoonNotifiedFor` | `RoutineResetService.cs` |
+| `RoutineResetService.TryReset(period, items, now)` | Static fn | List overload. Closes **one** cycle: advances the streak, returns the `RoutinePeriodCompletion` + `StreakOutcome`, clears `EndingSoonNotifiedFor`. Call it directly only when one cycle is what you mean | `RoutineResetService.cs` |
+| `RoutineResetService.TryResetCatchUp(period, items, now)` | Static fn | What the reset job, the grouped read and the bulk toggle actually call. Loops the list overload until the period is current (capped at 1200 cycles), returns the newest `HistoryDepth` completions plus one `Latest` result to notify on. A grace window opened by one closed cycle is checked against the *next* boundary, not against `now` | `RoutineResetService.cs` |
 | `RoutineResetService.EvaluateEndingSoon` / `ShouldWarnGraceExpiring` | Static fn | The two nudge conditions — nudge job only | `RoutineResetService.cs` |
 | `RoutineResetService.UpdateItemStreak` | Static fn | Item-level streak after a completing toggle | `RoutineResetService.cs` |
 | `RoutineStreakFreezeService.RefreshFreezeBudget` | Static fn | Lazy monthly refill. **Nothing else refills the budget** — there is no job | `RoutineStreakFreezeService.cs` |
@@ -163,7 +174,7 @@ They are picked up by the `IScopedService` marker scan like any other service, t
 
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
-| `RoutineTodoListResetJobHandler` | Job (`Routines.TodoListReset`) | 02:00 UTC daily. Sweeps every period: `CheckGrace` → `RefreshFreezeBudget` → `TryReset`; persists completions, then notifies **after** the commit | `infrastructure/jobs/RoutineTodoListResetJobHandler.cs` |
+| `RoutineTodoListResetJobHandler` | Job (`Routines.TodoListReset`) | 02:00 UTC daily. Sweeps every period: `CheckGrace` → `RefreshFreezeBudget` → `TryResetCatchUp`; persists completions, then notifies **after** the commit | `infrastructure/jobs/RoutineTodoListResetJobHandler.cs` |
 | `RoutinePeriodNudgeJobHandler` | Job (`Routines.PeriodNudge`) | 09:00 UTC daily — deliberately not alongside the reset, because this one is addressed to a person. Skips hidden periods. Sequential per period, and each period's failure is caught so it can't lose earlier markers or skip later periods | `infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
 | `RoutinesScheduledJobsRegistrar` | `IHostedService` | Pushes both schedules through `IScheduler` on **every** boot (idempotent upsert by `JobKey`; the Scheduler's RAM job store drops triggers on restart). Registers each independently so one bad cadence can't keep the other off the schedule, and swallows failures so a scheduling problem never blocks startup | `infrastructure/scheduling/RoutinesScheduledJobsRegistrar.cs` |
 

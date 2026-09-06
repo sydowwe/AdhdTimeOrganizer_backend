@@ -145,6 +145,60 @@ public class RoutineResetServiceTests
         next.Month.Should().Be(1);
     }
 
+    // ─── ComputeNextReset once the boundary has passed (CQ-1) ────────────────
+    // The two tests above pass `now == lastReset`, so they only ever see the first cycle. These pass a `now`
+    // *past* the boundary, which is the case the calendar-aligned branches used to answer with the following
+    // month/year — making the boundary permanently unreachable, since it is midnight UTC and the sweep runs at
+    // 02:00. The answer must be the due boundary itself, in the past.
+
+    [Fact]
+    public void ComputeNextReset_MonthlyPeriod_WhenTheBoundaryHasPassed_ReturnsThatBoundary_NotTheNextOne()
+    {
+        var period = MakePeriod(30, 1, lastResetAt: new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc));
+
+        var next = RoutineResetService.ComputeNextReset(period, new DateTime(2026, 2, 1, 2, 0, 0, DateTimeKind.Utc));
+
+        next.Should().Be(new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public void ComputeNextReset_YearlyPeriod_WhenTheBoundaryHasPassed_ReturnsThatBoundary_NotTheNextOne()
+    {
+        var period = MakePeriod(365, 1, lastResetAt: new DateTime(2025, 3, 10, 0, 0, 0, DateTimeKind.Utc));
+
+        var next = RoutineResetService.ComputeNextReset(period, new DateTime(2026, 3, 1, 2, 0, 0, DateTimeKind.Utc));
+
+        next.Should().Be(new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public void TryReset_Batch_MonthlyPeriodPastItsAnchor_Resets()
+    {
+        // The assertion that actually matters: ComputeNextReset is only interesting through its callers, and
+        // every user is seeded a 30-day anchor-1 period, so this is the default configuration.
+        var period = MakePeriod(30, 1, streakThreshold: 100, lastResetAt: new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc));
+
+        var result = RoutineResetService.TryReset(
+            period, [MakeItem(true)], new DateTime(2026, 2, 1, 2, 0, 0, DateTimeKind.Utc));
+
+        result.Should().NotBeNull();
+        period.LastResetAt.Should().Be(new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc));
+        period.Streak.Should().Be(1);
+    }
+
+    /// <summary>The negative control, so the fix cannot be "always return a boundary in the past".</summary>
+    [Fact]
+    public void TryReset_Batch_MonthlyPeriodBeforeItsAnchor_DoesNotReset()
+    {
+        var period = MakePeriod(30, 1, streakThreshold: 100, lastResetAt: new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc));
+
+        var result = RoutineResetService.TryReset(
+            period, [MakeItem(true)], new DateTime(2026, 1, 20, 2, 0, 0, DateTimeKind.Utc));
+
+        result.Should().BeNull();
+        period.LastResetAt.Should().Be(new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc));
+    }
+
     // ─── CheckGrace ──────────────────────────────────────────────────────────
 
     [Fact]
@@ -387,6 +441,106 @@ public class RoutineResetServiceTests
         RoutineResetService.TryReset(period, [MakeItem()], DateTime.UtcNow);
 
         period.EndingSoonNotifiedFor.Should().BeNull();
+    }
+
+    // ─── TryResetCatchUp (CQ-8) ──────────────────────────────────────────────
+    // A single TryReset advances LastResetAt by one boundary, so a dormant period would need one invocation per
+    // missed cycle — and the nightly job is one invocation per day. These pin that one pass leaves the period
+    // current, and that it costs the user one notification rather than one per missed cycle.
+
+    private static readonly DateTime Jan1 = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public void TryResetCatchUp_DormantPeriod_ClosesEveryElapsedCycleInOnePass()
+    {
+        // 59 days of dormancy on a 7-day period → eight whole cycles, the last one ending 2026-02-26.
+        var period = MakePeriod(7, lastResetAt: Jan1);
+        var now = new DateTime(2026, 3, 1, 2, 0, 0, DateTimeKind.Utc);
+
+        var result = RoutineResetService.TryResetCatchUp(period, [MakeItem()], now);
+
+        result.Should().NotBeNull();
+        result!.Value.CyclesClosed.Should().Be(8);
+        period.LastResetAt.Should().Be(new DateTime(2026, 2, 26, 0, 0, 0, DateTimeKind.Utc));
+        RoutineResetService.ComputeNextReset(period, now).Should().BeAfter(now, "the period is current after one pass");
+    }
+
+    [Fact]
+    public void TryResetCatchUp_NothingDue_ReturnsNull()
+    {
+        var period = MakePeriod(7, lastResetAt: Jan1);
+
+        RoutineResetService.TryResetCatchUp(period, [MakeItem()], Jan1.AddDays(3)).Should().BeNull();
+    }
+
+    /// <summary>
+    /// Only the newest <c>HistoryDepth</c> completions are ever read back, so a decade-dormant period must not
+    /// write a decade of rows — and the ones it does write have to be the recent ones.
+    /// </summary>
+    [Fact]
+    public void TryResetCatchUp_KeepsOnlyTheNewestHistoryDepthCompletions()
+    {
+        var period = MakePeriod(7, lastResetAt: Jan1);
+        period.HistoryDepth = 3;
+        var now = new DateTime(2026, 3, 1, 2, 0, 0, DateTimeKind.Utc);
+
+        var result = RoutineResetService.TryResetCatchUp(period, [MakeItem()], now);
+
+        result.Should().NotBeNull();
+        result!.Value.CyclesClosed.Should().Be(8);
+        result.Value.Completions.Should().HaveCount(3);
+        result.Value.Completions.Last().PeriodEnd.Should().Be(new DateOnly(2026, 2, 26));
+        result.Value.Completions.First().PeriodEnd.Should().Be(new DateOnly(2026, 2, 12));
+    }
+
+    /// <summary>One dormancy is one message: the caller notifies on <c>Latest</c>, which is the cycle that just
+    /// ended, not the first one the catch-up happened to close.</summary>
+    [Fact]
+    public void TryResetCatchUp_LatestIsTheMostRecentlyClosedCycle()
+    {
+        var period = MakePeriod(7, lastResetAt: Jan1);
+        var now = new DateTime(2026, 3, 1, 2, 0, 0, DateTimeKind.Utc);
+
+        var result = RoutineResetService.TryResetCatchUp(period, [MakeItem()], now);
+
+        result!.Value.Latest.Completion.PeriodEnd.Should().Be(new DateOnly(2026, 2, 26));
+        result.Value.Latest.Completion.Should().BeSameAs(result.Value.Completions.Last());
+    }
+
+    /// <summary>
+    /// A grace window opened by one missed cycle lapses at its own instant, not at <c>now</c> — so catching up
+    /// several missed cycles at once has to break the streak in the same place a day-by-day run would have.
+    /// </summary>
+    [Fact]
+    public void TryResetCatchUp_LapsedGraceFromAnEarlierCycle_BreaksTheStreak()
+    {
+        var period = MakePeriod(7, streakThreshold: 80, graceDays: 1, lastResetAt: Jan1);
+        period.Streak = 5;
+        period.BestStreak = 5;
+
+        var result = RoutineResetService.TryResetCatchUp(
+            period, [MakeItem()], new DateTime(2026, 1, 23, 2, 0, 0, DateTimeKind.Utc));
+
+        result!.Value.CyclesClosed.Should().Be(3);
+        period.Streak.Should().Be(0, "the grace opened by the first missed cycle had lapsed by the second");
+        period.BestStreak.Should().Be(5);
+    }
+
+    /// <summary>The whole point of the catch-up: the streak reflects every missed cycle, not just one.</summary>
+    [Fact]
+    public void TryResetCatchUp_AllCyclesEvaluated_NotJustTheFirst()
+    {
+        var period = MakePeriod(7, streakThreshold: 80, lastResetAt: Jan1);
+        var items = new List<RoutineTodoList> { MakeItem(true) };
+
+        var result = RoutineResetService.TryResetCatchUp(
+            period, items, new DateTime(2026, 1, 23, 2, 0, 0, DateTimeKind.Utc));
+
+        // Cycle 1 is the only one the user completed; the two after it are misses, so the run is broken.
+        result!.Value.CyclesClosed.Should().Be(3);
+        result.Value.Latest.Outcome.Should().Be(StreakOutcome.Broken);
+        period.Streak.Should().Be(0);
+        period.BestStreak.Should().Be(1);
     }
 
     // ─── EvaluateEndingSoon ──────────────────────────────────────────────────

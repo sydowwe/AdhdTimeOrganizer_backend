@@ -75,7 +75,10 @@ public class RoutineGroupedReadAndMoveItemTests(AppDbContextFixture fixture) : P
                 db, text: "grouped-reset-period", lengthInDays: 7, resetAnchorDay: 0, streakThreshold: 50, ct: TestContext.Current.CancellationToken);
 
             var period = await db.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == periodId, CancellationToken);
-            period.LastResetAt = DateTime.UtcNow.AddDays(-30);
+            // Exactly one elapsed cycle: the read catches a dormant period up cycle by cycle (see
+            // GroupedRead_PeriodDormantForSeveralCycles_CatchesThemAllUpInOneRead), and the streak evaluation
+            // pinned here is the single-cycle one.
+            period.LastResetAt = DateTime.UtcNow.AddDays(-8);
             await db.SaveChangesAsync(CancellationToken);
 
             var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-reset-activity", ct: TestContext.Current.CancellationToken);
@@ -87,7 +90,7 @@ public class RoutineGroupedReadAndMoveItemTests(AppDbContextFixture fixture) : P
 
         await using var verifyDb = CreateDbContext();
         var storedPeriod = await verifyDb.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == periodId, CancellationToken);
-        storedPeriod.LastResetAt.Should().NotBe(DateTime.UtcNow.AddDays(-30), "the elapsed period must have been advanced by the read");
+        storedPeriod.LastResetAt.Should().NotBe(DateTime.UtcNow.AddDays(-8), "the elapsed period must have been advanced by the read");
         storedPeriod.Streak.Should().Be(1, "the single item was fully done (100% >= 50% threshold), so the streak must have been evaluated and extended");
 
         var completions = await verifyDb.Set<RoutinePeriodCompletion>().Where(c => c.TimePeriodId == periodId).ToListAsync(CancellationToken);
@@ -95,6 +98,45 @@ public class RoutineGroupedReadAndMoveItemTests(AppDbContextFixture fixture) : P
 
         var item = await verifyDb.Set<RoutineTodoList>().SingleAsync(i => i.Id == itemId, CancellationToken);
         item.IsDone.Should().BeFalse("TryReset un-ticks every item once the period rolls over");
+    }
+
+    /// <summary>
+    /// CQ-8. Each <c>TryReset</c> advances the period by one boundary, so this read used to resolve exactly one
+    /// cycle per request — opening the app after a month away left the period four weeks stale, and the next
+    /// four nightly runs each announced a miss from weeks ago. One read must leave it current.
+    /// </summary>
+    [Fact(DisplayName = "Grouped read catches a dormant period up across every elapsed cycle, not one per request")]
+    public async Task GroupedRead_PeriodDormantForSeveralCycles_CatchesThemAllUpInOneRead()
+    {
+        long periodId;
+        var lastResetAt = DateTime.UtcNow.AddDays(-30);
+        await using (var db = CreateDbContext())
+        {
+            periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(
+                db, text: "grouped-catchup-period", lengthInDays: 7, resetAnchorDay: 0, streakThreshold: 50, ct: TestContext.Current.CancellationToken);
+
+            var period = await db.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == periodId, CancellationToken);
+            period.LastResetAt = lastResetAt;
+            await db.SaveChangesAsync(CancellationToken);
+
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "grouped-catchup-activity", ct: TestContext.Current.CancellationToken);
+            await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, periodId, isDone: true, ct: TestContext.Current.CancellationToken);
+        }
+
+        var response = await CreateClient().GetAsync("api/routine-todo-list/grouped-by-time-period", CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var verifyDb = CreateDbContext();
+        var storedPeriod = await verifyDb.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == periodId, CancellationToken);
+        // Boundaries at lastReset + 7/14/21/28 days (each truncated to midnight); + 35 is still in the future.
+        storedPeriod.LastResetAt.Should().Be(lastResetAt.AddDays(28).Date, "one read must leave the period current");
+
+        var completions = await verifyDb.Set<RoutinePeriodCompletion>()
+            .Where(c => c.TimePeriodId == periodId).ToListAsync(CancellationToken);
+        completions.Should().HaveCount(4, "every closed cycle owes the heatmap a row");
+
+        storedPeriod.BestStreak.Should().Be(1, "the first cycle was complete when it closed");
+        storedPeriod.Streak.Should().Be(0, "the three cycles after it went untouched, so the run is broken");
     }
 
     // ---- MoveTodoListItemEndpoint ----------------------------------------------------------------------

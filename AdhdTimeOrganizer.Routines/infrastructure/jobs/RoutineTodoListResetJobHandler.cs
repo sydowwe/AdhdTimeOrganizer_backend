@@ -49,11 +49,13 @@ public class RoutineTodoListResetJobHandler(
             // The freeze budget refills lazily, so the nightly sweep is the one thing that brings a period the
             // user has not opened in a month back to a full budget before they look at it.
             periodsChanged |= RoutineStreakFreezeService.RefreshFreezeBudget(period, now);
-            var result = RoutineResetService.TryReset(period, items, now);
+            // Catch-up, not a single cycle: a period nobody opened for two months is closed out in this one run
+            // and announced once, rather than dripping one retroactive miss per nightly run for two months.
+            var result = RoutineResetService.TryResetCatchUp(period, items, now);
             if (result is { } r)
             {
-                completionRecords.Add(r.Completion);
-                reset.Add((period, r));
+                completionRecords.AddRange(r.Completions);
+                reset.Add((period, r.Latest));
                 totalReset += items.Count;
             }
         }

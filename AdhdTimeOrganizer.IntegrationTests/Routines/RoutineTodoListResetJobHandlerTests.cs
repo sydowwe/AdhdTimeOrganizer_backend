@@ -39,6 +39,7 @@ public class RoutineTodoListResetJobHandlerTests(AppDbContextFixture fixture) : 
         DbContext db,
         long userId = UserId,
         int lengthInDays = 7,
+        int resetAnchorDay = 0,
         DateTime? lastResetAt = null,
         int streakThreshold = 100,
         int streakGraceDays = 0,
@@ -54,7 +55,7 @@ public class RoutineTodoListResetJobHandlerTests(AppDbContextFixture fixture) : 
             Text = $"Period {Guid.NewGuid():N}",
             Color = "#123456",
             LengthInDays = lengthInDays,
-            ResetAnchorDay = 0,
+            ResetAnchorDay = resetAnchorDay,
             StreakThreshold = streakThreshold,
             StreakGraceDays = streakGraceDays,
             StreakGraceUntil = streakGraceUntil,
@@ -234,6 +235,78 @@ public class RoutineTodoListResetJobHandlerTests(AppDbContextFixture fixture) : 
             .FirstAsync(p => p.Id == period.Id, CancellationToken);
         stored.Streak.Should().Be(1);
         stored.LastResetAt.Should().Be(originalLastResetAt.AddDays(7).Date);
+    }
+
+    // ---- CQ-1: calendar-anchored periods ---------------------------------------------------------------
+
+    /// <summary>
+    /// Every user is seeded a Monthly (30d, anchor 1) and a Yearly (365d, anchor 1), and those two branches used
+    /// to compute a boundary in the future unconditionally — so the sweep, which runs at 02:00, could never
+    /// reach one. The whole default configuration silently never reset. The other tests in this file all use
+    /// <c>ResetAnchorDay = 0</c>, which is exactly the branch that always worked.
+    /// </summary>
+    [Fact]
+    public async Task ResetSweep_MonthlyAnchoredPeriod_ResetsWhenItsAnchorHasPassed()
+    {
+        RoutineTimePeriod period;
+        RoutineTodoList item;
+        var now = DateTime.UtcNow;
+        await using (var db = CreateDbContext())
+        {
+            // Relative to UtcNow rather than a fixed date, so the period is due on every calendar day.
+            period = await SeedPeriodAsync(
+                db, lengthInDays: 30, resetAnchorDay: 1, lastResetAt: now.AddMonths(-2), ct: CancellationToken);
+            item = await SeedItemAsync(db, period, UserId, isDone: true, CancellationToken);
+        }
+
+        await RunJobAsync();
+
+        await using var verify = CreateDbContext();
+        var stored = await verify.Set<RoutineTimePeriod>().AsNoTracking()
+            .FirstAsync(p => p.Id == period.Id, CancellationToken);
+        // The catch-up walks to the newest anchor that has passed: the 1st of the current month.
+        stored.LastResetAt.Should().Be(new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var storedItem = await verify.Set<RoutineTodoList>().AsNoTracking()
+            .FirstAsync(i => i.Id == item.Id, CancellationToken);
+        storedItem.IsDone.Should().BeFalse();
+
+        var completions = await verify.Set<RoutinePeriodCompletion>().AsNoTracking()
+            .Where(c => c.TimePeriodId == period.Id)
+            .ToListAsync(CancellationToken);
+        completions.Should().NotBeEmpty();
+    }
+
+    // ---- CQ-8: dormancy is caught up in one sweep ------------------------------------------------------
+
+    /// <summary>
+    /// One <c>TryReset</c> advances the period by a single boundary, so a period nobody opened for a month used
+    /// to need a month of nightly runs to become current — dripping one retroactive miss per night. One sweep
+    /// must leave it current, with a row per closed cycle.
+    /// </summary>
+    [Fact]
+    public async Task ResetSweep_PeriodDormantForSeveralCycles_ClosesThemAllInOneRun()
+    {
+        RoutineTimePeriod period;
+        var lastResetAt = DateTime.UtcNow.AddDays(-10);
+        await using (var db = CreateDbContext())
+        {
+            period = await SeedPeriodAsync(db, lengthInDays: 3, lastResetAt: lastResetAt, ct: CancellationToken);
+            await SeedItemAsync(db, period, UserId, isDone: false, CancellationToken);
+        }
+
+        await RunJobAsync();
+
+        await using var verify = CreateDbContext();
+        var stored = await verify.Set<RoutineTimePeriod>().AsNoTracking()
+            .FirstAsync(p => p.Id == period.Id, CancellationToken);
+        // Boundaries at lastReset + 3/6/9 days (each truncated to midnight); + 12 is still in the future.
+        stored.LastResetAt.Should().Be(lastResetAt.AddDays(9).Date);
+
+        var completions = await verify.Set<RoutinePeriodCompletion>().AsNoTracking()
+            .Where(c => c.TimePeriodId == period.Id)
+            .ToListAsync(CancellationToken);
+        completions.Should().HaveCount(3, "one row per closed cycle, so the heatmap shows the gap");
     }
 
     // ---- streak outcome branches ---------------------------------------------------------------------

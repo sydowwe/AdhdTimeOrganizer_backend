@@ -51,12 +51,14 @@ public class GetAllGroupedRoutineTodoListEndpoint(
             // the one that has to bring it current. Skipping it here would serve a stale count and refuse a
             // freeze the user is owed.
             changed |= RoutineStreakFreezeService.RefreshFreezeBudget(period, now);
-            var result = RoutineResetService.TryReset(period, items, now);
+            // Catch-up, not a single cycle: opening the app after a fortnight away must leave the period current,
+            // not one cycle less stale than it was.
+            var result = RoutineResetService.TryResetCatchUp(period, items, now);
             if (result is { } r)
             {
                 changed = true;
-                newCompletions.Add(r.Completion);
-                reset.Add((period, r));
+                newCompletions.AddRange(r.Completions);
+                reset.Add((period, r.Latest));
             }
         }
 
