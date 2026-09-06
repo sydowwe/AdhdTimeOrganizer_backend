@@ -12,15 +12,10 @@ public class UpdateRoutineTodoListValidator : Validator<UpdateRoutineTodoListReq
             .InclusiveBetween(2, 99)
             .When(x => x.TotalCount.HasValue);
 
-        RuleFor(x => x.DoneCount)
-            .GreaterThanOrEqualTo(0)
-            .When(x => x.DoneCount.HasValue);
-
-        RuleFor(x => x)
-            .Must(x => x.DoneCount <= x.TotalCount)
-            .When(x => x.DoneCount.HasValue && x.TotalCount.HasValue)
-            .WithMessage("DoneCount must not exceed TotalCount.")
-            .OverridePropertyName(nameof(UpdateRoutineTodoListRequest.DoneCount));
+        // No DoneCount rules: the field rides in on the inherited request shape but this endpoint does not
+        // map it (see UpdateRoutineTodoListRequest) — it re-derives the count from TotalCount instead.
+        // Rejecting an echoed-back DoneCount that no longer fits a lowered TotalCount would be a 400 over a
+        // value the server ignores, on the most ordinary edit there is.
 
         RuleFor(x => x.Note)
             .MaximumLength(1000)

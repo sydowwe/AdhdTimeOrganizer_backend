@@ -458,12 +458,22 @@ public class UpdateRoutineTodoListEndpointTests(AppDbContextFixture fixture) : B
         TimePeriodId = _periodId
     });
 
+    /// <summary>
+    /// The payload stays entirely the caller's own — only the id in the route is foreign — so the 404 comes
+    /// from the row being filtered out of the lookup, which is what this test is about. Echoing the other
+    /// user's `ActivityId` / `TimePeriodId` back would be refused first, by the ownership guards those two
+    /// ids carry (invariant 11), and the 404 would never be reached.
+    /// </summary>
     protected override async Task<long?> SeedEntityOwnedByOtherUserAsync(DbContext db)
     {
         await ReminderSeedHelper.EnsureOtherUserAsync(db, TestContext.Current.CancellationToken);
-        _activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "routine-item-update-theirs", ReminderSeedHelper.OtherUserId);
-        _periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, ReminderSeedHelper.OtherUserId, "routine-item-update-theirs-period");
-        return await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, _activityId, _periodId, ReminderSeedHelper.OtherUserId);
+
+        _activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "routine-item-update-mine");
+        _periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, text: "routine-item-update-mine-period");
+
+        var theirActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "routine-item-update-theirs", ReminderSeedHelper.OtherUserId);
+        var theirPeriodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, ReminderSeedHelper.OtherUserId, "routine-item-update-theirs-period");
+        return await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, theirActivityId, theirPeriodId, ReminderSeedHelper.OtherUserId);
     }
 }
 

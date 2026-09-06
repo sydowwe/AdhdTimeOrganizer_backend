@@ -61,6 +61,19 @@ that has been away for a month a month stale. The catch-up writes a completion r
 (capped at `HistoryDepth` — older rows would fall straight off the heatmap) but hands back one
 `Latest` result, so a dormancy costs the user one notification rather than one per missed cycle.
 
+**Completion is server-owned.** `IsDone`, `DoneCount` and `DisplayOrder` reach
+`UpdateRoutineTodoListRequest` on its inherited base but are deliberately not mapped, so the item edit
+cannot write them. Completion belongs to the toggle endpoint: it is the path that reconciles `IsDone`,
+`DoneCount` and every step together, advances the item streak, and publishes
+`RoutineTodoListIsDoneChangedEvent` — the only channel by which Planning learns a routine was completed.
+A second way in would leave the paired planner task stale for good and say nothing, since cross-slice
+handlers log and swallow. `DoneCount` is re-derived from the client's `TotalCount` instead (clamped, so
+lowering the total cannot leave a count above it and trip the CHECK). `DisplayOrder` is per-period, so
+the update re-derives it exactly when the edit moves the item to another period, and otherwise leaves
+what the reorder endpoint decided alone. Steps are reconciled by id rather than rebuilt: `TodoListStep.Id`
+is `ValueGeneratedNever()`, so rebuilding mints a fresh `Guid` per step on every save and the three step
+routes that take one in the path 404 against steps the user can still see.
+
 **Grace.** `CheckGrace` must run before `TryReset` **and before `Apply`** — i.e. on *every* access, read
 or write. A lapsed window breaks the streak, and if only the reset job checked it, a streak would
 survive indefinitely as long as nobody's period rolled over. `Apply` is named explicitly because

@@ -85,7 +85,7 @@ validators.
 
 `Doc impact: domain-map.md → Invariants (add: "TimePeriodId on a routine item is caller-supplied; neither the FK nor the global filter checks that the caller owns it — the validators must")` — done, as invariant 11, plus the validators paragraph and a guard row in testing.md.
 
-### `SEC-2` 🟠 `PUT /routine-todo-list/{id}` writes `IsDone` / `DoneCount` / `DisplayOrder` raw, skipping the toggle logic and the cross-slice event
+### `SEC-2` 🟠 ✅ FIXED 2026-09-06 · `PUT /routine-todo-list/{id}` writes `IsDone` / `DoneCount` / `DisplayOrder` raw, skipping the toggle logic and the cross-slice event
 
 `application/dto/request/UpdateRoutineTodoListRequest.cs:16-18,22`
 
@@ -110,7 +110,34 @@ and reorder endpoints are the supported paths and the SPA uses them. That is exa
 worth copying (`RoutineTimePeriodRequest.cs:85-87`). If `IsDone` must stay, route it through the toggle
 logic and raise the event in `AfterMapping`.
 
-`Doc impact: domain-map.md → Business rules (state that IsDone/DoneCount/DisplayOrder on a routine item are server-owned, and why)`
+**Fixed 2026-09-06**, the way the finding prescribed: `UpdateEntity` no longer assigns `IsDone`,
+`DoneCount` or `DisplayOrder`, and says at the call site why — the toggle endpoint owns completion
+because it is the path that reconciles the three representations of "done", advances the item streak and
+publishes `RoutineTodoListIsDoneChangedEvent`.
+
+The three properties were **not** removed from the DTO: they are inherited from
+`BaseUpdateTodoListRequest`, which `UpdateTodoListItemRequest` also derives from — the same finding is
+open against that one as the todo-lists review's `SEC-5`/`CQ-16`, and narrowing the shared base from
+here would decide it for that slice too. They arrive and are ignored, as `RoutineTimePeriodRequest`
+already does for a period's derived fields.
+
+Two consequences worth recording, both in `AfterMapping`:
+
+- `DoneCount` is now re-derived rather than dropped — `Math.Min(entity.DoneCount ?? 0, TotalCount)` when
+  the item is counted. `TotalCount` stays client-owned, so lowering it under the count already recorded
+  would otherwise hit `CK_RoutineTodoList_DoneCount_LessOrEqual_TotalCount`. `IsDone` is left alone
+  rather than re-derived from the new ratio: re-deriving it would re-open a completed item without the
+  event, which is the failure this finding is about, pointed the other way.
+- The two `DoneCount` rules came out of `UpdateRoutineTodoListValidator`. Keeping them would 400 a
+  client that echoes the item's current `DoneCount` back alongside a lowered `TotalCount` — the most
+  ordinary edit there is — over a value the server now ignores.
+
+Pinned in `AdhdTimeOrganizer.IntegrationTests/Endpoints/RoutineTodoListUpdateEndpointTests.cs`:
+`UpdateRoutineTodoList_CannotWriteIsDoneOrDisplayOrder` (asserting on the row: `IsDone` false and
+`DisplayOrder` unmoved after a `PUT` that asked for both, with `Note` written so the test cannot pass by
+the endpoint refusing everything) and `UpdateRoutineTodoList_LoweringTotalCount_ClampsDoneCount`.
+
+`Doc impact: domain-map.md → Business rules (state that IsDone/DoneCount/DisplayOrder on a routine item are server-owned, and why)` — done, as the "Completion is server-owned" paragraph, plus a guard row in testing.md.
 
 ### `SEC-3` 🟠 Three reset sites race on the unique `(TimePeriodId, PeriodStart)` index, and none of the three handles the collision
 
@@ -276,7 +303,7 @@ catch it — see `TEST-4`.
 
 `Doc impact: none`
 
-### `CQ-4` 🟠 Updating a routine item destroys and recreates all of its steps
+### `CQ-4` 🟠 ✅ FIXED 2026-09-06 · Updating a routine item destroys and recreates all of its steps
 
 `application/endpoint/routineTodoList/command/UpdateRoutineTodoListEndpoint.cs:20-27`
 
@@ -294,6 +321,24 @@ step count for a no-op edit.
 **Fix.** Reconcile in place: update steps whose `Id` matches, add those without one, remove those absent
 from the request. `UpdateRoutineTodoListValidator` already models steps as having optional ids
 (`:75-81`), so the request shape supports it.
+
+**Fixed 2026-09-06**, exactly that: `ReconcileSteps` in the endpoint mutates the matched step and keeps
+the instance, so the `Guid` and `IsDone` survive; a request step without an id is new; one the request
+omits is gone.
+
+One correction to the finding's reasoning, which does not change the fix. Steps are an owned collection
+serialised **`ToJson`** into the item's row (`TodoListEntityConfigurationExtensions.cs`, `OwnsMany` +
+`ToJson`), so there are no step rows and there was never delete+insert traffic — the whole document is
+rewritten either way. What was real is the identity loss, and that is the part that hurts: `Id` defaults
+to `Guid.NewGuid()` and is `ValueGeneratedNever()`, so every save minted fresh ids and the three routes
+taking `{stepId:guid}` in the path 404 against steps still on screen.
+
+Pinned in `RoutineTodoListUpdateEndpointTests`: `UpdateRoutineTodoList_ReconcilesStepsInPlace` (id and
+tick survive, name/note overwritten, an id-less step gets a fresh id, an omitted one is dropped) and
+`UpdateRoutineTodoList_WithoutSteps_LeavesThemAlone` for the null-`Steps` path.
+
+The identical bug in `UpdateTodoListItemEndpoint` was left alone — it is the todo-lists review's own
+`CQ-19`, with a written testing prompt, and it is one slice over.
 
 `Doc impact: none`
 
@@ -635,7 +680,7 @@ which asserts the budget is untouched and the row unfrozen, not just the 400.
 `Doc impact: none` — but the `Apply` row in `domain-map.md`'s domain-services table now states the rule,
 since it is a refusal the client cannot predict.
 
-### `CQ-15` 🟡 An item can be moved to another period without re-deriving its display order
+### `CQ-15` 🟡 ✅ FIXED 2026-09-06 · An item can be moved to another period without re-deriving its display order
 
 `application/dto/request/UpdateRoutineTodoListRequest.cs:22`
 
@@ -651,6 +696,17 @@ against a duplicate activity, and `BaseUpdateEndpoint` maps that to a clean 409.
 extension the create path uses. `BaseUpdateEndpoint` exposes `DbContext` and loads the row tracked, so
 the original value is readable off the entry — that is what the property is documented for
 (`BaseUpdateEndpoint.cs`, "so a subclass hook can read tracked/original values").
+
+**Fixed 2026-09-06**, as written: `DbContext.Entry(entity).Property(e => e.TimePeriodId).OriginalValue`
+against the mapped value, and on a change `RoutineTodoListExtensions.GetNextDisplayOrder` — the create
+path's own call — puts the item at the top of its destination. Reads with `SEC-2`, which stops the body
+supplying `DisplayOrder` at all: without that fix this one would re-derive an order the same request had
+just overwritten with a client's number.
+
+Pinned in `RoutineTodoListUpdateEndpointTests`:
+`UpdateRoutineTodoList_MovedToAnotherPeriod_ReDerivesDisplayOrder` (the destination holds a row at 1000
+and the moved item lands above it) and `UpdateRoutineTodoList_SamePeriod_KeepsDisplayOrder` as the
+control — re-deriving on every save would silently undo whatever the reorder endpoint last decided.
 
 `Doc impact: none`
 
