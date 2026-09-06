@@ -71,6 +71,7 @@ default.
 | `RoutineTimePeriodRangeConstraintTests` (10 cases) | Every CHECK constraint is reachable through the API and rejects at 400, not 500 |
 | `RoutinePeriodCompletionHistoryTests.History_MoreCompletionsThanDepth_CapsToNewestAndReturnsOldestFirst` | Cap-to-newest then render oldest-first — two orderings that look interchangeable and are not |
 | `NudgeSweep_IgnoresUserTimezone_IdenticalUtcPeriodsProduceIdenticalResultsRegardlessOfOffset` | Periods are UTC end to end. This is the pin that catches someone "helpfully" adding zone conversion to the sweep |
+| `RoutineTodoListPeriodRulesTests` (create + update, foreign `TimePeriodId`) | Invariant 11, asserted on rows. A routine item pinned into another user's period is stamped with the attacker's own `UserId`, so nothing errors and no read of theirs shows it — the only visible effect is the victim's streak breaking. Deleting the validators' `p.UserId == userId` re-opens it silently |
 
 Owned elsewhere but load-bearing for this module: `SeamWiringTests` (both keyed source families cover
 every key exactly once — a renamed `ActivityMembershipSourceKeys.RoutineTodoList` is otherwise

@@ -99,6 +99,7 @@ owned by users in different zones must produce identical results.
 | 8 | Both seam sources are resolved by string key | **Nothing** — a rename without updating both sides is silent. `SeamWiringTests` is the only guard |
 | 9 | The freeze budget is refilled by whoever reads it, not by a job | **App-enforced by convention only** — forgetting it is silent |
 | 10 | Class names are table names | `BaseEntityConfigure`. Renaming a type is a migration; moving it is not |
+| 11 | A routine item may only name a `TimePeriodId` the caller owns | **App-enforced only** — `RoutineTodoListPeriodRules`, from both write validators. The FK proves the period exists, not whose it is, and the row is stamped with the caller's own `UserId`, so the global filter never sees a mismatch. The reset job then runs with the filter inert and counts the foreign item inside the victim's period |
 
 ## Navigation index
 
@@ -194,8 +195,15 @@ on the DTOs (`ICreateRequest` / `IUpdateRequest` / `IProjectionResponse`), not a
 (`GetCompletionHistoryRoutineTimePeriodEndpoint`, `RoutineTimePeriodResponse`) are here.
 
 Five validators. `RoutineTimePeriodValidator` mirrors the DB CHECKs so a bad range is a 400 rather
-than a 500. The two to-do list validators each carry a DB-backed cross-field rule — `SuggestedDays` /
-`SuggestedDayOfMonth` must match the target period's `LengthInDays` bucket, which means a query, which
-is why it is a `CustomAsync` rule and not a `RuleFor` chain. `SpendStreakFreezeValidator` only checks
+than a 500. The two to-do list validators each carry a DB-backed cross-field rule, which means a
+query, which is why it is a `CustomAsync` rule and not a `RuleFor` chain. Both delegate it to
+`RoutineTodoListPeriodRules.ApplyAsync`, which does two things in one round-trip: it resolves the
+target period **as the caller's** — invariant 11, and the only place that is checked — and then
+applies the `SuggestedDays` / `SuggestedDayOfMonth` bucket the period's `LengthInDays` decides. A
+period that does not resolve is a `TimePeriodId` failure with the same message whether it is missing
+or someone else's. The helper takes an `IServiceScopeFactory` and an `IHttpContextAccessor` rather
+than a `DbContext` and the principal, because FastEndpoints validators are singletons; the explicit
+`UserId` comparison is what decides, so it does not depend on the fresh scope's `ScopeUserId`.
+`SpendStreakFreezeValidator` only checks
 that `PeriodStart` parses (a full ISO instant is accepted, not just a date); every real freeze rule is
 a domain rule in `StreakFreezeRejection`.

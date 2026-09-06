@@ -17,7 +17,7 @@ except where a finding below happens to touch one.
 
 ## 5. Security & authorization
 
-### `SEC-1` 🔴 No ownership check on `TimePeriodId` — a routine item can be attached to another user's period
+### `SEC-1` 🔴 ✅ FIXED 2026-09-06 · No ownership check on `TimePeriodId` — a routine item can be attached to another user's period
 
 `application/dto/request/CreateRoutineTodoListRequest.cs:9,20` ·
 `application/dto/request/UpdateRoutineTodoListRequest.cs:9,22` ·
@@ -57,7 +57,33 @@ braces: re-assert ownership in `AfterMapping` on both endpoints
 (`CreateRoutineTodoListEndpoint.cs:25`, `UpdateRoutineTodoListEndpoint.cs:18`), which is where a future
 mapping refactor would otherwise reintroduce it.
 
-`Doc impact: domain-map.md → Invariants (add: "TimePeriodId on a routine item is caller-supplied; neither the FK nor the global filter checks that the caller owns it — the validators must")`
+**Fixed 2026-09-06**, in the validators, together with `CQ-11` — same two methods, as the finding
+prescribed. Both now delegate to `RoutineTodoListPeriodRules.ApplyAsync`, which resolves the period
+with `p.Id == timePeriodId && p.UserId == userId` and adds a `TimePeriodId` failure when nothing comes
+back, before the bucket rule runs. Same message for "does not exist" and "is not yours" — the
+anti-oracle rule `LookupOwnership` and Tracking `SEC-2` already follow.
+
+The user id comes off `IHttpContextAccessor`, not `ILoggedUserService`: FastEndpoints validators are
+singletons, which is why these two build their own scope in the first place, and the accessor is what
+the four ActivityProfiles validators with the same shape already take. Injecting the request-scoped
+`DbContext` — the finding's other suggestion, and `CQ-11`'s — would be a captive dependency, so the
+scope factory stays. The explicit `UserId` comparison is what decides, so the fresh scope's
+`ScopeUserId` provenance no longer matters.
+
+**No `AfterMapping` re-assert.** The belt-and-braces suggestion would be a second round-trip on every
+write to re-check what the validator just rejected, and the risk it guards against — a mapping
+refactor — cannot reach the validator. The invariant is documented and pinned instead.
+
+Pinned on rows, not status codes, in
+`AdhdTimeOrganizer.IntegrationTests/Endpoints/RoutineTodoListPeriodRulesTests.cs`:
+`CreateRoutineTodoList_WithForeignTimePeriodId_IsRejected` (asserting nothing was written into the
+victim's period) and `UpdateRoutineTodoList_WithForeignTimePeriodId_IsRejected` (asserting the row
+still points at the caller's own period), plus
+`CreateRoutineTodoList_WithOwnTimePeriodId_Succeeds` so the guard cannot degrade into a blanket
+rejection. The bucket rule had no test at all before the extraction; two now cover it from both
+validators.
+
+`Doc impact: domain-map.md → Invariants (add: "TimePeriodId on a routine item is caller-supplied; neither the FK nor the global filter checks that the caller owns it — the validators must")` — done, as invariant 11, plus the validators paragraph and a guard row in testing.md.
 
 ### `SEC-2` 🟠 `PUT /routine-todo-list/{id}` writes `IsDone` / `DoneCount` / `DisplayOrder` raw, skipping the toggle logic and the cross-slice event
 
@@ -441,7 +467,7 @@ DbContext's job here (invariant 3).
 
 `Doc impact: domain-map.md → the DTO paragraph says "two filters in dto/filter/"; drop that clause when the files go`
 
-### `CQ-11` 🟡 Both to-do list validators open a DI scope per validation, and duplicate 30 lines verbatim
+### `CQ-11` 🟡 ✅ FIXED 2026-09-06 (half) · Both to-do list validators open a DI scope per validation, and duplicate 30 lines verbatim
 
 `application/validator/CreateRoutineTodoListValidator.cs:34-63` ·
 `application/validator/UpdateRoutineTodoListValidator.cs:44-73`
@@ -456,7 +482,20 @@ the two files, so a change to the bucket boundaries has to land twice.
 **Fix.** Inject `DbContext`; extract the bucket rule into a shared private static helper or a small
 `AbstractValidator` base the two derive from. Do this together with `SEC-1` — same two methods.
 
-`Doc impact: none`
+**Fixed 2026-09-06, the duplication half; the scope stays on purpose.** The 30 lines now live once, in
+`RoutineTodoListPeriodRules`, called from both validators in two lines each along with `SEC-1`'s
+ownership predicate.
+
+The `IServiceScopeFactory` was **not** replaced with an injected `DbContext`, and this finding was
+wrong to ask for it: FastEndpoints resolves validators as singletons, so a constructor-injected scoped
+`DbContext` is a captive dependency — one context for the process, shared across concurrent requests.
+The scope is the correct shape here, not an oversight, and it is the shape all four ActivityProfiles
+validators with a DB-backed rule use. What `SEC-1` actually needed from it was the *principal*, which
+now comes from `IHttpContextAccessor` and is compared explicitly, so nothing depends on how the fresh
+scope's `ScopeUserId` is populated. The remark on `RoutineTodoListPeriodRules` records this so it is
+not "simplified" back.
+
+`Doc impact: none` — but see `SEC-1`; the validators paragraph in `domain-map.md` gained the helper.
 
 ### `CQ-12` 🟡 Three different user-scoping styles across the endpoints
 

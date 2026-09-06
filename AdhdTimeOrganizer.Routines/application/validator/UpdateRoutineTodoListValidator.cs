@@ -1,5 +1,4 @@
 using AdhdTimeOrganizer.Routines.application.dto.request.todoList;
-using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using FastEndpoints;
 using FluentValidation;
 
@@ -7,7 +6,7 @@ namespace AdhdTimeOrganizer.Routines.application.validator;
 
 public class UpdateRoutineTodoListValidator : Validator<UpdateRoutineTodoListRequest>
 {
-    public UpdateRoutineTodoListValidator(IServiceScopeFactory scopeFactory)
+    public UpdateRoutineTodoListValidator(IServiceScopeFactory scopeFactory, IHttpContextAccessor http)
     {
         RuleFor(x => x.TotalCount)
             .InclusiveBetween(2, 99)
@@ -41,36 +40,8 @@ public class UpdateRoutineTodoListValidator : Validator<UpdateRoutineTodoListReq
             .When(x => x.SuggestedDayOfMonth.HasValue)
             .WithMessage("SuggestedDayOfMonth must be between 1 and 31.");
 
-        RuleFor(x => x).CustomAsync(async (req, ctx, ct) =>
-        {
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
-            var lengthInDays = await db.Set<RoutineTimePeriod>()
-                .Where(p => p.Id == req.TimePeriodId)
-                .Select(p => (int?)p.LengthInDays)
-                .FirstOrDefaultAsync(ct);
-
-            if (lengthInDays is null)
-                return;
-
-            if (lengthInDays <= 1)
-            {
-                if (req.SuggestedDays.Count > 0)
-                    ctx.AddFailure("SuggestedDays", "SuggestedDays must be empty for daily periods.");
-                if (req.SuggestedDayOfMonth.HasValue)
-                    ctx.AddFailure("SuggestedDayOfMonth", "SuggestedDayOfMonth must be null for daily periods.");
-            }
-            else if (lengthInDays <= 14)
-            {
-                if (req.SuggestedDayOfMonth.HasValue)
-                    ctx.AddFailure("SuggestedDayOfMonth", "SuggestedDayOfMonth is only allowed for monthly+ periods (LengthInDays > 14).");
-            }
-            else
-            {
-                if (req.SuggestedDays.Count > 0)
-                    ctx.AddFailure("SuggestedDays", "SuggestedDays is only allowed for weekly periods (LengthInDays ≤ 14).");
-            }
-        });
+        RuleFor(x => x).CustomAsync((req, ctx, ct) => RoutineTodoListPeriodRules.ApplyAsync(
+            ctx, req.TimePeriodId, req.SuggestedDays, req.SuggestedDayOfMonth, scopeFactory, http, ct));
 
         RuleForEach(x => x.Steps)
             .ChildRules(step =>
