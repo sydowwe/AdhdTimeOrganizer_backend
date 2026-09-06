@@ -20,6 +20,12 @@ public class RoutineToggleIsDoneTodoListEndpoint(
     /// </summary>
     private readonly List<(RoutineTimePeriod Period, RoutineResetService.RoutinePeriodReset Result)> _reset = [];
 
+    /// <summary>
+    /// Ownership is filter-only here, deliberately: <c>RoutineTodoList</c> and <c>RoutineTimePeriod</c> both
+    /// reach <c>BaseEntityWithUser</c>, so AppDbContext's global <c>IEntityWithUser</c> filter scopes the id
+    /// lookup, <see cref="LoadPeriodsAsync"/> and the toggle alike — a foreign id matches nothing, this
+    /// returns empty and the base answers 404. Said out loud because the alternative reading is "forgot".
+    /// </summary>
     protected override async Task<List<RoutineTodoList>> FetchAndPrepare(ICollection<long> ids, DateTime now, CancellationToken ct)
     {
         var timePeriodIds = await _dbContext.Set<RoutineTodoList>()

@@ -11,6 +11,11 @@ public class ToggleStepIsDoneRoutineTodoListEndpoint(DbContext dbContext)
 {
     private readonly DbContext _dbContext = dbContext;
 
+    /// <summary>
+    /// Ownership is filter-only here, deliberately: <c>RoutineTodoList</c> reaches <c>BaseEntityWithUser</c>,
+    /// so AppDbContext's global <c>IEntityWithUser</c> filter scopes this lookup and another user's item id
+    /// returns null, which the base answers as 404. Said out loud because the alternative reading is "forgot".
+    /// </summary>
     protected override async Task<RoutineTodoList?> FetchItem(long itemId, CancellationToken ct)
     {
         return await _dbContext.Set<RoutineTodoList>()

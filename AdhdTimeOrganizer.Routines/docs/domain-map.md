@@ -144,7 +144,7 @@ owned by users in different zones must produce identical results.
 | `UpdateRoutineSettingsEndpoint` | Endpoint | `PUT /routine/settings`. Upserts the single row — this is what creates it | `routineSettings/UpdateRoutineSettingsEndpoint.cs` |
 | `CreateRoutineTimePeriodEndpoint` | `BaseCreateEndpoint` | Create a period | `routineTimePeriod/command/CreateRoutineTimePeriodEndpoint.cs` |
 | `UpdateRoutineTimePeriodEndpoint` | `BaseUpdateEndpoint` | Update a period (an anchor/length edit re-derives the next reset, and correctly earns a fresh nudge) | `routineTimePeriod/command/UpdateRoutineTimePeriodEndpoint.cs` |
-| `DeleteRoutineTimePeriodEndpoint` | `BaseDeleteEndpoint` | Delete a period; completions cascade | `routineTimePeriod/command/DeleteRoutineTimePeriodEndpoint.cs` |
+| `DeleteRoutineTimePeriodEndpoint` | `BaseDeleteEndpoint` | Delete a period; completions cascade, items `Restrict` — a period with items is a 409 | `routineTimePeriod/command/DeleteRoutineTimePeriodEndpoint.cs` |
 | `ToggleIsHiddenRoutineTimePeriodEndpoint` | `BaseToggleIsHiddenEndpoint` | Hide a period — hidden periods are skipped by the nudge sweep | `routineTimePeriod/command/ToggleIsHiddenRoutineTimePeriodEndpoint.cs` |
 | `SpendStreakFreezeRoutineTimePeriodEndpoint` | Endpoint | Spend a freeze on a missed period. ⚠ Routes to **`POST /routine-todo-list/time-period/{timePeriodId}/streak-freeze`**, not under `/routine-time-period` like its folder neighbours — that is the shipped frontend contract, don't "correct" it. Returns the whole `RoutineTimePeriodResponse` via the shared `From(...)`, so it can't drift from the grouped read. Runs `CheckGrace` **before** `Apply` — see the Grace rule | `routineTimePeriod/command/SpendStreakFreezeRoutineTimePeriodEndpoint.cs` |
 | `GetAllRoutineTimePeriodEndpoint` | `BaseGetAllEndpoint` | List periods. Overrides `PostProcessItemsAsync` to re-derive through `RoutineTimePeriodReadRefresher` — the base serves `Projection` straight, which has no `NextResetAt`, no history and neither lazy refresh | `routineTimePeriod/query/GetAllRoutineTimePeriodEndpoint.cs` |
@@ -225,7 +225,10 @@ They are picked up by the `IScopedService` marker scan like any other service, t
 
 ### DTOs and validators — `application/dto/`, `application/validator/`
 
-Requests in `dto/request/`, responses in `dto/response/`, two filters in `dto/filter/`. Mapping lives
+Requests in `dto/request/`, responses in `dto/response/`. There is no `dto/filter/` — the module has no
+grid or filter endpoint, and the two unreferenced filter records that used to sit there were deleted
+(`CQ-10`); if a grid is added, reintroduce them **without** a settable `UserId`, since scoping is the
+DbContext's job (invariant 3). Mapping lives
 on the DTOs (`ICreateRequest` / `IUpdateRequest` / `IProjectionResponse`), not a mapper generic.
 `PeriodCompletionRecord` sits with them rather than in the host, because both its consumers
 (`GetCompletionHistoryRoutineTimePeriodEndpoint`, `RoutineTimePeriodResponse`) are here.

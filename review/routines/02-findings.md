@@ -669,7 +669,7 @@ convention to `BaseEntityConfigure` will silently miss this table.
 
 `Doc impact: domain-map.md → Persistence (RoutinePeriodCompletionConfiguration row: say it does not go through BaseEntityConfigure, and that the table is consequently plural and has no row_version)`
 
-### `CQ-10` 🟡 Two dead filter DTOs, both exposing a settable `UserId`
+### `CQ-10` 🟡 ✅ FIXED 2026-09-07 · Two dead filter DTOs, both exposing a settable `UserId`
 
 `application/dto/filter/RoutineTimePeriodFilterRequest.cs` ·
 `application/dto/filter/RoutineToDoListFilterRequest.cs`
@@ -683,7 +683,11 @@ mass-assignment shape waiting for someone to wire a `BaseGridEndpoint` against i
 **Fix.** Delete both. If a routine grid is planned, reintroduce them without `UserId` — scoping is the
 DbContext's job here (invariant 3).
 
-`Doc impact: domain-map.md → the DTO paragraph says "two filters in dto/filter/"; drop that clause when the files go`
+**Fixed 2026-09-07.** Both deleted through Rider's safe-delete, which re-ran the usage analysis and found
+none, so the "whole-repo search" claim above is now machine-confirmed rather than grep-confirmed. The
+`application/dto/filter/` directory went with them — it held nothing else.
+
+`Doc impact: domain-map.md → the DTO paragraph says "two filters in dto/filter/"; drop that clause when the files go` — done, and it does not merely drop the clause: it records that there is no `dto/filter/` and that a reintroduced filter must not carry `UserId`, since the mass-assignment shape is the part worth not repeating.
 
 ### `CQ-11` 🟡 ✅ FIXED 2026-09-06 (half) · Both to-do list validators open a DI scope per validation, and duplicate 30 lines verbatim
 
@@ -715,7 +719,7 @@ not "simplified" back.
 
 `Doc impact: none` — but see `SEC-1`; the validators paragraph in `domain-map.md` gained the helper.
 
-### `CQ-12` 🟡 Three different user-scoping styles across the endpoints
+### `CQ-12` 🟡 ✅ FIXED 2026-09-07 · Three different user-scoping styles across the endpoints
 
 The module mixes: explicit `x.UserId == loggedUserId` predicates
 (`GetAllGroupedRoutineTodoListEndpoint.cs:32`, `SpendStreakFreezeRoutineTimePeriodEndpoint.cs:57`,
@@ -731,6 +735,21 @@ glance. The freeze endpoint's comment (`:54-55`) is the right model.
 
 **Fix.** Comment the filter-only sites, or standardise on the explicit predicate for anything that takes
 an id from the request.
+
+**Fixed 2026-09-07 by the first branch — commenting, not standardising.** The two silent sites now carry a
+doc comment naming the mechanism (`RoutineToggleIsDoneTodoListEndpoint.FetchAndPrepare`,
+`ToggleStepIsDoneRoutineTodoListEndpoint.FetchItem`), each saying which entity is `IEntityWithUser`, which
+queries the filter therefore covers, and what a foreign id produces — empty list → 404 in the batch
+endpoint, null → 404 in the step one, both from the `TodoLists` bases. Each closes with why the comment
+exists at all, since "the alternative reading is *forgot*" is the whole finding. The two `GetById`
+endpoints already had their one-liner and were left alone; the style count is unchanged, but no site is
+now silent about which one it is.
+
+Converting the two toggles to explicit predicates was the other branch and was not taken: neither endpoint
+holds a user id today (`RoutineToggleIsDoneTodoListEndpoint` never touches `User`), so the predicate form
+would add a `User.GetId()` and a second scoping mechanism to paths the filter already covers correctly —
+buying legibility that a comment buys for nothing. The freeze endpoint's predicate earns its keep for a
+different reason, stated in its own comment: it makes the 404 an *ownership* answer.
 
 `Doc impact: none`
 
@@ -936,7 +955,7 @@ flat reads via the helper, without a count to go stale next time.
 
 `Doc impact: domain-map.md → Invariants (9) — no edit once CQ-5 is fixed, which is the argument for fixing the code rather than the doc`
 
-### `DOC-5` 🟡 A test name contradicts the documented `TryReset` contract
+### `DOC-5` 🟡 ✅ FIXED 2026-09-07 · A test name contradicts the documented `TryReset` contract
 
 `AdhdTimeOrganizer.IntegrationTests/Services/RoutineResetServiceTests.cs:204` —
 `TryReset_Single_AfterResetTime_ResetsItemAndUpdatesPeriod`. The single-item overload explicitly does
@@ -948,9 +967,19 @@ pass if the method were deleted. See `TEST-10`.
 Rename to `..._ResetsItemWithoutAdvancingLastResetAt` and assert `LastResetAt` is **unchanged**, which is
 the actual guarantee and is currently unpinned.
 
+**Fixed 2026-09-07**, both halves, under the prescribed name. The `lastResetAt` the fixture is built with
+is now held in a local and asserted back — `period.LastResetAt.Should().Be(lastResetAt)` — so the
+assertion fails if the single-item overload ever starts advancing the cycle, which the vacuous
+`NotBeNull()` could not. The comment on it says why the omission is deliberate rather than missing:
+advancing here would consume the reset with no streak evaluation and no `RoutinePeriodCompletion` row.
+That is the same sentence `RoutineResetService.TryReset`'s own summary carries, so the test and the
+contract now say one thing.
+
+`RoutineResetServiceTests` is green, 50 of 50.
+
 `Doc impact: none (fix the test)`
 
-### `DOC-6` 🟡 The docs say completions cascade on period delete, but omit that items block it
+### `DOC-6` 🟡 ✅ FIXED 2026-09-07 · The docs say completions cascade on period delete, but omit that items block it
 
 `domain-map.md` → Navigation index, `DeleteRoutineTimePeriodEndpoint` row: "Delete a period; completions
 cascade". True (`RoutinePeriodCompletionConfiguration.cs:26-29`) but half the story:
@@ -961,7 +990,13 @@ period that still has items is refused. `DbUtils` maps the FK violation to `DbFo
 `TodoListDeleteBehaviorTests.DeleteRoutineTimePeriod_WithItems_Returns409`. The behaviour is fine; the
 doc row reads as though the delete always succeeds.
 
-`Doc impact: domain-map.md → Navigation index (DeleteRoutineTimePeriodEndpoint row: "completions cascade, items Restrict — a period with items is a 409")`
+**Fixed 2026-09-07, doc only** — the behaviour was already right, and `Restrict` is the correct answer for
+a delete that would otherwise take a user's routine items with it. The row now reads "Delete a period;
+completions cascade, items `Restrict` — a period with items is a 409", so the two halves of the delete are
+named together and the 409 is documented as the designed outcome rather than something a caller discovers.
+Still pinned by `TodoListDeleteBehaviorTests.DeleteRoutineTimePeriod_WithItems_Returns409`.
+
+`Doc impact: domain-map.md → Navigation index (DeleteRoutineTimePeriodEndpoint row: "completions cascade, items Restrict — a period with items is a 409")` — done, verbatim.
 
 ### `DOC-7` 🟡 ✅ FIXED 2026-09-06 · "CheckGrace before every access" is asserted as a rule and violated by three sites
 

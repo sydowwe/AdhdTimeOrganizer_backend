@@ -255,9 +255,10 @@ public class RoutineResetServiceTests
     }
 
     [Fact]
-    public void TryReset_Single_AfterResetTime_ResetsItemAndUpdatesPeriod()
+    public void TryReset_Single_AfterResetTime_ResetsItemWithoutAdvancingLastResetAt()
     {
-        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-8));
+        var lastResetAt = DateTime.UtcNow.AddDays(-8);
+        var period = MakePeriod(7, lastResetAt: lastResetAt);
         var item = MakeItem(true);
         // DoneCount is step-counted: SetDone only rewrites it when TotalCount is set, so a
         // DoneCount without a TotalCount is not a state the app can produce.
@@ -269,7 +270,9 @@ public class RoutineResetServiceTests
         result.Should().BeTrue();
         item.IsDone.Should().BeFalse();
         item.DoneCount.Should().Be(0);
-        period.LastResetAt.Should().NotBeNull();
+        // The single-item overload deliberately leaves the cycle open: advancing LastResetAt here would
+        // consume the reset with no streak evaluation and no completion row. Only the list overload closes it.
+        period.LastResetAt.Should().Be(lastResetAt);
     }
 
     [Fact]
