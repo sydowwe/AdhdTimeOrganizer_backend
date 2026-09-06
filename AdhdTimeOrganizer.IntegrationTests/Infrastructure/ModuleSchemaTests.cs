@@ -56,6 +56,9 @@ public class ModuleSchemaTests(AppDbContextFixture fixture) : PostgresTestBase(f
             "calendar", "planner_task", "repeating_planner_task", "template_planner_task",
             "task_importance", "task_planner_day_template", "user_planner_settings", "reminder"
         ],
+        // routine_period_completions is plural on purpose: RoutinePeriodCompletion is a plain BaseEntity, so its
+        // configuration cannot call BaseEntityConfigure() (which derives the singular name from the class) and EF
+        // falls back to the DbSet name. Declined as a rename — see RoutinePeriodCompletionConfiguration's remarks.
         [ModuleSchemas.Routines] =
         [
             "routine_todo_list", "routine_time_period", "routine_period_completions", "user_routine_settings"

@@ -634,7 +634,7 @@ after the fix; what changed is whether the next page load keeps it.
 
 `Doc impact: domain-map.md → Business rules (Grace) — restate the rule as "before TryReset **and before Apply**", i.e. on every access, which is what it already says and what the code will then do` — done, together with `DOC-7`.
 
-### `CQ-9` 🟡 `RoutinePeriodCompletion` is the one routines table outside the entity-base convention — and it shows in the schema
+### `CQ-9` 🟡 ✅ RESOLVED 2026-09-07 (documented, rename declined) · `RoutinePeriodCompletion` is the one routines table outside the entity-base convention — and it shows in the schema
 
 `infrastructure/persistence/configuration/RoutinePeriodCompletionConfiguration.cs:10` ·
 `domain/model/entity/RoutinePeriodCompletion.cs:5,13`
@@ -667,7 +667,23 @@ migration plus a `ModuleSchemaTests` edit, not a no-op — see `MIG-3`. Leaving 
 what is not defensible is the current state being undocumented, since the next person to add a
 convention to `BaseEntityConfigure` will silently miss this table.
 
-`Doc impact: domain-map.md → Persistence (RoutinePeriodCompletionConfiguration row: say it does not go through BaseEntityConfigure, and that the table is consequently plural and has no row_version)`
+**Resolved 2026-09-07 — the rename is declined (`MIG-3`), the divergence is now written down.** No schema
+change, no migration, no test-literal change: the ledger is append-only and never concurrently updated, so
+the missing `row_version` buys nothing, and the plural name stays pinned exactly as it was. What changed is
+that all four places a reader could hit this now say so, in the order they'd hit them:
+
+- `RoutinePeriodCompletionConfiguration` gained class remarks naming the constraint that blocks the call
+  (`IBaseTableEntity`), listing what the missing `BaseEntityConfigure()` costs (plural table, no
+  `row_version`, identity instead of `serial`), and stating that a **new** convention added to
+  `BaseEntityConfigure` skips this table — the exact failure mode this finding was about.
+- `RoutinePeriodCompletion` gained class remarks giving the *reason* it is a plain `BaseEntity` (no `UserId`,
+  never updated after the sweep writes it), plus a note on `CreatedAt` that it is this type's own timestamp
+  and has no `now()` default — so nobody assumes the base pair is there.
+- `ModuleSchemaTests`'s Routines literal gained a comment for why `routine_period_completions` is plural,
+  since that literal is precisely where a future reader would otherwise "correct" it.
+- `domain-map.md` records it in both the entity table and the Persistence table.
+
+`Doc impact: domain-map.md → Persistence (RoutinePeriodCompletionConfiguration row: say it does not go through BaseEntityConfigure, and that the table is consequently plural and has no row_version)` — done, and the `RoutinePeriodCompletion` entity row too, since the entity's base class is where the constraint originates.
 
 ### `CQ-10` 🟡 ✅ FIXED 2026-09-07 · Two dead filter DTOs, both exposing a settable `UserId`
 
