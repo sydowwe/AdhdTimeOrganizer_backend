@@ -196,8 +196,9 @@ They are picked up by the `IScopedService` marker scan like any other service, t
 
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
-| `RoutineTodoListResetJobHandler` | Job (`Routines.TodoListReset`) | 02:00 UTC daily. Sweeps every period: `CheckGrace` → `RefreshFreezeBudget` → `TryResetCatchUp`; persists completions, then notifies **after** the commit | `infrastructure/jobs/RoutineTodoListResetJobHandler.cs` |
-| `RoutinePeriodNudgeJobHandler` | Job (`Routines.PeriodNudge`) | 09:00 UTC daily — deliberately not alongside the reset, because this one is addressed to a person. Skips hidden periods. Sequential per period, and each period's failure is caught so it can't lose earlier markers or skip later periods | `infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
+| `RoutineTodoListResetJobHandler` | Job (`Routines.TodoListReset`) | 02:00 UTC daily. Sweeps every period: `CheckGrace` → `RefreshFreezeBudget` → `TryResetCatchUp`; persists completions (one save per period), then notifies **after** the commit. Walks the table a page of users at a time (`RoutineSweepPaging`) | `infrastructure/jobs/RoutineTodoListResetJobHandler.cs` |
+| `RoutinePeriodNudgeJobHandler` | Job (`Routines.PeriodNudge`) | 09:00 UTC daily — deliberately not alongside the reset, because this one is addressed to a person. Skips hidden periods. Sequential per period, and each period's failure is caught so it can't lose earlier markers or skip later periods. Paged by user (`RoutineSweepPaging`), committing the markers per page; the `NOT is_hidden` filter is on both of its queries and is indexed | `infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
+| `RoutineSweepPaging` | Helper (internal) | Both sweeps' user paging: the distinct user ids, ordered, in pages of `UserPageSize` (100). By user rather than by row — the page is also the commit and change-tracker-release unit, so one user's periods must never straddle two of them | `infrastructure/jobs/RoutineSweepPaging.cs` |
 | `RoutinesScheduledJobsRegistrar` | `IHostedService` | Pushes both schedules through `IScheduler` on **every** boot (idempotent upsert by `JobKey`; the Scheduler's RAM job store drops triggers on restart). Registers each independently so one bad cadence can't keep the other off the schedule, and swallows failures so a scheduling problem never blocks startup | `infrastructure/scheduling/RoutinesScheduledJobsRegistrar.cs` |
 
 ### Seams — `application/seam/`
@@ -212,7 +213,7 @@ They are picked up by the `IScopedService` marker scan like any other service, t
 
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
-| `RoutineTimePeriodConfiguration` | EF config | Nine CHECK constraints (anchor-day range, length range, non-negative streaks, threshold/grace/history-depth/reminder-lead ranges, and the two freeze ones) plus the two unique indexes | `configuration/RoutineTimePeriodConfiguration.cs` |
+| `RoutineTimePeriodConfiguration` | EF config | Nine CHECK constraints (anchor-day range, length range, non-negative streaks, threshold/grace/history-depth/reminder-lead ranges, and the two freeze ones), the two unique indexes, and the partial `ix_routine_time_period_user_id_visible` (`user_id` `WHERE NOT is_hidden`) that the paged nudge sweep reads on | `configuration/RoutineTimePeriodConfiguration.cs` |
 | `RoutineToDoListConfiguration` | EF config | `BaseTodoListConfigure()` (TodoLists) + `IsManyWithOneUser()` / `IsManyWithOneActivity()` (Core) + the `SuggestedDays` array conversion | `configuration/RoutineToDoListConfiguration.cs` |
 | `RoutinePeriodCompletionConfiguration` | EF config | Cascade FK to `RoutineTimePeriod`; unique `(TimePeriodId, PeriodStart)`; the `IsFrozen`/`FrozenAt` pairing CHECK | `configuration/RoutinePeriodCompletionConfiguration.cs` |
 | `UserRoutineSettingsConfiguration` | EF config | `BaseEntityConfigure()` + `IsOneWithOneUser<UserRoutineSettings>()` — the unique `user_id` index is what makes "one row per user" a constraint rather than a convention | `configuration/UserRoutineSettingsConfiguration.cs` |

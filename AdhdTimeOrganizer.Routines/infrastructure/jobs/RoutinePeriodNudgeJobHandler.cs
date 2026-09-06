@@ -26,7 +26,9 @@ namespace AdhdTimeOrganizer.Routines.infrastructure.jobs;
 public class RoutinePeriodNudgeJobHandler(
     DbContext dbContext,
     IRoutinePeriodNotificationService notifier,
-    ILogger<RoutinePeriodNudgeJobHandler> logger) : IScheduledJobHandler, IScopedService
+    ILogger<RoutinePeriodNudgeJobHandler> logger,
+    // Defaulted, never registered — see RoutineTodoListResetJobHandler's copy of this parameter.
+    int userPageSize = RoutineSweepPaging.UserPageSize) : IScheduledJobHandler, IScopedService
 {
     public const string HandlerKey = "Routines.PeriodNudge";
 
@@ -37,60 +39,81 @@ public class RoutinePeriodNudgeJobHandler(
         // No user filter: this runs unauthenticated, which is exactly when AppDbContext's per-user query
         // filter is inert, so every user's periods are in scope — as they must be for a sweep.
         // Hidden periods are skipped: the user has told us they are not looking at that routine right now.
-        var periods = await dbContext.Set<RoutineTimePeriod>()
-            .Where(p => !p.IsHidden)
-            .Include(p => p.RoutineTodoListColl)
-            .ToListAsync(ct);
+        // The same filter goes on the id query, so a user whose every period is hidden is never paged.
+        var visible = dbContext.Set<RoutineTimePeriod>().Where(p => !p.IsHidden);
+        var pages = await RoutineSweepPaging.LoadUserPagesAsync(visible, userPageSize, ct);
 
         var now = DateTime.UtcNow;
         var nudged = 0;
         var graceWarned = 0;
 
-        // Sequential on purpose. Fanning the notify calls out with Task.WhenAll would run them against
-        // this scope's single AppDbContext concurrently — INotificationService writes notification rows
-        // through the same scoped context — which throws rather than going faster. Doing it safely means
-        // a scope (and DbContext) per period plus moving the marker writes off these tracked entities,
-        // which is not worth it for a once-a-day sweep. See PERF-8 in review/portal/02-findings.md.
-        foreach (var period in periods)
+        foreach (var userIds in pages)
         {
-            try
-            {
-                if (RoutineResetService.EvaluateEndingSoon(period, now) is { } nudge)
-                {
-                    var items = period.RoutineTodoListColl;
-                    var remaining = items.Count(i => !i.IsDone);
+            var periods = await dbContext.Set<RoutineTimePeriod>()
+                .Where(p => !p.IsHidden && userIds.Contains(p.UserId))
+                .Include(p => p.RoutineTodoListColl)
+                .ToListAsync(ct);
 
-                    // Marked only when something actually went out — see IRoutinePeriodNotificationService.
-                    if (await notifier.NotifyEndingSoonAsync(period, nudge, remaining, items.Count, ct))
+            var pageNudged = 0;
+            var pageGraceWarned = 0;
+
+            // Sequential on purpose. Fanning the notify calls out with Task.WhenAll would run them against
+            // this scope's single AppDbContext concurrently — INotificationService writes notification rows
+            // through the same scoped context — which throws rather than going faster. Doing it safely means
+            // a scope (and DbContext) per period plus moving the marker writes off these tracked entities,
+            // which is not worth it for a once-a-day sweep. See PERF-8 in review/portal/02-findings.md.
+            foreach (var period in periods)
+            {
+                try
+                {
+                    if (RoutineResetService.EvaluateEndingSoon(period, now) is { } nudge)
                     {
-                        period.EndingSoonNotifiedFor = nudge.NextReset;
-                        nudged++;
+                        var items = period.RoutineTodoListColl;
+                        var remaining = items.Count(i => !i.IsDone);
+
+                        // Marked only when something actually went out — see IRoutinePeriodNotificationService.
+                        if (await notifier.NotifyEndingSoonAsync(period, nudge, remaining, items.Count, ct))
+                        {
+                            period.EndingSoonNotifiedFor = nudge.NextReset;
+                            pageNudged++;
+                        }
+                    }
+
+                    if (RoutineResetService.ShouldWarnGraceExpiring(period, now))
+                    {
+                        await notifier.NotifyGraceExpiringAsync(period, ct);
+                        period.GraceNotifiedFor = period.StreakGraceUntil;
+                        pageGraceWarned++;
                     }
                 }
-
-                if (RoutineResetService.ShouldWarnGraceExpiring(period, now))
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    await notifier.NotifyGraceExpiringAsync(period, ct);
-                    period.GraceNotifiedFor = period.StreakGraceUntil;
-                    graceWarned++;
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // One period's failure must not lose the "notified for" markers already set for
+                    // earlier periods in this sweep, nor skip the periods still to come.
+                    logger.LogError(ex, "Routine nudge sweep failed for period {PeriodId}", period.Id);
                 }
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                // One period's failure must not lose the "notified for" markers already set for
-                // earlier periods in this sweep, nor skip the periods still to come.
-                logger.LogError(ex, "Routine nudge sweep failed for period {PeriodId}", period.Id);
-            }
+
+            // Commit per page, not once for the whole sweep: the markers are what stop tomorrow's run
+            // re-sending today's nudges, so a page's worth of them must not be riding on the last page's save.
+            if (pageNudged > 0 || pageGraceWarned > 0)
+                await dbContext.SaveChangesAsync(ct);
+
+            nudged += pageNudged;
+            graceWarned += pageGraceWarned;
+
+            // Released once the page is committed — the sweep never holds more than UserPageSize users'
+            // periods and items.
+            dbContext.ChangeTracker.Clear();
         }
 
         if (nudged == 0 && graceWarned == 0)
             return;
 
-        await dbContext.SaveChangesAsync(ct);
         logger.LogInformation(
             "Routine nudge sweep sent {NudgeCount} lead-time nudges and {GraceCount} grace warnings", nudged, graceWarned);
     }

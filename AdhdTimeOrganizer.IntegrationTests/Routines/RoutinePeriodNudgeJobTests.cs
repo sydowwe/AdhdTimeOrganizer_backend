@@ -184,10 +184,15 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
     /// Runs the job the way the Scheduler's dispatcher would (one DI scope per fire), against a factory whose
     /// <see cref="IRoutinePeriodNotificationService"/> has been substituted with a controllable double.
     /// </summary>
-    private static async Task RunJobAsync(IServiceProvider services, CancellationToken ct)
+    private static async Task RunJobAsync(IServiceProvider services, CancellationToken ct, int? userPageSize = null)
     {
         await using var scope = services.CreateAsyncScope();
-        var handler = (IScheduledJobHandler)ActivatorUtilities.CreateInstance(scope.ServiceProvider, typeof(RoutinePeriodNudgeJobHandler));
+        // PERF-4: the sweep pages by user. Passing 1 puts every user on their own page, which is the only way
+        // to cross a page boundary without seeding RoutineSweepPaging.UserPageSize users; omitting it takes
+        // the constructor default, which is what DI and the dispatcher do.
+        var handler = (IScheduledJobHandler)(userPageSize is { } size
+            ? ActivatorUtilities.CreateInstance(scope.ServiceProvider, typeof(RoutinePeriodNudgeJobHandler), size)
+            : ActivatorUtilities.CreateInstance(scope.ServiceProvider, typeof(RoutinePeriodNudgeJobHandler)));
 
         var now = DateTime.UtcNow;
         await handler.ExecuteAsync(new ScheduledJobContext
@@ -200,7 +205,8 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         }, ct);
     }
 
-    private async Task RunJobWithDoubleAsync(RoutinePeriodNotificationServiceDouble notifier, CancellationToken ct)
+    private async Task RunJobWithDoubleAsync(
+        RoutinePeriodNotificationServiceDouble notifier, CancellationToken ct, int? userPageSize = null)
     {
         await using var factory = CreateFactory(TestRoles.AdminAndUser, configureServices: services =>
         {
@@ -213,7 +219,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
             services.RemoveAll<ILoggedUserService>();
             services.AddScoped<ILoggedUserService>(_ => new NoAmbientUserLoggedUserService());
         });
-        await RunJobAsync(factory.Services, ct);
+        await RunJobAsync(factory.Services, ct, userPageSize);
     }
 
     // ---- A. CQ-5: mid-loop notifier failure must not lose earlier markers ---------------------------
@@ -468,6 +474,67 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         // Deliberate: the job runs unauthenticated, so the global IEntityWithUser query filter is a no-op and
         // every user's due periods are swept in one pass. Don't "fix" this to scope to one user.
         notifier.EndingSoonCalls.Select(c => c.PeriodId).Should().BeEquivalentTo([periodAId, periodBId]);
+    }
+
+    /// <summary>
+    /// PERF-4. The sweep now walks the table a page of users at a time and commits the "notified for" markers
+    /// per page, so paging is a mechanism that can silently drop users (a page that never gets its own save,
+    /// or a <c>ChangeTracker.Clear()</c> that lands before one) without any error. Page size 1 puts each of the
+    /// three users on their own page; the assertion is on the stored markers, not just the notify calls,
+    /// because a lost per-page commit re-notifies everyone tomorrow while looking fine today.
+    /// <para>
+    /// The hidden period is here rather than in section D because the filter now appears twice — on the
+    /// distinct-user-id query and on the page fetch — and a user whose only period is hidden must not be paged.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task NudgeSweep_AcrossPageBoundaries_NotifiesAndMarksEveryUser()
+    {
+        var thirdUserId = FakeLoggedUserService.TestUserId + 3;
+        long periodAId, periodBId, periodCId, hiddenPeriodId;
+
+        await using (var db = CreateDbContext())
+        {
+            await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
+            await EnsureUserAsync(db, thirdUserId, null, CancellationToken);
+
+            var periodA = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            await SeedItemAsync(db, periodA, isDone: false, UserId, CancellationToken);
+            periodAId = periodA.Id;
+
+            var periodB = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            await SeedItemAsync(db, periodB, isDone: false, ReminderSeedHelper.OtherUserId, CancellationToken);
+            periodBId = periodB.Id;
+
+            var periodC = await SeedPeriodAsync(db, thirdUserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            await SeedItemAsync(db, periodC, isDone: false, thirdUserId, CancellationToken);
+            periodCId = periodC.Id;
+
+            // Same user as period C, on a different length so the unique (user_id, length_in_days) index holds:
+            // one page must still be able to hold a mix.
+            var hidden = await SeedPeriodAsync(db, thirdUserId, lengthInDays: 14, reminderLeadDays: 3,
+                lastResetAt: DateTime.UtcNow.AddDays(-12), isHidden: true, ct: CancellationToken);
+            await SeedItemAsync(db, hidden, isDone: false, thirdUserId, CancellationToken);
+            hiddenPeriodId = hidden.Id;
+        }
+
+        var notifier = new RoutinePeriodNotificationServiceDouble();
+        await RunJobWithDoubleAsync(notifier, CancellationToken, userPageSize: 1);
+
+        notifier.EndingSoonCalls.Select(c => c.PeriodId).Should()
+            .BeEquivalentTo([periodAId, periodBId, periodCId], "every page must be swept, and only the hidden period skipped");
+
+        await using (var verify = CreateDbContext())
+        {
+            var stored = await verify.Set<RoutineTimePeriod>().AsNoTracking()
+                .Where(p => p.Id == periodAId || p.Id == periodBId || p.Id == periodCId || p.Id == hiddenPeriodId)
+                .ToDictionaryAsync(p => p.Id, CancellationToken);
+
+            stored[periodAId].EndingSoonNotifiedFor.Should().NotBeNull("the first page's marker must be committed by its own save");
+            stored[periodBId].EndingSoonNotifiedFor.Should().NotBeNull();
+            stored[periodCId].EndingSoonNotifiedFor.Should().NotBeNull("the last page must be committed too");
+            stored[hiddenPeriodId].EndingSoonNotifiedFor.Should().BeNull("a hidden period is never swept, so it is never marked");
+        }
     }
 
     // ---- G. Timezone (exploratory) ---------------------------------------------------------------------

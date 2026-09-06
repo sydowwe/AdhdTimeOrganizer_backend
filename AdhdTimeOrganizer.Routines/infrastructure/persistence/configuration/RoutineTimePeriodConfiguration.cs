@@ -77,5 +77,14 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(t => new { t.UserId, t.LengthInDays }).IsUnique();
+
+        // The 09:00 nudge sweep's only filter is "not hidden", and it now walks the table a page of users at a
+        // time (RoutineSweepPaging), so both of its queries — the distinct user ids and the page fetch — are
+        // "visible periods, by user". Partial rather than an index on is_hidden alone: hidden periods are
+        // exactly the ones nothing sweeps, so keeping them out of the index is free. The two unique indexes
+        // above also lead with user_id, but neither can skip the hidden rows.
+        builder.HasIndex(t => t.UserId)
+            .HasDatabaseName("ix_routine_time_period_user_id_visible")
+            .HasFilter("NOT is_hidden");
     }
 }

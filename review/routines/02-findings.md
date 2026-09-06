@@ -777,9 +777,35 @@ control — re-deriving on every save would silently undo whatever the reorder e
 |---|---|---|---|---|
 | `GetAllGroupedRoutineTodoListEndpoint.cs:76-91` | Loads the **entire** completion history for every period, then trims to `HistoryDepth` in memory (`:89`) | History grows one row per period per cycle forever; a two-year-old daily routine is ~730 rows fetched to render 16. Grows unboundedly with account age, on the module's most-hit read | `PARTITION BY … ORDER BY period_start DESC` in SQL, or a per-period `Take(HistoryDepth)` — the pattern `GetCompletionHistoryRoutineTimePeriodEndpoint.cs:42-47` already uses correctly | `PERF-1` |
 | `GetAllGroupedRoutineTodoListEndpoint.cs:102` | `RoutineTodoListResponse.Projection(new[] { e }.AsQueryable()).Single()` — **per item** | Builds and interprets the whole projection expression tree once per item via LINQ-to-Objects, on a request that already holds the materialised graph | Project the list once outside the loop, or map with a plain function. The expression is only needed for the `IQueryable` path | `PERF-2` |
-| `RoutineTodoListResetJobHandler.cs:34-37` | Loads every user's periods with `RoutineTodoListColl` + `Steps` into memory in one go | Whole-table materialisation with two levels of collection include; memory scales with total users × routines × steps. Also makes the single `SaveChangesAsync` at `:68` an all-or-nothing batch — see `SEC-3` | Page by user id and commit per page | `PERF-3` |
-| `RoutinePeriodNudgeJobHandler.cs:40-43` | Same shape, plus `Where(p => !p.IsHidden)` with no supporting index | Sequential scan of `routine_time_period` daily. Small today; the sequential-notify loop below it is deliberate and documented (`:49-53`), so this is the only part worth changing | Page by user; see index note below | `PERF-4` |
+| `RoutineTodoListResetJobHandler.cs:34-37` | Loads every user's periods with `RoutineTodoListColl` + `Steps` into memory in one go | Whole-table materialisation with two levels of collection include; memory scales with total users × routines × steps. Also makes the single `SaveChangesAsync` at `:68` an all-or-nothing batch — see `SEC-3` | Page by user id and commit per page | `PERF-3` ✅ |
+| `RoutinePeriodNudgeJobHandler.cs:40-43` | Same shape, plus `Where(p => !p.IsHidden)` with no supporting index | Sequential scan of `routine_time_period` daily. Small today; the sequential-notify loop below it is deliberate and documented (`:49-53`), so this is the only part worth changing | Page by user; see index note below | `PERF-4` ✅ |
 | `RoutineStreakFreezeService.RecomputeStreak` via `SpendStreakFreezeRoutineTimePeriodEndpoint.cs:77-80` | Loads the complete history to recompute | **Deliberate and correct** — a truncated history under-counts the run, and the code says so at `:75-76`. Listed only so it is not "found" again later; its growth is bounded by fixing `PERF-1`, not this | none | — |
+
+#### `PERF-3` + `PERF-4` ✅ FIXED 2026-09-06 — both sweeps page by user
+
+Both handlers now read the distinct user ids once up front and walk them a page at a time
+(`infrastructure/jobs/RoutineSweepPaging.cs`, 100 users per page), so neither ever holds more than a page's
+object graph — for the reset job, a page's periods *plus* their items and steps.
+
+**Paged by user, not by row**, because a page is also the commit unit: the nudge sweep saves its
+"notified for" markers per page, so a user split across two pages could be half-notified, and the reset job
+clears the change tracker at each boundary. Skip/Take over periods would additionally drift as the sweep
+mutates the rows it is ordering by. The reset job's commit stays **per period** — the SEC-3 fix — so paging
+changed only where the tracker is released, never how much a single save carries.
+
+`ChangeTracker.Clear()` at the page boundary is the one thing here that can fail silently: it is safe only
+after every period on the page has been saved *and* announced, and `DiscardAsync`'s remark already records
+why the mid-page case cannot use it. Pinned accordingly, on the rows rather than on the call counts, by
+`RoutineTodoListResetJobHandlerTests.ResetSweep_AcrossPageBoundaries_ResetsEveryUsersPeriods` and
+`RoutinePeriodNudgeJobTests.NudgeSweep_AcrossPageBoundaries_NotifiesAndMarksEveryUser`. Both force a boundary
+by passing `userPageSize: 1` — a defaulted constructor parameter on each handler that only the tests supply
+— rather than seeding a hundred users; the nudge case also keeps a hidden period in the seed, because the
+`!IsHidden` filter now appears on two queries instead of one.
+
+The batching half of `SEC-3` was already fixed with that finding; `PERF-3` claimed it too, and nothing more
+was owed here.
+
+`Doc impact: testing.md → guard rows` — done.
 
 ### Indexes that should exist
 
@@ -787,8 +813,12 @@ control — re-deriving on every save would silently undo whatever the reorder e
   `(time_period_id, period_start)` already serves ordered lookups by period, so this is only worth
   adding if `PERF-1` is fixed with a windowed query that wants the descending order. **Probably no
   action.**
-- `routine_time_period (is_hidden)`, or a partial index `WHERE NOT is_hidden` — supports the nudge
-  sweep's filter (`PERF-4`). Marginal at current scale; add with `PERF-3`'s paging, not before.
+- ~~`routine_time_period (is_hidden)`, or a partial index `WHERE NOT is_hidden`~~ — ✅ **added 2026-09-06**
+  with `PERF-3`'s paging, as this note asked. Landed as `ix_routine_time_period_user_id_visible`: keyed on
+  `user_id` with `HasFilter("NOT is_hidden")`, because after the paging fix both of the nudge sweep's queries
+  — the distinct user ids and the page fetch — are "visible periods, by user" rather than "not hidden"
+  alone. The two unique indexes on the table also lead with `user_id`, but neither can skip the hidden rows.
+  Migration `20260906215926_RoutineTimePeriodVisibleUserIndex`.
 - **No missing index on the hot read path.** `routine_todo_list` already carries
   `(user_id, time_period_id)` as an explicit performance index
   (`RoutineTodoListConfiguration.cs:57`) and the unique `(user_id, time_period_id, activity_id)` above

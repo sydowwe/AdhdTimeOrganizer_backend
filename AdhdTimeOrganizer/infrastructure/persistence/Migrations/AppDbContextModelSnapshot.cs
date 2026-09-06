@@ -2342,6 +2342,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_routine_time_period");
 
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_routine_time_period_user_id_visible")
+                        .HasFilter("NOT is_hidden");
+
                     b.HasIndex("UserId", "LengthInDays")
                         .IsUnique()
                         .HasDatabaseName("ix_routine_time_period_user_id_length_in_days");

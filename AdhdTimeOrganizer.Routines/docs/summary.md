@@ -123,6 +123,15 @@ has no knowledge of Planning at all.
   concurrently against this scope's single `DbContext` — `INotificationService` writes its rows through
   the same scoped context — which throws rather than going faster.
 
+- **Both sweeps page by user, and the page is also the release point.** `RoutineSweepPaging` reads the
+  distinct user ids once and hands them out 100 at a time; each handler loads only that page's periods
+  and calls `ChangeTracker.Clear()` at the end of it. Paged by *user*, never by row: the nudge sweep
+  commits its "notified for" markers per page, so a user split across two pages could be half-notified.
+  The clear is only safe once the page is both saved and announced — mid-page, a lost race is rolled
+  back by `RoutineTodoListResetJobHandler.DiscardAsync` instead, because clearing there would detach the
+  periods still to come and their saves would silently write nothing. The reset job's commit stays one
+  per period; paging changed where the tracker is released, not how much a save carries.
+
 - **Seeder reads use explicit `UserId` predicates**, not the ambient query filter — `UserScoping` is
   on, so a seeder seeding a different user than the ambient one would otherwise read back zero rows.
 

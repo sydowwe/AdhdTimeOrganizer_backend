@@ -105,10 +105,15 @@ public class RoutineTodoListResetJobHandlerTests(AppDbContextFixture fixture) : 
     /// <see cref="ScheduledJobContext"/> (the handler reads nothing off it — its state all comes from the
     /// database). Defaults to the ordinary host factory; the notifier-failure test swaps in its own.
     /// </summary>
-    private async Task RunJobAsync(IServiceProvider? services = null)
+    private async Task RunJobAsync(IServiceProvider? services = null, int? userPageSize = null)
     {
         await using var scope = (services ?? Fixture.AdminAndUserFactory.Services).CreateAsyncScope();
-        var handler = ActivatorUtilities.CreateInstance<RoutineTodoListResetJobHandler>(scope.ServiceProvider);
+        // PERF-3: the sweep pages by user. Passing 1 puts every user on their own page, which is the only way
+        // to cross a page boundary without seeding RoutineSweepPaging.UserPageSize users; omitting it takes the
+        // constructor default, which is what DI and the dispatcher do.
+        var handler = userPageSize is { } size
+            ? ActivatorUtilities.CreateInstance<RoutineTodoListResetJobHandler>(scope.ServiceProvider, size)
+            : ActivatorUtilities.CreateInstance<RoutineTodoListResetJobHandler>(scope.ServiceProvider);
 
         var now = DateTime.UtcNow;
         await handler.ExecuteAsync(new ScheduledJobContext
@@ -478,6 +483,70 @@ public class RoutineTodoListResetJobHandlerTests(AppDbContextFixture fixture) : 
             .ToListAsync(CancellationToken);
 
         periods.Should().HaveCount(2).And.OnlyContain(p => p.Streak == 1);
+    }
+
+    /// <summary>
+    /// PERF-3. The sweep now loads a page of users at a time and clears the change tracker at each page
+    /// boundary, which is exactly the shape that can silently stop halfway: a clear that lands while later
+    /// periods are still tracked detaches them and their saves write nothing, with no error and no log line.
+    /// Page size 1 forces a boundary between the two users; the second user's period carries the assertion.
+    /// <para>
+    /// The first user holds two periods so the other half of the rule is pinned too — a page is a set of
+    /// users, not of rows, so one user's periods can never be split across two pages and half-swept.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task ResetSweep_AcrossPageBoundaries_ResetsEveryUsersPeriods()
+    {
+        RoutineTimePeriod weekly, fortnightly, theirs;
+        await using (var db = CreateDbContext())
+        {
+            await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
+
+            weekly = await SeedPeriodAsync(db, userId: UserId, lastResetAt: DateTime.UtcNow.AddDays(-8), ct: CancellationToken);
+            await SeedItemAsync(db, weekly, UserId, isDone: true, CancellationToken);
+
+            // Same user, second period — unique (user_id, length_in_days) forces a different length.
+            fortnightly = await SeedPeriodAsync(db, userId: UserId, lengthInDays: 14,
+                lastResetAt: DateTime.UtcNow.AddDays(-15), ct: CancellationToken);
+            await SeedItemAsync(db, fortnightly, UserId, isDone: true, CancellationToken);
+
+            theirs = await SeedPeriodAsync(db, userId: ReminderSeedHelper.OtherUserId,
+                lastResetAt: DateTime.UtcNow.AddDays(-8), ct: CancellationToken);
+            await SeedItemAsync(db, theirs, ReminderSeedHelper.OtherUserId, isDone: true, CancellationToken);
+        }
+
+        await using var factory = Fixture.CreateFactory(roles: null, configureServices: services =>
+        {
+            services.RemoveAll<ILoggedUserService>();
+            services.AddScoped<ILoggedUserService>(_ => new UnauthenticatedLoggedUserService());
+        });
+
+        await RunJobAsync(factory.Services, userPageSize: 1);
+
+        await using var verify = CreateDbContext();
+        var ids = new[] { weekly.Id, fortnightly.Id, theirs.Id };
+
+        var periods = await verify.Set<RoutineTimePeriod>().AsNoTracking()
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync(CancellationToken);
+
+        periods.Should().HaveCount(3).And.OnlyContain(p => p.Streak == 1,
+            "every page's periods must be committed, not just the last one's");
+
+        // On the rows, not on the tracker: a detached period's item update is the silent half of this failure.
+        var items = await verify.Set<RoutineTodoList>().AsNoTracking()
+            .Where(i => ids.Contains(i.TimePeriodId))
+            .ToListAsync(CancellationToken);
+
+        items.Should().HaveCount(3).And.OnlyContain(i => !i.IsDone);
+
+        var completions = await verify.Set<RoutinePeriodCompletion>().AsNoTracking()
+            .Where(c => ids.Contains(c.TimePeriodId))
+            .ToListAsync(CancellationToken);
+
+        completions.Select(c => c.TimePeriodId).Should().BeEquivalentTo(ids,
+            "each period closes exactly one cycle here, and the completion row is what the history reads");
     }
 
     private sealed class UnauthenticatedLoggedUserService : ILoggedUserService
