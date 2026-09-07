@@ -5,13 +5,9 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.@base;
-using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
@@ -26,128 +22,34 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 [Collection("Postgres")]
 public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
 {
-    private const string Password = "Test@1234!";
-
     // ---- seeding helpers -------------------------------------------------
+    // The bodies live in ActivityProfileTestSeedHelper so GetAllActivityBacklogProfileTests shares them
+    // rather than copying them; these stay as the call sites' names.
 
-    private async Task<long> CreateSecondUserAsync(string email)
-    {
-        using var scope = Fixture.UnauthenticatedFactory.Services.CreateScope();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
-        var user = new User
-        {
-            Email = email,
-            UserName = email,
-            NormalizedEmail = email.ToUpperInvariant(),
-            NormalizedUserName = email.ToUpperInvariant(),
-            EmailConfirmed = true,
-            Locale = AvailableLocales.En,
-            Timezone = TimeZoneInfo.Utc
-        };
-        var result = await userManager.CreateAsync(user, Password);
-        result.Succeeded.Should().BeTrue();
-        return user.Id;
-    }
+    private Task<long> CreateSecondUserAsync(string email) =>
+        ActivityProfileTestSeedHelper.CreateSecondUserAsync(Fixture, email);
 
-    private static async Task<long> SeedRoleAsync(DbContext db, long userId, string name)
-    {
-        var role = new ActivityRole { UserId = userId, Name = name, Color = "#112233" };
-        db.Set<ActivityRole>().Add(role);
-        await db.SaveChangesAsync(CancellationToken);
-        return role.Id;
-    }
+    private static Task<long> SeedActivityAsync(DbContext db, long userId, string name) =>
+        ActivityProfileTestSeedHelper.SeedActivityAsync(db, userId, name);
 
-    private static async Task<long> SeedActivityAsync(DbContext db, long userId, string name)
-    {
-        var roleId = await SeedRoleAsync(db, userId, $"{name} Role");
-        var activity = new Activity { UserId = userId, Name = name, RoleId = roleId };
-        db.Set<Activity>().Add(activity);
-        await db.SaveChangesAsync(CancellationToken);
-        return activity.Id;
-    }
+    private static Task<long> SeedLookupAsync<TLookup>(DbContext db, long userId, string text)
+        where TLookup : BaseLookupWithUser, new() =>
+        ActivityProfileTestSeedHelper.SeedLookupAsync<TLookup>(db, userId, text);
 
-    private static async Task<long> SeedLookupAsync<TLookup>(DbContext db, long userId, string text)
-        where TLookup : BaseLookupWithUser, new()
-    {
-        var lookup = new TLookup { UserId = userId, Text = text };
-        db.Set<TLookup>().Add(lookup);
-        await db.SaveChangesAsync(CancellationToken);
-        return lookup.Id;
-    }
+    private static Task<(long activityId, long profileId)> SeedBacklogProfileAsync(DbContext db, long userId,
+        string name = "Backlog Activity", bool isRepeatable = false) =>
+        ActivityProfileTestSeedHelper.SeedBacklogProfileAsync(db, userId, name, isRepeatable);
 
-    private async Task<(long activityId, long profileId)> SeedBacklogProfileAsync(DbContext db, long userId, string name = "Backlog Activity",
-        bool isRepeatable = false)
-    {
-        var activityId = await SeedActivityAsync(db, userId, name);
-        var locationTypeId = await SeedLookupAsync<ActivityLocationType>(db, userId, $"{name} Home");
-        var weatherId = await SeedLookupAsync<ActivityWeatherDependency>(db, userId, $"{name} Indoor");
-        var costTierId = await SeedLookupAsync<ActivityExpectedCostTier>(db, userId, $"{name} Free");
+    private static Task<(long activityId, long profileId)> SeedBucketListProfileAsync(DbContext db, long userId,
+        string name = "Bucket Activity") =>
+        ActivityProfileTestSeedHelper.SeedBucketListProfileAsync(db, userId, name);
 
-        var profile = new ActivityBacklogProfile
-        {
-            ActivityId = activityId,
-            LocationTypeId = locationTypeId,
-            WeatherDependencyId = weatherId,
-            ExpectedCostTierId = costTierId,
-            EnergyLevel = EnergyLevel.Low,
-            MinParticipants = 1,
-            DurationMinutes = 30,
-            IsRepeatable = isRepeatable
-        };
-        db.Set<ActivityBacklogProfile>().Add(profile);
-        await db.SaveChangesAsync(CancellationToken);
-        return (activityId, profile.Id);
-    }
+    private static Task<(long activityId, long profileId)> SeedProjectProfileAsync(DbContext db, long userId,
+        string name = "Project Activity") =>
+        ActivityProfileTestSeedHelper.SeedProjectProfileAsync(db, userId, name);
 
-    private async Task<(long activityId, long profileId)> SeedBucketListProfileAsync(DbContext db, long userId, string name = "Bucket Activity")
-    {
-        var activityId = await SeedActivityAsync(db, userId, name);
-        var experienceTypeId = await SeedLookupAsync<ActivityExperienceType>(db, userId, $"{name} Adventure");
-
-        var profile = new ActivityBucketListProfile
-        {
-            ActivityId = activityId,
-            ExperienceTypeId = experienceTypeId,
-            ComfortZoneStep = 5,
-            InspirationSource = "A friend's story"
-        };
-        db.Set<ActivityBucketListProfile>().Add(profile);
-        await db.SaveChangesAsync(CancellationToken);
-        return (activityId, profile.Id);
-    }
-
-    private async Task<(long activityId, long profileId)> SeedProjectProfileAsync(DbContext db, long userId, string name = "Project Activity")
-    {
-        var activityId = await SeedActivityAsync(db, userId, name);
-
-        var profile = new ActivityProjectProfile
-        {
-            ActivityId = activityId,
-            DifficultyLevel = DifficultyLevel.Beginner,
-            ProjectArea = "Woodworking",
-            EstimatedHours = 4,
-            ReadinessStatus = ReadinessStatus.Planning
-        };
-        db.Set<ActivityProjectProfile>().Add(profile);
-        await db.SaveChangesAsync(CancellationToken);
-        return (activityId, profile.Id);
-    }
-
-    private static async Task<long> SeedMemoryAnchorAsync(DbContext db, long userId, long activityId, int year, int month)
-    {
-        var anchor = new MemoryAnchor
-        {
-            UserId = userId,
-            ActivityId = activityId,
-            AnchorYear = year,
-            AnchorMonth = month,
-            HighlightNote = $"Anchored {year}-{month:00}",
-            Rating = 8
-        };
-        db.Set<MemoryAnchor>().Add(anchor);
-        await db.SaveChangesAsync(CancellationToken);
-        return anchor.Id;
-    }
+    private static Task<long> SeedMemoryAnchorAsync(DbContext db, long userId, long activityId, int year, int month) =>
+        ActivityProfileTestSeedHelper.SeedMemoryAnchorAsync(db, userId, activityId, year, month);
 
     private static object GridBody() => new { useFilter = false, filter = new { }, sortBy = Array.Empty<object>(), itemsPerPage = 20, page = 1 };
 
@@ -163,6 +65,27 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
 
     private static long? MemoryAnchorIdOf(JsonElement item) =>
         item.GetProperty("memoryAnchorId").ValueKind == JsonValueKind.Null ? null : item.GetProperty("memoryAnchorId").GetInt64();
+
+    private const string BucketListOptionsRoute = "api/activity-bucket-list-profile/all-options";
+    private const string ProjectOptionsRoute = "api/activity-project-profile/all-options";
+
+    // ---- all-options helpers (TEST-3) ------------------------------------
+    // The three /all-options routes are byte-identical overrides of BaseGetSelectOptionsEndpoint with
+    // nothing shared between them, so each is pinned separately through these.
+
+    private async Task<JsonElement[]> GetOptionsAsync(HttpClient client, string route)
+    {
+        var response = await client.GetAsync(route, TestContext.Current.CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return (await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOpts, TestContext.Current.CancellationToken))!;
+    }
+
+    private static long[] OptionIdsOf(JsonElement[] options) => options.Select(o => o.GetProperty("id").GetInt64()).ToArray();
+
+    private static string[] OptionTextsOf(JsonElement[] options) => options.Select(o => o.GetProperty("text").GetString()!).ToArray();
+
+    private static string TextOfOption(JsonElement[] options, long id) =>
+        options.Single(o => o.GetProperty("id").GetInt64() == id).GetProperty("text").GetString()!;
 
     // ---- A: backlog ---------------------------------------------------------
 
@@ -183,27 +106,8 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         body.Items.Select(i => i.GetProperty("id").GetInt64()).Should().NotContain(profileIdA);
     }
 
-    /// <summary>
-    /// The unfiltered sibling of the grid. BaseGetAllEndpoint has no ApplyUserScoping hook, so this
-    /// route answered 200 with every user's backlog profiles until it overrode Filter; nothing about the
-    /// response shape changed when it did, which is why only a row assertion catches a regression here.
-    /// </summary>
-    [Fact]
-    public async Task Backlog_GetAll_OnlyReturnsCallersOwnRows()
-    {
-        var userIdB = await CreateSecondUserAsync("backlog-getall-b@test.com");
-        await using var db = CreateDbContext();
-        var (_, profileIdA) = await SeedBacklogProfileAsync(db, FakeLoggedUserService.TestUserId, "A's get-all backlog activity");
-        var (_, profileIdB) = await SeedBacklogProfileAsync(db, userIdB, "B's get-all backlog activity");
-
-        await using var factoryB = CreateFactory(["User"], userIdB);
-        var response = await factoryB.CreateClient().GetAsync("api/activity-backlog-profile", TestContext.Current.CancellationToken);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOpts, TestContext.Current.CancellationToken);
-        items!.Select(i => i.GetProperty("id").GetInt64()).Should().Contain(profileIdB);
-        items.Select(i => i.GetProperty("id").GetInt64()).Should().NotContain(profileIdA);
-    }
+    // The unfiltered GET sibling of this grid lives in GetAllActivityBacklogProfileTests -- it needs both
+    // scoping directions plus the projection and auth cases, which is a suite of its own.
 
     [Fact]
     public async Task Backlog_GetById_ForeignProfile_Returns404()
@@ -377,6 +281,81 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact(DisplayName = "TEST-3: bucket-list /all-options returns the caller's rows and not another user's")]
+    public async Task BucketList_SelectOptions_OnlyReturnsCallersOwnRows()
+    {
+        var userIdB = await CreateSecondUserAsync("bucket-options-b@test.com");
+        await using var db = CreateDbContext();
+        var (_, profileIdA) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId, "A's optioned bucket activity");
+        var (_, profileIdB) = await SeedBucketListProfileAsync(db, userIdB, "B's optioned bucket activity");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var ids = OptionIdsOf(await GetOptionsAsync(factoryB.CreateClient(), BucketListOptionsRoute));
+
+        ids.Should().Contain(profileIdB);
+        ids.Should().NotContain(profileIdA, "the profile is not IEntityWithUser -- this endpoint's Filter override is the only guard");
+    }
+
+    [Fact(DisplayName = "TEST-3: a bucket-list option carries the profile id with the activity's name")]
+    public async Task BucketList_SelectOptions_IdIsTheProfileAndTextIsTheActivityName()
+    {
+        await using var db = CreateDbContext();
+        var (activityId, profileId) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId, "Sleep in a glass igloo");
+
+        var options = await GetOptionsAsync(CreateClient(), BucketListOptionsRoute);
+
+        // The client renders text into the picker and sends id back as a profile reference, so swapping the
+        // two in a refactor still answers 200 with a plausible-looking body.
+        TextOfOption(options, profileId).Should().Be("Sleep in a glass igloo");
+        OptionIdsOf(options).Should().NotContain(activityId, "the id is the profile's, never the activity's");
+    }
+
+    [Fact(DisplayName = "TEST-3: bucket-list options come back ordered by activity name")]
+    public async Task BucketList_SelectOptions_AreOrderedByActivityName()
+    {
+        // A fresh user, so the assertion is on the whole ordered list rather than on a subsequence of
+        // whatever the shared default user accumulated.
+        var userIdB = await CreateSecondUserAsync("bucket-options-order-b@test.com");
+        await using var db = CreateDbContext();
+        await SeedBucketListProfileAsync(db, userIdB, "Zeppelin ride");
+        await SeedBucketListProfileAsync(db, userIdB, "Abseiling");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var options = await GetOptionsAsync(factoryB.CreateClient(), BucketListOptionsRoute);
+
+        OptionTextsOf(options).Should().Equal("Abseiling", "Zeppelin ride");
+    }
+
+    [Fact(DisplayName = "TEST-3: bucket-list /all-options answers 200 with [] when the caller has no profiles")]
+    public async Task BucketList_SelectOptions_WithNoRows_IsAnEmptyArrayNot404()
+    {
+        var userIdB = await CreateSecondUserAsync("bucket-options-empty-b@test.com");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var options = await GetOptionsAsync(factoryB.CreateClient(), BucketListOptionsRoute);
+
+        options.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "TEST-3: bucket-list /all-options challenges an anonymous caller")]
+    public async Task BucketList_SelectOptions_Unauthenticated_Returns401()
+    {
+        var response = await CreateUnauthenticatedClient().GetAsync(BucketListOptionsRoute, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact(DisplayName = "TEST-3: bucket-list /all-options is open to the User role -- it is not admin surface")]
+    public async Task BucketList_SelectOptions_WithOnlyTheUserRole_Returns200()
+    {
+        await using var db = CreateDbContext();
+        var (_, profileId) = await SeedBucketListProfileAsync(db, FakeLoggedUserService.TestUserId, "User-role bucket activity");
+
+        var ids = OptionIdsOf(await GetOptionsAsync(CreateUserRoleClient(), BucketListOptionsRoute));
+
+        ids.Should().Contain(profileId, "the default AllowedRoles() is User + Admin + Root");
+    }
+
     // ---- A: project -------------------------------------------------
 
     [Fact]
@@ -504,6 +483,77 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         var response = await CreateClient().PostAsJsonAsync("api/activity-project-profile", payload, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact(DisplayName = "TEST-3: project /all-options returns the caller's rows and not another user's")]
+    public async Task Project_SelectOptions_OnlyReturnsCallersOwnRows()
+    {
+        var userIdB = await CreateSecondUserAsync("project-options-b@test.com");
+        await using var db = CreateDbContext();
+        var (_, profileIdA) = await SeedProjectProfileAsync(db, FakeLoggedUserService.TestUserId, "A's optioned project activity");
+        var (_, profileIdB) = await SeedProjectProfileAsync(db, userIdB, "B's optioned project activity");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var ids = OptionIdsOf(await GetOptionsAsync(factoryB.CreateClient(), ProjectOptionsRoute));
+
+        ids.Should().Contain(profileIdB);
+        ids.Should().NotContain(profileIdA, "the profile is not IEntityWithUser -- this endpoint's Filter override is the only guard");
+    }
+
+    [Fact(DisplayName = "TEST-3: a project option carries the profile id with the activity's name")]
+    public async Task Project_SelectOptions_IdIsTheProfileAndTextIsTheActivityName()
+    {
+        await using var db = CreateDbContext();
+        var (activityId, profileId) = await SeedProjectProfileAsync(db, FakeLoggedUserService.TestUserId, "Build a bookshelf");
+
+        var options = await GetOptionsAsync(CreateClient(), ProjectOptionsRoute);
+
+        TextOfOption(options, profileId).Should().Be("Build a bookshelf");
+        OptionIdsOf(options).Should().NotContain(activityId, "the id is the profile's, never the activity's");
+    }
+
+    [Fact(DisplayName = "TEST-3: project options come back ordered by activity name")]
+    public async Task Project_SelectOptions_AreOrderedByActivityName()
+    {
+        var userIdB = await CreateSecondUserAsync("project-options-order-b@test.com");
+        await using var db = CreateDbContext();
+        await SeedProjectProfileAsync(db, userIdB, "Zeppelin ride");
+        await SeedProjectProfileAsync(db, userIdB, "Abseiling");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var options = await GetOptionsAsync(factoryB.CreateClient(), ProjectOptionsRoute);
+
+        OptionTextsOf(options).Should().Equal("Abseiling", "Zeppelin ride");
+    }
+
+    [Fact(DisplayName = "TEST-3: project /all-options answers 200 with [] when the caller has no profiles")]
+    public async Task Project_SelectOptions_WithNoRows_IsAnEmptyArrayNot404()
+    {
+        var userIdB = await CreateSecondUserAsync("project-options-empty-b@test.com");
+
+        await using var factoryB = CreateFactory(["User"], userIdB);
+        var options = await GetOptionsAsync(factoryB.CreateClient(), ProjectOptionsRoute);
+
+        options.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "TEST-3: project /all-options challenges an anonymous caller")]
+    public async Task Project_SelectOptions_Unauthenticated_Returns401()
+    {
+        var response = await CreateUnauthenticatedClient().GetAsync(ProjectOptionsRoute, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact(DisplayName = "TEST-3: project /all-options is open to the User role -- it is not admin surface")]
+    public async Task Project_SelectOptions_WithOnlyTheUserRole_Returns200()
+    {
+        await using var db = CreateDbContext();
+        var (_, profileId) = await SeedProjectProfileAsync(db, FakeLoggedUserService.TestUserId, "User-role project activity");
+
+        var ids = OptionIdsOf(await GetOptionsAsync(CreateUserRoleClient(), ProjectOptionsRoute));
+
+        ids.Should().Contain(profileId, "the default AllowedRoles() is User + Admin + Root");
     }
 
     // ---- B1: completion (isAnchored / memoryAnchorId) ---------------------------------------------

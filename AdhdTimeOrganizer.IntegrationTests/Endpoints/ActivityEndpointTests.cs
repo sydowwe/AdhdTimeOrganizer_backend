@@ -789,6 +789,129 @@ public class ActivityWeatherDependencyBatchDeleteTests(AppDbContextFixture fixtu
 }
 
 // =====================================================================================================
+// TEST-6: the four lookups' GetAll routes. They were the only lookup verb with no suite of any kind --
+// not even proof that FastEndpoints registers them, since ActivityProfilesRouteSmokeTests probes only
+// /filtered-table. BaseGetAllLookupEndpoint has no scoping of its own (SEC-1), so every one of these
+// routes is user-safe purely because AppDbContext's global IEntityWithUser filter reaches it; that is
+// invisible in a single-user test and would survive an "optimising" IgnoreQueryFilters silently.
+// =====================================================================================================
+
+[Collection("Postgres")]
+public class ActivityLocationTypeGetAllTests(AppDbContextFixture fixture) : BaseGetAllEndpointTests(fixture)
+{
+    protected override string EndpointUrl => "api/activity-location-type";
+    protected override bool IsAdminOnly => false;
+    protected override Task<long> SeedEntityAsync(DbContext db) => Seed.LookupAsync<ActivityLocationType>(db, FakeLoggedUserService.TestUserId, "GetAll LocationType");
+}
+
+[Collection("Postgres")]
+public class ActivityWeatherDependencyGetAllTests(AppDbContextFixture fixture) : BaseGetAllEndpointTests(fixture)
+{
+    protected override string EndpointUrl => "api/activity-weather-dependency";
+    protected override bool IsAdminOnly => false;
+    protected override Task<long> SeedEntityAsync(DbContext db) => Seed.LookupAsync<ActivityWeatherDependency>(db, FakeLoggedUserService.TestUserId, "GetAll WeatherDependency");
+}
+
+[Collection("Postgres")]
+public class ActivityExpectedCostTierGetAllTests(AppDbContextFixture fixture) : BaseGetAllEndpointTests(fixture)
+{
+    protected override string EndpointUrl => "api/activity-expected-cost-tier";
+    protected override bool IsAdminOnly => false;
+    protected override Task<long> SeedEntityAsync(DbContext db) => Seed.LookupAsync<ActivityExpectedCostTier>(db, FakeLoggedUserService.TestUserId, "GetAll CostTier");
+}
+
+[Collection("Postgres")]
+public class ActivityExperienceTypeGetAllTests(AppDbContextFixture fixture) : BaseGetAllEndpointTests(fixture)
+{
+    protected override string EndpointUrl => "api/activity-experience-type";
+    protected override bool IsAdminOnly => false;
+    protected override Task<long> SeedEntityAsync(DbContext db) => Seed.LookupAsync<ActivityExperienceType>(db, FakeLoggedUserService.TestUserId, "GetAll ExperienceType");
+}
+
+/// <summary>
+/// The one assertion the framework base cannot make: that the global query filter, and not luck, is
+/// what keeps another user's lookup rows off these four routes. The second user is created through
+/// UserManager the way every other cross-user suite in this file does; note that this arrives with
+/// NO lookup rows -- the per-user default seeders do not run on a bare UserManager.CreateAsync in the
+/// test host -- so the foreign row is seeded explicitly. It is given the SAME Text as the caller's
+/// row, which is the real-world case ("Indoor" exists for everyone), so every assertion is on ids.
+/// </summary>
+[Collection("Postgres")]
+public class ActivityLookupGetAllScopingTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
+{
+    public static TheoryData<string> Routes => new()
+    {
+        "api/activity-location-type",
+        "api/activity-weather-dependency",
+        "api/activity-expected-cost-tier",
+        "api/activity-experience-type"
+    };
+
+    [Theory(DisplayName = "GetAll returns the caller's lookup rows and none of another user's")]
+    [MemberData(nameof(Routes))]
+    public async Task GetAll_IsScopedToTheCaller(string route)
+    {
+        var otherUserId = await Seed.SecondUserAsync(Fixture, $"lookup-getall-{Guid.NewGuid():N}@test.com");
+
+        var sharedText = $"Indoor {Guid.NewGuid():N}";
+        long ownId;
+        await using (var db = CreateDbContext())
+        {
+            ownId = await SeedLookupAsync(db, route, FakeLoggedUserService.TestUserId, sharedText);
+            await SeedLookupAsync(db, route, otherUserId, sharedText);
+        }
+
+        long[] foreignIds;
+        await using (var verifyDb = CreateDbContext())
+            foreignIds = await ForeignIdsAsync(verifyDb, route, otherUserId);
+
+        // Guards the guard: if the foreign row silently failed to land, the test would pass vacuously.
+        foreignIds.Should().NotBeEmpty();
+
+        var response = await CreateClient().GetAsync(route, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var items = await response.Content.ReadFromJsonAsync<List<LookupResponseDto>>(JsonOpts, CancellationToken);
+        var returnedIds = items!.Select(i => i.Id).ToArray();
+        returnedIds.Should().Contain(ownId);
+        returnedIds.Should().NotIntersectWith(foreignIds);
+    }
+
+    [Theory(DisplayName = "GetAll is open to the User role, not just Admin")]
+    [MemberData(nameof(Routes))]
+    public async Task GetAll_UserRole_Returns200(string route)
+    {
+        var response = await CreateUserRoleClient().GetAsync(route, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    private static Task<long> SeedLookupAsync(DbContext db, string route, long userId, string text) => route switch
+    {
+        "api/activity-location-type" => Seed.LookupAsync<ActivityLocationType>(db, userId, text),
+        "api/activity-weather-dependency" => Seed.LookupAsync<ActivityWeatherDependency>(db, userId, text),
+        "api/activity-expected-cost-tier" => Seed.LookupAsync<ActivityExpectedCostTier>(db, userId, text),
+        "api/activity-experience-type" => Seed.LookupAsync<ActivityExperienceType>(db, userId, text),
+        _ => throw new ArgumentOutOfRangeException(nameof(route), route, "Unknown lookup route.")
+    };
+
+    private static Task<long[]> ForeignIdsAsync(DbContext db, string route, long otherUserId) => route switch
+    {
+        "api/activity-location-type" => IdsOfAsync<ActivityLocationType>(db, otherUserId),
+        "api/activity-weather-dependency" => IdsOfAsync<ActivityWeatherDependency>(db, otherUserId),
+        "api/activity-expected-cost-tier" => IdsOfAsync<ActivityExpectedCostTier>(db, otherUserId),
+        "api/activity-experience-type" => IdsOfAsync<ActivityExperienceType>(db, otherUserId),
+        _ => throw new ArgumentOutOfRangeException(nameof(route), route, "Unknown lookup route.")
+    };
+
+    private static Task<long[]> IdsOfAsync<TLookup>(DbContext db, long userId) where TLookup : BaseLookupWithUser =>
+        db.Set<TLookup>().IgnoreQueryFilters().Where(e => e.UserId == userId).Select(e => e.Id)
+            .ToArrayAsync(TestContext.Current.CancellationToken);
+
+    private sealed record LookupResponseDto(long Id, string Text, int SortOrder);
+}
+
+// =====================================================================================================
 // D: uniqueness invariants, E: delete behavior, F: Clone, G: QuickEdit -- hand-written, none of the
 // 13 framework bases cover uniqueness conflicts, cascade behavior or these two bespoke endpoints.
 // =====================================================================================================

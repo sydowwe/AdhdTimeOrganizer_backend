@@ -40,6 +40,18 @@ public class OpenMeteoWeatherProviderTests
 
     // ─── the failure shapes that do not look like failures ───────────────────────────────────────────
 
+    [Theory(DisplayName = "A response with no daily block at all is no opinion")]
+    [InlineData("""{"utc_offset_seconds":7200}""")]
+    [InlineData("""{"utc_offset_seconds":7200,"daily":null}""")]
+    public async Task AForecastWithoutADailyBlock_IsNoOpinion(string forecastJson)
+    {
+        // The shape that was always handled correctly, pinned beside the ones that were not: an omitted key and an
+        // explicit null both deserialize to the same missing block, and neither may become a day of zeroes.
+        (await CreateProvider(new StubHandler(GeocodeHit, forecastJson))
+            .GetTodayAsync(Location, TestContext.Current.CancellationToken))
+            .Should().BeNull();
+    }
+
     [Fact(DisplayName = "A daily block whose arrays are all empty is no opinion, not a dry cold day")]
     public async Task AnEmptyDailyBlock_IsNoOpinion()
     {
