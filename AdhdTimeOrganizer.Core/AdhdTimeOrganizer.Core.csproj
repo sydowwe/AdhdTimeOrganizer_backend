@@ -34,5 +34,14 @@
         <ProjectReference Include="..\framework\Sydowwe.Framework\Sydowwe.Framework.csproj"/>
         <ProjectReference Include="..\framework\Sydowwe.Framework.Contracts\Sydowwe.Framework.Contracts.csproj"/>
     </ItemGroup>
+    <ItemGroup>
+      <Compile Remove="review\**" />
+    </ItemGroup>
+    <ItemGroup>
+      <EmbeddedResource Remove="review\**" />
+    </ItemGroup>
+    <ItemGroup>
+      <None Remove="review\**" />
+    </ItemGroup>
 
 </Project>
