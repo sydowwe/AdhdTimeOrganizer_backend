@@ -326,14 +326,50 @@ public static class RoutineResetService
     }
 
     /// <summary>
+    /// Whether this item has already been counted towards its streak in the cycle it is currently in.
+    /// <para>
+    /// The cycle opened at <see cref="RoutineTodoList.LastResetDate"/> — every reset path stamps it — so a
+    /// completion at or after that day belongs to the cycle in progress. A null <c>LastResetDate</c> means the
+    /// item has never been reset, so its first cycle runs from creation and any completion at all counts.
+    /// </para>
+    /// <para>
+    /// Deliberately compared on the item alone rather than against <see cref="RoutineTimePeriod.LastResetAt"/>:
+    /// the two event handlers in the host that complete a routine item load it without its period, and a guard
+    /// they cannot call is a guard with two holes in it. The cost is day granularity — a cycle that is both reset
+    /// and completed twice within one calendar day scores the second completion as already-counted — which needs
+    /// the single-item <see cref="TryReset(RoutineTimePeriod, RoutineTodoList, DateTime)"/> and a list reset to
+    /// land on the same day to reach at all.
+    /// </para>
+    /// </summary>
+    private static bool AlreadyCountedThisCycle(RoutineTodoList item)
+    {
+        if (item.LastCompletedAt == default)
+            return false;
+
+        return item.LastResetDate is not { } lastReset || DateOnly.FromDateTime(item.LastCompletedAt) >= lastReset;
+    }
+
+    /// <summary>
     /// Updates the item's streak after a toggle. Call after IsDoneLogic has been applied.
+    /// <para>
+    /// The increment is <b>once per cycle</b>, not once per toggle: un-ticking and re-ticking an item, or
+    /// re-sending <c>ForceValue = true</c> at an already-complete counted item (which leaves it done and still
+    /// runs the after-toggle hook), must not walk <c>Streak</c> and <c>BestStreak</c> up. Only a reset opens the
+    /// item up to being counted again. <see cref="RoutineTodoList.LastCompletedAt"/> still moves on every
+    /// completing toggle — it means "last completed", not "last scored".
+    /// </para>
     /// </summary>
     public static void UpdateItemStreak(RoutineTodoList item, DateTime now)
     {
         if (!item.IsDone)
             return;
 
+        var alreadyCounted = AlreadyCountedThisCycle(item);
         item.LastCompletedAt = now;
+
+        if (alreadyCounted)
+            return;
+
         item.Streak++;
         if (item.Streak > item.BestStreak)
             item.BestStreak = item.Streak;

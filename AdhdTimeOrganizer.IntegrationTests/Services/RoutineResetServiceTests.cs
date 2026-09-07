@@ -709,4 +709,44 @@ public class RoutineResetServiceTests
 
         item.BestStreak.Should().Be(10);
     }
+
+    /// <summary>
+    /// The increment is keyed to the cycle, not to the toggle: un-tick/re-tick, or a repeated force-true at an
+    /// already-complete counted item, must not walk the counters up.
+    /// </summary>
+    [Fact]
+    public void UpdateItemStreak_CalledTwiceInTheSameCycle_IncrementsOnlyOnce()
+    {
+        var now = DateTime.UtcNow;
+        var item = MakeItem(true);
+        item.LastResetDate = DateOnly.FromDateTime(now);
+
+        RoutineResetService.UpdateItemStreak(item, now);
+        RoutineResetService.UpdateItemStreak(item, now.AddMinutes(5));
+
+        item.Streak.Should().Be(1);
+        item.BestStreak.Should().Be(1);
+        item.LastCompletedAt.Should().Be(now.AddMinutes(5), "LastCompletedAt means last completed, not last scored");
+    }
+
+    /// <summary>The control for the guard above: a reset must open the item up to being counted again.</summary>
+    [Fact]
+    public void UpdateItemStreak_AfterANewCycle_IncrementsAgain()
+    {
+        var now = DateTime.UtcNow;
+        var item = MakeItem(true);
+        item.LastResetDate = DateOnly.FromDateTime(now);
+
+        RoutineResetService.UpdateItemStreak(item, now);
+
+        // What a reset does to the item.
+        item.SetDone(false);
+        item.LastResetDate = DateOnly.FromDateTime(now).AddDays(1);
+        item.SetDone(true);
+
+        RoutineResetService.UpdateItemStreak(item, now.AddDays(1));
+
+        item.Streak.Should().Be(2);
+        item.BestStreak.Should().Be(2);
+    }
 }

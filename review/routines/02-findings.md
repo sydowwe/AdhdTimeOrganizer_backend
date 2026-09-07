@@ -532,7 +532,7 @@ return-false path is the one that got past the guard.
 
 `Doc impact: none`
 
-### `CQ-7` 🟠 Item streak inflates on repeated toggles within one period
+### `CQ-7` 🟠 ✅ FIXED 2026-09-07 · Item streak inflates on repeated toggles within one period
 
 `domain/service/RoutineResetService.cs:258-267`
 
@@ -556,7 +556,25 @@ against `item.LastResetDate`). The entity carries both fields already
 (`RoutineTodoList.cs:9,12`). `UpdateItemStreak` currently takes only the item, so it needs the period —
 or the caller needs to make the decision.
 
-`Doc impact: domain-map.md → Domain services (UpdateItemStreak row: note it is once-per-cycle, not once-per-toggle)`
+**Fixed 2026-09-07.** `UpdateItemStreak` keeps its `(item, now)` signature and gates the increment on a new
+private `AlreadyCountedThisCycle(item)`: a completion counts only if the item has not been completed since
+the day its current cycle opened (`DateOnly.FromDateTime(LastCompletedAt) >= LastResetDate`, with a null
+`LastResetDate` — never reset — meaning any prior completion already counted). `LastCompletedAt` still moves
+on every completing toggle; it means "last completed", not "last scored".
+
+Departure from the finding's prescription: the guard is keyed on the **item**, not on
+`period.LastResetAt`, and the signature does not grow a period parameter. Two of the four call sites are host
+event handlers (`PlannerTaskIsDoneChangedEventHandler.cs:45`, `ActivityTimeRecordedEventHandler.cs:109`) that
+load the item without its period, and a guard they cannot call would leave two ways in open. The cost is day
+granularity: a cycle that is both reset *and* completed twice inside one calendar day scores the second
+completion as already-counted, which needs the single-item `TryReset` and a list reset to land on the same
+day to reach at all.
+
+Pinned by `UpdateItemStreak_CalledTwiceInTheSameCycle_IncrementsOnlyOnce` and its control
+`UpdateItemStreak_AfterANewCycle_IncrementsAgain` in `Services/RoutineResetServiceTests.cs`. The endpoint-level
+cases stay with `TEST-8`/`TEST-9` (`testingPrompts/ToggleIsDoneStreak.md`).
+
+`Doc impact: domain-map.md → Domain services (UpdateItemStreak row: note it is once-per-cycle, not once-per-toggle)` — done
 
 ### `CQ-8` 🟠 ✅ FIXED 2026-09-06 · A dormant period catches up one cycle per invocation
 
