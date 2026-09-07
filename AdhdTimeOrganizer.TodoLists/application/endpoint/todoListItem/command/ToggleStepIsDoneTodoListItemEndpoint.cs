@@ -19,7 +19,7 @@ public class ToggleStepIsDoneTodoListItemEndpoint(DbContext dbContext)
 
     protected override async Task PublishEvent(TodoListItem item, CancellationToken ct)
     {
-        await new TodoListItemIsDoneChangedEvent(item.Id, item.IsDone)
+        await new TodoListItemIsDoneChangedEvent(item.Id, item.UserId, item.IsDone)
             .PublishAsync(Mode.WaitForAll, ct);
     }
 }

@@ -1,4 +1,6 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.endpoint.extensions;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -19,9 +21,14 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 /// that row into existence.
 /// </para>
 /// </summary>
-public class CreatePlannerTaskEndpoint(DbContext dbContext, ICalendarProvisioner calendars)
+public class CreatePlannerTaskEndpoint(
+    DbContext dbContext,
+    ICalendarProvisioner calendars,
+    IReferencedIdOwnershipService ownership)
     : BaseCreateEndpoint<PlannerTask, PlannerTaskRequest>(dbContext)
 {
+    private readonly DbContext _dbContext = dbContext;
+
     private long? _resolvedCalendarId;
 
     public override void Configure()
@@ -33,9 +40,16 @@ public class CreatePlannerTaskEndpoint(DbContext dbContext, ICalendarProvisioner
     /// <summary>
     /// Resolved before mapping rather than after, because provisioning commits: doing it once this endpoint's
     /// own task is staged would drag that half-built write into the calendar's transaction.
+    /// <para>
+    /// The ownership check runs before provisioning for the same reason it commits: a request naming a
+    /// stranger's activity must not leave a calendar row behind on its way to a 404.
+    /// </para>
     /// </summary>
     protected override async Task<bool> BeforeMapping(PlannerTaskRequest req, CancellationToken ct = default)
     {
+        if (!await this.EnsureOwnsPlannerTaskReferencesAsync(_dbContext, ownership, req, ct))
+            return false;
+
         if (req.CalendarId is null && req.Date is { } date)
             _resolvedCalendarId = (await calendars.EnsureForDateAsync(User.GetId(), date, ct)).Id;
 

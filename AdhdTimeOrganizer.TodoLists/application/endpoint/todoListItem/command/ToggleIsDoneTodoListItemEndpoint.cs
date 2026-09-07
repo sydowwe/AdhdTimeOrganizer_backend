@@ -18,7 +18,7 @@ public class ToggleIsDoneTodoListItemEndpoint(DbContext dbContext) : BaseToggleI
 
     protected override async Task PublishEvent(TodoListItem entity, CancellationToken ct)
     {
-        await new TodoListItemIsDoneChangedEvent(entity.Id, entity.IsDone)
+        await new TodoListItemIsDoneChangedEvent(entity.Id, entity.UserId, entity.IsDone)
             .PublishAsync(Mode.WaitForAll, ct);
     }
 }

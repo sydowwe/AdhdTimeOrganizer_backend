@@ -1,4 +1,6 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.endpoint.extensions;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -10,9 +12,12 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 public class UpdatePlannerTaskEndpoint(
     DbContext dbContext,
     IReminderRegistrationService reminders,
-    ICalendarProvisioner calendars)
+    ICalendarProvisioner calendars,
+    IReferencedIdOwnershipService ownership)
     : BaseUpdateEndpoint<PlannerTask, PlannerTaskRequest>(dbContext)
 {
+    private readonly DbContext _dbContext = dbContext;
+
     private long? _resolvedCalendarId;
 
     public override void Configure()
@@ -25,9 +30,16 @@ public class UpdatePlannerTaskEndpoint(
     /// Moving a task onto a day the user has never planned creates that day, exactly as creating a task there
     /// does — otherwise a task could be dragged onto a date the app has no row for and the update would fail
     /// on a foreign key. Resolved before the entity is fetched because provisioning commits.
+    /// <para>
+    /// Update is checked as thoroughly as create, and is the more dangerous of the two: it can re-point a
+    /// task the caller already owns at a stranger's activity or to-do item without creating anything.
+    /// </para>
     /// </summary>
     protected override async Task<bool> BeforeMapping(PlannerTaskRequest req, CancellationToken ct = default)
     {
+        if (!await this.EnsureOwnsPlannerTaskReferencesAsync(_dbContext, ownership, req, ct))
+            return false;
+
         if (req.CalendarId is null && req.Date is { } date)
             _resolvedCalendarId = (await calendars.EnsureForDateAsync(User.GetId(), date, ct)).Id;
 

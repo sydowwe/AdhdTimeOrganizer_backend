@@ -1,5 +1,7 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.endpoint.extensions;
 using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
@@ -19,7 +21,8 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 public class ApplyTemplatePlannerTaskEndpoint(
     DbContext dbContext,
     IReminderRegistrationService reminders,
-    ICalendarProvisioner calendars)
+    ICalendarProvisioner calendars,
+    IReferencedIdOwnershipService ownership)
     : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
 {
     public override void Configure()
@@ -42,6 +45,12 @@ public class ApplyTemplatePlannerTaskEndpoint(
     {
         try
         {
+            // The template's own lines come off the wire, so every ActivityId / ImportanceId / TodolistId in
+            // them is unproven exactly as a single POST /planner-task's is. Checked before provisioning, which
+            // commits — a request that is about to 404 must not leave a calendar row behind.
+            if (!await this.EnsureOwnsPlannerTaskReferencesAsync(dbContext, ownership, req.TasksFromTemplate, ct))
+                return;
+
             // Provisioning first, and it commits — so nothing of this request's own is staged yet. A template
             // applied by date to a day the user has never opened creates that day; by id it still 404s, because
             // an id that resolves to nothing is a stale client, not an unplanned day.

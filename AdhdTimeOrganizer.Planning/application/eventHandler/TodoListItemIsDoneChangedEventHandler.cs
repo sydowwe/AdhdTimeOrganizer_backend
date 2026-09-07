@@ -33,9 +33,15 @@ public class TodoListItemIsDoneChangedEventHandler(
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
+            // Scoped on the event's UserId, not on the ambient query filter. The filter resolves to null
+            // whenever there is no authenticated principal (BaseDbContext.ScopeUserId) — a scheduled job, a
+            // seeder, a future background fan-out — and a no-op filter would fan this out across every user
+            // holding a task linked to that item id. Same predicate shape as the routine sibling.
             var tasks = await dbContext.Set<PlannerTask>()
                 .Include(pt => pt.Calendar)
-                .Where(pt => pt.TodolistItemId == eventModel.TodoListItemId && pt.Calendar.Date == today)
+                .Where(pt => pt.TodolistItemId == eventModel.TodoListItemId
+                             && pt.UserId == eventModel.UserId
+                             && pt.Calendar.Date == today)
                 .ToListAsync(ct);
 
             if (tasks.Count == 0)
@@ -61,7 +67,8 @@ public class TodoListItemIsDoneChangedEventHandler(
             // ToggleIsDoneTodoListItemEndpoint awaits this via PublishAsync(Mode.WaitForAll, …) after its
             // own commit, so a failure here (e.g. a concurrent PatchPlannerTaskStatusEndpoint call
             // throwing DbUpdateConcurrencyException) must not surface as a 500 for an unrelated endpoint.
-            logger.LogError(ex, "Failed to sync PlannerTasks for TodoListItem {TodoListItemId}", eventModel.TodoListItemId);
+            logger.LogError(ex, "Failed to sync PlannerTasks for TodoListItem {TodoListItemId} of user {UserId}",
+                eventModel.TodoListItemId, eventModel.UserId);
         }
     }
 }

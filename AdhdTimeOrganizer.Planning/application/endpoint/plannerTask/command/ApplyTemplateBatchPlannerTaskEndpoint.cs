@@ -1,5 +1,7 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.endpoint.extensions;
 using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
@@ -30,7 +32,8 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 /// </summary>
 public class ApplyTemplateBatchPlannerTaskEndpoint(
     DbContext dbContext,
-    IReminderRegistrationService reminders)
+    IReminderRegistrationService reminders,
+    IReferencedIdOwnershipService ownership)
     : Endpoint<ApplyTemplateToCalendarsBatchRequest, CalendarBatchResultResponse>
 {
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
@@ -56,6 +59,12 @@ public class ApplyTemplateBatchPlannerTaskEndpoint(
     public override async Task HandleAsync(ApplyTemplateToCalendarsBatchRequest req, CancellationToken ct)
     {
         var userId = User.GetId();
+
+        // Checked once for the whole batch, alongside the template's existence: the task list is shared by
+        // every day, so a foreign ActivityId in it is not a per-day outcome — it is a bad request that would
+        // otherwise be written N times over.
+        if (!await this.EnsureOwnsPlannerTaskReferencesAsync(dbContext, ownership, req.TasksFromTemplate, ct))
+            return;
 
         var template = await dbContext.Set<TaskPlannerDayTemplate>().FirstOrDefaultAsync(e => e.Id == req.TemplateId, ct);
         if (template == null)
