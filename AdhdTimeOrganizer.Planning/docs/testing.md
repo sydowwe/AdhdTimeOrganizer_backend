@@ -84,6 +84,7 @@ while a lost query filter serves other people's days.
 | `UserPlannerSettingsTests.RepeatedGet_CreatesExactlyOneRow` · `GetThenPut_StillOnlyOneRow` | The settings read is get-or-create against a one-row-per-user table with no unique constraint of its own beyond the 1:1 mapping. A second row is invisible until two devices read different settings |
 | `PlannerTaskStatusAndSpanTests.SettingCancelledOrNotStarted_ClearsActualTimes` | `PlannerTask.ApplyStatus` is the shared reset. A call site that sets `Status` directly leaves stale actual times that the trend then measures |
 | `RepeatingPlannerTaskSuggestionsTests` (5) | The suggestion tiers: three occurrences make a pattern, a cancelled one doesn't count, and a higher tier suppresses the ones below it |
+| `RoutineCompletionFanOutTests` (6) | `RoutineTodoListIsDoneChangedEventHandler`, which must stay the same shape as its to-do sibling: `ApplyStatus` rather than a bare `Status` write, `Cancelled` tasks skipped, `SyncForPlannerTasksAsync` after the save, and the whole body wrapped — a throw here 500s a Routines endpoint that already committed. All four were defects (`CQ-1`…`CQ-4`) found only because the handler had no tests |
 
 Owned elsewhere but load-bearing for this project: `SeamWiringTests` (the keyed
 `IActivityReferenceSource` family covers every key exactly once — a renamed
@@ -91,8 +92,10 @@ Owned elsewhere but load-bearing for this project: `SeamWiringTests` (the keyed
 `ActivityForeignKeyInventoryTests` (the reference seam repoints **all three** task tables),
 `ModuleSchemaTests` (this assembly resolves to the `planning` schema), `NamedQueryFilterTests`,
 `UserScopingQueryFilterTests`, `SuggestionPatternRefreshTests` (the host-side views the two
-suggestion endpoints read), `CompletionFanOutTests` (the two `*IsDoneChangedEvent` handlers that live
-in this project), `UserDataExportAndDeletionTests`, `PerUserDefaultSeederTests` /
+suggestion endpoints read), `CompletionFanOutTests` (the host-side
+`PlannerTaskIsDoneChangedEventHandler` and this project's `TodoListItemIsDoneChangedEventHandler`;
+despite its class doc it never touched the routine handler — see the row above for that one),
+`UserDataExportAndDeletionTests`, `PerUserDefaultSeederTests` /
 `PerUserDefaultMatcherTests`, and `SyncCalendarToGoogleTests` / `GoogleCalendarConnectionTests` (the
 host-side integration that reads `Calendar`).
 

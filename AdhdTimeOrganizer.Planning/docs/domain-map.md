@@ -399,7 +399,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `TaskPlannerHelper` | Helper (extensions) | `WithIncludes` (importance + activity/role/category) and `TasksOverlap` (assumes non-wrapping spans) | `application/helper/TaskPlannerHelper.cs` |
 | `PlannerTaskActivityReferenceSource` | Core seam (keyed) | Publishes and repoints `ActivityId` across **all three** task tables. The suggestion views are deliberately absent — they'd double-count | `application/seam/PlannerTaskActivityReferenceSource.cs` |
 | `CalendarDayLookup` | Core seam (by type) | Day metadata for History's calendar dashboard. `DayIndex` is computed, so the projection happens in memory | `application/seam/CalendarDayLookup.cs` |
-| `RoutineTodoListIsDoneChangedEventHandler` | Event handler | A routine's done state onto today's planner tasks for the same activity | `application/eventHandler/` |
+| `RoutineTodoListIsDoneChangedEventHandler` | Event handler | A routine's done state onto today's planner tasks for the same activity, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows, exactly as the to-do handler below does — the two are the same rule and any difference between them is a bug, not a design | `application/eventHandler/` |
 | `TodoListItemIsDoneChangedEventHandler` | Event handler | A to-do item's done state onto today's linked tasks, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows so an unrelated endpoint never 500s | `application/eventHandler/` |
 | `ICalendarProvisioner` · `IPlannerStreakReader` · `IReminderRegistrationService` | Contracts | | `domain/serviceContract/` |
 

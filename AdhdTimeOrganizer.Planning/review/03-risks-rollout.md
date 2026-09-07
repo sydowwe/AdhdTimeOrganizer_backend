@@ -8,13 +8,13 @@
 | # | Sev | Issue (one line) | ID | File |
 |---|---|---|---|---|
 | 1 | 🟠 | `MergeOverwrite` carving an overnight task deletes it and puts nothing back, silently, with a 201 | `CQ-7` | `application/helper/PlannerTemplateApplier.cs:150` |
-| 2 | 🟠 | The Routines fan-out handler never re-syncs reminders — a finished task keeps nudging | `CQ-2` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:40` |
+| 2 | ✅ | ~~The Routines fan-out handler never re-syncs reminders — a finished task keeps nudging~~ — fixed 2026-09-08 | `CQ-2` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:40` |
 | 3 | 🟠 | FK ids (`ActivityId`, `ImportanceId`, `TodolistId`, `DefaultApplyTemplateId`) accepted without an ownership check; another user's activity name and role colour come back on the attacker's own day | `SEC-1` | `application/dto/request/taskPlanner/PlannerTaskRequest.cs:61` |
 | 4 | 🟠 | Concurrent `GET /planner/settings` can create two settings rows; no unique index backs the 1:1 | `SEC-3` | `application/endpoint/plannerSettings/GetPlannerSettingsEndpoint.cs:26` |
 | 5 | 🟠 | The to-do fan-out query has no `UserId` predicate; safe only while `ScopeUserId` is non-null | `SEC-2` | `application/eventHandler/TodoListItemIsDoneChangedEventHandler.cs:36` |
-| 6 | 🟠 | The Routines fan-out handler sets `Status` directly, leaving stale actual times the trend then reads | `CQ-1` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:41` |
-| 7 | 🟠 | Same handler has no try/catch — a Planning concurrency fault 500s a Routines endpoint that already committed | `CQ-3` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:25` |
-| 8 | 🟠 | Same handler overwrites `Cancelled` tasks that its sibling deliberately leaves alone | `CQ-4` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:40` |
+| 6 | ✅ | ~~The Routines fan-out handler sets `Status` directly, leaving stale actual times the trend then reads~~ — fixed 2026-09-08 | `CQ-1` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:41` |
+| 7 | ✅ | ~~Same handler has no try/catch — a Planning concurrency fault 500s a Routines endpoint that already committed~~ — fixed 2026-09-08 | `CQ-3` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:25` |
+| 8 | ✅ | ~~Same handler overwrites `Cancelled` tasks that its sibling deliberately leaves alone~~ — fixed 2026-09-08 | `CQ-4` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:40` |
 | 9 | 🟠 | "Today" is UTC in three write paths, the user's own zone in both read paths | `CQ-5` | `application/endpoint/plannerTask/command/PatchPlannerTaskStatusEndpoint.cs:73` |
 | 10 | 🟠 | Carved segments inherit `Status` and `TodolistItemId` but not the actual times — one done-toggle fans across every segment | `CQ-6` | `application/helper/PlannerTemplateApplier.cs:181` |
 | 11 | 🟠 | The two `RepeatingPlannerTask` CRUD endpoints never wire their validator; 80 lines of recurrence rules are dead or untested and the two are indistinguishable | `CQ-8` | `application/endpoint/repeatingPlannerTask/command/CreateRepeatingPlannerTaskEndpoint.cs:3` |
@@ -26,15 +26,18 @@
 | 17 | 🟡 | Free-text `Tags` comma-joined into one column; a comma in a tag splits it, and no validator constrains the field | `CQ-11` | `infrastructure/persistence/configuration/activityPlanning/TaskPlannerDayTemplateConfiguration.cs:24` |
 | 18 | 🟡 | Eighteen lines of midnight-wrap window logic duplicated verbatim across two filter endpoints, neither tested | `CQ-12` | `application/endpoint/plannerTask/query/GetFilteredSortedPlannerTask.cs:14` |
 | 19 | 🟡 | `.Update()` on an already-tracked entity rewrites every column on every status patch | `CQ-10` | `application/endpoint/plannerTask/command/PatchPlannerTaskStatusEndpoint.cs:64` |
-| 20 | 🟡 | `testing.md` credits `CompletionFanOutTests` with a handler it never exercises | `DOC-5` | `docs/testing.md:94` |
+| 20 | ✅ | ~~`testing.md` credits `CompletionFanOutTests` with a handler it never exercises~~ — fixed 2026-09-08 | `DOC-5` | `docs/testing.md:94` |
 | 21 | 🟡 | Stale source comment names a `Holiday` day type the enum does not have | `DOC-2` | `domain/model/entity/Calendar.cs:12` |
 | 22 | 🟡 | Two delete-behaviour test names claim a doc contradiction that was resolved | `DOC-3` | `AdhdTimeOrganizer.IntegrationTests/Endpoints/PlannerDeleteBehaviorTests.cs` |
 | — | perf | `PERF-1` … `PERF-6` — see the table in file 02 § 9 | | |
 
-**The shape of the risk.** Eleven of the twenty-two entries are 🟠 and **four of them are in one
+**The shape of the risk.** Eleven of the twenty-two entries were 🟠 and **four of them were in one
 45-line file** — `RoutineTodoListIsDoneChangedEventHandler`, the only cross-slice handler in the slice
-with zero tests (`TEST-21`). Its sibling, which has four tests, has none of the four defects. If only
-one thing is fixed from this review, fix that file; if only one test is written, write `TEST-21`.
+with zero tests (`TEST-21`). Its sibling, which had four tests, had none of the four defects. That was
+this review's headline recommendation and it is **done as of 2026-09-08**: the handler now matches its
+sibling, `RoutineCompletionFanOutTests` gives it six tests, and rows 2, 6, 7, 8 and 20 above are closed.
+Seven 🟠 remain, led by `CQ-7` (row 1) and `SEC-1`/`SEC-3` (rows 3–4); `CQ-5` still touches this handler
+and is untouched by the above.
 
 Nothing here is 🔴. There is no data-loss path that a normal user reaches without first creating an
 overnight task (which the UI does not offer), no cross-user read that is reachable without an attacker

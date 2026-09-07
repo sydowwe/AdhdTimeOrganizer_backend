@@ -154,7 +154,15 @@ error and no failing test. Every other custom endpoint in the slice declares
 
 ## 6. Code quality
 
-### `CQ-1` 🟠 `RoutineTodoListIsDoneChangedEventHandler` sets `Status` directly instead of `ApplyStatus`
+> **`CQ-1`…`CQ-4` are all fixed (2026-09-08), together with `TEST-21` and `DOC-5`.** All four lived in
+> `RoutineTodoListIsDoneChangedEventHandler`, and all four were the same defect in different clothes: the
+> handler had drifted from its sibling `TodoListItemIsDoneChangedEventHandler`, which is the reference
+> implementation for "a parent toggle fans out onto today's planner tasks". It now has the sibling's shape
+> — `ApplyStatus`, the `Cancelled` skip, the reminder re-sync, the log-and-swallow wrapper — and
+> `AdhdTimeOrganizer.IntegrationTests/Endpoints/RoutineCompletionFanOutTests.cs` (6 tests) pins each one.
+> `CQ-5`, which also touches this handler, is **not** fixed and is unaffected by the above.
+
+### `CQ-1` 🟠 ✅ FIXED 2026-09-08 · `RoutineTodoListIsDoneChangedEventHandler` sets `Status` directly instead of `ApplyStatus`
 
 `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:41`
 
@@ -178,9 +186,13 @@ change to make it look measured.
 
 **Fix.** `task.ApplyStatus(...)`.
 
+**Fixed 2026-09-08.** As prescribed. Pinned by
+`RoutineCompletionFanOutTests.UntickingRoutineList_ClearsPlannerTaskActualTimes`, which was red before the
+change. `PlannerTask.ApplyStatus`'s XML doc now names this handler in its call-site list too.
+
 `Doc impact: none`
 
-### `CQ-2` 🟠 The same handler never re-syncs reminders
+### `CQ-2` 🟠 ✅ FIXED 2026-09-08 · The same handler never re-syncs reminders
 
 `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:40-43`
 
@@ -198,9 +210,14 @@ nudged about work they finished half an hour ago. `SyncCoreAsync` would have can
 **Fix.** Resolve `IReminderRegistrationService` from the same scope and call
 `SyncForPlannerTasksAsync(changedTaskIds, ct)` after the save — copy lines 30 and 57 of the sibling.
 
+**Fixed 2026-09-08.** As prescribed, resolved from the same scope and called after the save with the ids
+of the tasks that actually changed (so a day of only-cancelled tasks syncs nothing). Pinned by
+`RoutineCompletionFanOutTests.TickingRoutineList_RetiresLinkedPlannerTaskReminder`, which asserts on the
+module-side `ReminderDefinition` row rather than on the call.
+
 `Doc impact: none`
 
-### `CQ-3` 🟠 The same handler has no try/catch, so a Planning failure 500s a Routines endpoint
+### `CQ-3` 🟠 ✅ FIXED 2026-09-08 · The same handler has no try/catch, so a Planning failure 500s a Routines endpoint
 
 `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:25-44`
 
@@ -217,9 +234,15 @@ committed successfully — returns 500, and the client shows the routine as un-t
 **Fix.** Wrap in the sibling's `catch (Exception ex) when (ex is not OperationCanceledException)` and
 log.
 
+**Fixed 2026-09-08.** As prescribed; the log message carries `{ActivityId}` and `{UserId}`, which are the
+only two ids the event has and both non-PII. Pinned by
+`RoutineCompletionFanOutTests.HandlerFailure_DoesNotFailTheRoutineToggle`, which throws from
+`IReminderRegistrationService` rather than racing a real `row_version` conflict — see that file's class
+doc for why the deterministic lever was preferred to the concurrency one the prompt suggested.
+
 `Doc impact: none`
 
-### `CQ-4` 🟠 The same handler overwrites `Cancelled` tasks; its sibling deliberately does not
+### `CQ-4` 🟠 ✅ FIXED 2026-09-08 · The same handler overwrites `Cancelled` tasks; its sibling deliberately does not
 
 `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:40-41` ·
 compare `TodoListItemIsDoneChangedEventHandler.cs:44-46`
@@ -237,7 +260,13 @@ completed row, and the day's streak tally moves a task from the cancelled bucket
 
 **Fix.** Apply the same `!= Cancelled` filter, or record in `domain-map.md` why the two differ.
 
-`Doc impact: domain-map.md → Navigation index (the RoutineTodoListIsDoneChangedEventHandler row should say whether it skips Cancelled, as the sibling row does)`
+**Fixed 2026-09-08.** The first branch — the same filter, because the skip is a product ruling about the
+user's cancellation and not about which slice published the event. `domain-map.md`'s navigation row now
+states the rule and that the two handlers are deliberately identical. Pinned by
+`RoutineCompletionFanOutTests.TickingRoutineList_LeavesCancelledPlannerTaskAlone`, which also seeds an
+ordinary task alongside the cancelled one so the skip cannot regress into a whole-batch bail-out.
+
+`Doc impact: domain-map.md → Navigation index — done`
 
 ### `CQ-5` 🟠 "Today" is UTC in three write paths and the user's own zone in both read paths
 
@@ -260,7 +289,10 @@ local midnight fans out to nothing.
 **Fix.** Resolve the zone the way the two readers do (`IUserTimeZoneResolver` is already injected into
 `GetPlanVsActualTrendPlannerTaskEndpoint`) and derive `today` from it. Note
 `CompletionFanOutTests.TogglingTodoItem_OnlyFlipsTodaysPlannerTask` currently pins the UTC reading via
-`DateOnly.FromDateTime(DateTime.UtcNow)` at line 58 — it must be updated in the same change.
+`DateOnly.FromDateTime(DateTime.UtcNow)` at line 58 — it must be updated in the same change. **Since
+2026-09-08 there is a second such pin**, `RoutineCompletionFanOutTests.TickingRoutineList_OnlyFlipsTodaysPlannerTask`,
+added with `TEST-21`; both are commented as the UTC reading to flip, and this finding is otherwise
+untouched by that work.
 
 `Doc impact: domain-map.md → Business rules (both handler rows, and the day-plan section, should state which "today" the fan-out uses — the streak section already states its own)`
 
@@ -537,7 +569,7 @@ seeded-horizon reason, not the outside-it one.
 
 `Doc impact: none (source XML doc only — domain-map.md already describes lazy creation correctly)`
 
-### `DOC-5` 🟡 `testing.md` credits `CompletionFanOutTests` with covering a handler it never touches
+### `DOC-5` 🟡 ✅ FIXED 2026-09-08 · `testing.md` credits `CompletionFanOutTests` with covering a handler it never touches
 
 `docs/testing.md:94` lists *"`CompletionFanOutTests` (the two `*IsDoneChangedEvent` handlers that live
 in this project)"* among the load-bearing guards owned elsewhere. `CompletionFanOutTests`' own class
@@ -548,4 +580,10 @@ doc also names `RoutineTodoListIsDoneChangedEventHandler`. But of its nine test 
 
 **Fix both docs after `TEST-21` lands**; until then the claim is simply wrong.
 
-`Doc impact: testing.md → The guards (correct the CompletionFanOutTests entry) and → Known gaps (add the uncovered handler until TEST-21 exists)`
+**Fixed 2026-09-08, after `TEST-21`.** `docs/testing.md`'s owned-elsewhere paragraph now names the two
+handlers `CompletionFanOutTests` actually drives and points at the new suite for the third; § *The guards*
+gains a `RoutineCompletionFanOutTests` row. `CompletionFanOutTests`' own class doc no longer claims the
+routine handler and links to the new file. No known-gaps entry was needed — the gap closed rather than
+being recorded.
+
+`Doc impact: testing.md → The guards and the owned-elsewhere paragraph, plus the CompletionFanOutTests class doc — done`

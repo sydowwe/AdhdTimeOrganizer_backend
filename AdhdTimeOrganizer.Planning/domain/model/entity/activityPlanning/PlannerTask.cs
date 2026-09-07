@@ -42,7 +42,8 @@ public class PlannerTask : BasePlannerTask
 
     /// <summary>
     /// Sets Status and, for Cancelled/NotStarted, clears the actual start/end times — the reset shared
-    /// by every status-mutation call site (PatchPlannerTaskStatusEndpoint, TodoListItemIsDoneChangedEventHandler).
+    /// by every status-mutation call site (PatchPlannerTaskStatusEndpoint, TodoListItemIsDoneChangedEventHandler,
+    /// RoutineTodoListIsDoneChangedEventHandler).
     /// Callers that also want to set actual times for InProgress/Completed do so after calling this.
     /// </summary>
     public void ApplyStatus(PlannerTaskStatus newStatus)

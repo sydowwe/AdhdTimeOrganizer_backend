@@ -161,7 +161,7 @@ by the three by-date tests.
 | `PlannerTaskActivityReferenceSource` | ✅ | `SeamWiringTests`, `ActivityMergeTests`, `ActivityForeignKeyInventoryTests` |
 | `CalendarDayLookup` | ⚠ indirect | Only through History's calendar dashboard tests → `TEST-20` |
 | `TodoListItemIsDoneChangedEventHandler` | 4 | `CompletionFanOutTests` (CQ-7 block) |
-| `RoutineTodoListIsDoneChangedEventHandler` | **0** | Named in the `CompletionFanOutTests` class doc but never exercised → `TEST-21` |
+| `RoutineTodoListIsDoneChangedEventHandler` | 6 | `RoutineCompletionFanOutTests` (`TEST-21`, closed 2026-09-08 — it had been named in the `CompletionFanOutTests` class doc but never exercised, which is where `CQ-1`…`CQ-4` came from) |
 | `TaskImportanceSeeder` / `UserPlannerSettingsSeeder` | ✅ | `PerUserDefaultSeederTests`, `PerUserDefaultMatcherTests` |
 | `CalendarSeeder` | ⚠ indirect | Its hand-rolled `SetupDefaults` / no-op `ResetDefaults` unpinned → `TEST-22` |
 | `TaskPlannerDayTemplateSeeder` / `TemplatePlannerTaskSeeder` (dev) | **0** | `TruncateTable`'s cascade blast radius untested → `TEST-23` |
@@ -177,9 +177,12 @@ that is the hard 70%. The missing quarter is concentrated in three places, and t
    `GetAllRepeatingPlannerTaskEndpoint`. `FilterPlannerTaskEndpoint` is the day-planner view's *only*
    read and carries a non-trivial midnight-wrap predicate duplicated verbatim in a second file
    (`CQ-12`); it is the single riskiest untested thing in the slice.
-2. **`RoutineTodoListIsDoneChangedEventHandler`** — zero tests, and file 02 finds four defects in its
+2. ~~**`RoutineTodoListIsDoneChangedEventHandler`** — zero tests, and file 02 finds four defects in its
    45 lines (`CQ-1`…`CQ-4`). Its sibling handler, which *is* tested, has none of them. That correlation
-   is the argument for `TEST-21`.
+   is the argument for `TEST-21`.~~ **Closed 2026-09-08.** `RoutineCompletionFanOutTests` covers it and
+   all four defects are fixed; the correlation held exactly as stated, which is the argument for
+   treating the remaining zero-coverage rows in the table above as findings-in-waiting rather than as
+   merely untested.
 3. **Validator rules generally** — three of the recurrence/ordering rule sets are never exercised, and
    one validator may not be wired at all (`CQ-8`).
 
@@ -211,6 +214,6 @@ fixture, auth and seeding conventions every prompt assumes.
 | `TEST-18` | `CalendarProvisioner` race branch under two concurrent writers | `ConcurrentCalendarProvisioning.md` |
 | `TEST-19` | `HolidayCalendar`: Computus, both countries, leap years | `HolidayCalendarTable.md` |
 | `TEST-20` | `CalendarDayLookup` directly, incl. cross-user | `ReadSurfaceSweep.md` |
-| `TEST-21` | `RoutineTodoListIsDoneChangedEventHandler` — the whole handler | `RoutineTodoListFanOut.md` |
+| ~~`TEST-21`~~ | ~~`RoutineTodoListIsDoneChangedEventHandler` — the whole handler~~ ✅ done 2026-09-08 → `Endpoints/RoutineCompletionFanOutTests.cs` (6 tests; scenario F deferred with `CQ-5`) | `RoutineTodoListFanOut.md` |
 | `TEST-22` | `CalendarSeeder`'s hand-rolled setup / no-op reset | `CalendarSeederPartialYear.md` |
 | `TEST-23` | Dev seeder `TRUNCATE … CASCADE` blast radius | `DevSeederTruncateBlastRadius.md` |
