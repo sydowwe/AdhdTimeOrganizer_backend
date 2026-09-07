@@ -40,12 +40,11 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// Two notes on scope, so the next reader does not go looking for tests that are deliberately absent:
 /// </para>
 /// <list type="bullet">
-/// <item><b><c>CQ-5</c> ("today" is UTC here and user-local in both read paths) is not fixed and not
-/// tested.</b> It is a three-call-site change spanning this handler, the to-do sibling and
-/// <c>PatchPlannerTaskStatusEndpoint</c>, and it would have to move
-/// <c>CompletionFanOutTests.TogglingTodoItem_OnlyFlipsTodaysPlannerTask</c> with it. Scenario A below pins
-/// the current UTC reading the same way that test does, so whoever takes <c>CQ-5</c> has both pins in one
-/// place to flip.</item>
+/// <item><b><c>CQ-5</c> was fixed afterwards</b> (2026-09-08): "today" is now the user's own date in this
+/// handler, the to-do sibling and <c>PatchPlannerTaskStatusEndpoint</c> alike. Scenario A below still pins
+/// the single-day scoping on a UTC-seeded user, where both readings agree; the zone-sensitive pin is
+/// <see cref="TickingRoutineList_UsesTheUsersOwnDayBoundary"/>, with its counterparts in
+/// <c>CompletionFanOutTests</c>.</item>
 /// <item><b>Scenario E uses an injected failure rather than a concurrency race.</b> The prompt suggests
 /// racing a <c>PATCH /api/planner-task/{id}/status</c> against the handler's own save, which is what
 /// <c>CompletionFanOutTests.ConcurrentStatusPatches_ShouldNotReturnInternalServerError</c> does — but as a
@@ -82,7 +81,36 @@ public class RoutineCompletionFanOutTests(AppDbContextFixture fixture) : Postgre
         await using var db2 = CreateDbContext();
         (await LoadTaskAsync(db2, todayTaskId)).Status.Should().Be(PlannerTaskStatus.Completed);
         (await LoadTaskAsync(db2, yesterdayTaskId)).Status.Should().Be(PlannerTaskStatus.NotStarted,
-            "the fan-out is scoped to the calendar row for today — CQ-5: 'today' is UTC-today here, not the user's own");
+            "the fan-out is scoped to the calendar row for today — the fixture user is on UTC, so which clock decides that is pinned separately by TickingRoutineList_UsesTheUsersOwnDayBoundary");
+    }
+
+    [Fact(DisplayName = "CQ-5: the routine fan-out follows the user's own day boundary, not the server's UTC one")]
+    public async Task TickingRoutineList_UsesTheUsersOwnDayBoundary()
+    {
+        long routineItemId, userTodayTaskId, utcTodayTaskId;
+        await using (var db = CreateDbContext())
+        {
+            // A zone in which it is currently a different date than in UTC, so the two readings of "today"
+            // name two different calendar rows and the assertions can tell them apart.
+            var zone = await PlanningTestSeedHelper.UseZoneOffsetFromUtcTodayAsync(db, UserId, CancellationToken);
+            var userToday = PlanningTestSeedHelper.TodayIn(zone);
+            userToday.Should().NotBe(Today);
+
+            var (item, activityId) = await SeedRoutineItemAsync(db, "cq5-boundary");
+            routineItemId = item.Id;
+
+            userTodayTaskId = await SeedTaskOnAsync(db, activityId, userToday);
+            // Same activity, on the server's date: the control that catches the fix being "flip both days".
+            utcTodayTaskId = await SeedTaskOnAsync(db, activityId, Today);
+        }
+
+        (await ToggleRoutineAsync(routineItemId, forceValue: true)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var db2 = CreateDbContext();
+        (await LoadTaskAsync(db2, userTodayTaskId)).Status.Should().Be(PlannerTaskStatus.Completed,
+            "a Calendar.Date is a wall-clock date the user chose, so the row that is 'today' has to be picked on the user's clock — a UTC boundary updates the wrong day and leaves the right one open");
+        (await LoadTaskAsync(db2, utcTodayTaskId)).Status.Should().Be(PlannerTaskStatus.NotStarted,
+            "the server's date is not a day the fan-out has any business touching");
     }
 
     // ---- B: CQ-1 — the shared status reset ------------------------------------------------------------

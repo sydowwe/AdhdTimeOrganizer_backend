@@ -24,6 +24,7 @@ public class CalendarConfiguration : IEntityTypeConfiguration<Calendar>
         builder.Property(c => c.Notes).HasMaxLength(1000);
 
         builder.HasIndex(c => new { c.UserId, c.Date }).IsUnique();
-        builder.HasIndex(c => c.DayType);
+        // No index on DayType alone (PERF-5), for the same reason as planner_task.status: five distinct values
+        // and no user prefix, so every calendar read reaches the row through (user_id, date) instead.
     }
 }

@@ -21,18 +21,15 @@ public class TaskPlannerDayTemplateConfiguration : IEntityTypeConfiguration<Task
         builder.Property(t => t.UsageCount).HasDefaultValue(0).IsRequired();
         builder.Property(t => t.SuggestedForDayType).IsRequired();
 
+        // Tags are free text the user authors, so the comma-joined single column this used to be silently
+        // split any tag containing a comma into two on the next read — and there is no validator rule on Tags
+        // to stop one being written. Same shape and same reasoning as UserPlannerSettings.PredefinedSkipReasons
+        // and Reminder.LeadOffsetsMinutes: a short primitive list nothing queries element-wise, so jsonb beats
+        // both a delimiter and a child table, and it is lossless.
+        // ScheduledDays below keeps the join: its elements are DayOfWeek names, which cannot contain a comma.
         builder.Property(t => t.Tags)
-            .HasConversion(
-                v => string.Join(',', v),
-                v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
-            )
-            .Metadata.SetValueComparer(
-                new ValueComparer<List<string>>(
-                    (c1, c2) => c1!.SequenceEqual(c2!),
-                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
-                    c => c.ToList()
-                )
-            );
+            .HasColumnType("jsonb")
+            .IsRequired();
 
         builder.Property(t => t.ScheduledDays)
             .HasConversion(

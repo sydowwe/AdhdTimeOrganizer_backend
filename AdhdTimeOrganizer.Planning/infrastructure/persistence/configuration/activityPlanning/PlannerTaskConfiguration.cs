@@ -42,6 +42,8 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
         // Nothing about the column or the constraint changes; only where the model says so.
 
         builder.HasIndex(p => new { p.UserId, p.CalendarId, p.StartTime });
-        builder.HasIndex(p => p.Status);
+        // There is deliberately no index on Status alone (PERF-5). Five distinct values and no user prefix, so
+        // no read in the slice can use it — every one filters by user and calendar first, which is what the
+        // composite above serves. It was pure write amplification.
     }
 }

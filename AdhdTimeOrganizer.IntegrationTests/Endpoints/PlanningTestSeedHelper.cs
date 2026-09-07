@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
@@ -17,6 +18,39 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 public static class PlanningTestSeedHelper
 {
     public const long TestUserId = FakeLoggedUserService.TestUserId;
+
+    /// <summary>
+    /// Moves <paramref name="userId"/> onto a real system time zone in which it is a <b>different calendar
+    /// date</b> than it is in UTC right now, and returns that zone — the shape every "today is the user's
+    /// today, not the server's" pin needs (<c>CQ-5</c>).
+    ///
+    /// <para>Chosen at run time rather than hard-coded, because no fixed zone is on the other side of
+    /// midnight at every hour of the day: the search below always finds one (system zones span UTC-12 to
+    /// UTC+14, so at any instant some zone is a day ahead or a day behind), which makes the boundary case
+    /// constructible whenever the suite happens to run instead of only in the hours before UTC midnight.
+    /// It must be a system zone: <c>User.Timezone</c> is persisted as its id and read back through
+    /// <c>TimeZoneInfo.FindSystemTimeZoneById</c>, so a custom-offset zone would not round-trip.</para>
+    ///
+    /// <para>Safe to mutate the shared fixture user: Respawn deletes the row between tests and
+    /// <c>AppDbContextFixture.SeedFixtureAsync</c> re-creates it on <c>TimeZoneInfo.Utc</c>.</para>
+    /// </summary>
+    public static async Task<TimeZoneInfo> UseZoneOffsetFromUtcTodayAsync(DbContext db, long userId = TestUserId, CancellationToken ct = default)
+    {
+        var utcNow = DateTime.UtcNow;
+        var utcToday = DateOnly.FromDateTime(utcNow);
+
+        var zone = TimeZoneInfo.GetSystemTimeZones()
+            .FirstOrDefault(z => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(utcNow, z)) != utcToday)
+            ?? throw new InvalidOperationException("No system time zone is on a different calendar date than UTC right now.");
+
+        var user = await db.Set<User>().IgnoreQueryFilters().SingleAsync(u => u.Id == userId, ct);
+        user.Timezone = zone;
+        await db.SaveChangesAsync(ct);
+        return zone;
+    }
+
+    /// <summary>The date it is for a user in <paramref name="zone"/> — what the write paths must resolve.</summary>
+    public static DateOnly TodayIn(TimeZoneInfo zone) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone));
 
     public static async Task<long> SeedActivityAsync(DbContext db, string name, long userId = TestUserId, CancellationToken ct = default)
     {

@@ -1,6 +1,8 @@
 using AdhdTimeOrganizer.Core.application.@event;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -11,7 +13,10 @@ using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plannerTask.command;
 
-public class PatchPlannerTaskStatusEndpoint(DbContext dbContext, IReminderRegistrationService reminders) : Endpoint<PatchPlannerTaskStatusRequest>
+public class PatchPlannerTaskStatusEndpoint(
+    DbContext dbContext,
+    IReminderRegistrationService reminders,
+    IUserTimeZoneResolver timeZones) : Endpoint<PatchPlannerTaskStatusRequest>
 {
     public override void Configure()
     {
@@ -70,7 +75,10 @@ public class PatchPlannerTaskStatusEndpoint(DbContext dbContext, IReminderRegist
             // because the decision lives in the registration service, not here.
             await reminders.SyncForPlannerTasksAsync([entity.Id], ct);
 
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            // The user's today, not the server's — see TaskPlannerHelper.TodayIn. This decides whether the
+            // event is published at all, so a UTC boundary would silently drop the fan-out for a task the
+            // user completed after their own midnight.
+            var today = TaskPlannerHelper.TodayIn(await timeZones.GetAsync(entity.UserId, ct));
             if (entity.Calendar.Date == today)
                 await new PlannerTaskIsDoneChangedEvent(entity.ActivityId, entity.UserId, entity.IsDone, entity.TodolistItemId)
                     .PublishAsync(Mode.WaitForAll, ct);

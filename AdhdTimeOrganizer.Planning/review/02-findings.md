@@ -28,7 +28,7 @@ Recorded so nobody re-raises them, and so file 03 can rank around them.
 
 ## 5. Security & authorization
 
-### `SEC-1` 🟠 Foreign-key ids are accepted from the request without an ownership check
+### `SEC-1` 🟠 ✅ FIXED 2026-09-08 · Foreign-key ids are accepted from the request without an ownership check
 
 `application/dto/request/taskPlanner/PlannerTaskRequest.cs:61-65` and `:75-82` ·
 `application/validator/PlannerTaskValidator.cs:12-33` ·
@@ -61,9 +61,36 @@ B's activity name and role colour.
 (`AnyAsync` through the filtered set is both the existence *and* the ownership check). Do the same for
 the tasks built by `PlannerTemplateApplier.BuildTasks`, whose `ActivityId`s also come off the wire.
 
-`Doc impact: domain-map.md → Invariants (add a row: "a planner task's Activity / Importance / TodoListItem belongs to the same user — App only, per write endpoint")`
+**Fixed 2026-09-08.** As prescribed, in a shared guard —
+`AdhdTimeOrganizer.Planning/application/endpoint/extensions/PlannerReferencedIdOwnershipExtensions.cs`,
+the Planning counterpart of `ActivityIdOwnershipExtensions` / `MappingTargetOwnershipExtensions`. Called from
+`BeforeMapping` on `CreatePlannerTaskEndpoint` and `UpdatePlannerTaskEndpoint`, from the top of
+`ApplyTemplatePlannerTaskEndpoint` and `ApplyTemplateBatchPlannerTaskEndpoint` (the `BuildTasks` path, checked
+over the distinct ids of the whole task list rather than per line), and — for `DefaultApplyTemplateId` — from
+`UpdatePlannerSettingsEndpoint`. 404 per offending field, same message for missing and foreign.
 
-### `SEC-2` 🟠 `TodoListItemIsDoneChangedEventHandler` has no `UserId` predicate; its sibling does
+Two things went beyond the literal prescription, both forced by the code:
+
+- `TodolistId` cannot be checked with an `AnyAsync` the way `CreateReminderEndpoint`'s `PlannerTaskId` can —
+  Planning cannot see TodoLists and the column is navigation-free. It goes through Core's
+  `IReferencedIdOwnershipService` over the `IUserOwnedReferenceVerifier` seam (key `todoListItem`, already
+  implemented for History), which is why the seam README now lists Planning as a second consumer.
+- The guard runs **before** `ICalendarProvisioner.EnsureForDateAsync`, which commits. Placed after it, a
+  request on its way to a 404 would still leave a lazily-created calendar row behind.
+  `CreatePlannerTask_WithForeignActivityIdByDate_ProvisionsNoCalendar` pins the ordering.
+
+Pinned by `AdhdTimeOrganizer.IntegrationTests/Endpoints/PlannerReferencedIdOwnershipTests.cs` (10 tests),
+each negative case with a control — the `TodolistId` control is also what catches the seam failing *closed*
+for everyone.
+
+**Not covered, deliberately:** `TemplatePlannerTaskRequest` and `RepeatingPlannerTaskRequest` inherit the same
+`ActivityId` / `ImportanceId` from `BasePlannerTaskRequest` and are unguarded for the same reason. They are
+outside this finding's fix list, and their consequence is narrower (neither feeds a read that projects through
+`Activity.Role`), but they are the same hole and should be closed with the same helper.
+
+`Doc impact: domain-map.md → Invariants (add a row: "a planner task's Activity / Importance / TodoListItem belongs to the same user — App only, per write endpoint") — done, plus a second row for DefaultApplyTemplateId and a Navigation-index row on the two handlers' scoping`
+
+### `SEC-2` 🟠 ✅ FIXED 2026-09-08 · `TodoListItemIsDoneChangedEventHandler` has no `UserId` predicate; its sibling does
 
 `application/eventHandler/TodoListItemIsDoneChangedEventHandler.cs:36-39` ·
 compare `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:34`
@@ -94,9 +121,24 @@ write.
 already carries the id used by `PlannerTaskIsDoneChangedEventHandler`'s equivalent guard, so this is a
 one-line change plus the assertion in `TEST-21`'s prompt.
 
-`Doc impact: none`
+**Fixed 2026-09-08.** The predicate is as prescribed, but the finding is wrong about the cost:
+`TodoListItemIsDoneChangedEvent` was `(long TodoListItemId, bool NewIsDone)` and did **not** carry a `UserId`
+— that is `PlannerTaskIsDoneChangedEvent`, a different record. So the change is the record (now
+`(long TodoListItemId, long UserId, bool NewIsDone)`, matching `RoutineTodoListIsDoneChangedEvent`'s shape),
+both publishers (`ToggleIsDoneTodoListItemEndpoint`, `ToggleStepIsDoneTodoListItemEndpoint`, each passing the
+item's own `UserId`), and the handler predicate. The handler's log line gained `{UserId}` for parity with the
+routine sibling; both ids are non-PII.
 
-### `SEC-3` 🟠 `GET /planner/settings` is a get-or-create with no uniqueness backstop
+Pinned by `TodoListItemFanOutUserScopingTests.TodoListItemEvent_CannotFlipAnotherUsersPlannerTask`, driven
+against the handler from the unauthenticated factory's scope — that is the only way to reach the
+`ScopeUserId == null` state the finding names, so the test exercises the real precondition rather than an
+approximation of it. It asserts on both tasks: the publisher's own still flips (the control), the victim's
+does not.
+
+`Doc impact: none` — but `domain-map.md`'s navigation index gained a shared row stating that both handlers
+scope on the event's `UserId` rather than the ambient filter, since that is now a rule the two hold jointly.
+
+### `SEC-3` 🟠 ✅ FIXED 2026-09-08 · `GET /planner/settings` is a get-or-create that does not survive losing the race
 
 `application/endpoint/plannerSettings/GetPlannerSettingsEndpoint.cs:26-33` ·
 `infrastructure/persistence/configuration/activityPlanning/UserPlannerSettingsConfiguration.cs:13`
@@ -124,7 +166,39 @@ migration, and catch `DbUpdateException` in the endpoint to re-read the winner �
 `CalendarProvisioner.EnsureForDateAsync` already uses for `(user_id, date)`. See `MIG-1`: existing
 duplicates must be collapsed before the index can be created.
 
-`Doc impact: domain-map.md → Invariants ("One UserPlannerSettings row per user" currently reads "DB — 1:1 mapping"; after the fix it is a real unique index, before the fix it is App-only and racy)`
+**Fixed 2026-09-08 — and the finding's premise was half wrong, which changes what the fix is.** The
+index *is* unique in the database and always has been: `20260819234301_Initial` created
+`ix_user_planner_settings_user_id` with `unique: true`. EF's foreign-key index convention sees the 1:1
+relationship the helper declares on its next line and marks the helper's own `HasIndex` unique — so the
+non-unique call is real, and the uniqueness it ends up with is a convention nobody wrote down. **No
+migration was needed and none was added** (the model snapshot already carried `.IsUnique()`).
+
+Consequently two rows were never creatable and **`MIG-1` is moot** — there is nothing to collapse. What
+*was* real is the other half: the loser of the race takes a unique violation, and neither endpoint caught
+it, so a first-time `GET` — a page load — answered **500**. That is what the fix addresses:
+
+- `UserPlannerSettingsConfiguration` now declares `HasIndex(s => s.UserId).IsUnique()` itself. Same index,
+  no schema change; it stops the invariant resting on a convention that an edit to the relationship would
+  silently drop.
+- `GetPlannerSettingsEndpoint` catches the unique violation (`PostgresErrorCodes.UniqueViolation`,
+  narrower than the bare `DbUpdateException` the finding suggested — a concurrency conflict is a different
+  answer), clears the tracker so the rejected insert is not retried by a later save on the same request,
+  and re-reads the winner's row.
+- `UpdatePlannerSettingsEndpoint` was the fifth hand-written copy of the shape
+  `BaseUserSettingsUpsertEndpoint` already exists for — the one `Sydowwe.Framework`'s own class doc counts
+  as four — and now derives from it. It handles the same first-write race **and** the commoner one the
+  finding does not mention: two writes to a row that already exists lose on `row_version`, which is a
+  `DbUpdateConcurrencyException` a unique-violation catch would miss, and is now a 409 rather than a 500.
+  The `DefaultApplyTemplateId` ownership check (`SEC-1`) moved to the base's `BeforeUpsertAsync`.
+
+Pinned by `UserPlannerSettingsTests.ConcurrentFirstGet_BothSucceed_AndLeaveOneRow` and
+`ConcurrentFirstPut_BothSucceed_AndLeaveOneRow` — raced rather than simulated, for the reason
+`RoutineResetConcurrencyTests`' SEC-5 pair gives (no seeding can make the row absent at read time and
+present at insert time), plus `UncontendedFirstGet_StillCreatesTheRow` as the control against the recovery
+degrading into never inserting. Both race tests do reach the recovery branch: the run log carries the two
+rejected `INSERT INTO planning.user_planner_settings` statements.
+
+`Doc impact: domain-map.md → Invariants (now states the real unique index, that the helper's index is not what makes it unique, and that both endpoints recover) and testing.md → The guards — done`
 
 ### `SEC-4` 🟡 Six custom endpoints omit `Roles()` and lean on a host-side fallback
 
@@ -149,6 +223,10 @@ error and no failing test. Every other custom endpoint in the slice declares
 
 **Fix.** Add the two lines to each of the six, for symmetry with the rest of the slice.
 
+> **One of the six left this list on 2026-09-08.** `UpdatePlannerSettingsEndpoint` now derives from
+> `BaseUserSettingsUpsertEndpoint` (`SEC-3`), which calls `Roles(AllowedRoles())` itself with
+> `GetUserRole()` — the same User + Admin + Root set the host fallback was applying. Five to go.
+
 `Doc impact: none`
 
 ---
@@ -161,7 +239,7 @@ error and no failing test. Every other custom endpoint in the slice declares
 > implementation for "a parent toggle fans out onto today's planner tasks". It now has the sibling's shape
 > — `ApplyStatus`, the `Cancelled` skip, the reminder re-sync, the log-and-swallow wrapper — and
 > `AdhdTimeOrganizer.IntegrationTests/Endpoints/RoutineCompletionFanOutTests.cs` (6 tests) pins each one.
-> `CQ-5`, which also touches this handler, is **not** fixed and is unaffected by the above.
+> `CQ-5`, which also touches this handler, was fixed separately afterwards — see its own block below.
 
 ### `CQ-1` 🟠 ✅ FIXED 2026-09-08 · `RoutineTodoListIsDoneChangedEventHandler` sets `Status` directly instead of `ApplyStatus`
 
@@ -269,7 +347,7 @@ ordinary task alongside the cancelled one so the skip cannot regress into a whol
 
 `Doc impact: domain-map.md → Navigation index — done`
 
-### `CQ-5` 🟠 "Today" is UTC in three write paths and the user's own zone in both read paths
+### `CQ-5` 🟠 ✅ FIXED 2026-09-08 · "Today" is UTC in three write paths and the user's own zone in both read paths
 
 `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:30` ·
 `application/eventHandler/TodoListItemIsDoneChangedEventHandler.cs:34` ·
@@ -295,7 +373,33 @@ local midnight fans out to nothing.
 added with `TEST-21`; both are commented as the UTC reading to flip, and this finding is otherwise
 untouched by that work.
 
-`Doc impact: domain-map.md → Business rules (both handler rows, and the day-plan section, should state which "today" the fan-out uses — the streak section already states its own)`
+**Fixed 2026-09-08.** All three write paths now derive `today` from the user's zone. The conversion itself went
+into `TaskPlannerHelper.TodayIn(TimeZoneInfo)` rather than being written out a third time — it is the same
+expression the two readers had inline, and both were moved onto the helper too, so the slice now has exactly
+one definition of "today" (the `CQ-12` lesson, applied before the drift rather than after it). The handlers
+resolve `IUserTimeZoneResolver` from the same fresh scope they already resolve `DbContext` and
+`IReminderRegistrationService` from, keyed on the **event's** `UserId`: that is the only id available under a
+background dispatch, and it is the same id `SEC-2` scopes the query on, so the zone and the rows can never
+belong to different users. `PatchPlannerTaskStatusEndpoint` takes the resolver as a fourth constructor
+parameter and keys it on the loaded entity's `UserId`.
+
+Three new pins, each moving the test user onto a zone that is **currently** on a different calendar date than
+UTC (chosen at run time by `PlanningTestSeedHelper.UseZoneOffsetFromUtcTodayAsync` scanning the system zones —
+no fixed zone is across midnight at every hour, so a hard-coded one would make the test a no-op for most of
+the day):
+
+- `CompletionFanOutTests.TogglingTodoItem_UsesTheUsersOwnDayBoundary` — the to-do handler, with a task on
+  UTC-today linked to the same item as the control, so "flip both days" fails as loudly as "flip the wrong one";
+- `CompletionFanOutTests.PatchingStatus_PublishesOnTheUsersToday` — the endpoint's publish gate, asserted on
+  the linked to-do item rather than on the event, since the silence being fixed is the fan-out not happening;
+- `RoutineCompletionFanOutTests.TickingRoutineList_UsesTheUsersOwnDayBoundary` — the routine handler, same shape.
+
+The two existing "only today's task flips" pins keep their UTC-seeded user and were **not** rewritten: with the
+fixture user on `TimeZoneInfo.Utc` both readings agree, so they still pin the single-day scoping and the new
+tests own the zone question. Only their comments — which named the UTC reading as the thing to flip — were
+corrected, along with the class-doc bullet in `RoutineCompletionFanOutTests` that recorded `CQ-5` as open.
+
+`Doc impact: domain-map.md → Business rules — done, as a new § *Which "today" — the user's, everywhere* rather than a line per path: the rule is one rule and had already been restated three times. Both handler rows gained a shared navigation row, and the TaskPlannerHelper row names TodayIn. The day-plan section was left alone — that endpoint takes its date from the route and never asks what day it is`
 
 ### `CQ-6` 🟠 Carved task segments inherit execution state and the to-do link
 
@@ -466,7 +570,7 @@ status patch. Deleting the line is sufficient; `SaveChangesAsync` picks up the m
 
 `Doc impact: none`
 
-### `CQ-11` 🟡 Free-text `Tags` are comma-joined into one column
+### `CQ-11` 🟡 ✅ FIXED 2026-09-08 · Free-text `Tags` are comma-joined into one column
 
 `infrastructure/persistence/configuration/activityPlanning/TaskPlannerDayTemplateConfiguration.cs:24-35`
 
@@ -481,6 +585,20 @@ is the right choice for exactly this.
 constrained to enum names by `RepeatingPlannerTaskValidator` — *if* that validator runs (`CQ-8`).
 
 **Fix.** Move `Tags` to `jsonb`, matching the two nearby columns. See `MIG-4`.
+
+**Fixed 2026-09-08.** As prescribed: `HasColumnType("jsonb").IsRequired()`, and the `HasConversion` **and** its
+hand-written `ValueComparer` both deleted — Npgsql supplies the comparer for a jsonb-mapped `List<string>`, which
+is why the two nearby columns never needed one either.
+
+`ScheduledDays` on the same entity deliberately keeps its join, with a comment saying why: its elements are
+`DayOfWeek` names, so no element can contain the delimiter. That is the property the free-text column never had,
+and stating it is what stops the next reader "finishing the job" by converting a column that is already safe.
+
+> **`MIG-4` is now required, not optional, and is not a plain `ALTER … TYPE jsonb`.** The model says jsonb; a
+> migrated database still has `text`. Postgres cannot cast `productive,focused` to jsonb, so the migration needs
+> `USING to_jsonb(string_to_array(tags, ','))` — which is also the only thing that preserves the existing rows'
+> tags rather than erroring the deploy. The integration tests do not catch this: the fixture builds its schema
+> with `EnsureCreated`, so they have never seen the `text` column.
 
 `Doc impact: none`
 
@@ -540,8 +658,8 @@ Nothing is missing on the hot paths — `calendar (user_id, date)` unique,
 `reminder (planner_task_id)` each cover the query that needs them, and the cross-slice
 `todolist_item_id` FK gets its index from the host-side relationship declaration.
 
-**`PERF-5` — three indexes that should *not* exist.** Each is a single low-cardinality column with no
-user prefix, so no query in the slice can use it; every one is pure write amplification:
+**`PERF-5` ✅ FIXED 2026-09-08 — three indexes that should *not* exist.** Each is a single low-cardinality
+column with no user prefix, so no query in the slice can use it; every one is pure write amplification:
 
 | Index | Declared at | Why it is dead |
 |---|---|---|
@@ -550,6 +668,23 @@ user prefix, so no query in the slice can use it; every one is pure write amplif
 | `task_importance (importance)` | `TaskImportanceConfiguration.cs:17` | Redundant with the unique `(user_id, importance)`, which already serves ordering within a user. Its comment says "for sorting performance" — the composite does that |
 
 Dropping them is a cheap migration with no read-path risk (`MIG-5`).
+
+**Fixed 2026-09-08.** All three `HasIndex` calls removed. Each is **replaced in place by a comment** naming
+what serves the reads instead — the user-prefixed composite in all three cases — rather than deleted silently:
+a bare `HasIndex(Status)` is the single most re-addable line in a configuration file, and the deleted
+`task_importance` one came with a comment ("Add index for sorting performance") that argued for itself.
+
+Nothing needed a test: no query changes, and `PlanningCrudAuthMatrixTests` plus the filter/sort suites already
+cover every read that touches these three columns. The full suite is green (2203 passed, 0 failed).
+
+> **`MIG-5` is outstanding**, deliberately — same reason as `MIG-4` above. The model no longer declares the
+> three indexes; a migrated database still has them, and until the migration lands they keep costing writes
+> without the model knowing they exist. Unlike `MIG-4` this one is a pure `DROP INDEX` with no data step and
+> no failure mode.
+>
+> One index of the same shape is **left alone on purpose**: `task_planner_day_template (suggested_for_day_type)`
+> (`TaskPlannerDayTemplateConfiguration.cs:55`). It is not in `PERF-5`'s list, so it was not in this fix's
+> scope — but it is the same single low-cardinality column with no user prefix, and it should be looked at.
 
 ---
 
@@ -586,7 +721,7 @@ doc, and was corrected to match.
 
 `Doc impact: domain-map.md → Invariants, plus the TaskPlannerHelper.TasksOverlap source comment — done`
 
-### `DOC-2` 🟡 `Calendar` names a `Holiday` day type that the enum does not have
+### `DOC-2` 🟡 ✅ FIXED 2026-09-08 · `Calendar` names a `Holiday` day type that the enum does not have
 
 `domain/model/entity/Calendar.cs:12` — `public required DayType DayType { get; set; } // Workday, Weekend, Holiday, Vacation, SickDay, Special`
 
@@ -598,9 +733,15 @@ would read first.
 
 **Fix the code comment**, not the enum.
 
+**Fixed 2026-09-08.** The comment, not the enum, as prescribed. It now lists the five real members and — since a
+trailing `// Workday, Weekend, …` on the property line is what invited the phantom sixth in the first place —
+says *why* there is no `Holiday` among them: a public holiday is a `Workday` row carrying a `HolidayName`, so
+"is it a holiday" and "what kind of day is it" stay separate questions. That is the sentence the reader who was
+about to add the member needs, and `CalendarDayFactory` is named so they can check it.
+
 `Doc impact: none (source comment only)`
 
-### `DOC-3` 🟡 Two delete-behaviour tests are named for a contradiction that no longer exists
+### `DOC-3` 🟡 ✅ FIXED 2026-09-08 · Two delete-behaviour tests are named for a contradiction that no longer exists
 
 `AdhdTimeOrganizer.IntegrationTests/Endpoints/PlannerDeleteBehaviorTests.cs` —
 `"FINDING: deleting a Calendar with tasks is Restricted (blocked), not Cascaded, contradicting docs/domain-map.md"`
@@ -613,9 +754,24 @@ resolved.
 
 **Fix the test names** (the assertions are correct and should not change).
 
-`Doc impact: none (test naming only)`
+**Fixed 2026-09-08.** Both display names now state the behaviour — *"Deleting a Calendar that still has tasks is
+blocked at the database, not cascaded"* and *"Deleting an Activity cascades away every PlannerTask that
+referenced it, completed ones included"*. Assertions untouched, as prescribed.
 
-### `DOC-4` 🟠 `DayPlanResponse.HasPlan` documents the pre-lazy-creation world
+Two more copies of the same stale claim were in scope by consequence and were corrected with them: the class doc
+opened with *"These are the opposite of what `docs/domain-map.md` … claim"*, and the second test's `because`
+message ended *"the way docs/domain-map.md's 'Activity -> PlannerTask Restrict' claims"*. Renaming the tests
+while leaving those would have moved the archaeology rather than removed it.
+
+One thing went beyond the prescription. `domain-map.md` records the calendar edge but had **no row at all** for
+`Activity → PlannerTask`, so that test's old name was the only place in the repo stating that deleting an
+activity takes already-completed tasks with it. Dropping the name would have lost the fact, so the invariants
+table gained a row for it, next to the calendar edge it is the exact opposite of, and the class doc now points
+there instead of arguing with it.
+
+`Doc impact: domain-map.md → Invariants (new row for the Activity → PlannerTask cascade) — done`
+
+### `DOC-4` 🟠 ✅ FIXED 2026-09-08 · `DayPlanResponse.HasPlan` documents the pre-lazy-creation world
 
 `application/dto/response/taskPlanner/DayPlanResponse.cs:52-53`:
 
@@ -629,6 +785,15 @@ and `domain-map.md` § *Lazy day creation* is entirely about that. The **conclus
 seeded-horizon reason, not the outside-it one.
 
 **Fix the XML doc**; the property is fine.
+
+**Fixed 2026-09-08.** The XML doc only; the property is unchanged. It now states that a calendar row arrives
+**two** ways — `CalendarSeeder` bulk-seeding whole years, and `CalendarProvisioner.EnsureForDateAsync` creating
+one lazily on the first task for a date — and points at `domain-map.md` § *Lazy day creation* for the second.
+
+The conclusion is kept, on the half of the reasoning that survives: calendar presence answers "does this date
+have a row yet", which inside the seeded horizon is true for every untouched day and is therefore never the
+question the client means to ask. The finding notes the outside-the-horizon clause is dead; it is gone rather
+than rewritten, because with lazy creation there is no longer any date the client can reason about that way.
 
 `Doc impact: none (source XML doc only — domain-map.md already describes lazy creation correctly)`
 

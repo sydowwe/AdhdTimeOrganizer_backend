@@ -16,9 +16,8 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// Calendar→PlannerTask edge can only be reached by deleting the row directly (e.g. a future admin tool, a
 /// retention job, or a manual op).
 /// <para>
-/// <b>These are the opposite of what <c>docs/domain-map.md</c> and the review's testing prompt both claim.</b>
-/// The prompt says "Calendar → PlannerTask Cascade" and "Activity → PlannerTask Restrict". The actual model
-/// (<c>PlannerTaskConfiguration.cs</c>, confirmed against <c>AppDbContextModelSnapshot.cs</c>) is the reverse:
+/// The two edges the reader is most likely to guess wrong, both now recorded in
+/// <c>docs/domain-map.md</c> § <i>Invariants</i> — these tests are what pins them:
 /// </para>
 /// <list type="bullet">
 /// <item><c>PlannerTaskConfiguration.Configure</c> hand-sets <c>Calendar → PlannerTask</c> to
@@ -29,14 +28,15 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// deletes every <c>PlannerTask</c> that references it, including tasks the user has already completed.</item>
 /// </list>
 /// <para>
-/// This is flagged as a finding, not adjusted to match the docs: tests below assert the <i>actual</i> database
-/// behaviour, since that is what a caller experiences.
+/// Both were once titled "FINDING: … contradicting docs/domain-map.md", against a superseded version of that
+/// doc. The rewritten doc agrees with them, so the names now state the behaviour rather than a resolved
+/// disagreement (<c>DOC-3</c>); the assertions are unchanged.
 /// </para>
 /// </summary>
 [Collection("Postgres")]
 public class PlannerDeleteBehaviorTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
 {
-    [Fact(DisplayName = "FINDING: deleting a Calendar with tasks is Restricted (blocked), not Cascaded, contradicting docs/domain-map.md")]
+    [Fact(DisplayName = "Deleting a Calendar that still has tasks is blocked at the database, not cascaded")]
     public async Task DeletingCalendarWithTasks_IsRestricted_NotCascaded()
     {
         long calendarId;
@@ -80,7 +80,7 @@ public class PlannerDeleteBehaviorTests(AppDbContextFixture fixture) : PostgresT
         (await verifyDb.Set<Calendar>().IgnoreQueryFilters().AnyAsync(c => c.Id == calendarId, CancellationToken)).Should().BeFalse();
     }
 
-    [Fact(DisplayName = "FINDING: deleting an Activity referenced by a PlannerTask cascades the task away, not a clean 409")]
+    [Fact(DisplayName = "Deleting an Activity cascades away every PlannerTask that referenced it, completed ones included")]
     public async Task DeletingActivityReferencedByTask_Cascades_NotRestricted()
     {
         await using var db = CreateDbContext();
@@ -95,8 +95,8 @@ public class PlannerDeleteBehaviorTests(AppDbContextFixture fixture) : PostgresT
         await using var verifyDb = CreateDbContext();
         (await verifyDb.Set<PlannerTask>().IgnoreQueryFilters().AnyAsync(t => t.Id == taskId, CancellationToken))
             .Should().BeFalse("Activity -> PlannerTask is DeleteBehavior.Cascade (IsManyWithOneActivity's default, never overridden here) " +
-                               "-- a planned or already-completed task silently disappears with the activity, rather than blocking the delete " +
-                               "with a 409 the way docs/domain-map.md's 'Activity -> PlannerTask Restrict' claims");
+                               "-- a planned or already-completed task silently disappears with the activity rather than the delete being " +
+                               "blocked, which is the opposite of the Calendar edge above and the thing to remember about this graph");
     }
 
     [Fact(DisplayName = "Deleting a TaskImportance referenced by a task SetNulls the reference rather than deleting the task")]

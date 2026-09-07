@@ -81,8 +81,9 @@ the schema.
 |---|---|
 | One calendar row per (user, day) | **DB** — unique index `(user_id, date)` on `calendar` |
 | One importance rank per (user, value) | **DB** — unique index `(user_id, importance)` on `task_importance`. Text is free to repeat |
-| One `UserPlannerSettings` row per user | **DB** — 1:1 mapping (`IsOneWithOneUser`). The read endpoint is get-or-create on top of it |
-| A calendar with tasks cannot be deleted | **DB** — `planner_task.calendar_id` is `Restrict` |
+| One `UserPlannerSettings` row per user | **DB** — unique index `(user_id)` on `user_planner_settings`, declared outright in `UserPlannerSettingsConfiguration` (`IsOneWithOneUser`'s own `HasIndex` is not unique; the 1:1 relationship made it so by convention, which is not something to lean on). Both endpoints are get-or-create on top of it and both handle losing the insert race — `GET` re-reads the winner's row, `PUT` writes onto it via `BaseUserSettingsUpsertEndpoint`. Pinned by `UserPlannerSettingsTests` |
+| A calendar with tasks cannot be deleted | **DB** — `planner_task.calendar_id` is `Restrict`. Pinned by `PlannerDeleteBehaviorTests` |
+| Deleting an activity **does** delete the tasks planned from it | **DB** — `planner_task.activity_id` is `Cascade` (`IsManyWithOneActivity`'s default, never overridden). The opposite of the calendar edge above, and it takes already-completed tasks with it. Pinned by `PlannerDeleteBehaviorTests` |
 | Deleting a planner task deletes its reminders | **DB** — `reminder.planner_task_id` is `Cascade`. It does **not** reach the module's `ReminderDefinition` |
 | Deleting a template deletes its lines | **DB** — `template_planner_task.template_id` is `Cascade` |
 | Deleting an importance level does not delete the tasks that used it | **DB** — `SetNull` on all three task tables and on `user_planner_settings.default_apply_template_id` |
@@ -94,9 +95,30 @@ the schema.
 | A batched request's calendar ids are distinct and within `PlannerBatchLimits` | **App only** — `CalendarBatchValidators`, `PlanVsActualTrendValidator` |
 | `TaskImportance.OptionalMarkerValue` = 666 identifies the "optional" level | **App only, by value** — `BasePlannerTask.IsOptional` compares against the number. Nothing stops a user editing that row's rank; the guard is a test |
 | `Reminder.RemindAt` matches its task's instant | **App only** — recomputed by `ReminderRegistrationService` on every sync. Nothing detects drift |
+| A planner task's `Activity` / `TaskImportance` / `TodoListItem` belongs to the same user | **App only, per write endpoint** — `PlannerReferencedIdOwnershipExtensions`, called from `Create`/`UpdatePlannerTaskEndpoint`'s `BeforeMapping` and from both apply-template handlers. No FK spans the user column, so the database cannot express this. `TodolistItemId` is answered through Core's `IReferencedIdOwnershipService` over the `IUserOwnedReferenceVerifier` seam, which **fails closed** |
+| `UserPlannerSettings.DefaultApplyTemplateId` belongs to the same user | **App only** — `UpdatePlannerSettingsEndpoint`. Integrity, not disclosure: the response returns the bare id |
 | Every entity's schema is `planning` | **Model build** — `ModuleSchemas.Resolve` throws for an unmapped assembly |
 
 ## Business rules
+
+### Which "today" — the user's, everywhere
+
+**Every path in this slice that needs the current date resolves it in the user's own
+`User.Timezone`**, through `TaskPlannerHelper.TodayIn`. A `Calendar.Date` is a wall-clock date the user
+chose, so a `DateOnly.FromDateTime(DateTime.UtcNow)` picks the wrong row for anyone east or west of
+Greenwich: a Bratislava user ticking something at 01:15 would have it applied to yesterday's plan while
+today's stayed open, with nothing in the logs.
+
+The reads have always done this (streak, plan-vs-actual trend, `ReminderRegistrationService`'s instant
+composition); since `CQ-5` the three write paths do too — the two `*IsDoneChangedEventHandler`s and
+`PatchPlannerTaskStatusEndpoint`, where "today" also decides whether the fan-out event is published at
+all. The handlers resolve the zone from the event's `UserId` via `IUserTimeZoneResolver`, which works
+under a background dispatch where there is no `HttpContext` to read.
+
+Pinned by `CompletionFanOutTests.TogglingTodoItem_UsesTheUsersOwnDayBoundary` /
+`.PatchingStatus_PublishesOnTheUsersToday` and
+`RoutineCompletionFanOutTests.TickingRoutineList_UsesTheUsersOwnDayBoundary`, each moving the test user
+onto a zone that is currently on a different date than UTC.
 
 ### Day-plan completion streak
 
@@ -404,11 +426,13 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `PlannerTemplateApplier` | Helper (static) | The template stamp and the four conflict modes. Stages only, never saves | `application/helper/PlannerTemplateApplier.cs` |
 | `CalendarDayTypeRule` | Helper (static) | The one weekday/day-type rule, returning a message rather than throwing | `application/helper/CalendarDayTypeRule.cs` |
 | `PlannerBatchLimits` | Helper (constants) | `MaxCalendarIds` / `MaxSummaryRangeDays`, both 366 | `application/helper/PlannerBatchLimits.cs` |
-| `TaskPlannerHelper` | Helper (extensions) | `WithIncludes` (importance + activity/role/category) and `TasksOverlap` (assumes non-wrapping spans) | `application/helper/TaskPlannerHelper.cs` |
+| `TaskPlannerHelper` | Helper (extensions) | `WithIncludes` (importance + activity/role/category), `TasksOverlap` (assumes non-wrapping spans) and `TodayIn` (the one definition of "today" — the user's, never UTC's) | `application/helper/TaskPlannerHelper.cs` |
 | `PlannerTaskActivityReferenceSource` | Core seam (keyed) | Publishes and repoints `ActivityId` across **all three** task tables. The suggestion views are deliberately absent — they'd double-count | `application/seam/PlannerTaskActivityReferenceSource.cs` |
 | `CalendarDayLookup` | Core seam (by type) | Day metadata for History's calendar dashboard. `DayIndex` is computed, so the projection happens in memory | `application/seam/CalendarDayLookup.cs` |
 | `RoutineTodoListIsDoneChangedEventHandler` | Event handler | A routine's done state onto today's planner tasks for the same activity, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows, exactly as the to-do handler below does — the two are the same rule and any difference between them is a bug, not a design | `application/eventHandler/` |
 | `TodoListItemIsDoneChangedEventHandler` | Event handler | A to-do item's done state onto today's linked tasks, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows so an unrelated endpoint never 500s | `application/eventHandler/` |
+| *(both handlers)* | — | "Today" is the **user's** date, resolved from the event's `UserId` through `IUserTimeZoneResolver` / `TaskPlannerHelper.TodayIn` — never `DateTime.UtcNow`'s. `PatchPlannerTaskStatusEndpoint` holds the same rule for deciding whether to publish at all | — |
+| *(both handlers)* | — | Each scopes its query on the **event's** `UserId`, never on the ambient query filter: they run in a fresh scope, and `ScopeUserId` is `null` in any unauthenticated context, which turns that filter into a no-op. Both events carry the id for exactly this | — |
 | `ICalendarProvisioner` · `IPlannerStreakReader` · `IReminderRegistrationService` | Contracts | | `domain/serviceContract/` |
 
 ### Seeders (Order band 400–499)

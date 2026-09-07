@@ -1,4 +1,6 @@
 using AdhdTimeOrganizer.Core.application.@event;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -28,10 +30,13 @@ public class TodoListItemIsDoneChangedEventHandler(
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DbContext>();
         var reminders = scope.ServiceProvider.GetRequiredService<IReminderRegistrationService>();
+        var timeZones = scope.ServiceProvider.GetRequiredService<IUserTimeZoneResolver>();
 
         try
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            // The user's today, not the server's — see TaskPlannerHelper.TodayIn. Resolved from this scope's
+            // DbContext, so it works under a background dispatch where there is no HttpContext to read.
+            var today = TaskPlannerHelper.TodayIn(await timeZones.GetAsync(eventModel.UserId, ct));
 
             // Scoped on the event's UserId, not on the ambient query filter. The filter resolves to null
             // whenever there is no authenticated principal (BaseDbContext.ScopeUserId) — a scheduled job, a

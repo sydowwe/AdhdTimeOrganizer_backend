@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -26,7 +27,7 @@ public class PlannerStreakReader(DbContext dbContext) : IPlannerStreakReader, IS
         // ticking their last task at 00:30 has finished *that* day, and a UTC boundary would credit it to the
         // next one and leave a hole in the run. User.Timezone is a real TimeZoneInfo (value-converted from its
         // id), set at registration, so there is nothing to infer and nothing for the client to send.
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone));
+        var today = TaskPlannerHelper.TodayIn(timezone);
 
         // One grouped query over the user's whole planning history, deliberately uncapped. A lookback window
         // would make BestStreak a rolling maximum, so a record the user actually set could quietly get smaller

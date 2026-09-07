@@ -47,11 +47,12 @@ public record DayPlanResponse
     /// Whether this day has actually been planned, which is <b>not</b> the same question as whether
     /// <see cref="Calendar"/> is null.
     /// <para>
-    /// Calendar rows are bulk-seeded per user for whole years by <c>CalendarSeeder</c> — they are not created
-    /// lazily on first task. So inside the seeded horizon every date has a row whether or not the user ever
-    /// planned it, and outside it no date does, no matter how much the user plans. A client that branches on
-    /// calendar presence is branching on "is this date inside the seeded years", which is never the question
-    /// it means to ask. Branch on this instead.
+    /// A calendar row can arrive two ways. <c>CalendarSeeder</c> bulk-seeds them per user for whole years, so
+    /// inside the seeded horizon every date has a row whether or not the user ever planned it; and outside it
+    /// <c>CalendarProvisioner.EnsureForDateAsync</c> creates one lazily the first time a task is written for
+    /// that date (see <c>domain-map.md</c> § <i>Lazy day creation</i>). Either way, calendar presence answers
+    /// "does this date have a row yet", which is never the question the client means to ask — inside the
+    /// horizon it is true for every untouched day. Branch on this instead.
     /// </para>
     /// </summary>
     public bool HasPlan => Tasks.Count > 0;

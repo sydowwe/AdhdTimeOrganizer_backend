@@ -270,15 +270,11 @@ public class CompletionFanOutTests(AppDbContextFixture fixture) : PostgresTestBa
     }
 
     /// <summary>
-    /// Note on the UTC-midnight boundary the prompt asks for: the fixture's test user (and
-    /// <see cref="ReminderSeedHelper.OtherUserId"/>) are both seeded with <c>Timezone = TimeZoneInfo.Utc</c>
-    /// (see <c>AppDbContextFixture.SeedFixtureAsync</c> / <c>ReminderSeedHelper.EnsureOtherUserAsync</c>),
-    /// and both the handler and <c>PatchPlannerTaskStatusEndpoint</c> derive "today" from
-    /// <c>DateOnly.FromDateTime(DateTime.UtcNow)</c> directly rather than a user-local conversion. There is
-    /// no non-UTC test user available to construct the boundary case the prompt describes without adding
-    /// one — recorded here as a finding rather than bent into an assertion: "today" for this fan-out is
-    /// UTC-today for every user, regardless of their <c>Timezone</c> setting, which is itself worth a
-    /// follow-up if the product intent is user-local day boundaries.
+    /// The day boundary itself. The fixture's test user is seeded with <c>Timezone = TimeZoneInfo.Utc</c>
+    /// (see <c>AppDbContextFixture.SeedFixtureAsync</c>), so "today" here is the same date either way — that
+    /// is what makes this a pin on the <i>fan-out being scoped to a single day at all</i>, and why the
+    /// zone-sensitive half lives in <see cref="TogglingTodoItem_UsesTheUsersOwnDayBoundary"/> below, which
+    /// moves the user off UTC first.
     /// </summary>
     [Fact(DisplayName = "Only today's planner tasks flip when the to-do item is toggled — yesterday's is untouched")]
     public async Task TogglingTodoItem_OnlyFlipsTodaysPlannerTask()
@@ -317,6 +313,71 @@ public class CompletionFanOutTests(AppDbContextFixture fixture) : PostgresTestBa
             .Status.Should().Be(PlannerTaskStatus.Completed);
         (await db2.Set<PlannerTask>().SingleAsync(t => t.Id == yesterdayTaskId, CancellationToken))
             .Status.Should().Be(PlannerTaskStatus.NotStarted, "only today's linked planner task should flip");
+    }
+
+    // ---- C2: CQ-5 — whose midnight the fan-out uses ---------------------------------------------------
+
+    [Fact(DisplayName = "CQ-5: the to-do fan-out follows the user's own day boundary, not the server's UTC one")]
+    public async Task TogglingTodoItem_UsesTheUsersOwnDayBoundary()
+    {
+        long todoItemId, userTodayTaskId, utcTodayTaskId;
+        DateOnly userToday;
+        await using (var db = CreateDbContext())
+        {
+            // A zone in which it is currently a different date than in UTC, so the two readings of "today"
+            // name two different calendar rows and the assertions can tell them apart.
+            var zone = await PlanningTestSeedHelper.UseZoneOffsetFromUtcTodayAsync(db, UserId, CancellationToken);
+            userToday = PlanningTestSeedHelper.TodayIn(zone);
+            userToday.Should().NotBe(Today);
+
+            var (_, itemId, taskId) = await SeedLinkedTodoAndPlannerTaskAsync(db, "cq5-boundary", date: userToday);
+            todoItemId = itemId;
+            userTodayTaskId = taskId;
+
+            // The same item linked to a task on UTC-today as well: the control that catches the fix being
+            // "flip both days" rather than "flip the user's day".
+            var utcCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, Today, UserId, CancellationToken);
+            var activityId = (await db.Set<PlannerTask>().SingleAsync(t => t.Id == taskId, CancellationToken)).ActivityId;
+            utcTodayTaskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
+                db, activityId, utcCalendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), UserId, ct: CancellationToken);
+            var utcTask = await db.Set<PlannerTask>().SingleAsync(t => t.Id == utcTodayTaskId, CancellationToken);
+            utcTask.TodolistItemId = todoItemId;
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        (await ToggleTodoItemAsync(todoItemId, true)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var db2 = CreateDbContext();
+        (await db2.Set<PlannerTask>().SingleAsync(t => t.Id == userTodayTaskId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.Completed,
+                "a Calendar.Date is a wall-clock date the user chose, so the row that is 'today' has to be picked on the user's clock — a UTC boundary updates the wrong day and leaves the right one open");
+        (await db2.Set<PlannerTask>().SingleAsync(t => t.Id == utcTodayTaskId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.NotStarted, "the server's date is not a day the fan-out has any business touching");
+    }
+
+    [Fact(DisplayName = "CQ-5: a status patch on the user's today still publishes the fan-out, even when UTC has moved on")]
+    public async Task PatchingStatus_PublishesOnTheUsersToday()
+    {
+        long todoItemId, plannerTaskId;
+        await using (var db = CreateDbContext())
+        {
+            var zone = await PlanningTestSeedHelper.UseZoneOffsetFromUtcTodayAsync(db, UserId, CancellationToken);
+            var userToday = PlanningTestSeedHelper.TodayIn(zone);
+            userToday.Should().NotBe(Today);
+
+            var (_, itemId, taskId) = await SeedLinkedTodoAndPlannerTaskAsync(db, "cq5-patch", date: userToday);
+            todoItemId = itemId;
+            plannerTaskId = taskId;
+        }
+
+        var response = await CreateUserRoleClient().PatchAsJsonAsync(
+            $"api/planner-task/{plannerTaskId}/status", new { Status = "Completed" }, JsonOpts, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var db2 = CreateDbContext();
+        var item = await db2.Set<TodoListItem>().SingleAsync(i => i.Id == todoItemId, CancellationToken);
+        item.IsDone.Should().BeTrue(
+            "the endpoint publishes PlannerTaskIsDoneChangedEvent only for a task on 'today' — resolved on the UTC clock, a task the user finished on their own today fans out to nothing");
     }
 
     // ---- D: CQ-8 --------------------------------------------------------------------------------------

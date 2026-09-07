@@ -200,7 +200,7 @@ fixture, auth and seeding conventions every prompt assumes.
 | `TEST-3` | Both `PlannerBatchLimits` ceilings at their boundary (366 / 367) | `BatchLimitBoundaries.md` |
 | `TEST-4` | `UpdateCalendarEndpoint` day-type violation is a 400 | `CalendarDayTypeRuleBothShapes.md` |
 | `TEST-5` | `PlannerTaskValidator`'s ten rules. **Cases 15/16 (the ordering rule) are done** — the rule landed 2026-09-08 and `CreatingAnOvernightTask_IsRejected` covers create, update and equal-times; the other cases remain open | `PlannerTaskValidatorRules.md` |
-| `TEST-5`(b) | FK ids must belong to the caller — the `SEC-1` half of the same endpoints | `ForeignKeyOwnership.md` |
+| `TEST-5`(b) | ✅ **Written 2026-09-08** with the `SEC-1` fix — `PlannerReferencedIdOwnershipTests` (10) covers all four ids on create, update, both apply-template routes and planner settings, each with a control. Still open for `TemplatePlannerTaskRequest` / `RepeatingPlannerTaskRequest`, which inherit the same `ActivityId` / `ImportanceId` | `ForeignKeyOwnership.md` |
 | `TEST-6` | `BatchDeletePlannerTaskEndpoint` + its reminder cancellation | `BatchDeletePlannerTask.md` |
 | `TEST-7` | `ApplyTemplatePlannerTaskEndpoint`: cross-user calendar/template, error mapping | `ApplyTemplateSingleDayEdges.md` |
 | `TEST-8` | The duplicated midnight-wrap window predicate, both filter endpoints | `PlannerTaskFilterWindow.md` |

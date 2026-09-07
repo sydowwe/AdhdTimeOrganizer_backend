@@ -9,7 +9,10 @@ public class Calendar : BaseEntityWithUser
     public required DateOnly Date { get; init; }
 
     // Day metadata
-    public required DayType DayType { get; set; } // Workday, Weekend, Holiday, Vacation, SickDay, Special
+    // Workday, Weekend, Vacation, SickDay, Special — the five DayType members, and there is deliberately no
+    // Holiday among them: a public holiday is a Workday row carrying a HolidayName (see CalendarDayFactory),
+    // so that "is it a holiday" and "what kind of day is it" stay separate questions.
+    public required DayType DayType { get; set; }
     public string? HolidayName { get; init; } // Name of the holiday (e.g., "Christmas", "New Year")
     public string? Label { get; set; } // "HomeOffice", "Office", custom labels - independent of holiday
 

@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
@@ -59,7 +60,7 @@ public class GetPlanVsActualTrendPlannerTaskEndpoint(DbContext dbContext, IUserT
         // UTC boundary would let a Bratislava user's evening count as tomorrow and pull an unfinished day into
         // the aggregate.
         var timezone = await timeZones.GetAsync(userId, ct);
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone));
+        var today = TaskPlannerHelper.TodayIn(timezone);
 
         // "Materially over" is resolved as *strictly before the user's today*, and today is excluded however
         // late in the day the request arrives. This is stricter than the single-day block, which shows for the
