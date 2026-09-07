@@ -14,7 +14,11 @@ public class ActivityHistoryValidator : Validator<ActivityHistoryRequest>
         RuleFor(x => x.StartTimestamp)
             .NotEmpty();
 
+        // Cascade(Stop) is load-bearing, not tidiness: Length is a non-nullable reference the client can
+        // still send as JSON null, and the default rule-level cascade runs Must on the null, which throws
+        // inside validation and answers 500 instead of the 400 the NotNull is there to produce.
         RuleFor(x => x.Length)
+            .Cascade(CascadeMode.Stop)
             .NotNull()
             .Must(x => x.TotalSeconds >= 0)
             .WithMessage("Length must be non-negative.");

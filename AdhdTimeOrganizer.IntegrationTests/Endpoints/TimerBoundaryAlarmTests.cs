@@ -4,8 +4,10 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.History.application.endpoint.command;
 using AdhdTimeOrganizer.History.application.job;
 using AdhdTimeOrganizer.History.application.service;
+using AdhdTimeOrganizer.History.application.validator;
 using AdhdTimeOrganizer.History.domain.model.entity.timerAlarm;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
@@ -145,6 +147,253 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
         // A partially-registered set is the normal outcome of a tab dying mid-flight, and the client cancels
         // the whole set regardless of what it believes landed. "Nothing to cancel" is success.
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    /// <summary>
+    /// Session guids are client-issued, so <c>CancelSessionAsync</c>'s <c>UserId</c> predicate is the only
+    /// thing standing between a guessed guid and someone else's alarms. A no-op is still the right answer —
+    /// cancel never leaks whether the guid belonged to anyone — but the other user's rows must survive it.
+    /// </summary>
+    [Fact(DisplayName = "Cancelling with another user's sessionId is a no-op and leaves their alarms intact")]
+    public async Task Cancel_WithAnotherUsersSessionId_LeavesTheirAlarmsIntact()
+    {
+        var sessionId = Guid.NewGuid();
+
+        await using var ownerFactory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        await PostSessionAsync(ownerFactory.CreateClient(), sessionId, DateTime.UtcNow.AddMinutes(25));
+
+        var otherUserId = await ActivityMergeTestSupport.SecondUserAsync(Fixture, $"timer-alarm-cancel-{Guid.NewGuid():N}@test.com");
+        await using var attackerFactory = CreateFactory(TestRoles.AdminAndUser, userId: otherUserId, configOverrides: EmailOff);
+
+        var response = await attackerFactory.CreateClient()
+            .PostAsJsonAsync(CancelRoute, new { SessionId = sessionId }, JsonOpts, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var db = CreateDbContext();
+        (await db.Set<TimerBoundaryAlarm>().CountAsync(a => a.SessionId == sessionId, CancellationToken))
+            .Should().Be(1, "cancel is scoped to the caller — a guessed session guid must not reach another user's rows");
+    }
+
+    // ---- validator ----------------------------------------------------------------------------------
+
+    [Fact(DisplayName = "Exactly MaxBoundaries boundaries is accepted")]
+    public async Task Schedule_WithExactlyMaxBoundaries_IsAccepted()
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            Boundaries = BuildBoundaries(ScheduleTimerAlarmsValidator.MaxBoundaries)
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact(DisplayName = "One more than MaxBoundaries is rejected")]
+    public async Task Schedule_WithOneMoreThanMaxBoundaries_IsRejected()
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            Boundaries = BuildBoundaries(ScheduleTimerAlarmsValidator.MaxBoundaries + 1)
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact(DisplayName = "An empty boundary list is rejected")]
+    public async Task Schedule_WithEmptyBoundaryList_IsRejected()
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            Boundaries = Array.Empty<object>()
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory(DisplayName = "A boundary right at MaxHorizon is accepted; past it is rejected")]
+    [InlineData(23, HttpStatusCode.OK)]
+    [InlineData(25, HttpStatusCode.BadRequest)]
+    public async Task Schedule_AtHorizonBoundary_RespondsAccordingly(int hoursAhead, HttpStatusCode expected)
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            Boundaries = new object[] { new { BoundaryAt = DateTime.UtcNow.AddHours(hoursAhead), Phase = TimerBoundaryPhase.Focus } }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(expected);
+    }
+
+    [Fact(DisplayName = "An empty sessionId is rejected")]
+    public async Task Schedule_WithEmptySessionId_IsRejected()
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.Empty,
+            Boundaries = new object[] { new { BoundaryAt = DateTime.UtcNow.AddMinutes(25), Phase = TimerBoundaryPhase.Focus } }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory(DisplayName = "A non-positive activityId is rejected")]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Schedule_WithNonPositiveActivityId_IsRejected(long activityId)
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            ActivityId = activityId,
+            Boundaries = new object[] { new { BoundaryAt = DateTime.UtcNow.AddMinutes(25), Phase = TimerBoundaryPhase.Focus } }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory(DisplayName = "A zero phase/cycle field is rejected")]
+    [InlineData("phaseIndex")]
+    [InlineData("phaseTotal")]
+    [InlineData("cycleIndex")]
+    [InlineData("cycleTotal")]
+    public async Task Schedule_WithZeroPhaseOrCycleField_IsRejected(string field)
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+
+        var boundary = new Dictionary<string, object?>
+        {
+            ["boundaryAt"] = DateTime.UtcNow.AddMinutes(25),
+            ["phase"] = TimerBoundaryPhase.Focus,
+            ["phaseIndex"] = 1,
+            ["phaseTotal"] = 4,
+            ["cycleIndex"] = 1,
+            ["cycleTotal"] = 2
+        };
+        boundary[field] = 0;
+
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            Boundaries = new[] { boundary }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact(DisplayName = "A plain countdown supplying no phase/cycle fields is accepted")]
+    public async Task Schedule_WithNullPhaseAndCycleFields_IsAccepted()
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            Boundaries = new object[] { new { BoundaryAt = DateTime.UtcNow.AddMinutes(25), Phase = TimerBoundaryPhase.Focus } }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Theory(DisplayName = "Url must be a relative app route beginning with a single slash")]
+    [InlineData("/activity-history/pomodoro", HttpStatusCode.OK)]
+    [InlineData(null, HttpStatusCode.OK)]
+    [InlineData("https://evil.example/x", HttpStatusCode.BadRequest)]
+    [InlineData("//evil.example/x", HttpStatusCode.BadRequest)]
+    [InlineData("javascript:alert(1)", HttpStatusCode.BadRequest)]
+    [InlineData("activity-history/pomodoro", HttpStatusCode.BadRequest)]
+    public async Task Schedule_UrlValidation_AcceptsOnlyARelativeRoute(string? url, HttpStatusCode expected)
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            Url = url,
+            Boundaries = new object[] { new { BoundaryAt = DateTime.UtcNow.AddMinutes(25), Phase = TimerBoundaryPhase.Focus } }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(expected);
+    }
+
+    [Fact(DisplayName = "A url over 512 characters is rejected")]
+    public async Task Schedule_WithUrlOverMaxLength_IsRejected()
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var url = "/" + new string('a', 512); // 513 characters
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            Url = url,
+            Boundaries = new object[] { new { BoundaryAt = DateTime.UtcNow.AddMinutes(25), Phase = TimerBoundaryPhase.Focus } }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>
+    /// <c>ToUniversalTime</c> reads an <c>Unspecified</c>-kind instant as server-local time — a different
+    /// interpretation from the one <see cref="TimerBoundaryAlarmService"/> stores it under (it force-labels the
+    /// value UTC with <c>SpecifyKind</c>). Requiring the offset is what keeps validation and storage reading
+    /// the same instant.
+    /// </summary>
+    [Fact(DisplayName = "A boundaryAt with no offset is rejected, not silently reinterpreted")]
+    public async Task Schedule_WithUnspecifiedKindBoundaryAt_IsRejected()
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = Guid.NewGuid(),
+            Boundaries = new object[]
+            {
+                new { BoundaryAt = "2026-03-10T12:25:00", Phase = TimerBoundaryPhase.Focus }
+            }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "an instant with no offset is ambiguous between server-local and UTC — the contract requires one");
+    }
+
+    [Fact(DisplayName = "registered is the honest count of boundaries actually persisted")]
+    public async Task Schedule_RegisteredCount_MatchesRowsWritten()
+    {
+        var sessionId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync(ScheduleRoute, new
+        {
+            SessionId = sessionId,
+            Boundaries = new object[]
+            {
+                new { BoundaryAt = now.AddMinutes(-10), Phase = TimerBoundaryPhase.Focus },
+                new { BoundaryAt = now.AddMinutes(-5), Phase = TimerBoundaryPhase.Focus },
+                new { BoundaryAt = now.AddMinutes(10), Phase = TimerBoundaryPhase.Focus },
+                new { BoundaryAt = now.AddMinutes(20), Phase = TimerBoundaryPhase.Focus },
+                new { BoundaryAt = now.AddMinutes(30), Phase = TimerBoundaryPhase.Focus }
+            }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<ScheduleTimerAlarmsResponse>(JsonOpts, CancellationToken);
+        body!.Registered.Should().Be(3, "two of the five boundaries are already in the past and are dropped");
+
+        await using var db = CreateDbContext();
+        (await db.Set<TimerBoundaryAlarm>().CountAsync(a => a.SessionId == sessionId, CancellationToken))
+            .Should().Be(3, "the response field must not drift from the rows actually written");
+    }
+
+    private static object[] BuildBoundaries(int count)
+    {
+        var now = DateTime.UtcNow;
+        return Enumerable.Range(0, count)
+            .Select(i => (object)new { BoundaryAt = now.AddMinutes(5 + i), Phase = TimerBoundaryPhase.Focus })
+            .ToArray();
     }
 
     // ---- firing -----------------------------------------------------------------------------------

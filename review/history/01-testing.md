@@ -168,11 +168,14 @@ as it does. **`02-findings.md`'s preamble has been corrected** — it asserted t
   assertion *for the question it asks*, but it means five of those seven routes have no other test that
   drives them with a non-default `baseline` / `windowMinutes` / `topN`. The suite is honest about being
   a smoke test; the gap is that nothing sits above it for those parameters. → `TEST-2`, `TEST-7`
-- **`CalendarActivityEndpoint` has one test and it is about `roleId`.**
+- ~~**`CalendarActivityEndpoint` has one test and it is about `roleId`.**~~ ✅ **CLOSED 2026-09-07** by
+  `HistoryCalendarDashboardTests`; the `DOC-2` fold it describes was fixed in the same change.
   `HistoryDashboardGroupIdentityTests.Calendar_TopRolesCarryTheRoleId` is the only coverage of the one
   dashboard that reads another slice's entity, bounds its own range, and — unlike every sibling — does so
   in UTC (`DOC-2`). Nothing asserts its day fold, its range bounds or `TopN`. → `TEST-3`
-- **The attribution sink has zero tests and sits on a live path.**
+- ~~**The attribution sink has zero tests and sits on a live path.**~~ ✅ **closed 2026-09-07** by
+  `ActivityTimeAttributionSinkTests`, which also turned up three `KnownGap`s the prompt did not
+  anticipate — see the `TEST-4` note under § 12. The original text follows.
   `ActivityHistoryTimeAttributionSink` implements Core's `IActivityTimeAttributionSink` and is called by
   `Tracking.DesktopActivityHeartbeatEndpoint` (lines 90 and 119). The contiguous-window extension rule —
   which `summary.md` calls a property of the ledger's shape and the reason the logic lives here — is
@@ -182,10 +185,12 @@ as it does. **`02-findings.md`'s preamble has been corrected** — it asserted t
   fire / push envelope / quiet hours, and none on `ScheduleTimerAlarmsValidator` (the 64-boundary cap, the
   1-day horizon, the relative-`Url` rule that exists to stop a push becoming an off-site redirect) or on a
   foreign `ActivityId` (`SEC-1`). → `TEST-5`
-- **Create/update edge cases are untested.** The mutual exclusion of `TodoListItemId` /
-  `RoutineTodoListId` is a written rule in `ActivityHistoryValidator` with an explanatory comment and no
-  test; the `(UserId, ActivityId, StartTimestamp)` unique index has no test either, so nobody knows
-  whether a duplicate create answers 400/409 or a raw 500. → `TEST-6`
+- ~~**Create/update edge cases are untested.**~~ ✅ **CLOSED 2026-09-07** by
+  `ActivityHistoryWriteRuleTests`. The mutual exclusion of `TodoListItemId` / `RoutineTodoListId` is now
+  driven on all four combinations and asserts the *error key* (the rule's `.WithName` is what lets the
+  SPA put the message beside a field); the duplicate `(UserId, ActivityId, StartTimestamp)` answers
+  **409**, not the 500 this bullet feared, because `DbUtils.HandleException` maps the unique violation.
+  The pass found one defect inspection had missed → `CQ-13`. → `TEST-6`
 - **`ActivityHistoryRequest.UpdateEntity`'s deliberate omission is unpinned.** Not writing the two item
   links on update is load-bearing (writing them would unlink the row from its task on every ordinary
   edit) and is defended by a comment in three places. A future "map all the fields" cleanup deletes it
@@ -202,8 +207,8 @@ across a UTC midnight boundary would seed one day and query another. Not observe
 
 | Endpoint | Happy | Edge | Auth / IDOR | Test file |
 |---|---|---|---|---|
-| `POST /activity-history` | ✅ 1 | ❌ `TEST-6` | ✅ 3 | `HistoryCrudAuthMatrixTests` (`ActivityHistoryCreateTests`) |
-| `PUT /activity-history/{id}` | ✅ 1 | ❌ `TEST-8` | ✅ 4 (404 on foreign) | `HistoryCrudAuthMatrixTests` |
+| `POST /activity-history` | ✅ 1 | ✅ 10 (`TEST-6`: mutual exclusion + keys, length rules, duplicate → 409) | ✅ 3 + 4 (`SEC-4`) | `HistoryCrudAuthMatrixTests` (`ActivityHistoryCreateTests`), `ActivityHistoryWriteRuleTests`, `ActivityHistoryReferencedIdOwnershipTests` |
+| `PUT /activity-history/{id}` | ✅ 1 | ⚠️ `EndTimestamp` recompute pinned (`TEST-6`); item links still `TEST-8` | ✅ 4 (404 on foreign) | `HistoryCrudAuthMatrixTests`, `ActivityHistoryWriteRuleTests` |
 | `DELETE /activity-history/{id}` | ✅ 1 | — | ✅ 4 | `HistoryCrudAuthMatrixTests` |
 | `GET /activity-history/{id}` | ✅ 1 | — | ✅ 4 | `HistoryCrudAuthMatrixTests` |
 | `GET /activity-history/form-select-options` | ✅ 1 (200 only) | ❌ no value assertion; `?includeArchived` untested | ⚠️ implicit | `HistoryRouteSmokeTests` |
@@ -216,7 +221,7 @@ across a UTC midnight boundary would seed one day and query another. Not observe
 | `POST …/dashboard/summary/stacked-bars` | ✅ 3 | ✅ zone + DST gap | ⚠️ smoke | `HistoryDashboardUserZoneTests` |
 | `POST …/dashboard/summary/summary-cards` | ✅ 2 | ❌ baselines `TEST-2` | ⚠️ smoke | `…GroupIdentityTests`, `…CustomRangeTests` |
 | `POST …/dashboard/summary/time-of-day` | ✅ 5 | ✅ 24-bucket / zone / split / totals equality | ⚠️ smoke | `HistoryTimeOfDayDashboardTests` |
-| `POST …/dashboard/calendar` | ⚠️ 1 (`roleId` only) | ❌ zone, range bounds, `TopN` `TEST-3` | ❌ no cross-user test | `HistoryDashboardGroupIdentityTests` |
+| `POST …/dashboard/calendar` | ✅ 18 | ✅ user-zone fold both directions, range edges, empty days, `TopN` + its bound, span cap at the boundary (`TEST-3`) | ✅ 1 (days *and* seconds) | `HistoryCalendarDashboardTests`, `HistoryDashboardGroupIdentityTests` |
 | `POST …/timer-alarm/schedule` | ✅ 2 | ❌ validator + foreign `ActivityId` `TEST-5` | ⚠️ implicit (`User.GetId()`) | `TimerBoundaryAlarmTests` |
 | `POST …/timer-alarm/cancel` | ✅ 2 | ✅ unknown session = no-op | ❌ no cross-user cancel test `TEST-5` | `TimerBoundaryAlarmTests` |
 
@@ -230,11 +235,11 @@ non-default parameter.
 | `TimerBoundaryAlarmService` | 5 (via endpoints) | `ReplaceSessionAsync` idempotency and past-boundary drop are pinned; `RegisterTriggerAsync`'s swallow-and-log path is not |
 | `TimerBoundaryAlarmJobHandler` | 3 | fires → self-drains; no-op on a cancelled row; push envelope shape |
 | `TimerBoundaryAlarmRegistrar` | **0** | previously known standing caveat (`docs/testing.md` → Known gaps); needs a host restart inside a fixture |
-| `ActivityHistoryTimeAttributionSink` | **0** | `SeamWiringTests` proves resolution only → `TEST-4` |
+| `ActivityHistoryTimeAttributionSink` | 12 | `ActivityTimeAttributionSinkTests` — `TEST-4` ✅ **written 2026-09-07**. Both rules pinned (no-`SaveChanges`, contiguous-window extension), plus `CQ-5` as a regression. Surfaced three new `KnownGap`s: `IntTime` truncates sub-minute seconds to zero, which also makes the extension rule unreachable for real heartbeats, and `AttributeAsync` does not guard a negative `activeSeconds` |
 | `TodoListItemLoggedTimeSource` | 2 | `TodoListItemDailyRecapTests` — keys on item id, and `SET NULL` keeps the recording |
 | `ActivityHistoryActivityReferenceSource` | ✅ | `ActivityMergeTests.Merge_RepointsEveryReferencingSlice` (spans seven slices) + `ActivityForeignKeyInventoryTests` |
 | `HistoryGrouping` | 7 (indirect) | every group-shaped response asserts `groupId` |
-| `ActivityHistoryValidator` | 0 direct | `TEST-6` |
+| `ActivityHistoryValidator` | 7 (through the two endpoints) | `ActivityHistoryWriteRuleTests` — every rule, asserted on the error key; `CQ-13` came out of it |
 | `HistorySummaryDateRangeValidators` | 4 | `EveryFourthSummaryEndpoint_RejectsACustomRangeItWillNotAnswer` — the "fifth endpoint needs a fifth line" guard |
 | `ScheduleTimerAlarmsValidator` / `ActivityHistoryAggregateByActivityValidator` | 0 | `TEST-5` |
 | `ActivityHistorySeeder` | **0** | previously known (dev-only fixture; the chain is pinned by `PerUserDefaultSeederTests`) |
@@ -263,12 +268,33 @@ Prompts are self-contained and paste-ready for a context-less agent; all live un
 |---|---|---|---|
 | ~~`TEST-1`~~ | ~~The grid ignores `page` / `itemsPerPage` / `sortBy`; nothing notices~~ — **withdrawn 2026-09-02**: endpoint deleted with `CQ-1`, no client ever called it | — | ~~`GridPaginationAndSorting.md`~~ |
 | `TEST-2` | `summary-cards` `baseline` values (`alltime` suspected 500, `sameWeekday`, `last30days`) never driven | 🔴 | [`SummaryCardsBaselines.md`](testingPrompts/SummaryCardsBaselines.md) |
-| `TEST-3` | Calendar dashboard: day fold, range bounds, `TopN`, cross-user | 🟠 | [`CalendarDashboardBounds.md`](testingPrompts/CalendarDashboardBounds.md) |
-| `TEST-4` | `ActivityHistoryTimeAttributionSink` — contiguous-window extension and day totals, both untested on a live path | 🔴 | [`TimeAttributionSink.md`](testingPrompts/TimeAttributionSink.md) |
+| `TEST-3` ✅ **written 2026-09-07** | Calendar dashboard: day fold, range bounds, `TopN`, cross-user | 🟠 | [`CalendarDashboardBounds.md`](testingPrompts/CalendarDashboardBounds.md) — landed as `HistoryCalendarDashboardTests` (17 tests) alongside the `DOC-2` fix |
+| `TEST-4` ✅ **written 2026-09-07** | `ActivityHistoryTimeAttributionSink` — contiguous-window extension and day totals, both untested on a live path | 🔴 | [`TimeAttributionSink.md`](testingPrompts/TimeAttributionSink.md) — landed as `ActivityTimeAttributionSinkTests` (12 tests); see the note below |
 | `TEST-5` | `ScheduleTimerAlarmsValidator` caps + foreign `ActivityId` + cross-user cancel | 🟠 | [`TimerAlarmInputValidation.md`](testingPrompts/TimerAlarmInputValidation.md) |
-| `TEST-6` | `ActivityHistoryValidator` mutual exclusion; duplicate `(UserId, ActivityId, StartTimestamp)`; foreign `ActivityId` on create | 🟠 | [`ActivityHistoryWriteRules.md`](testingPrompts/ActivityHistoryWriteRules.md) |
+| `TEST-6` ✅ **written 2026-09-07** | `ActivityHistoryValidator` mutual exclusion; duplicate `(UserId, ActivityId, StartTimestamp)`; foreign `ActivityId` on create | 🟠 | [`ActivityHistoryWriteRules.md`](testingPrompts/ActivityHistoryWriteRules.md) — landed as `ActivityHistoryWriteRuleTests` (12 tests); found `CQ-13` |
 | `TEST-7` ✅ **written 2026-09-02** | `detail/stacked-bars` emits 24 windows regardless of the picked range | 🟠 | [`DetailStackedBarsWindows.md`](testingPrompts/DetailStackedBarsWindows.md) — landed in `HistoryDashboardUserZoneTests` alongside the `CQ-3` fix |
 | `TEST-8` | `UpdateEntity` must not write the two item links | 🟡 | [`UpdateKeepsItemLinks.md`](testingPrompts/UpdateKeepsItemLinks.md) |
+
+`TEST-4` ✅ **written 2026-09-07** — `ActivityTimeAttributionSinkTests`, 12 tests, all passing. Notes for
+whoever reads the matrix above:
+
+- **`CQ-5` is closed and now genuinely guarded.** Both items were already fixed in the source
+  (commit `e624797`); the two tests that would have caught them are kept as regressions. They are
+  load-bearing again only because the submodule has since dropped the harness's
+  `Npgsql.EnableLegacyTimestampBehavior` switch (`INFRA-1`, commit `ab0547d`) — under that switch a
+  round trip could not have failed on the `Unspecified` bound, which is exactly why the prompt's
+  scenario 5 expected a throw that no longer happens.
+- **Three new findings, pinned rather than fixed**, all rooted in `IntTime` keeping only hours and
+  minutes. The headline one: a sub-minute attribution is recorded with a **zero** `Length` while its
+  `EndTimestamp` is written honestly, so it is a wrong number rather than an error — this slice's
+  stated worst failure mode, on the desktop ingest path. Since the heartbeat validator caps a window at
+  60 active seconds across all entries, any window split over two applications loses **both**
+  attributions; and because `EndTimestamp` then never lands on the minute boundary the next window
+  starts at, the contiguous-window extension rule — the reason this class lives in History at all — can
+  only ever fire when a single activity holds all 60 seconds. The fix is in `Sydowwe.Framework`'s value
+  object (the column is already `int` seconds), so it is a submodule change with solution-wide reach
+  and was left out of this test-only change. Details in `AdhdTimeOrganizer.History/docs/testing.md`
+  § *Known gaps*.
 
 `TEST-2` ✅ **written 2026-09-02** — `HistorySummaryCardsBaselineTests` drives all four baselines on both
 summary-cards routes, landed with the `CQ-4` fix. Left in the table above rather than struck through,

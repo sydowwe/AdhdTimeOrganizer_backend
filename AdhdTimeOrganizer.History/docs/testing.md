@@ -50,6 +50,7 @@ below.
 | `HistoryRouteSmokeTests.AggregateByActivity_SumsPerId_OmitsEmptyIds_AndExcludesOtherUsers` | The aggregate keys by id, **omits** ids with no rows rather than returning zeros (which is what lets callers divide by `entryCount` unguarded), and is user-scoped |
 | `HistoryDashboardGroupIdentityTests` (7 tests) | Every group-shaped response carries the `groupId` of the entity it grouped by; identity survives a rename; `groupId` is null on exactly the two synthetic buckets (`Uncategorized`, the pie's `_other` roll-up). A name-keyed response is well-formed and its numbers add up — this is the only thing that catches it |
 | `HistoryDashboardUserZoneTests` (4 tests) | Ranges and picked windows resolve in `User.Timezone`, not UTC; summary and detail agree on the instants a window names; a window starting inside the spring-forward gap resolves to the end of the gap |
+| `HistoryCalendarDashboardTests` (17 tests) | The calendar dashboard, which was the one dashboard folding in UTC (`DOC-2`): a row lands on the calendar cell its start reads on the **user's** clock, east and west of Greenwich, and the range runs from the user's first midnight to the user's last. Also that the response is one entry per calendar day — empty days included, so a client may index it — the `topN` ranking and its `1..10` bound, the `MaxCustomRangeDays` span cap at exactly the boundary, and that both the day cells and the seconds are the caller's own. The fold and the bounds are pinned by an equality with `summary/pie-chart`'s total for the same days |
 | `HistoryTimeOfDayDashboardTests` (5 tests) | The three contract properties of the fold: always 24 hours in order 0…23 including zeros; folded in the user's zone; a record crossing an hour boundary split by elapsed time and counted in `entries` once per hour — so `sum(entries)` is not the record count while `sum(totalSeconds)` **is** the period total |
 | `HistorySummaryCustomRangeTests` (7 tests) | A custom range spans `date`…`endDate` **inclusive**, a single day is one day not two, the max span is enforced at exactly the boundary, and named range types ignore `endDate` rather than reading or rejecting it |
 | `HistoryCrudAuthMatrixTests.Filter_ExcludesOtherUsersHistory` · `GetFilteredTable_ExcludesOtherUsersHistory` | The global user query filter actually scopes these reads. `ApplyUserScoping` on the endpoint bases is a **no-op virtual** and guards nothing |
@@ -68,8 +69,30 @@ and the scheduler suites under `Infrastructure/` that the alarms ride on.
 
 ## Known gaps (living list)
 
-No `[Trait("Status","KnownGap")]` tests are carried for this slice today. Three standing caveats
-rather than gaps:
+Three `[Trait("Status","KnownGap")]` tests are carried, all in
+`ActivityTimeAttributionSinkTests` (TEST-4) and all pinning *today's* behaviour so a fix breaks them
+loudly:
+
+- **`IntTime` discards sub-minute seconds, so most heartbeat attribution is recorded as zero.**
+  `AttributeAsync_WithSubMinuteSeconds_RecordsNothing` and
+  `AttributeAsync_AcrossTwoSubMinuteHeartbeats_NeitherExtendsNorAccumulates`. `IntTime` holds only
+  `Hours` and `Minutes`, so `new IntTime(45)` is 0 seconds — while `EndTimestamp` records the window
+  honestly. `DesktopActivityHeartbeatValidator` caps a heartbeat at 60 active seconds *across all
+  entries*, so any window split over two applications loses both. It also makes the
+  contiguous-window extension rule unreachable in practice: `WindowStart` is minute-aligned and
+  `EndTimestamp` is `windowStart + activeSeconds`, so the next window can only start exactly where the
+  last ended when `activeSeconds` was exactly 60. The stored column is already `int` seconds
+  (`IntTimeConverter` writes `TotalSeconds`), so the loss is in the value object's constructor, not the
+  schema — fixing it is a `Sydowwe.Framework` change with solution-wide reach, which is why it is
+  pinned here rather than fixed.
+- **`AttributeAsync` does not guard a negative `activeSeconds`.**
+  `AttributeAsync_WithNegativeSeconds_WritesAnInvertedRow` — the row's `EndTimestamp` precedes its
+  `StartTimestamp` and its `Length` is negative, which subtracts from the day total the completion
+  automation reads. Not reachable from the desktop heartbeat (its validator applies
+  `GreaterThanOrEqualTo(0)`), but the seam is a Core interface any slice may call, so the guard belongs
+  on the sink rather than on one caller's validator.
+
+Three standing caveats rather than gaps:
 
 - **The registrar's boot behaviour is not integration-tested.** `TimerBoundaryAlarmTests` covers
   schedule / cancel / fire, but not `TimerBoundaryAlarmRegistrar.StartAsync` re-pushing triggers after

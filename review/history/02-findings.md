@@ -490,6 +490,39 @@ doesn't assume atomicity.
 is left that way (the transaction would have to span a Scheduler call) and what absorbs the collision
 (the client's own `Tag` replacement). `summary.md` carries the same line.
 
+### `CQ-13` 🟠 ✅ FIXED 2026-09-07 · `"length": null` throws inside the validator and answers 500
+
+`application/validator/ActivityHistoryValidator.cs:17-20`. Found by `TEST-6`, which is why it is minted
+here rather than in the original pass — inspection reads this rule as correct.
+
+```csharp
+RuleFor(x => x.Length)
+    .NotNull()
+    .Must(x => x.TotalSeconds >= 0)     // runs anyway when Length is null
+```
+
+`Length` is a non-nullable `IntTime`, but nothing stops a client sending JSON `null` for it: `required`
+is enforced by System.Text.Json only against a *missing* property, and the nullable annotation is not
+enforced at all, so the bound request carries a null. FluentValidation's default rule-level cascade is
+`Continue`, so `Must` then runs on that null and dereferences it:
+
+```
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at …ActivityHistoryValidator.<>c.<.ctor>b__0_3(IntTime x) in ActivityHistoryValidator.cs:line 19
+   at FastEndpoints.Endpoint`2.ValidateRequest(…)
+```
+
+The throw is inside FastEndpoints' validation step, ahead of the endpoint's own `try`/`catch`, so
+`DbUtils.HandleException` never sees it and the client gets a bare 500 with an error id — for a payload
+the `NotNull` exists precisely to answer 400 for. Both `POST` and `PUT` share the validator.
+
+**Fixed:** `.Cascade(CascadeMode.Stop)` on the rule, with a comment saying why it is load-bearing rather
+than tidiness. Pinned by `ActivityHistoryWriteRuleTests.Create_WithNullLength_IsRejected`, which asserts
+400 *and* that the failure is keyed to `length` — a 400 from a different rule would not prove the
+`NotNull` fired.
+
+`Doc impact: none`
+
 ---
 
 ## 9. Performance hotspots
@@ -548,7 +581,7 @@ beside it names the two bases that own the two routes, points at the smoke test 
 distinction, and says why the flag exists (an edit form must still list the archived activity a stored
 row points at).
 
-### `DOC-2` 🟠 · The Timezone invariant says "every dashboard"; two surfaces fold in UTC
+### `DOC-2` 🟠 ✅ FIXED 2026-09-07 · The Timezone invariant says "every dashboard"; two surfaces fold in UTC
 
 `docs/domain-map.md:194` ("Every dashboard folds and bounds its range in `User.Timezone`, never UTC")
 vs `application/endpoint/CalendarActivityEndpoint.cs:23-35` and
@@ -572,8 +605,15 @@ Note the knock-on: the days come from `ICalendarDayLookup` keyed by `DateOnly`, 
 history into the *user's* date to line up with the calendar rows it is joined against — using UTC on one
 side and the user's calendar on the other is what makes the mismatch invisible.
 
-`Doc impact: domain-map.md → Invariants (Timezone)` — once fixed, add the calendar to
-`HistoryDashboardUserZoneTests`' guard row in `docs/testing.md`.
+**Fixed:** `CalendarActivityEndpoint` now takes `IUserTimeZoneResolver` like every sibling, bounds the
+range with `WallClockZone.ToUtc(date, TimeOnly.MinValue, tz)` and buckets with
+`DateOnly.FromDateTime(WallClockZone.FromUtc(ah.StartTimestamp, tz))`. Both sides moved together, which
+is the point: the day cells were already the user's days. Landed with `TEST-3`
+(`HistoryCalendarDashboardTests`) — four of its seventeen cases fail against the previous code, in both
+directions across Greenwich and at both ends of the range.
+
+`Doc impact: done` — `domain-map.md` → Invariants (Timezone) names the calendar and why the mismatch was
+invisible; `docs/testing.md` carries the new suite's guard row beside `HistoryDashboardUserZoneTests`'.
 
 ### `DOC-3` 🟡 ✅ FIXED 2026-09-02 · The aggregate endpoint's summary describes a pie chart that no longer exists
 

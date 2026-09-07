@@ -217,7 +217,11 @@ and by `AppDbContextFixture.OnSchemaCreatedAsync` in tests.
 **Timezone.** Every dashboard folds and bounds its range in `User.Timezone`, never UTC — the summary
 range stops at the user's midnights, and `time-of-day` folds into the user's hours. *App-enforced
 only*: nothing in the schema or the request shape stops a UTC fold, and the wrong answer is a
-plausible number rather than an error. `HistoryDashboardUserZoneTests` is the guard.
+plausible number rather than an error. `HistoryDashboardUserZoneTests` is the guard, and
+`HistoryCalendarDashboardTests` guards the calendar — the one dashboard that had drifted from this
+(`DOC-2`), and the one where it matters twice over: its day cells come from `ICalendarDayLookup` keyed
+by a bare `DateOnly`, which is already a *user's* day, so a UTC fold on the history side mismatches a
+user-day calendar on the other.
 
 **Alarm liveness.** A `TimerBoundaryAlarm` row is meaningful only while its Scheduler trigger exists,
 and the trigger does not survive a restart — `TimerBoundaryAlarmRegistrar` re-pushes it on boot.
