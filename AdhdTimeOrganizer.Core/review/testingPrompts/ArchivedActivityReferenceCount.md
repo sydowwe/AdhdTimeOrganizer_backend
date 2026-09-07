@@ -1,5 +1,24 @@
 # TEST-4 — the reference seam runs under the archival filter it never lifts
 
+> ✅ **Done 2026-09-08.** The fix landed 2026-09-01 (`ActivityProfileActivityReferenceSource` lifts
+> `AppQueryFilters.ActivityArchived` in one private helper used by `ReferencingActivityIds` *and* by
+> both of `RepointUniqueProfileAsync`'s reads, `survivorHasOne` included), so **nothing here carries
+> `KnownGap`** — every case below is written against the corrected behaviour and passes.
+>
+> Sections 1, 3 and 5 had already been covered while fixing `SEC-4`, so they were not rewritten:
+> `ActivityArchivingTests.UsageCount_CountsTheProfilesOfAnArchivedActivity` does 1 and 5 in one test
+> (both read paths), and section 3 is
+> `ActivityMergeTests.Merge_IntoAnArchivedSurvivorThatAlreadyHasAProfile_KeepsTheSurvivorsProfile`.
+> `Endpoints/ArchivedActivityReferenceCountTests.cs` holds the two that were missing — section 2 (the
+> withheld delete really does cascade the profile away) and section 4 (the active control, plus an
+> archived activity whose profile is counted *alongside* its unfiltered history and preset references
+> rather than instead of them). The asymmetry section 5 was written to document no longer exists.
+>
+> The "fix, for reference" below could not be followed exactly: it cannot be centralised in
+> `ActivityReferenceService`, because `IgnoreQueryFilters` needs an entity type and by that point the
+> queryable has projected to `IQueryable<long>`. See `SEC-4`'s **Fixed as:** note. The rest of this
+> file is kept as the record of why.
+
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first. Finding: `SEC-4` 🟠.
 
 **Status today:** `ActivityArchivingTests:353` (`UsageCount_CountsEveryReferencingSlice_AndCanDeleteFollowsIt`)

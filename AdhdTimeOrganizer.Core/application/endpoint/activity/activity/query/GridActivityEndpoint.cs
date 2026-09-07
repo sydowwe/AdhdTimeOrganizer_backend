@@ -102,13 +102,13 @@ public class GridActivityEndpoint(
         if (!string.IsNullOrWhiteSpace(filter.Name))
         {
             var pattern = filter.Name.ToContainsPattern();
-            query = query.Where(a => EF.Functions.ILike(a.Name, pattern));
+            query = query.Where(a => EF.Functions.ILike(a.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Text))
         {
             var pattern = filter.Text.ToContainsPattern();
-            query = query.Where(a => a.Text != null && EF.Functions.ILike(a.Text, pattern));
+            query = query.Where(a => a.Text != null && EF.Functions.ILike(a.Text, pattern, FreeTextFilterExtensions.EscapeCharacter));
         }
 
         if (filter.IsUnavoidable.HasValue)
@@ -117,13 +117,13 @@ public class GridActivityEndpoint(
         if (!string.IsNullOrWhiteSpace(filter.RoleName))
         {
             var pattern = filter.RoleName.ToContainsPattern();
-            query = query.Where(a => EF.Functions.ILike(a.Role.Name, pattern));
+            query = query.Where(a => EF.Functions.ILike(a.Role.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.CategoryName))
         {
             var pattern = filter.CategoryName.ToContainsPattern();
-            query = query.Where(a => a.Category != null && EF.Functions.ILike(a.Category.Name, pattern));
+            query = query.Where(a => a.Category != null && EF.Functions.ILike(a.Category.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
         }
 
         if (filter.RoleId.HasValue)

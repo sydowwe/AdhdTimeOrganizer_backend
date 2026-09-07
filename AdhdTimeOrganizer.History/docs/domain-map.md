@@ -102,6 +102,13 @@ than firing them immediately.
 paging nor sorting, and nothing in the frontend ever called it (the claim that "the SPA calls it that
 way" was never true). `/activity-history/filter` is the only list read on this entity.
 
+⚠ **`filter` bounds its window on `StartTimestamp`, half-open `[from, to)`** — the same predicate as
+every dashboard, the calendar and both seams, so the detail list and the charts above it always agree
+on which records are in the period. A record starting inside the window contributes its whole tail,
+however far past `to` it ends; a record that started before `from` is out even if it is still running.
+Do not "tighten" the upper bound onto `EndTimestamp`: that drops long sessions from the list while
+they still count in every chart, and it defeats the `(UserId, StartTimestamp)` index.
+
 ⚠ **The select-options route is `form-select-options`, not `all-options`.** It comes from
 `Core/application/endpoint/base/BaseActivityFormSelectOptionsEndpoint`, whose own remarks name
 `/activity-history/form-select-options`; `all-options` is `BaseGetSelectOptionsEndpoint`'s route and

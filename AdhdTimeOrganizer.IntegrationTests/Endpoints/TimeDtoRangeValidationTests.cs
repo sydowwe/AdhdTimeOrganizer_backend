@@ -20,6 +20,10 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 ///
 /// <para>Both halves matter, hence the second theory: a fix applied to one of two sibling properties is the
 /// likely half-fix, and a range rule that fires but breaks the 200 case is the likely over-fix.</para>
+///
+/// <para>One theory per shape the fix had to take: History's request validator, which had no rule at all;
+/// Planning's, which hand-rolled the same check nine times and had to keep answering the way it already did;
+/// and Tracking's shared <c>ApplyDateRangeRules</c>, which twelve dashboards inherit from one call.</para>
 /// </summary>
 [Collection("Postgres")]
 public class TimeDtoRangeValidationTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
@@ -82,6 +86,50 @@ public class TimeDtoRangeValidationTests(AppDbContextFixture fixture) : Postgres
             CancellationToken);
 
         response.StatusCode.Should().Be(expected);
+    }
+
+    /// <summary>
+    /// The third branch of the same fix. Tracking had History's hole, not Planning's inline check: the twelve
+    /// dashboards share <c>DashboardDateRangeRules.ApplyDateRangeRules</c>, which had <c>NotEmpty()</c> on
+    /// <c>From</c>/<c>To</c> and nothing else, while <c>ToDailyWindows</c> resolves both through
+    /// <c>TimeDto.ToTimeOnly()</c>. Covering one route covers all twelve — they get the rule from that one
+    /// shared method, so the failure mode is the method losing the call, not a dashboard drifting from it.
+    ///
+    /// <para>The error key is asserted by <b>name</b> rather than by searching the body, because these two
+    /// properties are called <c>from</c> and <c>to</c>: a substring match on "from" hits the prose of
+    /// half the validation messages in the response and would pass with the key absent.</para>
+    ///
+    /// <para>No accepted-boundary case here — <see cref="TrackingDashboardDateRangeTests"/> posts real
+    /// windows (00:00, 07:00, 09:00-17:00) to these routes and asserts 200 with numbers throughout, so the
+    /// over-fix that rejects a valid time of day is already pinned there.</para>
+    /// </summary>
+    [Theory(DisplayName = "CQ-2: a tracking dashboard's daily window is range-checked too")]
+    [InlineData("from", 24, 0)]
+    [InlineData("from", 0, -1)]
+    [InlineData("to", 99, 0)]
+    [InlineData("to", 0, 60)]
+    public async Task TrackingPieChart_OutOfRangeDailyWindow_IsRejected(string field, int hours, int minutes)
+    {
+        var badTime = new { hours, minutes };
+        var goodTime = new { hours = 0, minutes = 0 };
+
+        var response = await CreateUserRoleClient().PostAsJsonAsync(
+            "/api/activity-tracking/desktop/pie-chart",
+            new
+            {
+                dateFrom = new DateOnly(2026, 6, 1),
+                dateTo = new DateOnly(2026, 6, 3),
+                from = field == "from" ? badTime : goodTime,
+                to = field == "to" ? badTime : goodTime
+            },
+            Json,
+            CancellationToken);
+
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, body);
+
+        JsonDocument.Parse(body).RootElement.GetProperty("errors").EnumerateObject().Select(e => e.Name)
+            .Should().Contain(name => string.Equals(name, field, StringComparison.OrdinalIgnoreCase), body);
     }
 
     private Task<HttpResponseMessage> PostStackedBarsAsync(

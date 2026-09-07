@@ -3,15 +3,21 @@
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first. Finding: `PERF-2` 🟡 (a UX defect first, an
 index problem second).
 
-**Status today:** `ActivityArchivingTests:175,189,207` exercise the activity grid's `isArchived`
+> ✅ **Closed 2026-09-08.** `Endpoints/GridTextFilterTests.cs` holds all five cases below (4 tests, 8
+> cases), and the `ILike` fix has landed in all three grids. Neither KnownGap trait was needed — the
+> fix shipped in the same change, so every case is green. The name predicate on each of the three
+> grids is pinned; the remaining `text`, `roleName`, `categoryName` and `icon` predicates share
+> `FreeTextFilterExtensions` with it but have no test of their own. Kept as written for the record.
+
+**Status when written:** `ActivityArchivingTests:175,189,207` exercise the activity grid's `isArchived`
 filter. `BaseFetchTableEndpointTests` exercises the category grid's role column and sorting. **No test
 posts a text filter to any of the three grids**, so none of the seven `Contains` predicates has ever
 been asserted.
 
-## What the code does
+## What the code did
 
 `GridActivityEndpoint.cs:90-103`, `GridActivityRoleEndpoint.cs:15-25`,
-`GridActivityCategoryEndpoint.cs:29-33` all filter with `.Contains(...)`:
+`GridActivityCategoryEndpoint.cs:29-33` all filtered with `.Contains(...)`:
 
 ```csharp
 if (!string.IsNullOrWhiteSpace(filter.Name))
@@ -86,7 +92,15 @@ wildcard is visible as a wrong row rather than as a merely-too-large result.
 ## The fix, for reference
 
 `EF.Functions.ILike(a.Name, $"%{filter.Name}%")` — Npgsql-specific, translates to Postgres `ILIKE`, and
-keeps parameterisation. Do **not** use `.ToLower().Contains(...)`: it produces `lower(name) LIKE …`,
+keeps parameterisation.
+
+⚠ **As shipped this needed two corrections the sketch above misses**, both of which case 5 catches:
+the interpolated pattern does **not** escape `%` / `_` / `\` the way `Contains` did, so patterns are
+built by `FreeTextFilterExtensions.ToContainsPattern`; and the escape character must be passed to
+`ILike` as a third argument, because the two-argument overload emits `ESCAPE ''`, which turns escaping
+off rather than defaulting to backslash and makes any filter containing a metacharacter match nothing.
+
+Do **not** use `.ToLower().Contains(...)`: it produces `lower(name) LIKE …`,
 which is unindexable in a different and worse way and changes behaviour under non-invariant collations.
 
 If free-text grid filters stay, a `pg_trgm` GIN index on `activity.name` becomes worthwhile — but only

@@ -415,41 +415,4 @@ public class RoutineDevSeederTests(AppDbContextFixture fixture) : PostgresTestBa
         public long GetUserId => throw new InvalidOperationException("No user is signed in.");
         public long? GetUserIdOrNull => null;
     }
-
-    /// <summary>Captures every formatted log message across all categories, for asserting on presence.</summary>
-    private sealed class CapturingLoggerProvider : ILoggerProvider
-    {
-        private readonly List<string> _messages = [];
-
-        public IReadOnlyList<string> Messages
-        {
-            get
-            {
-                lock (_messages)
-                    return _messages.ToList();
-            }
-        }
-
-        public ILogger CreateLogger(string categoryName) => new CapturingLogger(_messages);
-        public void Dispose() { }
-
-        private sealed class CapturingLogger(List<string> messages) : ILogger
-        {
-            public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
-            public bool IsEnabled(LogLevel logLevel) => true;
-
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-                Func<TState, Exception?, string> formatter)
-            {
-                lock (messages)
-                    messages.Add(formatter(state, exception));
-            }
-
-            private sealed class NullScope : IDisposable
-            {
-                public static readonly NullScope Instance = new();
-                public void Dispose() { }
-            }
-        }
-    }
 }

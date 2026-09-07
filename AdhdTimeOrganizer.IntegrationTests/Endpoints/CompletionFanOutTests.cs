@@ -20,8 +20,15 @@ using Xunit;
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 /// <summary>
-/// TEST-16 — the completion fan-out event handlers (<c>PlannerTaskIsDoneChangedEventHandler</c>,
-/// <c>TodoListItemIsDoneChangedEventHandler</c>, <c>RoutineTodoListIsDoneChangedEventHandler</c>).
+/// TEST-16 — two of the three completion fan-out event handlers:
+/// <c>PlannerTaskIsDoneChangedEventHandler</c> (host-side) and
+/// <c>TodoListItemIsDoneChangedEventHandler</c> (Planning).
+/// <para>
+/// The third, <c>RoutineTodoListIsDoneChangedEventHandler</c>, is <b>not</b> covered here — this doc
+/// claimed it for a while and no method ever exercised it, which is <c>DOC-5</c> in
+/// <c>AdhdTimeOrganizer.Planning/review/02-findings.md</c> and is why four defects sat in its 45 lines.
+/// It has its own suite now: <see cref="RoutineCompletionFanOutTests"/>.
+/// </para>
 /// </summary>
 /// <remarks>
 /// The originating prompt (<c>review/portal/testingPrompts/CompletionFanOutEventHandlers.md</c>) was

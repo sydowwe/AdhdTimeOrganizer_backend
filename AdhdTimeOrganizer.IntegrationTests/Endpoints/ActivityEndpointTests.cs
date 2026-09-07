@@ -1153,6 +1153,97 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Fact(DisplayName = "CQ-4: a cloned activity carries its own creation timestamp")]
+    public async Task Clone_StampsTheCopyWithItsOwnTimestamps_NotTheSourcesAsync()
+    {
+        await using var db = CreateDbContext();
+        var userId = FakeLoggedUserService.TestUserId;
+        var roleId = await Seed.RoleAsync(db, userId, $"Clone Stamp Role {Guid.NewGuid():N}");
+        var sourceActivity = new Activity { UserId = userId, Name = $"Clone Stamp Source {Guid.NewGuid():N}", RoleId = roleId };
+        db.Set<Activity>().Add(sourceActivity);
+        await db.SaveChangesAsync(CancellationToken);
+        var sourceId = sourceActivity.Id;
+
+        // Backdate through ExecuteUpdate, not through the tracker: BaseDbContext.SaveChangesAsync runs
+        // BaseSaveChangesAsync, which stamps ModifiedTimestamp = UtcNow on every Modified entry, so a
+        // seed that mutated the entity and saved would silently keep today's ModifiedTimestamp and the
+        // assertion below could pass without Clone() having reset anything.
+        var backdated = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        await db.Set<Activity>().Where(a => a.Id == sourceId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(a => a.CreatedTimestamp, backdated)
+                .SetProperty(a => a.ModifiedTimestamp, backdated), CancellationToken);
+
+        var before = DateTime.UtcNow;
+        var response = await CreateClient()
+            .PostAsJsonAsync($"api/activity/{sourceId}/clone", new { Name = $"Clone Stamp Copy {Guid.NewGuid():N}", Text = (string?)null, CategoryId = (long?)null }, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var cloneId = await response.Content.ReadFromJsonAsync<long>(CancellationToken);
+
+        await using var assertDb = CreateDbContext();
+        var clone = await assertDb.Set<Activity>().AsNoTracking().FirstAsync(a => a.Id == cloneId, CancellationToken);
+        clone.CreatedTimestamp.Should().BeCloseTo(before, TimeSpan.FromMinutes(1),
+            "MemberwiseClone copies CreatedTimestamp, and it is a mapped property EF always sends, so without an explicit reset the copy is persisted claiming it was created in 2020");
+        clone.ModifiedTimestamp.Should().BeCloseTo(before, TimeSpan.FromMinutes(1),
+            "the copy has never been edited, so its ModifiedTimestamp is its creation instant, not the source's");
+
+        // Pins the seed itself: if the backdate had not taken, the two assertions above would pass for
+        // the wrong reason.
+        var source = await assertDb.Set<Activity>().AsNoTracking().FirstAsync(a => a.Id == sourceId, CancellationToken);
+        source.CreatedTimestamp.Should().BeCloseTo(backdated, TimeSpan.FromSeconds(1), "cloning must not touch the source's audit columns");
+        source.ModifiedTimestamp.Should().BeCloseTo(backdated, TimeSpan.FromSeconds(1), "cloning reads the source, it never writes it");
+    }
+
+    [Fact(DisplayName = "CQ-4: a clone is a distinct row that still carries every copied column")]
+    public async Task Clone_CopiesEveryColumnItShould_AndOverwritesOnlyTheRequestFieldsAsync()
+    {
+        await using var db = CreateDbContext();
+        var userId = FakeLoggedUserService.TestUserId;
+        var roleId = await Seed.RoleAsync(db, userId, $"Clone Fields Role {Guid.NewGuid():N}");
+        var sourceCategoryId = await Seed.CategoryAsync(db, userId, $"Clone Fields Source Category {Guid.NewGuid():N}");
+        var requestCategoryId = await Seed.CategoryAsync(db, userId, $"Clone Fields Request Category {Guid.NewGuid():N}");
+        var sourceName = $"Clone Fields Source {Guid.NewGuid():N}";
+        var sourceActivity = new Activity
+        {
+            UserId = userId,
+            Name = sourceName,
+            Text = "source text",
+            RoleId = roleId,
+            CategoryId = sourceCategoryId,
+            IsUnavoidable = true
+        };
+        db.Set<Activity>().Add(sourceActivity);
+        await db.SaveChangesAsync(CancellationToken);
+        var sourceId = sourceActivity.Id;
+
+        var cloneName = $"Clone Fields Copy {Guid.NewGuid():N}";
+        var response = await CreateClient()
+            .PostAsJsonAsync($"api/activity/{sourceId}/clone", new { Name = cloneName, Text = "clone text", CategoryId = (long?)requestCategoryId }, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var cloneId = await response.Content.ReadFromJsonAsync<long>(CancellationToken);
+
+        await using var assertDb = CreateDbContext();
+        var clone = await assertDb.Set<Activity>().AsNoTracking().FirstAsync(a => a.Id == cloneId, CancellationToken);
+        clone.Id.Should().NotBe(sourceId);
+        clone.UserId.Should().Be(userId);
+        clone.RoleId.Should().Be(roleId, "QuickEditActivityRequest carries no RoleId, so the clone keeps the source's");
+        clone.IsUnavoidable.Should().BeTrue("IsUnavoidable is not on the quick-edit form, so it is a copied column -- an explicit object initialiser that forgets it would drop the flag silently");
+        clone.IsArchived.Should().BeFalse("a clone always starts active");
+        clone.Name.Should().Be(cloneName, "the request name differs from the source's, so no (copy) suffix");
+        clone.Text.Should().Be("clone text");
+        clone.CategoryId.Should().Be(requestCategoryId, "the request's category wins over the source's");
+
+        var source = await assertDb.Set<Activity>().AsNoTracking().FirstAsync(a => a.Id == sourceId, CancellationToken);
+        source.Name.Should().Be(sourceName);
+        source.Text.Should().Be("source text");
+        source.CategoryId.Should().Be(sourceCategoryId);
+        source.RoleId.Should().Be(roleId);
+        source.IsUnavoidable.Should().BeTrue();
+        source.IsArchived.Should().BeFalse();
+    }
+
     // ---- G: QuickEditActivityEndpoint ------------------------------------------------------------
 
     [Fact]

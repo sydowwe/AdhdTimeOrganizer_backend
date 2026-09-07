@@ -29,7 +29,11 @@ public class FilterActivityHistoryEndpoint(DbContext dbContext, IUserTimeZoneRes
     {
         var (from, to) = filter.ToDateTimeRange(_timeZone);
 
-        query = query.Where(ah => ah.StartTimestamp >= from && ah.EndTimestamp <= to);
+        // Half-open on StartTimestamp, exactly as every dashboard, the calendar and both seams select: a
+        // record starting inside the window contributes, tail included, however far past `to` it runs.
+        // Bounding the upper end on EndTimestamp instead would drop long sessions from this list while
+        // they still counted in the charts above it.
+        query = query.Where(ah => ah.StartTimestamp >= from && ah.StartTimestamp < to);
 
         return query;
     }

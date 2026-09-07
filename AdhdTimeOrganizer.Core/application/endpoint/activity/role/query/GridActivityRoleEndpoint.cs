@@ -51,13 +51,13 @@ public class GridActivityRoleEndpoint(
         if (!string.IsNullOrWhiteSpace(filter.Name))
         {
             var pattern = filter.Name.ToContainsPattern();
-            query = query.Where(r => EF.Functions.ILike(r.Name, pattern));
+            query = query.Where(r => EF.Functions.ILike(r.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Text))
         {
             var pattern = filter.Text.ToContainsPattern();
-            query = query.Where(r => r.Text != null && EF.Functions.ILike(r.Text, pattern));
+            query = query.Where(r => r.Text != null && EF.Functions.ILike(r.Text, pattern, FreeTextFilterExtensions.EscapeCharacter));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Color))
@@ -66,7 +66,7 @@ public class GridActivityRoleEndpoint(
         if (!string.IsNullOrWhiteSpace(filter.Icon))
         {
             var pattern = filter.Icon.ToContainsPattern();
-            query = query.Where(r => r.Icon != null && EF.Functions.ILike(r.Icon, pattern));
+            query = query.Where(r => r.Icon != null && EF.Functions.ILike(r.Icon, pattern, FreeTextFilterExtensions.EscapeCharacter));
         }
 
         return query;

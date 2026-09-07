@@ -11,11 +11,25 @@ namespace AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 ///
 /// <para><b>Why the escape.</b> EF escapes LIKE metacharacters for you inside <c>Contains</c>; handing
 /// <c>EF.Functions.ILike</c> an interpolated pattern does not. Unescaped, a user typing <c>%</c> or
-/// <c>_</c> gets a wildcard instead of the literal they typed. Backslash is Postgres' default LIKE
-/// escape character, so no <c>ESCAPE</c> clause is needed.</para>
+/// <c>_</c> gets a wildcard instead of the literal they typed.</para>
+///
+/// <para>⚠ <b>The escape character has to be passed to <c>ILike</c> explicitly</b>, via
+/// <see cref="EscapeCharacter"/> — the two-argument overload emits <c>ILIKE @pattern ESCAPE ''</c>,
+/// and an <em>empty</em> ESCAPE turns the mechanism off rather than falling back to Postgres' default
+/// backslash. Every <c>\%</c> this class produces then means "a literal backslash followed by any
+/// text", so a filter containing <c>%</c>, <c>_</c> or <c>\</c> matches <b>nothing at all</b> — an
+/// empty grid with no error, which is the same symptom as the case-sensitivity bug the <c>ILIKE</c>
+/// switch was made to fix. <c>GridTextFilterTests</c> pins it.</para>
 /// </summary>
 public static class FreeTextFilterExtensions
 {
+    /// <summary>
+    /// The <c>ESCAPE</c> character every <c>ILike</c> call over a <see cref="ToContainsPattern"/>
+    /// pattern must pass as its third argument. A single backslash, matching what the escaping below
+    /// inserts.
+    /// </summary>
+    public const string EscapeCharacter = "\\";
+
     /// <summary>
     /// Turns caller-supplied search text into a contains-anywhere <c>ILIKE</c> pattern.
     /// Call it <b>outside</b> the <c>Where</c> lambda — the result is a parameter, not something EF

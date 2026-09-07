@@ -200,4 +200,42 @@ public class ActivityHistoryFilterTests(AppDbContextFixture fixture) : BaseFilte
             .Should().Contain(ownId, "the caller's own row must be returned")
             .And.HaveCount(1, "another user's row must never leak into the filter results");
     }
+
+    // CQ-11. The window is half-open on StartTimestamp -- the same predicate every dashboard, the
+    // calendar and both seams use -- so the detail list and the charts above it agree on membership.
+    // Bounding the upper end on EndTimestamp instead (what this endpoint used to do) hid a session
+    // that ran past the picked window while it still counted in every chart.
+    [Fact]
+    public async Task Filter_BoundsOnStartTimestamp_KeepingSessionsThatRunPastTheWindow()
+    {
+        await using var db = CreateDbContext();
+        var day = DateTime.UtcNow.Date;
+
+        // Starts inside the window, ends 15 minutes after it: in, tail included.
+        var overrunsEndId = await Seed.HistoryAsync(db, FakeLoggedUserService.TestUserId, $"Overruns {Guid.NewGuid():N}", day.AddHours(10).AddMinutes(45));
+        // Wholly inside.
+        var insideId = await Seed.HistoryAsync(db, FakeLoggedUserService.TestUserId, $"Inside {Guid.NewGuid():N}", day.AddHours(9));
+        // Started before the window and ran into it: out, because the bound is on the start.
+        var startsBeforeId = await Seed.HistoryAsync(db, FakeLoggedUserService.TestUserId, $"Before {Guid.NewGuid():N}", day.AddHours(7).AddMinutes(50));
+        // Starts exactly at `to`: out, the range is half-open.
+        var atUpperBoundId = await Seed.HistoryAsync(db, FakeLoggedUserService.TestUserId, $"AtBound {Guid.NewGuid():N}", day.AddHours(11));
+
+        var payload = new
+        {
+            Date = DateOnly.FromDateTime(day),
+            From = new { Hours = 8, Minutes = 0 },
+            To = new { Hours = 11, Minutes = 0 }
+        };
+
+        var response = await CreateClient().PostAsJsonAsync(EndpointUrl, payload, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var ids = (await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOpts, CancellationToken))!
+            .Select(i => i.GetProperty("id").GetInt64()).ToList();
+
+        ids.Should().Contain(insideId, "a record wholly inside the window is in");
+        ids.Should().Contain(overrunsEndId, "a record starting inside the window contributes its tail, however far past `to` it ends");
+        ids.Should().NotContain(startsBeforeId, "the bound is on StartTimestamp, so a record that started before `from` is out");
+        ids.Should().NotContain(atUpperBoundId, "the range is half-open: a record starting exactly at `to` belongs to the next window");
+    }
 }

@@ -42,13 +42,13 @@ public class GridActivityCategoryEndpoint(
         if (!string.IsNullOrWhiteSpace(filter.Name))
         {
             var pattern = filter.Name.ToContainsPattern();
-            query = query.Where(c => EF.Functions.ILike(c.Name, pattern));
+            query = query.Where(c => EF.Functions.ILike(c.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Text))
         {
             var pattern = filter.Text.ToContainsPattern();
-            query = query.Where(c => c.Text != null && EF.Functions.ILike(c.Text, pattern));
+            query = query.Where(c => c.Text != null && EF.Functions.ILike(c.Text, pattern, FreeTextFilterExtensions.EscapeCharacter));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Color))

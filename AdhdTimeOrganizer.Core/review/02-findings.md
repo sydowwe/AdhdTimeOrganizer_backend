@@ -243,7 +243,12 @@ including `survivorHasOne`. Guards, on rows:
 `ActivityMergeTests.Merge_IntoAnArchivedSurvivorThatAlreadyHasAProfile_KeepsTheSurvivorsProfile`, and
 `ActivityArchivingTests.FilteredTable_DefaultView_StillHidesArchived_EvenThoughTheUsageSubqueryLiftsTheFilter`
 for the grid concern raised above — a named `IgnoreQueryFilters` applies across the whole compiled
-query, so that one pins that the subquery's lift does not un-archive the outer page.
+query, so that one pins that the subquery's lift does not un-archive the outer page. Since 2026-09-08,
+`ArchivedActivityReferenceCountTests` (`TEST-4`) adds the two things a count assertion cannot say: that
+the withheld delete really does cascade the profile away (archive, read `canDelete: false`, delete
+anyway, find the profile row gone), and that lifting the filter did not start double-counting — an
+active activity's profile still counts once, and an archived one's profile is counted *alongside* its
+unfiltered history and timer-preset references, not instead of them.
 
 **Doc impact:** `../application/seam/README.md` → "How each one fails" (add the archival-filter mode
 to `IActivityReferenceSource`); `domain-map.md` → Invariants #7 (a seam's `IQueryable` must stay

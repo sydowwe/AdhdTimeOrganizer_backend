@@ -368,35 +368,6 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         return (factory, provider);
     }
 
-    /// <summary>Captures every formatted log message across all categories, for asserting on content (SEC-10) or presence (A/E).</summary>
-    private sealed class CapturingLoggerProvider : ILoggerProvider
-    {
-        private readonly List<string> _messages = [];
-        public IReadOnlyList<string> Messages => _messages;
-
-        public ILogger CreateLogger(string categoryName) => new CapturingLogger(_messages);
-        public void Dispose() { }
-
-        private sealed class CapturingLogger(List<string> messages) : ILogger
-        {
-            public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
-            public bool IsEnabled(LogLevel logLevel) => true;
-
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-                Func<TState, Exception?, string> formatter)
-            {
-                lock (messages)
-                    messages.Add(formatter(state, exception));
-            }
-
-            private sealed class NullScope : IDisposable
-            {
-                public static readonly NullScope Instance = new();
-                public void Dispose() { }
-            }
-        }
-    }
-
     /// <summary>
     /// Sets one or more process env vars for the scope's lifetime and restores their prior values on
     /// Dispose — required because Helper.GetEnvVar reads Environment.GetEnvironmentVariable directly,

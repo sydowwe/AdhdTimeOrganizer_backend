@@ -168,6 +168,102 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
         reloaded.IsArchived.Should().BeTrue("archiving is not part of the edit form");
     }
 
+    // ---- the two row actions the archive view offers (CQ-3) --------------------------------------
+
+    // The active-path regression pins for both routes already exist as
+    // ActivityAreaBehaviorTests.QuickEdit_UpdatesEditableFieldsOnly_RoleIdAndUserIdUnchanged and
+    // Clone_CreatesNewRowAndLeavesSourceAndItsChildrenUntouched — lifting the archival filter here must
+    // leave those unchanged, which is what makes them the other half of this section.
+
+    /// <summary>
+    /// `CQ-3` — quick-edit reaches an archived activity, exactly as <c>PUT /activity/{id}</c> does. Both
+    /// row actions are offered by the archive view, and <c>FindAsync</c> — which cannot lift a named
+    /// query filter — used to 404 them while update, get-by-id, delete and the archive toggle all worked.
+    /// </summary>
+    /// <remarks>
+    /// The <c>IsArchived</c> half of the assertion is the load-bearing one: it is the same guarantee
+    /// <see cref="Update_DoesNotUnarchive"/> pins for the full edit form. <c>QuickEditActivityRequest</c>
+    /// cannot carry the flag either, so lifting the filter must not introduce a silent un-archive on this
+    /// path.
+    /// </remarks>
+    [Fact(DisplayName = "CQ-3: quick-edit reaches an archived activity, like update does")]
+    public async Task QuickEdit_ReachesAnArchivedActivity_AndLeavesItArchived()
+    {
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, "Quick Edited While Archived", isArchived: true);
+        var newName = $"Renamed While Archived {Guid.NewGuid():N}";
+
+        var response = await CreateClient().PutAsJsonAsync($"api/activity/{activityId}/quick-edit",
+            new { Name = newName, Text = (string?)null, CategoryId = (long?)null }, JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var assertDb = CreateDbContext();
+        var reloaded = await assertDb.Set<Activity>().IgnoreQueryFilters().FirstAsync(a => a.Id == activityId, CancellationToken);
+        reloaded.Name.Should().Be(newName, "the edit itself must apply");
+        reloaded.IsArchived.Should().BeTrue("quick-edit is not a restore, and its request cannot carry the flag");
+    }
+
+    /// <summary>
+    /// `CQ-3` — cloning an archived activity works, and the copy starts <b>active</b>. Cloning something
+    /// you retired is how you start using it again; <c>Clone()</c> is a <c>MemberwiseClone</c>, so
+    /// without an explicit reset the copy would be born invisible in every picker.
+    /// </summary>
+    [Fact(DisplayName = "CQ-3: cloning an archived activity produces an active copy")]
+    public async Task Clone_ReachesAnArchivedActivity_AndTheCopyStartsActive()
+    {
+        await using var db = CreateDbContext();
+        var sourceId = await SeedActivityAsync(db, "Cloned While Archived", isArchived: true);
+
+        var response = await CreateClient().PostAsJsonAsync($"api/activity/{sourceId}/clone",
+            new { Name = $"Clone Of Archived {Guid.NewGuid():N}", Text = (string?)null, CategoryId = (long?)null },
+            JsonOpts, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var cloneId = await response.Content.ReadFromJsonAsync<long>(CancellationToken);
+        cloneId.Should().NotBe(sourceId);
+
+        await using var assertDb = CreateDbContext();
+        var clone = await assertDb.Set<Activity>().IgnoreQueryFilters().FirstAsync(a => a.Id == cloneId, CancellationToken);
+        clone.IsArchived.Should().BeFalse("a copy the user can only find in the archive view is not what the row action promises");
+
+        var source = await assertDb.Set<Activity>().IgnoreQueryFilters().FirstAsync(a => a.Id == sourceId, CancellationToken);
+        source.IsArchived.Should().BeTrue("cloning reads the source, it never writes it");
+    }
+
+    /// <summary>
+    /// Lifting the archival filter must not lift the per-user one with it — confusing the two is the most
+    /// likely way to break this while fixing it, and the symptom would be silent cross-account access
+    /// rather than an error.
+    /// </summary>
+    [Fact(DisplayName = "CQ-3: another user's archived activity is still a 404 on both row actions")]
+    public async Task QuickEditAndClone_ForeignArchivedActivity_Return404()
+    {
+        await using var db = CreateDbContext();
+        var otherUserId = await SecondUserAsync($"archived-idor-{Guid.NewGuid():N}@test.com");
+
+        var role = new ActivityRole { UserId = otherUserId, Name = $"Foreign Archived Role {Guid.NewGuid():N}", Color = "#112233" };
+        db.Set<ActivityRole>().Add(role);
+        await db.SaveChangesAsync(CancellationToken);
+        var foreign = new Activity { UserId = otherUserId, Name = "Theirs, Archived", RoleId = role.Id, IsArchived = true };
+        db.Set<Activity>().Add(foreign);
+        await db.SaveChangesAsync(CancellationToken);
+
+        var quickEdit = await CreateClient().PutAsJsonAsync($"api/activity/{foreign.Id}/quick-edit",
+            new { Name = "Hijacked", Text = (string?)null, CategoryId = (long?)null }, JsonOpts, TestContext.Current.CancellationToken);
+        quickEdit.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var clone = await CreateClient().PostAsJsonAsync($"api/activity/{foreign.Id}/clone",
+            new { Name = "Stolen Archived Clone", Text = (string?)null, CategoryId = (long?)null }, JsonOpts, TestContext.Current.CancellationToken);
+        clone.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await using var assertDb = CreateDbContext();
+        var stillTheirs = await assertDb.Set<Activity>().IgnoreQueryFilters().FirstAsync(a => a.Id == foreign.Id, CancellationToken);
+        stillTheirs.Name.Should().Be("Theirs, Archived", "the foreign row must be untouched, not merely unreported");
+        (await assertDb.Set<Activity>().IgnoreQueryFilters().CountAsync(a => a.UserId == otherUserId, CancellationToken))
+            .Should().Be(1, "the refused clone must not have written a copy under either account");
+    }
+
     // ---- POST /activity/filtered-table ----------------------------------------------------------
 
     /// <summary>

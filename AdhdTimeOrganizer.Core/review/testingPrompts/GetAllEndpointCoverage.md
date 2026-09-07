@@ -18,7 +18,16 @@ The three remaining ones are one-line subclasses of Framework bases, so the risk
 row this user owns" is the shape where a missing user filter is invisible until it isn't, and these are
 the only Core reads with no assertion of any kind behind them.
 
-## Part A — `TEST-11`, the three `GET …/all` routes
+## Part A — `TEST-11`, the three GetAll routes — ✅ CLOSED 2026-09-08
+
+> Written as `Endpoints/CoreGetAllEndpointTests.cs`: `BaseGetAllEndpointTests` subclasses for Activity
+> and ActivityRole (the ActivityCategory one already existed in `Endpoints/BaseGetAllEndpointTests.cs`),
+> plus `CoreGetAllScopingTests` — a cross-user scoping fact per entity and the archived-exclusion fact.
+> **Route correction:** the routes are `GET api/activity`, `api/activity-role`,
+> `api/activity-category` — *not* `…/all`. `BaseGetAllEndpoint.Configure()` registers
+> `/{entity.Kebaberize()}` plus an optional `RouteParam` suffix and none of the three overrides it; the
+> `/all` spelling in the table above and in `01-testing.md` was wrong. The analysis below is the
+> original prompt, kept as written.
 
 The cheapest correct fix is three `BaseGetAllEndpointTests` subclasses, matching the existing pattern.
 Add them to a new `Endpoints/CoreGetAllEndpointTests.cs` (**not** `ActivityEndpointTests.cs`, which is
