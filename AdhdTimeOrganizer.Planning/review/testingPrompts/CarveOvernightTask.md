@@ -1,5 +1,23 @@
 # TEST-17 — carving an overnight task must not silently delete it
 
+> ## ✅ DONE 2026-09-08 — both halves of "the fix this test drives" landed
+>
+> The test is
+> `ApplyTemplatePlannerTaskConflictResolutionTests.MergeOverwrite_LeavesANegativeDurationTaskWhole_InsteadOfDeletingIt`.
+> It follows the scenario below with two deviations, both anticipated in the prompt itself:
+>
+> - **The overnight row is seeded, not posted.** `CQ-14` was fixed in the same change, so
+>   `POST /api/planner-task` now answers 400 for a 23:00→01:00 span — as step 2 said to do if that
+>   happened. The carving defect is independent of how the row got there.
+> - **It is green against the fixed behaviour, not the old one.** The prompt's "tag it red or write it
+>   green against current behaviour" applies only when the fix is not being made in the same change.
+>
+> Fix 1 is `PlannerTemplateApplier.IsCarvable`, consulted in `CarveTaskAroundBlockers` *and* in
+> `MergeCarveExistingTasksAroundNew` **before** the removal is staged — returning the original from the
+> carve alone would have handed `RemoveRange`/`AddRange` the same tracked instance and attempted an insert
+> on an existing id. Fix 2 is the ordering rule on all three CRUD validators. **`MIG-3` — normalising the
+> rows that predate the rule — is still outstanding and is being done separately.**
+
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first.
 
 ## The defect (`CQ-7`)

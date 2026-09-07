@@ -1,5 +1,20 @@
 # TEST-5 — `PlannerTaskValidator`'s rules
 
+> ## ⚠️ PARTLY DONE 2026-09-08 — cases 15 and 16 only
+>
+> **`CQ-14` is fixed**: `PlannerTaskValidator`, `RepeatingPlannerTaskValidator` and
+> `TemplatePlannerTaskValidator` all carry the `StartTime < EndTime` rule now, so the § *"15 and 16 are the
+> point of this prompt"* section below describes the world before that change. `DOC-1`'s doc line is
+> corrected too. The renamed probe
+> `PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsRejected` covers case 15 on **create**, case 16
+> (equal times), and case 15 on the **`PUT`** path this prompt asked for — plus that the rejected update
+> left the row untouched.
+>
+> **Still open from this prompt:** cases 1–14, the same two cases against
+> `POST /api/repeating-planner-task` and `POST /api/template-planner-task` (the rule is in both validators,
+> but nothing exercises either — and `CQ-8` means the repeating one may not even be wired), and the two
+> `UpdateEntity` tests under § *Also worth one test each*.
+
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first. See `ForeignKeyOwnership.md` for the security
 half of this endpoint's input validation.
 

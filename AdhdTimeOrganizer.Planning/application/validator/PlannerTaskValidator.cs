@@ -36,6 +36,14 @@ public class PlannerTaskValidator : Validator<PlannerTaskRequest>
         RuleFor(x => x.StartTime).ApplyTimeOfDayRules();
         RuleFor(x => x.EndTime).ApplyTimeOfDayRules();
 
+        // A task ends after it starts. TimeOnly has no day component, so a 23:00→01:00 request does not
+        // describe an overnight task — it lands a row with EndTime < StartTime that TaskPlannerHelper.TasksOverlap
+        // and PlannerTemplateApplier.CarveTaskAroundBlockers both read as a same-day, negative-duration span
+        // (carving one returned zero segments and deleted the task outright). Matches
+        // PlannerTaskChangeSpanValidator, which has always refused the shape this path used to accept.
+        RuleFor(x => x).Must(req => req.StartTime.IsBefore(req.EndTime))
+            .WithMessage("StartTime must be before EndTime.");
+
         RuleFor(x => x.ActualStartTime!).ApplyTimeOfDayRules().When(x => x.ActualStartTime != null);
 
         // "Work began at" only means something for a task that has begun. ApplyStatus clears the actual times

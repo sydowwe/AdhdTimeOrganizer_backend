@@ -104,16 +104,20 @@ public class PlannerTaskStatusAndSpanTests(AppDbContextFixture fixture) : Postgr
     }
 
     /// <summary>
-    /// CQ-14 probe. <c>BasePlannerTask.IsNextDay</c> is commented out and <c>TimeOnly</c> cannot express an
-    /// overnight span, so a 23:00→01:00 task has nowhere to record "ends the next day". Unlike the span-patch
-    /// path (<c>PlannerTaskChangeSpanValidator</c> rejects <c>EndTime &lt;= StartTime</c>), the create/update
-    /// path's <c>PlannerTaskValidator</c> has <b>no such rule</b> — only per-field hour/minute range checks —
-    /// so this is expected to be <b>accepted</b>, landing a row with <c>EndTime &lt; StartTime</c> that every
-    /// overlap computation (<c>TasksOverlap</c>) then reads as a same-day, negative-duration span. That is the
-    /// finding: create and patch-span disagree about whether an overnight task is even expressible.
+    /// CQ-14, fixed 2026-09-08. <c>BasePlannerTask.IsNextDay</c> is commented out and <c>TimeOnly</c> cannot
+    /// express an overnight span, so a 23:00→01:00 task has nowhere to record "ends the next day". This test
+    /// used to be a green probe on the opposite behaviour: <c>PlannerTaskValidator</c> had no ordering rule, so
+    /// the create path accepted the shape that <c>PlannerTaskChangeSpanValidator</c> refuses, landing a row with
+    /// <c>EndTime &lt; StartTime</c> that <c>TasksOverlap</c> reads as a same-day negative duration and that
+    /// <c>PlannerTemplateApplier</c> would delete outright while putting nothing back (<c>CQ-7</c>).
+    /// <para>
+    /// The two paths now agree. Both directions are asserted here — create and full update — because the same
+    /// validator guards both, and it is the update path that a client would otherwise use to walk a task into
+    /// the state the patch endpoint refuses.
+    /// </para>
     /// </summary>
-    [Fact(DisplayName = "CQ-14: creating a 23:00->01:00 task is accepted, producing a negative same-day duration")]
-    public async Task CreatingAnOvernightTask_IsAcceptedWithNegativeDuration()
+    [Fact(DisplayName = "CQ-14: creating or updating a 23:00->01:00 task is rejected, matching the span-patch path")]
+    public async Task CreatingAnOvernightTask_IsRejected()
     {
         await using var db = CreateDbContext();
         var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "overnight-cq14", ct: TestContext.Current.CancellationToken);
@@ -129,28 +133,48 @@ public class PlannerTaskStatusAndSpanTests(AppDbContextFixture fixture) : Postgr
             CalendarId = calendarId
         }, JsonOpts, CancellationToken);
 
-        // Documenting current behaviour, not endorsing it: PlannerTaskValidator has no StartTime<EndTime rule,
-        // so this is accepted. If a future fix adds the rule here (to match PlannerTaskChangeSpanValidator),
-        // this assertion is the one to flip to BadRequest.
-        response.StatusCode.Should().Be(HttpStatusCode.Created,
-            "PlannerTaskValidator, unlike PlannerTaskChangeSpanValidator, has no ordering rule on StartTime/EndTime");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "PlannerTaskValidator now carries the same StartTime<EndTime rule as PlannerTaskChangeSpanValidator");
 
-        var taskId = await response.Content.ReadFromJsonAsync<long>(CancellationToken);
+        // EndTime == StartTime is the same defect with a zero-length span, and the rule is strict.
+        var zeroLength = await CreateClient().PostAsJsonAsync("api/planner-task", new
+        {
+            StartTime = new { Hours = 9, Minutes = 0 },
+            EndTime = new { Hours = 9, Minutes = 0 },
+            IsBackground = false,
+            ActivityId = activityId,
+            Status = "NotStarted",
+            CalendarId = calendarId
+        }, JsonOpts, CancellationToken);
+        zeroLength.StatusCode.Should().Be(HttpStatusCode.BadRequest, "the ordering rule is strictly-before, not before-or-equal");
+
+        // The update path shares PlannerTaskValidator, so a well-formed task cannot be walked into the bad
+        // shape either -- that was the hole the span-patch endpoint's own rule could not close.
+        var (_, existingTaskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+        var update = await CreateClient().PutAsJsonAsync($"api/planner-task/{existingTaskId}", new
+        {
+            StartTime = new { Hours = 23, Minutes = 0 },
+            EndTime = new { Hours = 1, Minutes = 0 },
+            IsBackground = false,
+            ActivityId = activityId,
+            Status = "NotStarted",
+            CalendarId = calendarId
+        }, JsonOpts, CancellationToken);
+        update.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "UpdatePlannerTaskEndpoint uses the same validator as the create path");
+
         await using var verifyDb = CreateDbContext();
-        var task = await verifyDb.Set<PlannerTask>().SingleAsync(t => t.Id == taskId, CancellationToken);
-        (task.EndTime < task.StartTime).Should().BeTrue(
-            "TimeOnly has no day component, so 01:00 stored as 'EndTime' is earlier than 23:00 'StartTime' -- a negative same-day duration");
+        var task = await verifyDb.Set<PlannerTask>().SingleAsync(t => t.Id == existingTaskId, CancellationToken);
+        task.StartTime.Should().Be(new TimeOnly(9, 0), "the rejected update must not have been applied");
+        task.EndTime.Should().Be(new TimeOnly(10, 0));
 
-        // Once created, the task cannot be normalised back into range through the span-patch endpoint: that
-        // validator rejects EndTime <= StartTime outright, so the only way out of the bad state this endpoint
-        // created is a full PUT through UpdatePlannerTaskEndpoint (same lenient validator) or direct deletion.
-        var spanFix = await CreateClient().PatchAsJsonAsync($"api/planner-task/{taskId}", new
+        var spanFix = await CreateClient().PatchAsJsonAsync($"api/planner-task/{existingTaskId}", new
         {
             StartTime = new { Hours = 23, Minutes = 0 },
             EndTime = new { Hours = 1, Minutes = 0 }
         }, JsonOpts, CancellationToken);
         spanFix.StatusCode.Should().Be(HttpStatusCode.BadRequest,
-            "the span-patch validator refuses the very shape the create endpoint just accepted");
+            "the span-patch validator refuses the same shape -- the two paths no longer disagree");
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────

@@ -45,8 +45,10 @@ two pure services take `today` as a parameter rather than reading the clock. Two
   and its HTTP counterpart `Streak_UntickingATask_LowersIt_AndRetickingRestoresItExactly` pin the *reason*
   the streak is derived rather than stored, not just its current value.
 - **Tests document findings instead of hiding them.** `PlannerTaskStatusAndSpanTests.
-  CreatingAnOvernightTask_IsAcceptedWithNegativeDuration` asserts `Created` and explains in its own body
-  that this is wrong and which assertion to flip when it is fixed. `CompletionFanOutTests` opens with a
+  CreatingAnOvernightTask_IsAcceptedWithNegativeDuration` asserted `Created` and explained in its own body
+  that this was wrong and which assertion to flip when it was fixed — which is exactly how it was closed on
+  2026-09-08: the rule landed (`CQ-14`) and the same test, renamed `CreatingAnOvernightTask_IsRejected`,
+  now pins the opposite plus the `PUT` path it never covered. `CompletionFanOutTests` opens with a
   four-item list of points where its originating prompt was stale, each re-confirmed against source.
   That is the opposite of test theater.
 - **The pure-service suites cover the branches that matter** and stay out of Postgres: 17 tests on
@@ -151,7 +153,7 @@ by the three by-date tests.
 | `PlanVsActualTrendService` | 12 | Both midnight-wrap paths; the unmeasurable-completed case |
 | `PlannerStreakReader` | 8 (via HTTP) | `PlannerStreakTests` covers the predicate half |
 | `PlanVsActualTrend` eligibility predicate | 8 (via HTTP) | `PlanVsActualTrendTests` |
-| `PlannerTemplateApplier` | 4 | All four conflict modes; carving of an **overnight** task untested → `TEST-17` |
+| `PlannerTemplateApplier` | 5 | All four conflict modes, plus `TEST-17` (2026-09-08): a negative-duration task is left whole instead of carved away, with an ordinary task through the same blocker as the control |
 | `CalendarProvisioner` | 7 (via HTTP) | Race branch not exercised concurrently → `TEST-18` (already a documented gap) |
 | `CalendarDayFactory` | ✅ theory | `ALazilyCreatedDay_CarriesTheSameMetadataTheSeederWouldHaveGivenIt` |
 | `HolidayCalendar` | **0** | Computus and both country tables entirely untested → `TEST-19` |
@@ -197,7 +199,7 @@ fixture, auth and seeding conventions every prompt assumes.
 | `TEST-2` | `FilterCalendarEndpoint`: range, sort, cross-user, unbounded range | `ReadSurfaceSweep.md` |
 | `TEST-3` | Both `PlannerBatchLimits` ceilings at their boundary (366 / 367) | `BatchLimitBoundaries.md` |
 | `TEST-4` | `UpdateCalendarEndpoint` day-type violation is a 400 | `CalendarDayTypeRuleBothShapes.md` |
-| `TEST-5` | `PlannerTaskValidator`'s ten rules, incl. the missing ordering rule | `PlannerTaskValidatorRules.md` |
+| `TEST-5` | `PlannerTaskValidator`'s ten rules. **Cases 15/16 (the ordering rule) are done** — the rule landed 2026-09-08 and `CreatingAnOvernightTask_IsRejected` covers create, update and equal-times; the other cases remain open | `PlannerTaskValidatorRules.md` |
 | `TEST-5`(b) | FK ids must belong to the caller — the `SEC-1` half of the same endpoints | `ForeignKeyOwnership.md` |
 | `TEST-6` | `BatchDeletePlannerTaskEndpoint` + its reminder cancellation | `BatchDeletePlannerTask.md` |
 | `TEST-7` | `ApplyTemplatePlannerTaskEndpoint`: cross-user calendar/template, error mapping | `ApplyTemplateSingleDayEdges.md` |
@@ -210,7 +212,7 @@ fixture, auth and seeding conventions every prompt assumes.
 | `TEST-14` | `TemplatePlannerTaskChangeSpanEndpoint` | `ReadSurfaceSweep.md` |
 | `TEST-15` | `GridTaskImportanceEndpoint` + both `GetSelectOptions` routes | `ReadSurfaceSweep.md` |
 | `TEST-16` | Concurrent `GET /planner/settings` must not make two rows | `SettingsGetOrCreateRace.md` |
-| `TEST-17` | Carving an **overnight** existing task must not silently delete it | `CarveOvernightTask.md` |
+| `TEST-17` | ✅ **Written 2026-09-08** — carving an **overnight** existing task must not silently delete it. `ApplyTemplatePlannerTaskConflictResolutionTests.MergeOverwrite_LeavesANegativeDurationTaskWhole_InsteadOfDeletingIt` | `CarveOvernightTask.md` |
 | `TEST-18` | `CalendarProvisioner` race branch under two concurrent writers | `ConcurrentCalendarProvisioning.md` |
 | `TEST-19` | `HolidayCalendar`: Computus, both countries, leap years | `HolidayCalendarTable.md` |
 | `TEST-20` | `CalendarDayLookup` directly, incl. cross-user | `ReadSurfaceSweep.md` |

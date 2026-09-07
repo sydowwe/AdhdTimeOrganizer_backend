@@ -110,7 +110,9 @@ Every helper takes a `userId`; pass a second user's id to build the cross-user h
 4. **Do not tag `[Trait("Status","KnownGap")]` unless the test is genuinely expected to fail** and the
    behaviour is a decision nobody has made yet. This repo's convention is a *green* regression pin with
    a comment explaining the current behaviour and naming the assertion to flip — see
-   `PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsAcceptedWithNegativeDuration`. Prefer that.
+   `PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsRejected` — which is the convention working as
+   intended: it was that green pin on the *old* behaviour until `CQ-14` was fixed on 2026-09-08, and the
+   named assertion was then flipped in place rather than the test being rewritten. Prefer that.
    Several prompts here describe defects; if you are writing the test **before** the fix, write it green
    against current behaviour with a `// FINDING: …` comment, or red-and-tagged — but not silently red.
 5. **A new user-scoped entity fails `UserDataExportAndDeletionTests` until it is classified** as exported

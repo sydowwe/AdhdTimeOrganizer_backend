@@ -4,9 +4,10 @@
 > 🟠 important (wrong behaviour or a maintainability hole) · 🟡 polish.
 >
 > **Numbering note.** `CQ-14` appears in a test display name
-> (`PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsAcceptedWithNegativeDuration`). That id
-> belongs to the earlier **portal-wide** review under `review/portal/`, not to this file. The `CQ-n`
-> ids below are this slice's own and start at 1.
+> (`PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsRejected`). That id belongs to the earlier
+> **portal-wide** review under `review/portal/`, not to this file. The `CQ-n` ids below are this slice's
+> own and start at 1. It is recorded here anyway because `CQ-7` and `DOC-1` are its consequences and all
+> three were fixed together — see the `CQ-14` block in § 6.
 
 ## Previously known — not re-flagged
 
@@ -14,7 +15,7 @@ Recorded so nobody re-raises them, and so file 03 can rank around them.
 
 | Item | Where it is pinned | Status |
 |---|---|---|
-| `PlannerTaskValidator` accepts `EndTime <= StartTime` (overnight tasks) | portal review `CQ-14`; green probe test asserts current behaviour and names the assertion to flip | Open, deliberate. A **new consequence** is `CQ-7` below |
+| `PlannerTaskValidator` accepts `EndTime <= StartTime` (overnight tasks) | portal review `CQ-14`; `PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsRejected` | ✅ **Fixed 2026-09-08** — see the `CQ-14` block below. `CQ-7` and `DOC-1` were fixed with it; **`MIG-3` (normalising the rows that predate the rule) is deliberately still open** |
 | `Reminder`, `RepeatingPlannerTask`, `TemplatePlannerTask`, `TaskImportance`, `UserPlannerSettings`, `PlannerSuggestionFromDayTemplate` absent from the user data export | `UserDataExportAndDeletionTests.KnownGaps` | Open, classified |
 | `GetSuggestionsTaskPlannerDayTemplateEndpoint` has no test | `docs/testing.md` known-gap list | Open → `TEST-13` |
 | `CalendarProvisioner`'s `DbUpdateException` race branch not exercised concurrently | `docs/testing.md` known-gap list | Open → `TEST-18` |
@@ -321,7 +322,44 @@ actual times too and keep the link on at most one segment.
 
 `Doc impact: domain-map.md → Business rules → Applying a day template (add a row to the four-mode table: what a carved segment inherits)`
 
-### `CQ-7` 🟠 Carving an overnight task returns zero segments — a silent delete
+### `CQ-14` 🟠 ✅ FIXED 2026-09-08 · Three of the six planner-task validators had no `StartTime < EndTime` rule
+
+> Not this slice's id — see the numbering note at the top. Recorded here because `CQ-7` and `DOC-1` are
+> its consequences and the three were fixed in one change.
+
+`application/validator/PlannerTaskValidator.cs` · `RepeatingPlannerTaskValidator.cs` ·
+`TemplatePlannerTaskValidator.cs`
+
+**Fixed 2026-09-08.** All three now carry the rule `PlannerTaskChangeSpanValidator:19` has always had,
+written with `TimeDtoRules.IsBefore` — minute-of-day arithmetic rather than `ToTimeOnly()`, because
+FluentValidation runs every chain and a `ToTimeOnly()` on an out-of-range hour throws out of the
+validator, turning the 400 it was about to produce into a 500. That is `TimeDtoRules`' own documented
+reason for the extension existing.
+
+The probe that pinned the old behaviour was flipped rather than deleted:
+`PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsRejected` now asserts 400 on **create**, on
+`EndTime == StartTime` (the rule is strictly-before), and on the **`PUT`** path — which the old probe did
+not cover and which was the hole the span-patch endpoint's own rule could not close — plus that the
+rejected update left the row untouched.
+
+> ### ⚠️ `MIG-3` is deliberately **not** done — the rule guards the door, not the table
+>
+> There is **no CHECK constraint**, so every `planner_task` / `repeating_planner_task` /
+> `template_planner_task` row created *before* this change can still carry `end_time <= start_time`, and
+> such a row now cannot round-trip through **any** write path (create, update and patch-span all refuse
+> it). The normalising data migration `MIG-3` prescribes — survey with
+> `SELECT count(*) FROM planning.planner_task WHERE end_time <= start_time` across all three tables, then
+> clamp — **is still outstanding and is being handled separately, after the rest of the findings are
+> fixed.** Until it lands:
+>
+> - `TaskPlannerHelper.TasksOverlap` reads such a row as a same-day negative span and reports no overlap;
+> - `PlannerTemplateApplier` screens for it (`IsCarvable`) and leaves it whole rather than deleting it —
+>   that is the `CQ-7` fix below, and it is what makes the outstanding migration survivable;
+> - `docs/domain-map.md`'s invariant row says exactly this rather than claiming enforcement (`DOC-1`).
+
+`Doc impact: domain-map.md → Invariants — done (see DOC-1)`
+
+### `CQ-7` 🟠 ✅ FIXED 2026-09-08 · Carving an overnight task returns zero segments — a silent delete
 
 `application/helper/PlannerTemplateApplier.cs:150-179` (with `application/helper/TaskPlannerHelper.cs:19`)
 
@@ -347,7 +385,23 @@ and that `TasksOverlap` misreads it — it never reaches the applier.
 `CarveTaskAroundBlockers` defensive: if it would return zero segments for a task it did not fully
 overlap, keep the original rather than dropping it.
 
-`Doc impact: domain-map.md → Invariants (see DOC-1 — the same line is wrong for a second reason)`
+**Fixed 2026-09-08.** Both halves, since either alone leaves the other's failure reachable — `CQ-14`
+closes the door, this closes the table. `PlannerTemplateApplier` gained `IsCarvable(task)` —
+`task.StartTime < task.EndTime`, the precondition the whole walk assumes — and consults it in two places:
+`CarveTaskAroundBlockers` returns `[task]` up front for a span it cannot reason about, and
+`MergeCarveExistingTasksAroundNew` skips such a task **before** staging its removal. The order matters:
+returning the original from the carve alone would have handed `RemoveRange`/`AddRange` the same tracked
+instance, flipping it to `Added` and attempting an insert on an id that already exists. The new task is
+added over the survivor instead — an overlap the day view can show is recoverable; a silent delete is not.
+
+Pinned by `ApplyTemplatePlannerTaskConflictResolutionTests.MergeOverwrite_LeavesANegativeDurationTaskWhole_InsteadOfDeletingIt`
+(`TEST-17`), which seeds the overnight row directly — `CQ-14` now rejects it at the endpoint — and carries
+an ordinary 09:00→12:00 task through the same blocker as the control, so the guard cannot regress into
+"never carve anything". It asserts on the **reminder rows**: the survivor's `ReminderDefinition` is still
+`Active`, the consumed control's is `Cancelled`. That is where the silence lived — the old delete cancelled
+its reminders perfectly correctly.
+
+`Doc impact: domain-map.md → Invariants — done (see DOC-1)`
 
 ### `CQ-8` 🟠 The two `RepeatingPlannerTask` CRUD endpoints are the only ones that do not wire their validator
 
@@ -501,7 +555,7 @@ Dropping them is a cheap migration with no read-path risk (`MIG-5`).
 
 ## Code/doc drift
 
-### `DOC-1` 🟠 The `EndTime > StartTime` invariant claims an enforcement that does not exist
+### `DOC-1` 🟠 ✅ FIXED 2026-09-08 · The `EndTime > StartTime` invariant claims an enforcement that does not exist
 
 `docs/domain-map.md:91` says:
 
@@ -521,7 +575,16 @@ rule."* The doc was written after that test and got the direction backwards.
 `CQ-7` shows what it costs today). Until it does, the doc must state the actual split, because an agent
 reading the invariant table will reasonably assume `TasksOverlap`'s precondition holds.
 
-`Doc impact: domain-map.md → Invariants (rewrite the EndTime>StartTime row: name the three validators that enforce it and the three that do not, and note the CQ-14/CQ-7 consequence)`
+**Fixed 2026-09-08.** The code side went first (`CQ-14`), so the row no longer needs to name a split — all
+six validators do enforce it now. What it states instead is the thing that is *still* true and was the
+more dangerous half of the original claim: **there is no CHECK constraint**, so rows created before
+2026-09-08 can still violate the invariant (`MIG-3`, outstanding), and it names the two places that cope
+with one — `TasksOverlap` reading it as a same-day negative span, and
+`PlannerTemplateApplier.IsCarvable` refusing to carve it. `TaskPlannerHelper`'s own source comment made
+the same false claim one line above `TasksOverlap`, where an agent is far likelier to read it than the
+doc, and was corrected to match.
+
+`Doc impact: domain-map.md → Invariants, plus the TaskPlannerHelper.TasksOverlap source comment — done`
 
 ### `DOC-2` 🟡 `Calendar` names a `Holiday` day type that the enum does not have
 

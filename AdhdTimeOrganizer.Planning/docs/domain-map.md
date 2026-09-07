@@ -88,7 +88,7 @@ the schema.
 | Deleting an importance level does not delete the tasks that used it | **DB** — `SetNull` on all three task tables and on `user_planner_settings.default_apply_template_id` |
 | Deleting a to-do item does not delete the task planned from it | **DB** — `SetNull`, declared host-side |
 | `Reminder.LeadOffsetsMinutes` are all `<= 0` and unique | **App, twice** — `ReminderValidator` gives the user a friendly 400; the property setter throws as a backstop for write paths that skip the DTO validator |
-| `EndTime > StartTime` on a planner task | **App only** — every planner-task validator rejects it. There is no CHECK constraint, and `TaskPlannerHelper.TasksOverlap` assumes it |
+| `EndTime > StartTime` on a planner task | **App only** — all six request validators reject it (`PlannerTaskValidator`, `RepeatingPlannerTaskValidator` and `TemplatePlannerTaskValidator` gained the rule on 2026-09-08; `PlannerTaskChangeSpanValidator`, `ApplyTemplateToTaskPlannerValidator` and `ApplyTemplateToCalendarsBatchValidator` always had it). There is no CHECK constraint, so **rows created before that date can still violate it**: `TaskPlannerHelper.TasksOverlap` reads such a row as a same-day negative span, and `PlannerTemplateApplier` refuses to carve one rather than deleting it (`IsCarvable`) |
 | `DayType.Weekend` only on Sat/Sun, `DayType.Workday` never on a weekend | **App only** — `CalendarDayTypeRule`, called from two endpoints. Not a constraint: neither caller has the date in its request, so it cannot live in a validator |
 | A planner task names its day by **exactly one** of `CalendarId` / `Date` | **App only** — the two request validators. Both or neither is a 400, deliberately, rather than a precedence rule |
 | A batched request's calendar ids are distinct and within `PlannerBatchLimits` | **App only** — `CalendarBatchValidators`, `PlanVsActualTrendValidator` |
@@ -241,6 +241,14 @@ cascaded-away tasks are captured.
 | `Overwrite` | The conflicting **existing** tasks are deleted whole; all new tasks are added |
 | `MergeIgnore` | New tasks are **carved** around existing ones — split when an existing task sits in the middle, shortened when it overlaps an edge |
 | `MergeOverwrite` | Existing tasks are carved around the new ones (removed and re-added as segments) |
+
+**Both merge modes refuse to carve a task whose `EndTime` is not after its `StartTime`.** The carving walk
+assumes a strictly-forward same-day span; given a negative one it emits no segments at all, and the
+`MergeOverwrite` branch had already staged the original for removal — so the task was deleted, nothing was
+put back, its reminders cascaded away, and the endpoint answered 201. `PlannerTemplateApplier.IsCarvable`
+now screens for that shape *before* the removal is staged, and the new task is simply added over the
+survivor. No write path can create such a row any more (see the `EndTime > StartTime` invariant above), but
+there is no CHECK constraint and older rows are not yet normalised, so the guard is load-bearing.
 
 The stamp itself always runs: `Calendar.AppliedTemplateId` / `AppliedTemplateName`, the template's
 `DefaultWakeUpTime` / `DefaultBedTime` when it has them, and `LastUsedAt` / `UsageCount++` on the

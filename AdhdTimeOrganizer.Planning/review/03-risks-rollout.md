@@ -7,7 +7,7 @@
 
 | # | Sev | Issue (one line) | ID | File |
 |---|---|---|---|---|
-| 1 | 🟠 | `MergeOverwrite` carving an overnight task deletes it and puts nothing back, silently, with a 201 | `CQ-7` | `application/helper/PlannerTemplateApplier.cs:150` |
+| 1 | 🟠 | ✅ **Fixed 2026-09-08** — `MergeOverwrite` carving an overnight task deletes it and puts nothing back, silently, with a 201. Fixed together with the root cause `CQ-14` and the doc line `DOC-1`; **`MIG-3` below is still open** | `CQ-7` | `application/helper/PlannerTemplateApplier.cs:150` |
 | 2 | ✅ | ~~The Routines fan-out handler never re-syncs reminders — a finished task keeps nudging~~ — fixed 2026-09-08 | `CQ-2` | `application/eventHandler/RoutineTodoListIsDoneChangedEventHandler.cs:40` |
 | 3 | 🟠 | FK ids (`ActivityId`, `ImportanceId`, `TodolistId`, `DefaultApplyTemplateId`) accepted without an ownership check; another user's activity name and role colour come back on the attacker's own day | `SEC-1` | `application/dto/request/taskPlanner/PlannerTaskRequest.cs:61` |
 | 4 | 🟠 | Concurrent `GET /planner/settings` can create two settings rows; no unique index backs the 1:1 | `SEC-3` | `application/endpoint/plannerSettings/GetPlannerSettingsEndpoint.cs:26` |
@@ -19,7 +19,7 @@
 | 10 | 🟠 | Carved segments inherit `Status` and `TodolistItemId` but not the actual times — one done-toggle fans across every segment | `CQ-6` | `application/helper/PlannerTemplateApplier.cs:181` |
 | 11 | 🟠 | The two `RepeatingPlannerTask` CRUD endpoints never wire their validator; 80 lines of recurrence rules are dead or untested and the two are indistinguishable | `CQ-8` | `application/endpoint/repeatingPlannerTask/command/CreateRepeatingPlannerTaskEndpoint.cs:3` |
 | 12 | 🟠 | `ApplyTemplatePlannerTaskEndpoint` serves 400 for concurrency conflicts and for 500s alike, discarding the status code it computed | `CQ-9` | `application/endpoint/plannerTask/command/ApplyTemplatePlannerTaskEndpoint.cs:92` |
-| 13 | 🟠 | `domain-map.md` asserts every planner-task validator rejects `EndTime <= StartTime`; three of six do not | `DOC-1` | `docs/domain-map.md:91` |
+| 13 | 🟠 | ✅ **Fixed 2026-09-08** — `domain-map.md` asserted every planner-task validator rejects `EndTime <= StartTime`; three of six did not. All six do now, and the row states the remaining truth: no CHECK constraint, so older rows can still violate it | `DOC-1` | `docs/domain-map.md:91` |
 | 14 | 🟠 | `DayPlanResponse.HasPlan`'s doc still says calendar rows are never created lazily | `DOC-4` | `application/dto/response/taskPlanner/DayPlanResponse.cs:52` |
 | 15 | 🟡 | Both suggestion endpoints NRE on a materialized-view row whose principal was deleted since the last refresh | `CQ-13` | `application/endpoint/taskPlannerDayTemplate/query/GetSuggestionsTaskPlannerDayTemplateEndpoint.cs:58` |
 | 16 | 🟡 | Six custom endpoints omit `Roles()`; **not** an authz hole today — the host's configurator supplies the identical gate | `SEC-4` | `application/endpoint/plannerSettings/GetPlannerSettingsEndpoint.cs:11` |
@@ -36,12 +36,15 @@
 with zero tests (`TEST-21`). Its sibling, which had four tests, had none of the four defects. That was
 this review's headline recommendation and it is **done as of 2026-09-08**: the handler now matches its
 sibling, `RoutineCompletionFanOutTests` gives it six tests, and rows 2, 6, 7, 8 and 20 above are closed.
-Seven 🟠 remain, led by `CQ-7` (row 1) and `SEC-1`/`SEC-3` (rows 3–4); `CQ-5` still touches this handler
-and is untouched by the above.
+Rows 1 and 13 (`CQ-7` and `DOC-1`, with their shared root cause `CQ-14`) closed on the same day. Six 🟠
+remain, led by `SEC-1`/`SEC-3` (rows 3–4); `CQ-5` still touches this handler and is untouched by the above.
 
-Nothing here is 🔴. There is no data-loss path that a normal user reaches without first creating an
-overnight task (which the UI does not offer), no cross-user read that is reachable without an attacker
-crafting a request by hand, and no unauthenticated surface.
+Nothing here is 🔴. The one data-loss path — `MergeOverwrite` carving an overnight task away — is closed
+as of 2026-09-08, and it was never reachable without first creating an overnight task, which the UI does
+not offer and which no write path now accepts. **What remains from it is `MIG-3`**: rows created before
+that date are not normalised, and the owner is doing that migration in one pass once the rest of the
+findings are fixed. There is no cross-user read reachable without an attacker crafting a request by hand,
+and no unauthenticated surface.
 
 ## 10. Migration / rollout risks
 
@@ -49,7 +52,7 @@ crafting a request by hand, and no unauthenticated surface.
 |---|---|---|
 | **`MIG-1`** — the unique index `SEC-3` needs (`user_planner_settings.user_id`) fails to create because duplicate rows already exist in production. The whole point of the finding is that duplicates are creatable and invisible | Medium — the race needs two concurrent first-reads per user, so few users but plausible over the life of the table | Ship in two steps. First a data migration that keeps the **lowest-id** row per user and deletes the rest (log the count; a user whose kept row is not the one they had been editing loses recent settings changes, which is unavoidable and preferable to non-deterministic reads). Then `CREATE UNIQUE INDEX CONCURRENTLY`. Verify with `SELECT user_id, count(*) … HAVING count(*) > 1` before and after |
 | **`MIG-2`** — `TaskPlannerDayTemplateSeeder.TruncateTable()` issues `TRUNCATE … RESTART IDENTITY CASCADE` (`framework/…/seeder/SeederExtensions.cs:76`). Postgres `TRUNCATE CASCADE` **truncates every referencing table outright** and does not honour `ON DELETE SET NULL`. `user_planner_settings.default_apply_template_id` references `task_planner_day_template`, so re-running the dev seeders silently wipes **every user's planner settings**, not just the templates | High in any dev/staging reset; zero in production (dev seeders do not run there) | Confirm the blast radius with `TEST-23` before changing anything. Then either exclude `UserPlannerSettings` by nulling the FK first (`UPDATE … SET default_apply_template_id = NULL`) and truncating without `CASCADE`, or accept it and re-run `UserPlannerSettingsSeeder` after. Note `UserPlannerSettingsSeeder` is a **per-user default** seeder (order 420) and does not truncate, so today nothing restores what this removes |
-| **`MIG-3`** — adding the `EndTime > StartTime` rule (the pre-existing `CQ-14`, and the root of `CQ-7`) makes existing overnight rows unsaveable through the update path, and flips `CreatingAnOvernightTask_IsAcceptedWithNegativeDuration` red | Medium — the fix is wanted, and the probe test explicitly names the assertion to flip | Survey first: `SELECT count(*) FROM planning.planner_task WHERE end_time <= start_time` across all three task tables. If the count is small, normalise (clamp `EndTime` to 23:59 and log the ids) in the same migration; the rows cannot round-trip through `PlannerTaskChangeSpanValidator` today either, so they are already stuck. Add the validator rule to all three validators at once, not just `PlannerTaskValidator` — `DOC-1` names the other two |
+| **`MIG-3` — ⚠️ STILL OPEN; the code half landed 2026-09-08 without it, deliberately.** The validator rule is in (`CQ-14`: `PlannerTaskValidator`, `RepeatingPlannerTaskValidator`, `TemplatePlannerTaskValidator`), so *new* bad rows are impossible — but there is **no CHECK constraint** and nothing has normalised the rows that predate it. Such a row now round-trips through **no** write path at all: create, update and patch-span all refuse it, so it can only be deleted | Medium — unchanged. Rows are only reachable via a hand-crafted request; the UI never offered an overnight task | **Deferred by the owner to a single pass after the rest of the findings are fixed.** Survey first: `SELECT count(*) FROM planning.planner_task WHERE end_time <= start_time`, and the same on `repeating_planner_task` and `template_planner_task`. Then clamp in one data migration — `SET end_time = TIME '23:59', start_time = LEAST(start_time, TIME '23:58') WHERE end_time <= start_time` handles the 23:59-start edge too — logging the ids; `Down` cannot restore the originals, so say so in the migration. Nothing depends on this landing first: `PlannerTemplateApplier.IsCarvable` (`CQ-7`) leaves an un-normalised row whole instead of silently deleting it, and `docs/domain-map.md`'s invariant row states the gap rather than claiming enforcement (`DOC-1`) |
 | **`MIG-4`** — moving `Tags` from a comma-joined `text` to `jsonb` (`CQ-11`) needs a data migration, and any tag that was *already* split by a comma cannot be un-split | Low — cosmetic column, small table | `UPDATE … SET tags = to_jsonb(string_to_array(tags, ','))` in the migration. Accept the already-split tags as lost; there is no record of the original |
 | **`MIG-5`** — dropping the three dead indexes (`PERF-5`) | Low | `DROP INDEX CONCURRENTLY` × 3. No read path uses them; check `pg_stat_user_indexes.idx_scan` first to confirm zero scans in production before dropping |
 | **Drift risk: the slice registers with the host in four places, none of which break the build** | Standing, and already documented | `PlanningRouteSmokeTests.PlanningRoutes_AreRegistered` covers the FastEndpoints `o.Assemblies` half and `PlannerTaskToTodoListItem_ForeignKey_SurvivesTheSliceSplit` covers the cross-slice FK. `ModuleWiringTests` / `ModuleSchemaTests` / `SeamWiringTests` cover the rest. **No new drift found this pass** — the four registration points are all live |

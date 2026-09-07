@@ -134,6 +134,14 @@ public static class PlannerTemplateApplier
             if (overlappingNewTasks.Count == 0)
                 continue;
 
+            // A task that is not carvable is left whole rather than staged for removal. Carving one returns no
+            // segments at all (see IsCarvable), so the old order — remove first, then carve — deleted the task,
+            // put nothing back, cascaded its reminders away through StagedTaskDeletions, and answered 201. The
+            // new task is added over it instead: an overlap the day view can show is recoverable, a silent
+            // delete is not.
+            if (!IsCarvable(existingTask))
+                continue;
+
             tasksToRemove.Add(existingTask);
             var segments = CarveTaskAroundBlockers(existingTask, overlappingNewTasks);
             tasksToAdd.AddRange(segments);
@@ -144,11 +152,27 @@ public static class PlannerTemplateApplier
     }
 
     /// <summary>
+    /// A span the carving walk can reason about: strictly forward within one day. Everything below compares
+    /// <c>currentStart</c> against <c>task.EndTime</c>, so a row with <c>EndTime &lt;= StartTime</c> — which
+    /// <c>PlannerTaskValidator</c> accepted until the ordering rule was added, and which older rows still carry
+    /// — makes every comparison read on the wrong side of midnight and yields an empty segment list.
+    /// <para>
+    /// Callers must consult this <b>before</b> staging the original for removal; an empty list from a carvable
+    /// task means "fully covered by blockers", from a non-carvable one it means "the arithmetic gave up".
+    /// </para>
+    /// </summary>
+    private static bool IsCarvable(PlannerTask task) => task.StartTime < task.EndTime;
+
+    /// <summary>
     /// Carves a task around blocking tasks, returning segments that don't overlap with blockers.
     /// Handles splitting when a blocker is in the middle, and shortening when blockers overlap edges.
+    /// A task that is not <see cref="IsCarvable"/> comes back whole — see that method.
     /// </summary>
     private static List<PlannerTask> CarveTaskAroundBlockers(PlannerTask task, List<PlannerTask> blockers)
     {
+        if (!IsCarvable(task))
+            return [task];
+
         var overlappingBlockers = blockers
             .Where(b => task.TasksOverlap(b.StartTime, b.EndTime))
             .OrderBy(b => b.StartTime)

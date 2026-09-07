@@ -214,6 +214,68 @@ public class ApplyTemplatePlannerTaskConflictResolutionTests(AppDbContextFixture
         await AssertTemplateStampAsync(template.Id, calendarId, expectedUsageCount: 1);
     }
 
+    /// <summary>
+    /// TEST-17 / <c>CQ-7</c>. <c>CarveTaskAroundBlockers</c> walks <c>currentStart</c> forward and only emits a
+    /// segment when it is still before <c>task.EndTime</c>. For a row with <c>EndTime &lt; StartTime</c> every
+    /// comparison reads on the wrong side of midnight and the walk returns **no segments at all** — while
+    /// <c>MergeCarveExistingTasksAroundNew</c> had already staged the original for removal. The task was
+    /// deleted, nothing was put back, <c>StagedTaskDeletions</c> faithfully cancelled its reminders, and the
+    /// endpoint answered 201. A silent, internally consistent data loss.
+    /// <para>
+    /// The row is seeded directly rather than posted: since <c>CQ-14</c> was fixed, <c>PlannerTaskValidator</c>
+    /// rejects the shape at the door (pinned by
+    /// <c>PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsRejected</c>). The carving defect is
+    /// independent of how the row got there, and rows created before that rule landed still exist — there is no
+    /// CHECK constraint and the normalising data migration is still outstanding (<c>MIG-3</c>).
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "CQ-7: MergeOverwrite leaves a negative-duration task whole instead of deleting it")]
+    public async Task MergeOverwrite_LeavesANegativeDurationTaskWhole_InsteadOfDeletingIt()
+    {
+        var (activityId, template) = await SeedApplyFixtureAsync("overnight");
+        var calendarId = await SeedCalendarAsync(new DateOnly(2029, 3, 5));
+
+        long overnightId, ordinaryId;
+        await using (var db = CreateDbContext())
+        {
+            // 23:00 -> 01:00: TimeOnly has no day component, so this is stored as EndTime < StartTime.
+            overnightId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(23, 0), new TimeOnly(1, 0), ct: TestContext.Current.CancellationToken);
+            // The control: an ordinary task the same blocker fully covers, which must still be consumed.
+            ordinaryId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(12, 0), ct: TestContext.Current.CancellationToken);
+        }
+
+        var reminderOnOvernight = await CreateTaskReminderAsync(overnightId);
+        var reminderOnOrdinary = await CreateTaskReminderAsync(ordinaryId);
+
+        var response = await ApplyAsync(calendarId, template.Id, "MergeOverwrite",
+        [
+            NewTask(activityId, 0, 0, 23, 59) // spans the whole day, so it "overlaps" both existing tasks
+        ]);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<ApplyTemplatePlannerTaskResponse>(JsonOpts, CancellationToken);
+
+        body!.Tasks.Select(t => (t.StartTime.Hours, t.StartTime.Minutes, t.EndTime.Hours, t.EndTime.Minutes))
+            .Should().BeEquivalentTo(
+            [
+                (0, 0, 23, 59),  // the new template task
+                (23, 0, 1, 0)    // the un-carvable original, left whole rather than dropped
+                // the ordinary 09:00-12:00 task is gone -- fully covered, correctly consumed
+            ], "a task the carving cannot reason about is kept and overlapped, not deleted");
+
+        await using (var db = CreateDbContext())
+        {
+            (await db.Set<PlannerTask>().IgnoreQueryFilters().AnyAsync(t => t.Id == overnightId, CancellationToken))
+                .Should().BeTrue("CQ-7: the negative-duration task must survive the carve");
+            (await db.Set<PlannerTask>().IgnoreQueryFilters().AnyAsync(t => t.Id == ordinaryId, CancellationToken))
+                .Should().BeFalse("the control task is fully covered by the blocker and is consumed as before");
+        }
+
+        await AssertReminderStillActiveAsync(reminderOnOvernight);
+        await AssertReminderCancelledAsync(reminderOnOrdinary);
+        await AssertTemplateStampAsync(template.Id, calendarId, expectedUsageCount: 1);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private async Task<(long ActivityId, TaskPlannerDayTemplate Template)> SeedApplyFixtureAsync(string tag)
@@ -286,6 +348,25 @@ public class ApplyTemplatePlannerTaskConflictResolutionTests(AppDbContextFixture
         definition.Status.Should().Be(ReminderStatus.Cancelled,
             "the orphaning task delete happened inside ApplyTemplate, and the endpoint must cancel it just like DeletePlannerTaskEndpoint does");
         definition.NextOccurrenceAt.Should().BeNull();
+    }
+
+    /// <summary>
+    /// The converse of <see cref="AssertReminderCancelledAsync"/>: the task survived, so its module-side
+    /// registration must still be live. Asserting on the row rather than on "no cancel call was made" is what
+    /// makes this catch the silent half of <c>CQ-7</c> — the delete cancelled reminders perfectly well.
+    /// </summary>
+    private async Task AssertReminderStillActiveAsync(long reminderId)
+    {
+        await using var db = CreateDbContext();
+        var definition = await db.Set<ReminderDefinition>()
+            .Where(d => d.OwnerModule == ReminderRegistrationService.OwnerModule
+                        && d.SubjectType == ReminderRegistrationService.SubjectType
+                        && d.SubjectId == reminderId.ToString()
+                        && d.Kind == ReminderRegistrationService.Kind)
+            .SingleAsync(CancellationToken);
+
+        definition.Status.Should().Be(ReminderStatus.Active, "the task it belongs to was never deleted");
+        definition.NextOccurrenceAt.Should().NotBeNull();
     }
 
     private async Task AssertTemplateStampAsync(long templateId, long calendarId, int expectedUsageCount)

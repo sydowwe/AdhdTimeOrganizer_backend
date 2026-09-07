@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using FastEndpoints;
@@ -29,6 +30,13 @@ public class RepeatingPlannerTaskValidator : Validator<RepeatingPlannerTaskReque
         RuleFor(x => x.EndTime)
             .Must(t => t.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
             .WithMessage("EndTime hours must be 0–23 and minutes 0–59.");
+
+        // Same ordering rule as PlannerTaskValidator: a recurrence materialises into ordinary planner tasks,
+        // so a negative-duration recurrence would seed the bad shape on every day it fires. IsBefore is
+        // minute-of-day arithmetic rather than ToTimeOnly() precisely so it cannot throw on the out-of-range
+        // input the two rules above are in the middle of rejecting.
+        RuleFor(x => x).Must(req => req.StartTime.IsBefore(req.EndTime))
+            .WithMessage("StartTime must be before EndTime.");
 
         RuleFor(x => x.Location)
             .MaximumLength(200)
