@@ -200,13 +200,13 @@ and assumes only `_SHARED-CONTEXT.md`.
 | `TEST-1` ✅ | **Written 2026-09-06** with the `CQ-1` / `CQ-8` fix — both pure-domain and sweep-level, plus six `TryResetCatchUp_*` cases the prompt did not anticipate | `ComputeNextResetCatchUp.md` |
 | `TEST-2` ✅ | **Written 2026-09-07** with the `CQ-2` fix — the collision case plus the different-periods control the prompt asked for | `ActivityMergeRoutineCollision.md` |
 | `TEST-3` | Create/Update a routine item with a **foreign** `TimePeriodId` — `SEC-1` | `RoutineTodoListCrud.md` (§1) |
-| `TEST-4` | Range tests cannot distinguish FluentValidation from a DB check violation — `CQ-3` | `ValidatorVsDbConstraint.md` (§1) |
+| `TEST-4` ✅ | **Written 2026-09-07** with the `CQ-3` fix — all ten cases now assert the error's field key, plus the two top-of-range cases that keep the new rules honest | `ValidatorVsDbConstraint.md` (§1) |
 | `TEST-5` | `PUT /routine-todo-list` flipping `IsDone`: no event, no streak, steps re-keyed — `SEC-2`, `CQ-4` | `RoutineTodoListCrud.md` (§2, §3) |
 | `TEST-6` | Flat read endpoints' response shape and freshness — `CQ-5`, `DOC-4` | `RoutineReadEndpointShape.md` |
 | `TEST-7` | Concurrent reset writing a duplicate `RoutinePeriodCompletion` — `SEC-3` | `ConcurrentResetRace.md` |
 | `TEST-8` | `PATCH /routine-todo-list/toggle-is-done` at endpoint level: streak inflation, reset side-effect, event — `CQ-7` | `ToggleIsDoneStreak.md` (§1–§3) |
 | `TEST-9` | Step toggle cannot consume a reset cycle, asserted at endpoint level (today only unit-pinned) | `ToggleIsDoneStreak.md` (§4) |
-| `TEST-10` | `TryReset_Single_…UpdatesPeriod` asserts a property the method never sets — `DOC-5` | `ValidatorVsDbConstraint.md` (§2) |
+| `TEST-10` ✅ | **Written 2026-09-07** with the `DOC-5` fix — renamed, and the vacuous `NotBeNull()` replaced by an assertion that `LastResetAt` is unchanged | `ValidatorVsDbConstraint.md` (§2) |
 | `TEST-11` | `PUT /routine-time-period` — freeze-budget clamp when the budget is lowered mid-window | `RoutineTimePeriodUpdate.md` |
 | `TEST-12` | Freezing an older miss while a lapsed grace window is still open — `CQ-13` | `FreezeAfterLapsedGrace.md` |
 | `TEST-13` | `RoutineTodoListSeeder` (dev) — truncate scope and per-user seeding | `RoutineDevSeeder.md` |

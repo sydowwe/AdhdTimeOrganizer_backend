@@ -11,10 +11,18 @@ public class RoutineTimePeriodValidator : Validator<RoutineTimePeriodRequest>
 
     public RoutineTimePeriodValidator()
     {
+        // Mirrors ck_routine_time_period_length_in_days_range. The upper bound matters as much as the lower
+        // one: without it a 366-day period reaches the database and comes back as a check violation, which
+        // DbUtils maps to the same 400 but without the field key the form binds an error to.
         RuleFor(x => x.LengthInDays)
-            .GreaterThanOrEqualTo(1);
+            .InclusiveBetween(1, 365);
 
         RuleFor(x => x.StreakThreshold)
+            .InclusiveBetween(1, 100);
+
+        // Mirrors ck_routine_time_period_history_depth_range, and the 1–100 the request's own doc comment
+        // promises.
+        RuleFor(x => x.HistoryDepth)
             .InclusiveBetween(1, 100);
 
         // Mirrors ck_routine_time_period_freeze_budget_range. 0 is legal — it means the period grants no
