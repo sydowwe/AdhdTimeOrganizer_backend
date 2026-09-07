@@ -71,7 +71,7 @@ itself was fine, so read past the copy errors before believing your code is brok
 
 ```powershell
 ./scripts/test.ps1 -Class '*CoreForeignKeyOwnershipTests'   # build + run one class
-./scripts/test.ps1 -Class '*Activity*' -Class '*TimerPreset*'  # filters OR together
+./scripts/test.ps1 -Class '*Activity*','*TimerPreset*'       # comma-separated; filters OR together
 ./scripts/test.ps1 -Method '*.Create_*' -Trait 'Status=KnownGap'
 ./scripts/test.ps1 -BuildOnly -Project AdhdTimeOrganizer.Core  # compile check, no run
 ./scripts/test.ps1 -NoBuild -Class '*Foo*'                   # rerun what's already built
@@ -85,6 +85,9 @@ that tree is a full one; after that it is incremental. `artifacts-cli/` is gitig
 - **`dotnet test` does not work here.** On the .NET 10 SDK it still drives VSTest, which
   Microsoft.Testing.Platform refuses. The script runs the xunit v3 executable directly; its filter
   syntax (`-class` / `-method` / `-trait`, `*` at either end) is xunit's, not VSTest's.
+- `-Class`, `-Method` and `-Trait` each take a **comma-separated array**. Repeating the switch
+  (`-Class a -Class b`) is a PowerShell binding error — *"parameter 'Class' is specified more than
+  once"* — not a filter that matches nothing, so it fails before any build or test runs.
 - Integration tests start their own Postgres via Testcontainers — **Docker must be up**, and they
   never touch the dev database the debugged app is using, so running them against a live app is safe.
 - Building by hand instead? `dotnet build <proj> --artifacts-path .\artifacts-cli`. The narrower

@@ -20,12 +20,14 @@
 
 .PARAMETER Class
     Wildcarded class filter, e.g. '*CoreForeignKeyOwnershipTests'. OR'd with -Method.
+    Several at once are comma-separated ('a','b'); repeating the switch is a binding error.
 
 .PARAMETER Method
     Wildcarded method filter, fully qualified, e.g. '*.CreateActivity_*'. OR'd with -Class.
+    Comma-separated for several, as with -Class.
 
 .PARAMETER Trait
-    'name=value' trait filter, e.g. 'Status=KnownGap'.
+    'name=value' trait filter, e.g. 'Status=KnownGap'. Comma-separated for several.
 
 .PARAMETER Project
     Test project directory name. Defaults to the integration tests, the only test project here.
@@ -40,7 +42,7 @@
     ./scripts/test.ps1 -Class '*CoreForeignKeyOwnershipTests'
 
 .EXAMPLE
-    ./scripts/test.ps1 -Class '*Activity*' -Class '*TimerPreset*'
+    ./scripts/test.ps1 -Class '*Activity*','*TimerPreset*'
 
 .EXAMPLE
     ./scripts/test.ps1            # everything

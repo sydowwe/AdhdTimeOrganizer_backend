@@ -10,6 +10,7 @@ using AdhdTimeOrganizer.Tracking.infrastructure.jobs;
 using AdhdTimeOrganizer.Tracking.infrastructure.scheduling;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.@enum;
@@ -36,6 +37,19 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// <see cref="PartitionedTrackingTables_KeepTheirPartitionKey"/> covers the two partitioned tables,
 /// whose partition DDL comes from a generator wired host-side: if the entity configurations stopped
 /// being applied, the model would still build and the tables would silently lose their partitioning.
+/// Two companions pin the rest of what that one <c>ApplyConfigurationsFromAssembly</c> call carries —
+/// <see cref="PartitionedTrackingTables_KeepTheirCompositePrimaryKey"/> and
+/// <see cref="PartitionedTrackingTables_KeepTheirNonConcurrencyRowVersion"/>. All five facts vanish
+/// together, at once, with no build error.
+/// </para>
+/// <para>
+/// Not here, deliberately: the schema these five entities resolve to. <c>ModuleSchemaTests</c> already
+/// pins every table in the solution against a literal read back out of <c>information_schema</c>,
+/// including all five tracking tables, so duplicating it here would only give the same regression two
+/// places to be edited. Nor is there a <c>pg_class.relkind = 'p'</c> check: the fixture builds its
+/// schema with <c>EnsureCreated</c>, which does not run the migrations SQL generator, so the tables
+/// really are ordinary ones in the test database and such an assertion would fail against a perfectly
+/// healthy model. The partition DDL is only observable from migration output.
 /// </para>
 /// <para>
 /// The ingest endpoints' auth (extension-client token + the <c>ActivityTracking</c> policy) is covered
@@ -230,20 +244,92 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     /// and <c>AppCommandDbContextFactory</c> — so if the slice's configurations stopped being applied
     /// (a missing <c>ApplyConfigurationsFromAssembly</c> call, say), the model would still build and
     /// the next migration would quietly emit plain, unpartitioned tables.
+    /// <para>
+    /// The annotation key is read from <see cref="PartitioningExtensions"/> rather than written out as a
+    /// string: an assertion that reads a key nothing sets passes for the wrong reason forever. The
+    /// <em>column</em> is asserted too, because the annotation surviving with the wrong column is the
+    /// same failure wearing a different hat — the partition key must be <c>record_date</c>, which is
+    /// also why the primary key is composite (see
+    /// <see cref="PartitionedTrackingTables_KeepTheirCompositePrimaryKey"/>).
+    /// </para>
     /// </summary>
     [Theory]
     [InlineData(typeof(DesktopActivityEntry))]
     [InlineData(typeof(WebExtensionActivityEntry))]
     public void PartitionedTrackingTables_KeepTheirPartitionKey(Type entityType)
     {
-        using var db = CreateDbContext();
+        var entity = HostEntityType(entityType);
 
-        var entity = db.Model.FindEntityType(entityType);
+        var column = entity.FindAnnotation(PartitioningExtensions.AnnotationPartitionColumn);
+        column.Should().NotBeNull($"{entityType.Name} must keep its range-partition annotation");
+        column!.Value.Should().Be("record_date",
+            "the partition key is the column the yearly partitions are bounded on; anything else " +
+            "routes every row into the default partition");
+
+        entity.FindAnnotation(PartitioningExtensions.AnnotationPartitions)
+            .Should().NotBeNull($"{entityType.Name} must keep its partition list — the generator reads " +
+                                "the bounds from this annotation, and an empty one emits a partitioned " +
+                                "parent with nowhere to put a row");
+    }
+
+    /// <summary>
+    /// Postgres requires the partition key to be part of every unique constraint on a partitioned
+    /// table, so both configurations override the single-column PK <c>BaseEntityConfigure()</c> installs
+    /// with a composite <c>(Id, RecordDate)</c>. This is the cheapest half of the guard and the most
+    /// robust: it needs no annotation knowledge, and it fails the moment the configuration stops being
+    /// applied — an unconfigured entity falls back to the base's <c>Id</c>-only key.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(DesktopActivityEntry))]
+    [InlineData(typeof(WebExtensionActivityEntry))]
+    public void PartitionedTrackingTables_KeepTheirCompositePrimaryKey(Type entityType)
+    {
+        var key = HostEntityType(entityType).FindPrimaryKey();
+
+        key.Should().NotBeNull($"{entityType.Name} must have a primary key");
+        key!.Properties.Select(p => p.Name).Should().Equal(
+            new[] { nameof(DesktopActivityEntry.Id), nameof(DesktopActivityEntry.RecordDate) },
+            "Postgres refuses a partitioned table whose primary key omits the partition column, so " +
+            "BaseEntityConfigure's single-column key has to be overridden — losing that override does " +
+            "not fail the model build, it fails the next migration against the database");
+    }
+
+    /// <summary>
+    /// A partitioned table cannot return <c>xmin</c> in a <c>RETURNING</c> clause, so both
+    /// configurations demote the inherited <c>row_version</c> shadow property to a plain,
+    /// never-generated column. Both halves matter and neither is visible in a green build: left as a
+    /// concurrency token, every insert asks for <c>xmin</c> back and fails at runtime; left
+    /// value-generated-on-add, EF expects the database to fill a column nothing fills.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(DesktopActivityEntry))]
+    [InlineData(typeof(WebExtensionActivityEntry))]
+    public void PartitionedTrackingTables_KeepTheirNonConcurrencyRowVersion(Type entityType)
+    {
+        var rowVersion = HostEntityType(entityType).FindProperty("row_version");
+
+        rowVersion.Should().NotBeNull($"{entityType.Name} must still carry the base's row_version property");
+        rowVersion!.IsConcurrencyToken.Should().BeFalse(
+            "a partitioned table cannot return xmin in a RETURNING clause, so the inherited concurrency " +
+            "token has to be switched off");
+        rowVersion.ValueGenerated.Should().Be(ValueGenerated.Never,
+            "nothing generates this column once it is no longer xmin");
+    }
+
+    /// <summary>
+    /// The model as the <em>host</em> builds it, not as the fixture does. Both produce the same
+    /// annotations here, but the host-built model is the one production runs and the one the query-filter
+    /// case above already has to use, so the partition assertions read from the same place.
+    /// </summary>
+    private IEntityType HostEntityType(Type entityType)
+    {
+        using var scope = Fixture.UnauthenticatedFactory.Services.CreateScope();
+        var model = scope.ServiceProvider.GetRequiredService<AppDbContext>().Model;
+
+        var entity = model.FindEntityType(entityType);
         entity.Should().NotBeNull($"{entityType.Name} must be in the model -- if it is null, the " +
                                   "Tracking ApplyConfigurationsFromAssembly call is missing from AppDbContext");
-
-        entity!.FindAnnotation(PartitioningExtensions.AnnotationPartitionColumn)
-            .Should().NotBeNull($"{entityType.Name} must keep its range-partition annotation");
+        return entity!;
     }
 
     /// <summary>
