@@ -29,6 +29,11 @@ public interface IRoutinePeriodNotificationService
     /// </summary>
     Task<bool> NotifyEndingSoonAsync(RoutineTimePeriod period, RoutineResetService.RoutineNudge nudge, int remaining, int total, CancellationToken ct = default);
 
-    /// <summary>The period's streak grace window is about to lapse.</summary>
-    Task NotifyGraceExpiringAsync(RoutineTimePeriod period, CancellationToken ct = default);
+    /// <summary>
+    /// The period's streak grace window is about to lapse. Returns true when a notification was actually
+    /// raised, which is the caller's cue to stamp <c>GraceNotifiedFor</c> — a dispatch that was swallowed
+    /// must leave the period unmarked, or the grace window lapses and breaks the streak with no warning
+    /// having reached the user.
+    /// </summary>
+    Task<bool> NotifyGraceExpiringAsync(RoutineTimePeriod period, CancellationToken ct = default);
 }

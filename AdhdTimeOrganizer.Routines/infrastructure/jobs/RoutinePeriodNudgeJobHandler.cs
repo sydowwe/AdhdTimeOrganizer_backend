@@ -81,9 +81,14 @@ public class RoutinePeriodNudgeJobHandler(
 
                     if (RoutineResetService.ShouldWarnGraceExpiring(period, now))
                     {
-                        await notifier.NotifyGraceExpiringAsync(period, ct);
-                        period.GraceNotifiedFor = period.StreakGraceUntil;
-                        pageGraceWarned++;
+                        // Marked only when something actually went out — a swallowed dispatch that still
+                        // stamped the marker would suppress the warning for the whole grace window, and the
+                        // window would then lapse and break the streak with no warning ever sent.
+                        if (await notifier.NotifyGraceExpiringAsync(period, ct))
+                        {
+                            period.GraceNotifiedFor = period.StreakGraceUntil;
+                            pageGraceWarned++;
+                        }
                     }
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)

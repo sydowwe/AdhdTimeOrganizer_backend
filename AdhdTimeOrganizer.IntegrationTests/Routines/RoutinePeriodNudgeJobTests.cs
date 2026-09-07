@@ -49,6 +49,12 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         /// <summary>1-based ordinal across both notify methods, in call order. 0 = never throw.</summary>
         public int ThrowOnCallNumber { get; set; }
 
+        /// <summary>
+        /// Mirrors the real implementation swallowing a dispatch failure: the call is recorded and returns
+        /// false instead of throwing, which is the only signal the job gets that nothing went out.
+        /// </summary>
+        public bool GraceDispatchFails { get; set; }
+
         private int _callCount;
 
         public Task NotifyPeriodEndedAsync(RoutineTimePeriod period, RoutinePeriodCompletion completion, StreakOutcome outcome, CancellationToken ct = default)
@@ -69,14 +75,14 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
             return Task.FromResult(true);
         }
 
-        public Task NotifyGraceExpiringAsync(RoutineTimePeriod period, CancellationToken ct = default)
+        public Task<bool> NotifyGraceExpiringAsync(RoutineTimePeriod period, CancellationToken ct = default)
         {
             _callCount++;
             GraceCalls.Add(new GraceCall(period.Id, period.UserId));
             if (_callCount == ThrowOnCallNumber)
                 throw new InvalidOperationException($"stub notifier failure on call {_callCount}");
 
-            return Task.CompletedTask;
+            return Task.FromResult(!GraceDispatchFails);
         }
     }
 
@@ -305,6 +311,44 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         await RunJobWithDoubleAsync(notifier, CancellationToken);
 
         notifier.GraceCalls.Should().HaveCount(1);
+    }
+
+    /// <summary>
+    /// CQ-6 — a swallowed grace dispatch must not stamp <c>GraceNotifiedFor</c>. The marker is what
+    /// <c>ShouldWarnGraceExpiring</c> reads, so stamping it on a failed send suppresses the warning for the
+    /// rest of the window, which then lapses and breaks the streak with nothing ever having reached the user.
+    /// </summary>
+    [Fact]
+    public async Task NudgeSweep_GraceWarning_SwallowedDispatch_LeavesPeriodUnmarkedAndRetriesNextRun()
+    {
+        long periodId;
+        await using (var db = CreateDbContext())
+        {
+            var period = await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: DateTime.UtcNow.AddHours(12), ct: CancellationToken);
+            periodId = period.Id;
+        }
+
+        var failingNotifier = new RoutinePeriodNotificationServiceDouble { GraceDispatchFails = true };
+        await RunJobWithDoubleAsync(failingNotifier, CancellationToken);
+
+        failingNotifier.GraceCalls.Select(c => c.PeriodId).Should().Equal([periodId]);
+
+        await using (var verify = CreateDbContext())
+        {
+            var stored = await verify.Set<RoutineTimePeriod>().AsNoTracking().SingleAsync(p => p.Id == periodId, CancellationToken);
+            stored.GraceNotifiedFor.Should().BeNull("nothing was delivered, so the warning must stay pending");
+        }
+
+        var healthyNotifier = new RoutinePeriodNotificationServiceDouble();
+        await RunJobWithDoubleAsync(healthyNotifier, CancellationToken);
+
+        healthyNotifier.GraceCalls.Select(c => c.PeriodId).Should().Equal([periodId], "the warning that failed must be retried");
+
+        await using (var verify = CreateDbContext())
+        {
+            var stored = await verify.Set<RoutineTimePeriod>().AsNoTracking().SingleAsync(p => p.Id == periodId, CancellationToken);
+            stored.GraceNotifiedFor.Should().NotBeNull("the retry went out, so the window is now marked");
+        }
     }
 
     // ---- C. Fully-done periods are skipped without marking ---------------------------------------------

@@ -491,7 +491,7 @@ refresh makes the budget infinite and grace worthless.
 
 `Doc impact: domain-map.md → Invariants (9) — no doc edit needed once the code is fixed, which is the point of fixing the code` — the invariant now also names the surfaces, and the Grace rule, the two navigation rows and `summary.md`'s freeze gotcha name the helper. See `DOC-4` / `DOC-7`.
 
-### `CQ-6` 🟠 The grace warning is marked as sent even when it failed
+### `CQ-6` 🟠 ✅ FIXED 2026-09-07 · The grace warning is marked as sent even when it failed
 
 `infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs:71-76` ·
 `application/service/RoutinePeriodNotificationService.cs:55-62,69-84`
@@ -513,6 +513,22 @@ silently.
 **Fix.** Make `NotifyGraceExpiringAsync` return `Task<bool>` like its sibling and gate the marker on it.
 The interface doc already promises best-effort semantics for both; this only makes "was it actually
 raised" observable for the second one.
+
+**Fixed 2026-09-07** as prescribed. `SafeNotifyAsync` now returns `bool` — true on dispatch, false on
+the swallowed-and-logged branch — so "was it raised" is answered by the one place that knows.
+`NotifyGraceExpiringAsync` returns `Task<bool>` off it and the sweep gates both the marker and the
+counter on the result (`RoutinePeriodNudgeJobHandler.cs:82-90`).
+
+One thing beyond the finding: `NotifyEndingSoonAsync` now returns that same value instead of a bare
+`true`, so a *failed* nudge no longer stamps `EndingSoonNotifiedFor` either. The finding only called
+the second path out because the first one's `bool` looked deliberate, but it was answering "was there
+anything to say", not "did it go out" — same defect, one branch further in. The `remaining <= 0` early
+return is unchanged.
+
+Pinned by `NudgeSweep_GraceWarning_SwallowedDispatch_LeavesPeriodUnmarkedAndRetriesNextRun`, which
+needed a new `GraceDispatchFails` flag on the test double: its existing failure mode *throws*, and a
+throw was already handled by the per-period catch, so it could not reproduce this. The swallow-and-
+return-false path is the one that got past the guard.
 
 `Doc impact: none`
 
