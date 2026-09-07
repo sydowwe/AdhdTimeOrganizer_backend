@@ -247,6 +247,41 @@ with each other on the update). It is a different finding from this one, which i
 fixing it means either a bounded retry loop or an `ExecuteUpdate`-based upsert — a shape no endpoint in the
 solution uses today. Worth raising on its own rather than smuggling in here.
 
+**The residual is closed as of 2026-09-07 — as a missing base, not as a fourth copy of a fix.** The right
+question turned out to be the one the residual's framing missed: *why is this endpoint hand-written at all?*
+It is not `BaseUpdateEndpoint`'s shape (that one takes the row id from the route, 404s when the row is
+missing, and answers 200 — all three wrong for an upsert keyed on the caller's identity), and none of the
+other 18 bases fit either. So four endpoints across three modules carried the same hand-written body, and the
+Reminders one documented itself as a copy of the Notifications one. Four copies of a race fallback is how the
+second race stayed unhandled in all four.
+
+`Sydowwe.Framework/application/endpoint/base/command/BaseUserSettingsUpsertEndpoint.cs` now owns the shape —
+read by user, insert-or-update, **both** races, 204 — and `SetNotificationQuietHoursEndpoint`,
+`UpdateNotificationPreferenceEndpoint`, `UpdateReminderKindPreferenceEndpoint` and
+`UpdateRoutineSettingsEndpoint` are its four subclasses, each down to a route, a match predicate, a
+constructor and an apply. The lost-update race is **reported, not retried**: the base's outer handler runs
+`DbUtils.HandleException`, which maps `DbUpdateConcurrencyException` → `DbConcurrencyError` → **409**, the
+answer every other write path in the solution gives a caller that lost. `RetryDbConcurrencyHelper`'s bounded
+loop is the alternative and is deliberately not used — it has no call site anywhere in the solution, it needs
+an explicit transaction, and a preference toggle's two in-flight writes are near-always the same value, so a
+409 the client repeats converges on it.
+
+`TEntity` is constrained to `class` and **not** to `IEntityWithUser`, with the reason recorded on the base:
+only the portal's row implements it, and declaring it on the three module entities would opt them into a
+host's user-scope query filter. The base therefore does no scoping of its own — `MatchRow(userId, req)` is
+handed the id, so an implementation that forgets the predicate is a missing argument rather than a missing
+filter.
+
+Pinned by `RoutineResetConcurrencyTests.ExistingSettingsRow_UnderConcurrency_NeverAnswers500`: five writers
+against a row that already exists, asserting no 5xx and that the surviving row holds a value somebody
+actually sent. It asserts "no 5xx" rather than "some 409" because five writers that serialise are five
+correct 204s, and demanding a conflict would flake on a fast box — but the run that landed this was not
+vacuous: three of the five lost and returned **409**, which is precisely the three requests that used to be
+500s. 48 tests green across the four endpoints' existing suites.
+
+Note this is a **submodule change**: the framework half must be committed and pushed in `framework/` before
+the gitlink moves here, or the base travels nowhere and the four subclasses stop compiling for everyone else.
+
 `Doc impact: none`
 
 ---
@@ -363,7 +398,7 @@ swallow. `SeedRoutineTodoListAsync` gained a `streak` parameter so the two rows 
 
 `Doc impact: domain-map.md → Invariants (add the merge collision rule); and fix the XML remark on RoutineTodoListActivityReferenceSource` — done, as invariants 12 (the unique index it rests on) and 13, plus the seam row in the navigation index, `summary.md`'s seam bullet, and the remark itself (`DOC-3`).
 
-### `CQ-3` 🟠 `RoutineTimePeriodValidator` does not mirror two of its DB constraints
+### `CQ-3` 🟠 ✅ FIXED 2026-09-07 · `RoutineTimePeriodValidator` does not mirror two of its DB constraints
 
 `application/validator/RoutineTimePeriodValidator.cs:14-15` (and no `HistoryDepth` rule anywhere in the file)
 
@@ -381,6 +416,22 @@ catch it — see `TEST-4`.
 
 **Fix.** `RuleFor(x => x.LengthInDays).InclusiveBetween(1, 365);` and
 `RuleFor(x => x.HistoryDepth).InclusiveBetween(1, 100);`.
+
+**Fixed 2026-09-07**, those two lines verbatim, each with the comment naming the constraint it mirrors that
+every other rule in the file already carries. Nothing else changed: both bounds were already enforced by the
+database, so no value that used to be accepted is now rejected (`MIG-4`) — what changed is which layer says
+no, and therefore whether the 400 carries a field key.
+
+The pin is the repair `TEST-4` asked for rather than a new file. All ten cases in
+`RoutineTimePeriodRangeConstraintTests` now go through one `ShouldBeValidationErrorFor(response, property)`
+helper that asserts the status **and** that the property appears as a key in the error response — the only
+thing that distinguishes a validator rejection from a `DbUtils`-mapped check violation, since both are 400.
+That is what makes the file's own summary true; it was previously asserting a layer it could not observe.
+
+Verified by reverting: with `HistoryDepth`'s upper bound widened to 1000, `HistoryDepth_101_Returns400`
+**fails** on the missing field key, where the old status-only assertion passed. Two boundary cases were added
+so the new rules cannot be over-tight — `LengthInDays == 365` and `HistoryDepth == 100` both create — since
+an `ExclusiveBetween` slip would satisfy every rejection case above. 12 of 12 green.
 
 `Doc impact: none`
 

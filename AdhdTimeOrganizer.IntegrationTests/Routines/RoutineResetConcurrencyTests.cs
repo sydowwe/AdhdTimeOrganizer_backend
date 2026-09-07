@@ -288,4 +288,51 @@ public class RoutineResetConcurrencyTests(AppDbContextFixture fixture) : Postgre
             .CountAsync(s => s.UserId == UserId, CancellationToken))
             .Should().Be(1, "the unique index holds and nobody inserted a second row");
     }
+
+    /// <summary>
+    /// SEC-5's residual — the <i>other</i> half of the same endpoint, and the commoner one. Once the row
+    /// exists, concurrent writes no longer collide on the unique index at all: they lose on the
+    /// <c>row_version</c> token every table through <c>BaseEntityConfigure</c> carries, which is a
+    /// <c>DbUpdateConcurrencyException</c> and was not caught by the unique-violation handler the first-write
+    /// fix added. The loser got a 500 — indistinguishable, to a client, from the server being broken.
+    /// <para>
+    /// Now on <c>BaseUserSettingsUpsertEndpoint</c>, whose outer handler runs <c>DbUtils.HandleException</c>,
+    /// so the loser is told it lost: 409. The assertion is therefore "no 5xx", not "some 409" — five writers
+    /// that happen to serialise are five 204s and equally correct, and demanding a conflict would make the
+    /// test flake on a fast box. What it rules out is the one status that cannot be right.
+    /// </para>
+    /// <para>
+    /// Five writers rather than two: the losers of the first round re-read and contend again, which is what
+    /// surfaced this residual in the first place.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task ExistingSettingsRow_UnderConcurrency_NeverAnswers500()
+    {
+        var seed = await CreateClient().PutAsJsonAsync(
+            "api/routine/settings",
+            new { RoutineReviewDismissedForWeekStart = "2026-08-10" },
+            JsonOpts,
+            CancellationToken);
+        seed.StatusCode.Should().Be(HttpStatusCode.NoContent, "the row has to exist before the update race means anything");
+
+        var weeks = Enumerable.Range(0, 5).Select(i => new DateOnly(2026, 8, 17).AddDays(i * 7)).ToList();
+        var responses = await Task.WhenAll(weeks.Select(w => CreateClient().PutAsJsonAsync(
+            "api/routine/settings",
+            new { RoutineReviewDismissedForWeekStart = w.ToString("yyyy-MM-dd") },
+            JsonOpts,
+            CancellationToken)));
+
+        responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.NoContent || r.StatusCode == HttpStatusCode.Conflict,
+            "a lost row_version race is a 409 the client can retry, never a 500");
+
+        await using var db = CreateDbContext();
+        var settings = await db.Set<UserRoutineSettings>().AsNoTracking()
+            .SingleAsync(s => s.UserId == UserId, CancellationToken);
+
+        // Whoever won, the row holds a value somebody actually sent — a recovery branch that re-applied a
+        // stale request would leave the seed value behind instead.
+        settings.RoutineReviewDismissedForWeekStart.Should().BeOneOf(weeks.Cast<DateOnly?>(),
+            "one of the five writers won outright; none of them asked for the seed value");
+    }
 }

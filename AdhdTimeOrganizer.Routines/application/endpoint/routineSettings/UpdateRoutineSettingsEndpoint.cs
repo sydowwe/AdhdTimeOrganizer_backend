@@ -1,23 +1,30 @@
+using System.Linq.Expressions;
 using AdhdTimeOrganizer.Routines.application.dto.request.todoList;
 using AdhdTimeOrganizer.Routines.application.validator;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using FastEndpoints;
-using Npgsql;
-using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.Routines.application.endpoint.todoList.routineSettings;
 
 /// <summary>
 /// Upserts the caller's routine settings — this is where the weekly-review dismissal is written, and the row
 /// is created here rather than on read.
+/// <para>
+/// The upsert shape is <see cref="BaseUserSettingsUpsertEndpoint{TEntity,TRequest}"/>'s, shared with the three
+/// module settings endpoints that had the same hand-written body. Both write races are handled there: a lost
+/// first-write insert recovers onto the winner's row, and a lost update — two dismissal clicks in flight
+/// against a row that already exists, which is the commoner one — is a 409 rather than the 500 it used to be.
+/// </para>
 /// </summary>
 public class UpdateRoutineSettingsEndpoint(DbContext dbContext)
-    : Endpoint<UserRoutineSettingsRequest>
+    : BaseUserSettingsUpsertEndpoint<UserRoutineSettings, UserRoutineSettingsRequest>(dbContext)
 {
+    protected override string Route => "/routine/settings";
+
     public override void Configure()
     {
-        Put("/routine/settings");
-
+        base.Configure();
         Validator<UserRoutineSettingsValidator>();
         Summary(s =>
         {
@@ -27,43 +34,23 @@ public class UpdateRoutineSettingsEndpoint(DbContext dbContext)
         });
     }
 
-    public override async Task HandleAsync(UserRoutineSettingsRequest req, CancellationToken ct)
+    protected override Expression<Func<UserRoutineSettings, bool>> MatchRow(long userId, UserRoutineSettingsRequest req) =>
+        s => s.UserId == userId;
+
+    // UserId explicitly: this is the only insert path, and it must not depend on the ambient user.
+    protected override UserRoutineSettings NewRow(long userId, UserRoutineSettingsRequest req) => new()
     {
-        var userId = User.GetId();
+        UserId = userId,
+        RoutineReviewDismissedForWeekStart = WeekStart(req)
+    };
 
-        // The validator already rejected an unparseable value; this cannot fail here.
+    protected override void Apply(UserRoutineSettings row, UserRoutineSettingsRequest req) =>
+        row.RoutineReviewDismissedForWeekStart = WeekStart(req);
+
+    /// <summary>The validator already rejected an unparseable value, so the parse cannot fail here.</summary>
+    private static DateOnly? WeekStart(UserRoutineSettingsRequest req)
+    {
         req.TryGetRoutineReviewDismissedForWeekStart(out var weekStart);
-
-        var settings = await dbContext.Set<UserRoutineSettings>().FirstOrDefaultAsync(s => s.UserId == userId, ct);
-
-        if (settings == null)
-        {
-            // UserId explicitly: this is the only insert path, and it must not depend on the ambient user.
-            settings = new UserRoutineSettings { UserId = userId, RoutineReviewDismissedForWeekStart = weekStart };
-            await dbContext.Set<UserRoutineSettings>().AddAsync(settings, ct);
-
-            try
-            {
-                await dbContext.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-            {
-                // Two concurrent first writes both found no row and both inserted against the unique user_id
-                // index. Detach and update the winning row — same shape as UpdateReminderKindPreferenceEndpoint,
-                // which upserts the same per-user settings row one module over.
-                dbContext.ChangeTracker.Clear();
-                settings = await dbContext.Set<UserRoutineSettings>().FirstAsync(s => s.UserId == userId, ct);
-                settings.RoutineReviewDismissedForWeekStart = weekStart;
-                await dbContext.SaveChangesAsync(ct);
-            }
-        }
-        else
-        {
-            settings.RoutineReviewDismissedForWeekStart = weekStart;
-            dbContext.Set<UserRoutineSettings>().Update(settings);
-            await dbContext.SaveChangesAsync(ct);
-        }
-
-        await Send.NoContentAsync(ct);
+        return weekStart;
     }
 }
