@@ -1,6 +1,8 @@
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
 using Humanizer;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList;
 
@@ -46,8 +48,15 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(DbContext dbContext)
         var wasReset = BeforeToggle(item, now);
         ApplyStepToggle(item, step, now, wasReset);
 
-        dbContext.Set<TEntity>().Update(item);
-        await dbContext.SaveChangesAsync(ct);
+        // See BaseToggleIsDoneTodoListEndpoint: mapped rather than bare, so a row_version loser gets a 409
+        // instead of a 500, and the event below only fires on a save that actually committed (CQ-10).
+        var result = await dbContext.UpdateEntityAsync(item, ct);
+        if (result.Failed)
+        {
+            AddError(result.ErrorMessage ?? "An error occurred while toggling the step.");
+            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+            return;
+        }
 
         await PublishEvent(item, ct);
         await Send.NoContentAsync(ct);
@@ -96,8 +105,8 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(DbContext dbContext)
                 item.IsDone = true;
             }
 
-            // if (item.IsDone)
-            //     OnItemCompleted(item, now);
+            if (item.IsDone)
+                OnItemCompleted(item, now);
         }
         else
         {
@@ -105,6 +114,18 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(DbContext dbContext)
         }
     }
 
+    /// <summary>
+    /// Runs when this toggle is the one that completed the item — the step path's equivalent of
+    /// <c>BaseToggleIsDoneTodoListEndpoint.AfterItemToggled</c>, so finishing an item by ticking its last step
+    /// scores the same as finishing it through the bulk toggle.
+    /// <para>
+    /// Overridden by <c>ToggleStepIsDoneRoutineTodoListEndpoint</c> to advance the routine item's streak, and
+    /// by nothing else — which is why it reads as dead on a search of this project alone. It is not:
+    /// <c>RoutineToggleIsDoneTests.StepToggle_CompletingTheLastStep_UpdatesTheItemStreak</c> is what goes red
+    /// if the call above is removed again. <see cref="TodoListItem"/> has no per-item streak, so the default
+    /// no-op is correct for it.
+    /// </para>
+    /// </summary>
     protected virtual void OnItemCompleted(TEntity item, DateTime now)
     {
     }

@@ -185,8 +185,10 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     private static async Task SeedActivityHistoryOnWeekdayAsync(Microsoft.EntityFrameworkCore.DbContext db, long activityId, DateOnly target, int weeksAgo)
     {
         var date = target.AddDays(-7 * weeksAgo);
-        var start = date.ToDateTime(new TimeOnly(9, 0));
-        var end = date.ToDateTime(new TimeOnly(10, 0));
+        // The DateTimeKind overload is load-bearing: ToDateTime alone yields Kind=Unspecified, and Npgsql
+        // refuses to write anything but UTC to a `timestamp with time zone` column.
+        var start = date.ToDateTime(new TimeOnly(9, 0), DateTimeKind.Utc);
+        var end = date.ToDateTime(new TimeOnly(10, 0), DateTimeKind.Utc);
         db.Set<ActivityHistory>().Add(new ActivityHistory
         {
             UserId = PlanningTestSeedHelper.TestUserId,

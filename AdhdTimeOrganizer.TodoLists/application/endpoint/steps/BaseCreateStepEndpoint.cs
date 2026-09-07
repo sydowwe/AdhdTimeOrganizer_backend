@@ -3,6 +3,8 @@ using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
 using Humanizer;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.steps;
 
@@ -43,7 +45,16 @@ public abstract class BaseCreateStepEndpoint<TParent>(DbContext dbContext)
         if (parent.DoneCount is null)
             parent.DoneCount = 0;
 
-        await dbContext.SaveChangesAsync(ct);
+        var result = await dbContext.UpdateEntityAsync(parent, ct);
+        if (result.Failed)
+        {
+            AddError(result.ErrorMessage ?? "An error occurred while adding the step.");
+            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+            return;
+        }
+
+        // Only after the save: the id is the caller's handle for the three step routes, so returning it for a
+        // step that was never persisted hands out a 404 waiting to happen (CQ-10).
         await Send.ResponseAsync(step.Id, 201, ct);
     }
 }

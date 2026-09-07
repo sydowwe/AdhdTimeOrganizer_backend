@@ -2,6 +2,8 @@ using AdhdTimeOrganizer.Core.application.dto.request.generic;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
 using Humanizer;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList;
 
@@ -40,9 +42,20 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(DbContext dbCont
             AfterItemToggled(entity, now);
         }
 
-        dbContext.Set<TEntity>().UpdateRange(itemsToToggle);
-        await dbContext.SaveChangesAsync(ct);
+        // Through the Result helper, not a bare SaveChangesAsync: every entity here carries a row_version, so
+        // two clients toggling the same item is an ordinary DbUpdateConcurrencyException, and Routines' override
+        // adds a period whose reset can collide besides. Unmapped, either escapes as a 500 indistinguishable
+        // from a real fault; mapped, the loser gets the 409 the rest of the API returns (CQ-10).
+        var result = await dbContext.UpdateRangeAsync(itemsToToggle, ct);
+        if (result.Failed)
+        {
+            AddError(result.ErrorMessage ?? "An error occurred while toggling.");
+            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+            return;
+        }
 
+        // Only past the failure gate: AfterSave announces something that has happened, and PublishEvent below
+        // drives the cross-slice fan-out. Both on a save that did not commit would report a lie.
         await AfterSave(ct);
 
         foreach (var entity in itemsToToggle)

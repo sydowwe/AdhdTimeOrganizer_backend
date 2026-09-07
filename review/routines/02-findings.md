@@ -623,7 +623,17 @@ day to reach at all.
 
 Pinned by `UpdateItemStreak_CalledTwiceInTheSameCycle_IncrementsOnlyOnce` and its control
 `UpdateItemStreak_AfterANewCycle_IncrementsAgain` in `Services/RoutineResetServiceTests.cs`. The endpoint-level
-cases stay with `TEST-8`/`TEST-9` (`testingPrompts/ToggleIsDoneStreak.md`).
+cases are now written: `Routines/RoutineToggleIsDoneTests.cs` (`TEST-8`/`TEST-9`,
+`testingPrompts/ToggleIsDoneStreak.md`).
+
+**Correction to the call-site list above, 2026-09-07.** Only *one* of the two toggle endpoints named here
+could ever inflate. `ToggleStepIsDoneRoutineTodoListEndpoint.cs:37` overrides `OnItemCompleted`, but
+TodoLists' `BaseToggleStepIsDoneEndpoint.ApplyStepToggle` had its only call to that hook **commented out**,
+so the step route reached `UpdateItemStreak` never — it scored nothing at all rather than scoring twice.
+Writing `TEST-9` surfaced this; it is `CQ-11` in [`review/todo-lists/02-findings.md`](../todo-lists/02-findings.md),
+whose own premise was wrong in the opposite direction (it read the dormant hook as dead code and proposed
+deleting it, which would have removed this streak permanently). Fixed 2026-09-07 by restoring the call, so
+both endpoints now score, once per cycle, through the guard described above.
 
 `Doc impact: domain-map.md → Domain services (UpdateItemStreak row: note it is once-per-cycle, not once-per-toggle)` — done
 

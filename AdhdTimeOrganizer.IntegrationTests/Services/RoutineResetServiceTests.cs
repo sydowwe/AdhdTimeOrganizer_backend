@@ -254,11 +254,19 @@ public class RoutineResetServiceTests
         item.IsDone.Should().BeTrue();
     }
 
+    /// <summary>
+    /// The single-item overload's whole contract is what it does <b>not</b> do to the period: the step-toggle
+    /// path freshens the item it has in hand and leaves the cycle open, so the list overload can still close it
+    /// with a streak evaluation and a completion row. The overload returns <c>bool</c>, not a
+    /// <c>RoutinePeriodReset</c>, so "no completion row" shows up here as the streak standing still.
+    /// </summary>
     [Fact]
     public void TryReset_Single_AfterResetTime_ResetsItemWithoutAdvancingLastResetAt()
     {
         var lastResetAt = DateTime.UtcNow.AddDays(-8);
         var period = MakePeriod(7, lastResetAt: lastResetAt);
+        period.Streak = 4;
+        period.BestStreak = 4;
         var item = MakeItem(true);
         // DoneCount is step-counted: SetDone only rewrites it when TotalCount is set, so a
         // DoneCount without a TotalCount is not a state the app can produce.
@@ -273,6 +281,30 @@ public class RoutineResetServiceTests
         // The single-item overload deliberately leaves the cycle open: advancing LastResetAt here would
         // consume the reset with no streak evaluation and no completion row. Only the list overload closes it.
         period.LastResetAt.Should().Be(lastResetAt);
+        // Every part of the streak transition the list overload owns has to be untouched here — an item cleared
+        // by a toggle is not evidence the cycle was met or missed.
+        period.Streak.Should().Be(4);
+        period.BestStreak.Should().Be(4);
+        period.StreakGraceUntil.Should().BeNull();
+    }
+
+    /// <summary>
+    /// The sibling of <c>TryReset_Batch_ClearsTheEndingSoonMark</c>. The mark is scoped to the cycle the list
+    /// overload closes; clearing it here — where <c>LastResetAt</c> does not move, so
+    /// <c>ComputeNextReset</c> still reports the same due instant — would re-arm a nudge for a reset the user
+    /// has already been told about, and a step toggle would re-send it every time.
+    /// </summary>
+    [Fact]
+    public void TryReset_Single_DoesNotClearTheEndingSoonMark()
+    {
+        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-8));
+        var notifiedFor = DateTime.UtcNow.AddDays(-1);
+        period.EndingSoonNotifiedFor = notifiedFor;
+
+        var result = RoutineResetService.TryReset(period, MakeItem(true), DateTime.UtcNow);
+
+        result.Should().BeTrue("the reset has to actually happen for the mark to be at risk");
+        period.EndingSoonNotifiedFor.Should().Be(notifiedFor);
     }
 
     [Fact]

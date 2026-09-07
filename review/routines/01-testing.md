@@ -102,12 +102,18 @@ their own header comments instead of leaving it implicit.
    `POST` / `PUT /routine-todo-list` rejects a `TimePeriodId` belonging to another user. The auth matrix
    covers *entity* ownership on both endpoints thoroughly — it does not cover the foreign **foreign key**
    in the body, which is a different hole. → `TEST-3`, `SEC-1`
-5. **The routine toggle endpoint has no test of any kind.** `PATCH /routine-todo-list/toggle-is-done` is
-   the single densest endpoint in the module — it runs the list `TryReset`, inserts a completion row,
-   updates the item streak, and publishes the only cross-slice event this slice raises — and a route-level
-   search of the whole test project finds zero hits. `CompletionFanOutTests` exercises
-   `api/todo-list-item/toggle-is-done`, i.e. the TodoLists sibling, not this one. `CQ-7` (streak
-   inflation) and half of `SEC-3` (unhandled 500 on the reset race) both live behind it. → `TEST-8`
+5. ~~**The routine toggle endpoint has no test of any kind.**~~ ✅ **Closed 2026-09-07** by
+   `Routines/RoutineToggleIsDoneTests.cs` (`TEST-8`/`TEST-9`, 11 cases). As written, the gap read:
+   `PATCH /routine-todo-list/toggle-is-done` is the single densest endpoint in the module — it runs the
+   list `TryReset`, inserts a completion row, updates the item streak, and publishes the only cross-slice
+   event this slice raises — and a route-level search of the whole test project finds zero hits.
+   `CompletionFanOutTests` exercises `api/todo-list-item/toggle-is-done`, i.e. the TodoLists sibling, not
+   this one. `CQ-7` (streak inflation) and half of `SEC-3` (unhandled 500 on the reset race) both live
+   behind it.
+   **Vindicated on writing:** the step half of the same surface turned out to be scoring no streak at all
+   (`CQ-11`, todo-lists), a defect that had been sitting behind the zero hits and that a review of the
+   Routines slice alone could not see, because the dead call was in a TodoLists base. `SEC-3`'s half is
+   still open — nothing here asserts the unhandled 500 on the reset race. → `TEST-7`
 6. **The flat read endpoints are untested and malformed.** `GET /routine-time-period`,
    `GET /routine-time-period/{id}`'s *shape* (its auth is covered), `GET /routine-todo-list`,
    `GET /routine-time-period/all-options/` — no test asserts what any of them actually returns. They are
@@ -144,8 +150,8 @@ user's row or an unauthenticated/role-restricted caller.
 | `GET /routine-todo-list` | ❌ | ❌ | ❌ | — → `TEST-6` |
 | `GET /routine-todo-list/{id}` | ⚠ auth only | ❌ | ✅ 2 | `TodoListCrudAuthMatrixTests` — nested-period shape unasserted → `TEST-6` |
 | `GET /routine-todo-list/grouped-by-time-period` | ✅ 3 | ✅ 1 | ✅ 1 | `RoutineGroupedReadAndMoveItemTests`, `RoutineStreakFreezeTests` |
-| `PATCH /routine-todo-list/toggle-is-done` | ❌ | ❌ | ❌ | — **nothing at all** → `TEST-8` |
-| `PATCH /routine-todo-list/{itemId}/steps/{stepId}/toggle` | ❌ | ❌ | ❌ | — → `TEST-9` |
+| `PATCH /routine-todo-list/toggle-is-done` | ✅ 2 | ✅ 4 | ✅ 1 | `RoutineToggleIsDoneTests` — **written 2026-09-07** (`TEST-8`); was "nothing at all" |
+| `PATCH /routine-todo-list/{itemId}/steps/{stepId}/toggle` | ✅ 1 | ✅ 2 | ✅ 1 | `RoutineToggleIsDoneTests` — **written 2026-09-07** (`TEST-9`); found and fixed a live defect, see below |
 | `PATCH /routine-todo-list/change-display-order` | ❌ | ❌ | ❌ | — the reorder tests target `todo-list-item`, not this → `TEST-6` |
 | `POST /routine-todo-list/{itemId}/steps` | ✅ 1 | ❌ | ❌ | `TodoListStepsCrudTests.CreateStep_OnRoutineTodoList_AlsoWorks` — one deliberate cross-check that the shared base behaves identically |
 | `PUT` / `DELETE /routine-todo-list/{itemId}/steps/{stepId}` | ⚠ base only | ⚠ base only | ⚠ base only | `TodoListStepsCrudTests` via `TodoListItem`; the routine overrides add an explicit `UserId` predicate in `GetParentQuery` that nothing exercises |
@@ -204,8 +210,8 @@ and assumes only `_SHARED-CONTEXT.md`.
 | `TEST-5` | `PUT /routine-todo-list` flipping `IsDone`: no event, no streak, steps re-keyed — `SEC-2`, `CQ-4` | `RoutineTodoListCrud.md` (§2, §3) |
 | `TEST-6` | Flat read endpoints' response shape and freshness — `CQ-5`, `DOC-4` | `RoutineReadEndpointShape.md` |
 | `TEST-7` | Concurrent reset writing a duplicate `RoutinePeriodCompletion` — `SEC-3` | `ConcurrentResetRace.md` |
-| `TEST-8` | `PATCH /routine-todo-list/toggle-is-done` at endpoint level: streak inflation, reset side-effect, event — `CQ-7` | `ToggleIsDoneStreak.md` (§1–§3) |
-| `TEST-9` | Step toggle cannot consume a reset cycle, asserted at endpoint level (today only unit-pinned) | `ToggleIsDoneStreak.md` (§4) |
+| `TEST-8` ✅ | **Written 2026-09-07** as `Routines/RoutineToggleIsDoneTests.cs`. The prompt was stale: `CQ-7` had already been fixed and its two pure-domain tests already existed, so §1 landed as green endpoint-level pins over that fix rather than as expected-failing cases | `ToggleIsDoneStreak.md` (§1–§3) |
+| `TEST-9` ✅ | **Written 2026-09-07**, same file. Found a live defect the prompt did not anticipate: the step route reached `UpdateItemStreak` **never**, because TodoLists' `BaseToggleStepIsDoneEndpoint` had its only call to `OnItemCompleted` commented out. Fixed the same day by restoring it — see `CQ-11` in [`review/todo-lists/02-findings.md`](../todo-lists/02-findings.md) | `ToggleIsDoneStreak.md` (§4) |
 | `TEST-10` ✅ | **Written 2026-09-07** with the `DOC-5` fix — renamed, and the vacuous `NotBeNull()` replaced by an assertion that `LastResetAt` is unchanged | `ValidatorVsDbConstraint.md` (§2) |
 | `TEST-11` | `PUT /routine-time-period` — freeze-budget clamp when the budget is lowered mid-window | `RoutineTimePeriodUpdate.md` |
 | `TEST-12` | Freezing an older miss while a lapsed grace window is still open — `CQ-13` | `FreezeAfterLapsedGrace.md` |

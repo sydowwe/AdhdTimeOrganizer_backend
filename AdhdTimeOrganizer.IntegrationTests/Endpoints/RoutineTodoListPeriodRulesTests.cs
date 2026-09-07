@@ -57,6 +57,34 @@ public class RoutineTodoListPeriodRulesTests(AppDbContextFixture fixture) : Post
         (await CountInPeriodAsync(foreignPeriodId)).Should().Be(0);
     }
 
+    /// <summary>
+    /// The other half of "a foreign id and a non-existent one are refused identically". The FK on
+    /// `TimePeriodId` would refuse this on its own, but a database round trip is not the same guard: it
+    /// answers 409 rather than 400, and it only fires for ids that exist nowhere — an id belonging to
+    /// another account satisfies the FK perfectly. Both have to be the validator's 400, or the difference
+    /// between the two status codes is an existence oracle over another account's id range.
+    /// </summary>
+    [Fact(DisplayName = "Creating a routine item in a time period that does not exist is rejected the same way")]
+    public async Task CreateRoutineTodoList_WithNonexistentTimePeriodId_IsRejected()
+    {
+        const long nonexistentPeriodId = 999_999_999L;
+
+        long activityId;
+        await using (var db = CreateDbContext())
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "Own activity, no period", ct: CancellationToken);
+
+        var response = await CreateUserRoleClient().PostAsJsonAsync(
+            "/api/routine-todo-list",
+            new { activityId, timePeriodId = nonexistentPeriodId },
+            JsonOpts,
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "the validator must refuse this; a 409 means the request reached the database and the foreign key "
+            + "caught it, which is a different status from the one a foreign id gets");
+        (await CountInPeriodAsync(nonexistentPeriodId)).Should().Be(0);
+    }
+
     [Fact(DisplayName = "Moving a routine item into another user's time period is rejected")]
     public async Task UpdateRoutineTodoList_WithForeignTimePeriodId_IsRejected()
     {
@@ -108,30 +136,75 @@ public class RoutineTodoListPeriodRulesTests(AppDbContextFixture fixture) : Post
             TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // On the row, not the status: the point of the control is that the write actually landed, in the
+        // caller's own name, so the two rejections above are refusals rather than a broken endpoint.
+        await using var check = CreateDbContext();
+        var stored = await check.Set<RoutineTodoList>()
+            .SingleAsync(r => r.TimePeriodId == periodId, CancellationToken);
+        stored.UserId.Should().Be(TodoListTestSeedHelper.TestUserId);
+        stored.ActivityId.Should().Be(activityId);
     }
 
     // ---- suggestion buckets ----------------------------------------------------------------------
 
-    [Fact(DisplayName = "Create: SuggestedDayOfMonth is refused on a weekly period")]
-    public async Task CreateRoutineTodoList_WithDayOfMonthOnWeeklyPeriod_IsRejected()
+    /// <summary>
+    /// The whole bucket rule, both fields across all three of the period lengths that decide them: daily
+    /// (<c>LengthInDays &lt;= 1</c>) takes neither suggestion, weekly (<c>&lt;= 14</c>) takes days only,
+    /// monthly and longer takes day-of-month only.
+    /// </summary>
+    /// <remarks>
+    /// The two accepting rows are what give this teeth — a rule that refused both fields on every length
+    /// would satisfy the four rejections on its own and leave the feature quietly unusable.
+    /// </remarks>
+    [Theory(DisplayName = "Create: each period length admits only its own suggestion field")]
+    // Daily: a period that comes round every day has nothing to suggest a day within.
+    [InlineData(1, true, false)]
+    [InlineData(1, false, false)]
+    // Weekly (and up to a fortnight): days of the week, never a day of the month.
+    [InlineData(7, true, true)]
+    [InlineData(7, false, false)]
+    // Monthly and longer: the mirror image.
+    [InlineData(30, true, false)]
+    [InlineData(30, false, true)]
+    public async Task CreateRoutineTodoList_SuggestionFieldMatchesThePeriodBucket(
+        int lengthInDays, bool useSuggestedDays, bool expectAccepted)
     {
-        long activityId, weeklyPeriodId;
+        long activityId, periodId;
         await using (var db = CreateDbContext())
         {
-            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "Weekly bucket rule", ct: CancellationToken);
-            weeklyPeriodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, lengthInDays: 7, ct: CancellationToken);
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "Bucket rule", ct: CancellationToken);
+            periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(
+                db, lengthInDays: lengthInDays, ct: CancellationToken);
         }
 
-        var response = await CreateUserRoleClient().PostAsJsonAsync(
-            "/api/routine-todo-list",
-            new { activityId, timePeriodId = weeklyPeriodId, suggestedDayOfMonth = 15 },
-            JsonOpts,
-            TestContext.Current.CancellationToken);
+        object body = useSuggestedDays
+            ? new { activityId, timePeriodId = periodId, suggestedDays = new[] { DayOfWeek.Monday } }
+            : new { activityId, timePeriodId = periodId, suggestedDayOfMonth = 15 };
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await CountInPeriodAsync(weeklyPeriodId)).Should().Be(0);
+        var response = await CreateUserRoleClient().PostAsJsonAsync(
+            "/api/routine-todo-list", body, JsonOpts, TestContext.Current.CancellationToken);
+
+        var field = useSuggestedDays ? "SuggestedDays" : "SuggestedDayOfMonth";
+
+        if (expectAccepted)
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.Created,
+                $"{field} is the suggestion a {lengthInDays}-day period is meant to carry");
+            (await CountInPeriodAsync(periodId)).Should().Be(1);
+        }
+        else
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+                $"{field} means nothing on a {lengthInDays}-day period");
+            (await CountInPeriodAsync(periodId)).Should().Be(0, "a refused create must not leave a row behind");
+        }
     }
 
+    /// <summary>
+    /// One update-path case, because the rule lives in a single shared implementation now: what this pins is
+    /// that `UpdateRoutineTodoListValidator` still calls it at all. The matrix above covers the rule itself.
+    /// </summary>
     [Fact(DisplayName = "Update: SuggestedDays is refused on a monthly period")]
     public async Task UpdateRoutineTodoList_WithSuggestedDaysOnMonthlyPeriod_IsRejected()
     {

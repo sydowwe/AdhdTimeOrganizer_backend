@@ -254,6 +254,28 @@ public class RoutineStreakFreezeServiceTests
     }
 
     /// <summary>
+    /// A period that elapsed with no items at all is not a miss to cover. <c>IsSuccess</c> says false for it, but
+    /// <see cref="RoutineStreakFreezeService.RecomputeStreak"/> skips such rows outright — see
+    /// <c>RecomputeStreak_PeriodWithNoItems_CarriesTheRun</c> above, which is this test's companion — and
+    /// <c>TryReset</c> leaves the streak <c>NotEvaluated</c>. The run already survives for free, so charging a
+    /// freeze here would take the budget and change nothing.
+    /// </summary>
+    [Fact]
+    public void Apply_OnAPeriodWithNoItems_RefusesAsNotAMiss()
+    {
+        var period = MakePeriod();
+        period.FreezeBudgetResetsAt = Now.AddDays(10);
+
+        var empty = MakeCompletion(0, 0, 0);
+
+        RoutineStreakFreezeService.Apply(period, new[] { empty }, empty, Now)
+            .Should().Be(StreakFreezeRejection.NotAMiss);
+
+        period.FreezesRemaining.Should().Be(2, "a freeze that cannot change the streak must not be charged");
+        empty.IsFrozen.Should().BeFalse();
+    }
+
+    /// <summary>
     /// A zero budget is a real configuration — "this period grants no freezes" — and must refuse rather than
     /// fall through to a refill that hands out a budget the period does not have.
     /// </summary>

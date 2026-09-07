@@ -3,6 +3,8 @@ using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
 using Humanizer;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.steps;
 
@@ -42,7 +44,14 @@ public abstract class BaseUpdateStepEndpoint<TParent>(DbContext dbContext)
         step.Order = req.Order;
         step.Note = req.Note;
 
-        await dbContext.SaveChangesAsync(ct);
+        var result = await dbContext.UpdateEntityAsync(parent!, ct);
+        if (result.Failed)
+        {
+            AddError(result.ErrorMessage ?? "An error occurred while updating the step.");
+            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+            return;
+        }
+
         await Send.NoContentAsync(ct);
     }
 }

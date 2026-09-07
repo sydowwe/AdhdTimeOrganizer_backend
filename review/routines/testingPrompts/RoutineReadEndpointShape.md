@@ -1,5 +1,40 @@
 # TEST-6 — Read endpoints serve a malformed period (pins `CQ-5`, restores `DOC-4` / `DOC-7`)
 
+> **DONE — 2026-09-07. Do not work this prompt again; everything below is kept for the reasoning only.**
+>
+> The bug this prompt describes **was fixed before the prompt was worked**, so the "fails today" notes
+> are all stale. The fix landed as
+> `AdhdTimeOrganizer.Routines/application/service/RoutineTimePeriodReadRefresher.cs` — the
+> `PostProcess` hook the "Note on the fix" section predicted — and all four flat reads override
+> `PostProcessItemsAsync` / `PostProcessAsync` to call it. `RoutineTodoListResponse.Projection` now
+> carries `ReminderLeadDays` and the three freeze fields too.
+>
+> Coverage landed in **two** files, not the one this prompt names:
+>
+> - `Endpoints/RoutineFlatPeriodReadTests.cs` — `NextResetAt` / `CompletionHistory` on both period
+>   routes, the elapsed-window refill **and** the open-window no-op, the lapsed-grace break **and** the
+>   open-grace no-op, and the nested period on `GET /routine-todo-list`.
+> - `Endpoints/RoutineReadEndpointShapeTests.cs` — what the above leaves open: the exact
+>   `ComputeNextReset` oracle (rather than `NotBe(default)`, which a wrong anchor also passes), a
+>   hand-set 1-of-2 freeze count surviving a read (the refill tests can only ever prove `2`, which is
+>   also the default), the grace break from the `GET all` hook (the two endpoints override *different*
+>   hooks, so neither implies the other), the item **by-id** route, select-options sorting, and the two
+>   reorder tests.
+>
+> **One real defect came out of it, and it is not the one this prompt predicted.**
+> `BaseChangeDisplayOrderTodoListEndpoint.RebalanceDisplayOrdersAsync` filtered with
+> `Where(e => GroupFilterExpression.Compile()(e) == groupId)`. That puts a compiled delegate inside an
+> expression tree; EF evaluated `Compile()` client-side, could not translate the resulting
+> `Invoke(delegate, e)`, and threw — so **every reorder that had to rebalance answered 500**, on
+> `todo-list-item` as well as `routine-todo-list`. Unreachable from any assertion that leaves a gap
+> between neighbours, which is why nothing caught it. Fixed by composing the predicate expression
+> (`InGroupExpression`); pinned by
+> `ChangeDisplayOrder_WithNoGapBetweenNeighbours_RebalancesTheGroupAndCompletesTheMove`.
+>
+> Two fixture values below are impossible as written and were changed: the select-options lengths
+> (30, 1, 7) and any second period sharing length 7 collide with the `(user_id, length_in_days)` unique
+> index. The suite uses 1 / 5 / 30 and a 14-day second period.
+
 Read `_SHARED-CONTEXT.md` first.
 
 ## Endpoints with no *shape* coverage

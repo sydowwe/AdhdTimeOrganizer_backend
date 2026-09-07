@@ -139,6 +139,29 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
 
     protected abstract Expression<Func<TEntity, long>> GroupFilterExpression { get; }
 
+    /// <summary>
+    /// <see cref="GroupFilterExpression"/> as a predicate EF can translate.
+    /// <para>
+    /// Composing the tree by hand is not a style choice. The obvious spelling —
+    /// <c>Where(e =&gt; GroupFilterExpression.Compile()(e) == groupId)</c> — puts a <b>compiled delegate</b>
+    /// inside the expression tree: EF evaluates the <c>Compile()</c> call client-side (it does not involve the
+    /// parameter), is left with <c>Invoke(delegate, e)</c>, and cannot translate that, so the whole rebalance
+    /// throws <see cref="InvalidOperationException"/> and the reorder answers 500.
+    /// </para>
+    /// <para>
+    /// The group id is spliced in as a captured closure member rather than an <c>Expression.Constant</c> so
+    /// EF still parameterises it — a literal would give every group its own entry in the query plan cache.
+    /// </para>
+    /// </summary>
+    private Expression<Func<TEntity, bool>> InGroupExpression(long groupId)
+    {
+        Expression<Func<long>> groupIdRef = () => groupId;
+        var groupFilter = GroupFilterExpression;
+
+        return Expression.Lambda<Func<TEntity, bool>>(
+            Expression.Equal(groupFilter.Body, groupIdRef.Body),
+            groupFilter.Parameters[0]);
+    }
 
     private async Task RebalanceDisplayOrdersAsync(long followingId, long userId, CancellationToken ct)
     {
@@ -149,7 +172,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
         var query = _dbSet.AsQueryable()
             .Where(e => e.UserId == userId);
 
-        var items = await query.Where(e => GroupFilterExpression.Compile()(e) == groupId)
+        var items = await query.Where(InGroupExpression(groupId.Value))
             .OrderByDescending(e => e.DisplayOrder)
             .ToListAsync(ct);
 

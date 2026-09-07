@@ -47,6 +47,8 @@ public class RoutineTodoListResetJobHandler(
         {
             var periods = await dbContext.Set<RoutineTimePeriod>()
                 .Where(tp => userIds.Contains(tp.UserId))
+                // Unfiltered by necessity: a filtered Include cannot correlate to the parent (`tp` is not
+                // translatable inside the filter), so the owner check happens on `items` below instead.
                 .Include(tp => tp.RoutineTodoListColl)
                 .ThenInclude(t => t.Steps)
                 .ToListAsync(ct);
@@ -55,7 +57,18 @@ public class RoutineTodoListResetJobHandler(
 
             foreach (var period in periods)
             {
-                var items = period.RoutineTodoListColl.ToList();
+                // Owner-filtered (SEC-1). TimePeriodId is client-supplied on a routine item and the foreign key
+                // enforces existence, not ownership, so a row can point at a period belonging to someone else —
+                // the write validators refuse that now, but rows written before they existed are still there.
+                // This job is exactly where such a row costs the victim something: it runs unauthenticated, so
+                // the host's per-user query filter is inert and the include above returns every row aiming at
+                // the period. One permanently unticked stranger's item is enough to drag completedCount /
+                // items.Count below the threshold, breaking a streak whose cause the victim cannot see and
+                // writing a RoutinePeriodCompletion that is wrong for good — the ledger is append-only.
+                // Filtered here rather than in the Include because a filtered Include cannot reference `tp`.
+                // Foreign rows are deliberately left alone rather than reset: they are not this period's to
+                // touch, and silently mutating another user's data is the bug, not the fix.
+                var items = period.RoutineTodoListColl.Where(t => t.UserId == period.UserId).ToList();
                 var changed = RoutineResetService.CheckGrace(period, now);
                 // The freeze budget refills lazily, so the nightly sweep is the one thing that brings a period
                 // the user has not opened in a month back to a full budget before they look at it.

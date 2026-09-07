@@ -11,6 +11,14 @@ Every finding below was re-read against the source, not carried forward on trust
 `6079f93` touched `AdhdTimeOrganizer.TodoLists/docs/` only. So **every `SEC-`, `CQ-` and `PERF-`
 finding is confirmed at the file and line stated**, with the corrections listed here.
 
+> **Later than this pass — 2026-09-07:** `CQ-11` has been **corrected and fixed**. Its premise ("no
+> subclass overrides `OnItemCompleted`") was wrong, and its recommended fix — deleting the hook — would
+> have silently removed the routine item streak. Restoring the commented-out call was the actual fix. The
+> line numbers below `BaseToggleStepIsDoneEndpoint.cs:99` have shifted accordingly.
+>
+> **Also 2026-09-07:** `CQ-10` is **fixed**, all five sites. Line numbers in all five files have shifted.
+> The sentence above still holds for every other finding in this file.
+
 | Change in this pass | Where |
 |---|---|
 | `DOC-1` **resolved** by `6079f93` — the settings row now reads `MaxItems` / `DisplayOrderGap` with `DisplayOrderStart` derived | `domain-map.md:53` |
@@ -368,7 +376,7 @@ extended to seed an already-overshot row.
 
 `Doc impact: none`
 
-### CQ-10 🟡 The step endpoints call `SaveChangesAsync` directly instead of the Result helpers
+### CQ-10 🟡 ✅ FIXED 2026-09-07 · The step endpoints call `SaveChangesAsync` directly instead of the Result helpers
 
 `application/endpoint/steps/BaseCreateStepEndpoint.cs:46`,
 `BaseUpdateStepEndpoint.cs:45`, `BaseDeleteStepEndpoint.cs:42`, plus
@@ -383,20 +391,67 @@ pipeline as a 500 instead of the mapped 409 the rest of the API returns — the 
 
 **Fix.** Route all five through the helper and map `result.ErrorType` via `EndpointHelper.ToStatusCode`.
 
+**Fixed 2026-09-07, all five sites**, as prescribed — `UpdateRangeAsync` for the bulk toggle,
+`UpdateEntityAsync` for the other four, each mapping `result.ErrorType` through
+`EndpointHelper.ToStatusCode` in the shape `BaseChangeDisplayOrderTodoListEndpoint:68` already used.
+
+Two things the fix had to get right beyond the status code, neither of them in the finding:
+
+- **The failure gate has to sit ahead of the side effects.** Both toggle bases do more after their save
+  than answer: `AfterSave` announces the end-of-period summary and `PublishEvent` raises
+  `RoutineTodoListIsDoneChangedEvent`, the only channel into Planning. Left below a bare save they would
+  fire on a save that did not commit — a notification and a cross-slice fan-out for a toggle that did not
+  happen. Both now return before reaching them.
+- **`BaseCreateStepEndpoint` returned the step id before persisting it.** `Send.ResponseAsync(step.Id, 201)`
+  followed the save with nothing between, so a failed save handed the client a 201 and a `Guid` that names
+  no row — and three step routes take that id in the path. Now sent only past the gate.
+
+Blast radius is both slices: these five bases serve `TodoListItem` and `RoutineTodoList` alike. Verified by
+the full suite — 2101 tests, no new failures.
+
 `Doc impact: none`
 
-### CQ-11 🟡 Dead code in `BaseToggleStepIsDoneEndpoint`
+### CQ-11 🟡 ⚠️ PREMISE WRONG · INVERTED AND FIXED 2026-09-07 — `OnItemCompleted` in `BaseToggleStepIsDoneEndpoint` was dormant, not dead
 
-`application/endpoint/BaseToggleStepIsDoneEndpoint.cs:99-100` is a commented-out call to
-`OnItemCompleted`; `:108-110` is the `protected virtual OnItemCompleted` it would have called, which no
-subclass overrides. With them gone, the `DateTime now` parameter threaded through `HandleAsync:45`,
-`BeforeToggle`, `ApplyStepToggle` and `OnItemCompleted` has no reader either — `CompletedTimestamp` is
-the interceptor's job, which is precisely why the call was commented out.
+**The original finding, kept on the record because acting on it would have caused the defect it
+described as harmless:**
 
-**Fix.** Delete both, then drop the `now` parameter from `ApplyStepToggle` and `OnItemCompleted`.
-`BeforeToggle` keeps its `now` — Routines' period-reset override uses it.
+> `application/endpoint/BaseToggleStepIsDoneEndpoint.cs:99-100` is a commented-out call to
+> `OnItemCompleted`; `:108-110` is the `protected virtual OnItemCompleted` it would have called, which no
+> subclass overrides. With them gone, the `DateTime now` parameter threaded through `HandleAsync:45`,
+> `BeforeToggle`, `ApplyStepToggle` and `OnItemCompleted` has no reader either — `CompletedTimestamp` is
+> the interceptor's job, which is precisely why the call was commented out.
+>
+> **Fix.** Delete both, then drop the `now` parameter from `ApplyStepToggle` and `OnItemCompleted`.
+> `BeforeToggle` keeps its `now` — Routines' period-reset override uses it.
 
-`Doc impact: none`
+**Correction, 2026-09-07.** *"which no subclass overrides"* is false.
+`AdhdTimeOrganizer.Routines/application/endpoint/routineTodoList/command/ToggleStepIsDoneRoutineTodoListEndpoint.cs:40-43`
+overrides it, and calls `RoutineResetService.UpdateItemStreak`. The override reads as unreferenced only
+because a search scoped to `AdhdTimeOrganizer.TodoLists` cannot see it — the same cross-slice blind spot
+`MIG-6` in [03-risks-rollout.md](03-risks-rollout.md) warns about, arriving here from the opposite
+direction: not "a fix in this base changes Routines' behaviour" but "a Routines file is the only reason
+this base's member is live at all".
+
+So the commented-out call was not tidy-up awaiting deletion — it was a **live defect in Routines**.
+Completing a routine item by ticking its last step advanced no streak, while completing the same item
+through `PATCH /api/routine-todo-list/toggle-is-done` advanced it normally. Silent, as usual for this
+solution: the toggle answered 204, the item showed as done, and only the streak column stayed at 0. Had
+the fix above been applied, the hook and its override would both have been deleted and the routine item
+streak would have become permanently unreachable from the step route, with nothing going red.
+
+**Fixed** by restoring the two commented-out lines — the inverse of the recommendation. `now` therefore
+keeps its reader and stays on `ApplyStepToggle` / `OnItemCompleted`; nothing about the signature changes.
+`TodoListItem` has no per-item streak, so the default no-op remains correct for the TodoLists side and
+that behaviour is unchanged.
+
+Pinned by `RoutineToggleIsDoneTests.StepToggle_CompletingTheLastStep_UpdatesTheItemStreak`
+(`AdhdTimeOrganizer.IntegrationTests/Routines/`), which found the defect and now guards it, including the
+un-tick/re-tick case that confirms `UpdateItemStreak`'s once-per-cycle guard holds on this path too.
+
+`Doc impact: none in the living docs. The rule now lives as an XML summary on OnItemCompleted itself,
+naming the override and the test — deliberately at the declaration, since that is where the next reader
+will conclude it is dead.`
 
 ### CQ-12 🟡 `TodoListGroupedByCategoryResponse` is dead
 

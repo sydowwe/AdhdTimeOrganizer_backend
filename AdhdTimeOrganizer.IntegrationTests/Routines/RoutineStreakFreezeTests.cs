@@ -63,12 +63,13 @@ public class RoutineStreakFreezeTests(AppDbContextFixture fixture) : PostgresTes
         _periodId = period.Id;
     }
 
-    private static RoutinePeriodCompletion Completion(long periodId, DateOnly start, int completed, int total) =>
+    private static RoutinePeriodCompletion Completion(
+        long periodId, DateOnly start, int completed, int total, int lengthInDays = 7) =>
         new()
         {
             TimePeriodId = periodId,
             PeriodStart = start,
-            PeriodEnd = start.AddDays(7),
+            PeriodEnd = start.AddDays(lengthInDays),
             CompletedCount = completed,
             TotalCount = total
         };
@@ -265,6 +266,145 @@ public class RoutineStreakFreezeTests(AppDbContextFixture fixture) : PostgresTes
         var response = await SpendAsync(CreateUserRoleClient(), "2025-06-03");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // ─── A grace window that has lapsed but has not been observed yet ────────────────────────────────────────
+
+    // 5, not 7: RoutineTimePeriod is uniquely indexed on (UserId, Text) *and* (UserId, LengthInDays), and the
+    // fixture period above already owns 7 for this user.
+    private const int GraceLength = 5;
+
+    // The miss the freeze is spent on. Deliberately not the newest row — Apply only clears the grace window when
+    // the frozen entry is the newest one, which is what leaves the lapsed window standing here.
+    private static readonly DateOnly OlderMissStart = new(2026, 2, 6);
+
+    /// <summary>
+    /// A period whose run is intact, whose grace window is set to <paramref name="graceUntil"/>, and whose
+    /// history holds an older unfrozen miss with two met periods after it. Nothing has read this period since
+    /// the window was written, so it is still on the row exactly as the reset job left it.
+    /// </summary>
+    private async Task<long> SeedGraceWindowPeriodAsync(DateTime graceUntil)
+    {
+        await using var seed = CreateDbContext();
+
+        var period = new RoutineTimePeriod
+        {
+            UserId = UserId,
+            Text = "Grace window period",
+            Color = "#abcdef",
+            LengthInDays = GraceLength,
+            ResetAnchorDay = 0,
+            StreakThreshold = 100,
+            // 0, so no *new* window can be opened by anything the test triggers; the one below is hand-placed.
+            StreakGraceDays = 0,
+            Streak = 3,
+            BestStreak = 3,
+            StreakGraceUntil = graceUntil,
+            FreezeBudget = 2,
+            FreezesRemaining = 2,
+            // Well inside the window, so the lazy refill cannot fire and confuse the spent count.
+            FreezeBudgetResetsAt = DateTime.UtcNow.AddMonths(1)
+        };
+        seed.Set<RoutineTimePeriod>().Add(period);
+        await seed.SaveChangesAsync(CancellationToken);
+
+        seed.Set<RoutinePeriodCompletion>().AddRange(
+            Completion(period.Id, new DateOnly(2026, 2, 1), 3, 3, GraceLength),
+            Completion(period.Id, OlderMissStart, 1, 3, GraceLength),
+            Completion(period.Id, new DateOnly(2026, 2, 11), 3, 3, GraceLength),
+            Completion(period.Id, new DateOnly(2026, 2, 16), 3, 3, GraceLength));
+        await seed.SaveChangesAsync(CancellationToken);
+
+        return period.Id;
+    }
+
+    private async Task<RoutineTimePeriodResponse> GroupedReadAsync(HttpClient client, long periodId)
+    {
+        var response = await client.GetAsync("/api/routine-todo-list/grouped-by-time-period", CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var groups = await response.Content
+            .ReadFromJsonAsync<List<RoutineTodoListGroupedResponse>>(JsonOpts, CancellationToken);
+
+        return groups!.Should().ContainSingle(g => g.RoutineTimePeriod.Id == periodId).Subject.RoutineTimePeriod;
+    }
+
+    /// <summary>
+    /// The pin. A freeze has to survive the next read, not just answer 200.
+    /// <para>
+    /// The endpoint calls <c>CheckGrace</c> before <c>Apply</c>. Without it, freezing an older miss leaves the
+    /// lapsed window standing — <c>Apply</c> only clears it for the newest entry — <c>RecomputeStreak</c> raises
+    /// the streak back out of the history, the response reports it restored, and then the very next grouped read
+    /// observes the still-set lapsed window and writes <c>Streak = 0</c>. The user spends a budgeted resource,
+    /// is shown that it worked, and loses the run on the next page load. A test that stops at the freeze
+    /// response passes against that bug, so this one reads on.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task SpendFreeze_OnAnOlderMiss_WithALapsedGraceWindow_SurvivesTheNextRead()
+    {
+        var periodId = await SeedGraceWindowPeriodAsync(DateTime.UtcNow.AddDays(-1));
+        var client = CreateUserRoleClient();
+
+        var response = await SpendAsync(client, "2026-02-06", periodId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var frozen = (await response.Content
+            .ReadFromJsonAsync<RoutineTimePeriodResponse>(JsonOpts, CancellationToken))!;
+
+        frozen.Streak.Should().Be(3, "one met period before the frozen miss and two after are one unbroken run");
+
+        // What the SPA does next.
+        var served = await GroupedReadAsync(client, periodId);
+        served.Streak.Should().Be(3, "the freeze must not evaporate on the read that follows it");
+
+        await using var db = CreateDbContext();
+        var persisted = await db.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == periodId, CancellationToken);
+        persisted.Streak.Should().Be(3);
+    }
+
+    /// <summary>
+    /// The cheaper direct pin on the same bug: the lapsed window is settled by the freeze rather than left for
+    /// the next reader to trip over.
+    /// </summary>
+    [Fact]
+    public async Task SpendFreeze_OnAnOlderMiss_WithALapsedGraceWindow_ClearsTheLapsedWindow()
+    {
+        var periodId = await SeedGraceWindowPeriodAsync(DateTime.UtcNow.AddDays(-1));
+
+        var response = await SpendAsync(CreateUserRoleClient(), "2026-02-06", periodId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var db = CreateDbContext();
+        var persisted = await db.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == periodId, CancellationToken);
+        persisted.StreakGraceUntil.Should().BeNull("a window whose instant has passed has nothing left to protect");
+    }
+
+    /// <summary>
+    /// The control for the two above, and the reason to write them as a pair: a window still in the future is
+    /// not lapsed, and belongs to the newest period, which is still unresolved. Adding <c>CheckGrace</c> to the
+    /// endpoint must not cost the user that window. <c>Apply_OnAnOlderMiss_LeavesTheOpenGraceWindowAlone</c> in
+    /// the pure suite asserts the domain half of this.
+    /// </summary>
+    [Fact]
+    public async Task SpendFreeze_OnAnOlderMiss_WithALiveGraceWindow_LeavesItAlone()
+    {
+        var graceUntil = DateTime.UtcNow.AddDays(2);
+        var periodId = await SeedGraceWindowPeriodAsync(graceUntil);
+
+        var response = await SpendAsync(CreateUserRoleClient(), "2026-02-06", periodId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var db = CreateDbContext();
+        var persisted = await db.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == periodId, CancellationToken);
+
+        persisted.StreakGraceUntil.Should()
+            .BeCloseTo(graceUntil, TimeSpan.FromSeconds(1), "the open window protects the newest period, not the frozen one");
+        persisted.Streak.Should().Be(3);
+        persisted.FreezesRemaining.Should().Be(1);
+
+        var entry = await db.Set<RoutinePeriodCompletion>()
+            .SingleAsync(c => c.TimePeriodId == periodId && c.PeriodStart == OlderMissStart, CancellationToken);
+        entry.IsFrozen.Should().BeTrue();
     }
 
     /// <summary>
