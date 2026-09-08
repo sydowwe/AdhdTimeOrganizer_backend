@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
@@ -16,9 +17,10 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// reminder that omits one (deep coverage of that path lives in <c>ReminderRegistrationTests</c>; this pins
 /// the settings endpoints' own contract).
 /// <para>
-/// SEC-3 added the three concurrency cases at the bottom: <c>user_id</c> is unique, so the row cannot double
+/// SEC-3 added the four concurrency cases at the bottom: <c>user_id</c> is unique, so the row cannot double
 /// — what a race produces is a loser holding a unique violation, and both endpoints now recover from it
-/// rather than answering 500.
+/// rather than answering 500. The uniqueness the other three lean on is itself pinned, below HTTP, by
+/// <c>TwoRowsForOneUser_AreRejectedByTheDatabase</c>.
 /// </para>
 /// </summary>
 [Collection("Postgres")]
@@ -149,6 +151,40 @@ public class UserPlannerSettingsTests(AppDbContextFixture fixture) : PostgresTes
             .Where(s => s.UserId == UserId).ToListAsync(CancellationToken);
         rows.Should().ContainSingle("the unique index holds and nobody inserted a second row");
         rows[0].ReminderMinutesBefore.Should().BeOneOf([20, 21], "the row holds a value somebody actually sent");
+    }
+
+    /// <summary>
+    /// SEC-3, deterministically. Both race tests above pass vacuously when the two callers do not overlap, so
+    /// neither of them actually proves the constraint they lean on exists — they would stay green against a
+    /// database whose <c>user_id</c> index was non-unique. This asserts the index directly: it is the thing
+    /// that makes "recover and re-read" a correct fix rather than a narrowing of the window.
+    /// <para>
+    /// It also pins the uniqueness against the way it is configured. The Framework helper's
+    /// <c>HasIndex(UserId)</c> is non-unique; the index is unique because
+    /// <c>UserPlannerSettingsConfiguration</c> says so on top of it. Drop that line and this is the only test
+    /// in the solution that fails.
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "user_planner_settings.user_id is unique — the row cannot double even below HTTP")]
+    public async Task TwoRowsForOneUser_AreRejectedByTheDatabase()
+    {
+        await using var db = CreateDbContext();
+        db.Set<UserPlannerSettings>().Add(new UserPlannerSettings { UserId = UserId });
+        db.Set<UserPlannerSettings>().Add(new UserPlannerSettings { UserId = UserId });
+
+        var act = async () => await db.SaveChangesAsync(CancellationToken);
+
+        (await act.Should().ThrowAsync<DbUpdateException>(
+                "user_planner_settings.user_id must be unique — the get-or-create in " +
+                "GetPlannerSettingsEndpoint has no other backstop"))
+            .WithInnerException<PostgresException>()
+            .Which.SqlState.Should().Be(PostgresErrorCodes.UniqueViolation,
+                "it is the unique index that rejects the second row, not a null or FK check");
+
+        await using var verifyDb = CreateDbContext();
+        (await verifyDb.Set<UserPlannerSettings>().AsNoTracking()
+            .CountAsync(s => s.UserId == UserId, CancellationToken))
+            .Should().Be(0, "the failed SaveChanges is one transaction — neither row survives");
     }
 
     /// <summary>

@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.IntegrationTests.Reminders;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
@@ -422,7 +423,172 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
         }
     }
 
+    // ─── 5. the PlannerBatchLimits.MaxCalendarIds ceiling ────────────────────
+
+    /// <summary>
+    /// The three routes whose id list goes through <c>CalendarIdListRules</c>. They are exercised as one theory
+    /// on purpose: the rule set is shared, so a rule quietly dropped from <i>one</i> of the four
+    /// <c>ApplyCalendarIdListRules()</c> call sites is exactly the regression this shape catches.
+    /// </summary>
+    public enum IdListRoute
+    {
+        ApplyTemplateBatch,
+        CopyToDays,
+        BatchDayType
+    }
+
+    /// <summary>
+    /// <b>366 ids are accepted.</b> The ids need not exist — the ceiling is a validation rule, not a data one,
+    /// so a batch of ids that all come back <c>succeeded: false</c> is the proof that the request reached the
+    /// handler at all. The result count is what pins that: a 400 would have no <c>results</c> to count.
+    /// </summary>
+    [Theory]
+    [InlineData(IdListRoute.ApplyTemplateBatch)]
+    [InlineData(IdListRoute.CopyToDays)]
+    [InlineData(IdListRoute.BatchDayType)]
+    public async Task IdList_AtTheCeiling_ReachesTheHandler_AndAnswersOneResultPerIdInOrder(IdListRoute route)
+    {
+        var ids = NonExistentIds(PlannerBatchLimits.MaxCalendarIds);
+
+        var response = await SendIdListBatchAsync(route, ids);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<CalendarBatchResultResponse>(JsonOpts, CancellationToken);
+
+        body!.Results.Select(r => r.CalendarId).Should().Equal(ids,
+            $"{PlannerBatchLimits.MaxCalendarIds} ids is the ceiling, not one past it — one result per requested id, in request order");
+        body.Results.Should().OnlyContain(r => !r.Succeeded, "none of these days exist");
+    }
+
+    /// <summary>
+    /// One id past the ceiling is a 400 naming the limit. This is the assertion that has to fail if the
+    /// constant is raised by accident: every other test here passes just as happily at 3660.
+    /// </summary>
+    [Theory]
+    [InlineData(IdListRoute.ApplyTemplateBatch)]
+    [InlineData(IdListRoute.CopyToDays)]
+    [InlineData(IdListRoute.BatchDayType)]
+    public async Task IdList_OneOverTheCeiling_IsRejectedWithTheLimitInTheMessage(IdListRoute route)
+    {
+        var response = await SendIdListBatchAsync(route, NonExistentIds(PlannerBatchLimits.MaxCalendarIds + 1));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync(CancellationToken))
+            .Should().Contain(PlannerBatchLimits.MaxCalendarIds.ToString(),
+                "the caller has to be told what the ceiling is to split its selection under it");
+    }
+
+    /// <summary>An empty list is a request that asks for nothing, and is rejected rather than answered with an empty batch.</summary>
+    [Theory]
+    [InlineData(IdListRoute.ApplyTemplateBatch)]
+    [InlineData(IdListRoute.CopyToDays)]
+    [InlineData(IdListRoute.BatchDayType)]
+    public async Task IdList_Empty_IsRejected(IdListRoute route)
+    {
+        var response = await SendIdListBatchAsync(route, []);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>
+    /// A null list is rejected rather than reaching the handler, which dereferences it (<c>req.CalendarIds.Count</c>)
+    /// on its very first line.
+    /// </summary>
+    [Theory]
+    [InlineData(IdListRoute.ApplyTemplateBatch)]
+    [InlineData(IdListRoute.CopyToDays)]
+    [InlineData(IdListRoute.BatchDayType)]
+    public async Task IdList_Null_IsRejected(IdListRoute route)
+    {
+        var response = await SendIdListBatchAsync(route, null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>
+    /// A non-positive id can never name a row, so it is a malformed request rather than one more
+    /// <c>succeeded: false</c> — the whole batch is rejected, including the well-formed ids around it.
+    /// </summary>
+    [Theory]
+    [InlineData(IdListRoute.ApplyTemplateBatch)]
+    [InlineData(IdListRoute.CopyToDays)]
+    [InlineData(IdListRoute.BatchDayType)]
+    public async Task IdList_WithANonPositiveId_IsRejected(IdListRoute route)
+    {
+        var response = await SendIdListBatchAsync(route, [900_001L, 0L]);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
+
+    /// <summary>Distinct, positive, and far outside anything the fixture seeds — so only the count is under test.</summary>
+    private static long[] NonExistentIds(int count) =>
+        Enumerable.Range(900_000, count).Select(i => (long)i).ToArray();
+
+    /// <summary>
+    /// Fires one of the three id-list batches with <paramref name="calendarIds"/> and everything else valid.
+    /// Each route's non-id preconditions are seeded here — the template and the copy source both 404 before the
+    /// id list is ever iterated, which would make the accepted case indistinguishable from a rejected one.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendIdListBatchAsync(IdListRoute route, long[]? calendarIds)
+    {
+        var client = CreateClient();
+
+        switch (route)
+        {
+            case IdListRoute.ApplyTemplateBatch:
+            {
+                long activityId, templateId;
+                await using (var db = CreateDbContext())
+                {
+                    activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "ceiling-apply", ct: CancellationToken);
+                    templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, ct: CancellationToken);
+                }
+
+                return await client.PostAsJsonAsync("api/calendar/apply-planner-template/batch", new
+                {
+                    TemplateId = templateId,
+                    CalendarIds = calendarIds,
+                    ConflictResolution = "Ignore",
+                    TasksFromTemplate = new[]
+                    {
+                        new
+                        {
+                            StartTime = new { Hours = 9, Minutes = 0 },
+                            EndTime = new { Hours = 10, Minutes = 0 },
+                            IsBackground = false,
+                            ActivityId = activityId,
+                            Status = "NotStarted"
+                        }
+                    }
+                }, JsonOpts, CancellationToken);
+            }
+
+            case IdListRoute.CopyToDays:
+            {
+                long sourceDay;
+                await using (var db = CreateDbContext())
+                    sourceDay = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2029, 3, 1), ct: CancellationToken);
+
+                return await client.PostAsJsonAsync("api/planner-task/copy-to-days", new
+                {
+                    SourceCalendarId = sourceDay,
+                    TargetCalendarIds = calendarIds
+                }, JsonOpts, CancellationToken);
+            }
+
+            case IdListRoute.BatchDayType:
+                return await client.PatchAsJsonAsync("api/calendar/day-type/batch", new
+                {
+                    CalendarIds = calendarIds,
+                    DayType = "Vacation"
+                }, JsonOpts, CancellationToken);
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(route), route, null);
+        }
+    }
 
     private async Task<List<(TimeOnly Start, TimeOnly End)>> TaskSpansAsync(DbContext db, long calendarId) =>
         (await db.Set<PlannerTask>()

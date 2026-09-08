@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using FluentAssertions;
@@ -234,7 +235,109 @@ public class PlanVsActualTrendTests(AppDbContextFixture fixture) : PostgresTestB
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    // ─── the PlannerBatchLimits.MaxSummaryRangeDays ceiling ──────────────────
+
+    // The three routes that take a { From, Until } window and are bounded only by it. They are pinned together
+    // on purpose: they share one constant and two identically-worded rules across three separate validator
+    // classes (PlanVsActualTrendValidator, CalendarTaskSummariesValidator, CalendarFilterValidator), and
+    // nothing but a theory over all three makes one of them drifting visible.
+    //
+    // calendar/filter is here because it used to be the odd one out — PERF-2: same window, no cap at all, so a
+    // 1900 → 2100 filter scanned the user's whole calendar table with two correlated subqueries per row.
+    // Range_TwoCenturies_IsRejectedOnEveryRangeRoute is the pin on that having been closed.
+    public const string TaskSummariesRoute = "api/calendar/task-summaries";
+    public const string TrendRoute = "api/planner-task/plan-vs-actual-trend";
+    public const string CalendarFilterRoute = "api/calendar/filter";
+
+    /// <summary>
+    /// The ceiling is counted <b>inclusively</b> — <c>Until.DayNumber - From.DayNumber + 1</c> — so a year and a
+    /// day either side of it is the only pair that tells an off-by-one apart from the rule itself. 2029 is not a
+    /// leap year, so 2029-01-01 → 2030-01-01 is exactly 366 days.
+    /// </summary>
+    [Theory]
+    [InlineData(TaskSummariesRoute)]
+    [InlineData(TrendRoute)]
+    [InlineData(CalendarFilterRoute)]
+    public async Task Range_AtTheCeiling_IsAccepted(string route)
+    {
+        var response = await PostRangeAsync(route, new DateOnly(2029, 1, 1), new DateOnly(2030, 1, 1));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            $"{PlannerBatchLimits.MaxSummaryRangeDays} days counted inclusively is the ceiling, not one past it");
+    }
+
+    /// <summary>
+    /// One day past the ceiling is a 400 naming the limit. This is the assertion that has to fail if the
+    /// constant is raised by accident.
+    /// </summary>
+    [Theory]
+    [InlineData(TaskSummariesRoute)]
+    [InlineData(TrendRoute)]
+    [InlineData(CalendarFilterRoute)]
+    public async Task Range_OneDayOverTheCeiling_IsRejectedWithTheLimitInTheMessage(string route)
+    {
+        var response = await PostRangeAsync(route, new DateOnly(2029, 1, 1), new DateOnly(2030, 1, 2));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync(CancellationToken))
+            .Should().Contain(PlannerBatchLimits.MaxSummaryRangeDays.ToString(),
+                "the caller has to be told what the ceiling is to narrow its window under it");
+    }
+
+    /// <summary>
+    /// A single day is one day, not zero — the same inclusive count from the other end. The month grid's first
+    /// request after a day is picked is exactly this shape.
+    /// </summary>
+    [Theory]
+    [InlineData(TaskSummariesRoute)]
+    [InlineData(TrendRoute)]
+    [InlineData(CalendarFilterRoute)]
+    public async Task Range_OfASingleDay_IsAccepted(string route)
+    {
+        var response = await PostRangeAsync(route, new DateOnly(2029, 1, 1), new DateOnly(2029, 1, 1));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    /// <summary>
+    /// A backwards range is rejected on every one of the three, rather than silently answered as empty. Asserted
+    /// alongside the ceiling deliberately: the two rules are ordered — the length check is <c>When(Until >= From)</c>,
+    /// so an inverted range yields a negative length that would otherwise sail under the ceiling unnoticed.
+    /// </summary>
+    [Theory]
+    [InlineData(TaskSummariesRoute)]
+    [InlineData(TrendRoute)]
+    [InlineData(CalendarFilterRoute)]
+    public async Task Range_WithUntilBeforeFrom_IsRejectedOnEveryRangeRoute(string route)
+    {
+        var response = await PostRangeAsync(route, new DateOnly(2029, 4, 10), new DateOnly(2029, 4, 1));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>
+    /// <c>PERF-2</c>, closed: <c>calendar/filter</c> takes the same window as its two siblings and now carries
+    /// the same ceiling (<c>CalendarFilterValidator</c>, wired explicitly on <c>FilterCalendarEndpoint</c>
+    /// rather than by FastEndpoints' convention binding). A two-century range is the shape the finding named,
+    /// and all three routes turn it away.
+    /// </summary>
+    [Theory]
+    [InlineData(TaskSummariesRoute)]
+    [InlineData(TrendRoute)]
+    [InlineData(CalendarFilterRoute)]
+    public async Task Range_TwoCenturies_IsRejectedOnEveryRangeRoute(string route)
+    {
+        var response = await PostRangeAsync(route, new DateOnly(1900, 1, 1), new DateOnly(2100, 1, 1));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "an unbounded window is the only way any of these three reads can get expensive");
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
+
+    /// <summary>The one wire shape all three range routes share — which is the whole reason they share a ceiling.</summary>
+    private async Task<HttpResponseMessage> PostRangeAsync(string route, DateOnly from, DateOnly until) =>
+        await CreateClient().PostAsJsonAsync(route, new { From = from, Until = until }, JsonOpts, CancellationToken);
 
     private async Task<PlanVsActualTrendResponse> GetTrendAsync(DateOnly from, DateOnly until)
     {

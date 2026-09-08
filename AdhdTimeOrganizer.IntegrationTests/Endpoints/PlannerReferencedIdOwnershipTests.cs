@@ -46,6 +46,7 @@ public class PlannerReferencedIdOwnershipTests(AppDbContextFixture fixture) : Po
     private const string TaskRoute = "/api/planner-task";
     private const string SettingsRoute = "/api/planner/settings";
     private const string ApplyTemplateRoute = "/api/calendar/apply-planner-template";
+    private const string ApplyTemplateBatchRoute = "/api/calendar/apply-planner-template/batch";
 
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
 
@@ -280,6 +281,58 @@ public class PlannerReferencedIdOwnershipTests(AppDbContextFixture fixture) : Po
             "one bad line rejects the whole apply — the legitimate line beside it must not be written either");
     }
 
+    /// <summary>
+    /// The batch apply is the one where <b>where</b> the guard sits is load-bearing, not just whether it
+    /// exists. <c>ApplyTemplateBatchPlannerTaskEndpoint</c> applies and commits each day on its own, in
+    /// request order, precisely so that one bad day cannot undo the days before it — so a guard moved into
+    /// the per-day loop (or re-derived per day) would answer 404 having already written the foreign activity
+    /// onto every day ahead of the failure, and the status code alone would look identical. Three days, so a
+    /// per-day check would have committed two of them.
+    /// </summary>
+    [Fact(DisplayName = "SEC-1: a batch apply naming another user's activity writes to none of the days")]
+    public async Task ApplyTemplateBatch_WithForeignActivityId_WritesNoDay()
+    {
+        var (_, foreignActivityId) = await SeedForeignUserWithActivityAsync("foreign-template-batch");
+
+        long ownActivityId, templateId;
+        long[] calendarIds;
+        await using (var db = CreateDbContext())
+        {
+            ownActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "own-template-batch", UserId, CancellationToken);
+            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, ct: CancellationToken);
+            calendarIds =
+            [
+                await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2034, 7, 21), UserId, CancellationToken),
+                await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2034, 7, 22), UserId, CancellationToken),
+                await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2034, 7, 23), UserId, CancellationToken)
+            ];
+        }
+
+        var response = await CreateClient().PostAsJsonAsync(ApplyTemplateBatchRoute, new
+        {
+            TemplateId = templateId,
+            CalendarIds = calendarIds,
+            ConflictResolution = "Ignore",
+            TasksFromTemplate = new[]
+            {
+                TaskBody(ownActivityId, 8),
+                TaskBody(foreignActivityId, 9)
+            }
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            "the task list is shared by every day, so a foreign id in it is a bad request for the whole batch — not a per-day succeeded:false");
+
+        (await CountTasksAsync(t => calendarIds.Contains(t.CalendarId))).Should().Be(0,
+            "the check runs once, before the first day is applied and committed");
+
+        await using var assertDb = CreateDbContext();
+        var template = await assertDb.Set<TaskPlannerDayTemplate>().SingleAsync(t => t.Id == templateId, CancellationToken);
+        template.UsageCount.Should().Be(0);
+        (await assertDb.Set<Calendar>().CountAsync(c => calendarIds.Contains(c.Id) && c.AppliedTemplateId != null, CancellationToken))
+            .Should().Be(0, "a day stamped with the template it never received is the trace a per-day guard would leave");
+    }
+
     // ---- DefaultApplyTemplateId --------------------------------------------------------------------
 
     /// <summary>
@@ -486,5 +539,75 @@ public class TodoListItemFanOutUserScopingTests(AppDbContextFixture fixture) : P
             "the publisher's own task still has to follow the item — the control for the assertion below");
         tasks[victimTaskId].Status.Should().Be(PlannerTaskStatus.NotStarted,
             "the handler's UserId predicate is what keeps one user's fan-out off another user's day, with the query filter off");
+    }
+
+    /// <summary>
+    /// The same rule over the real route, which is the half <c>SEC-1</c> leaves behind: a task pointing at a
+    /// stranger's to-do item can no longer be <i>created</i>, but rows written before the guard existed still
+    /// carry one, and this is the request that would fire on them.
+    /// </summary>
+    /// <remarks>
+    /// It passes for a different reason than the test above, which is why both are here. Under HTTP the
+    /// ambient <c>HttpContext</c> flows into the handler's fresh scope, so the global query filter binds to
+    /// the toggling user and hides the other user's task regardless of the handler's own predicate — this
+    /// pinned the accidental pass before <c>SEC-2</c> and pins the deliberate one after it. The pair is the
+    /// point: remove the predicate and only the sibling fails; lose the filter and only this one does.
+    /// </remarks>
+    [Fact(DisplayName = "SEC-2: toggling a to-do item over HTTP cannot flip another user's task linked to it")]
+    public async Task TodoListItemToggle_AsItemOwner_LeavesAnotherUsersLinkedTaskAlone()
+    {
+        var itemOwnerId = await ActivityMergeTestSupport.SecondUserAsync(
+            Fixture, $"todo-toggle-scoping-{Guid.NewGuid():N}@test.com");
+
+        long itemId, itemOwnerTaskId, otherUsersTaskId;
+        await using (var db = CreateDbContext())
+        {
+            var itemOwnerActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "toggle-owner", itemOwnerId, CancellationToken);
+            var otherActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "toggle-other", UserId, CancellationToken);
+
+            var priority = new TaskPriority { UserId = itemOwnerId, Text = "Normal", Color = "#556677", Priority = 1 };
+            db.Set<TaskPriority>().Add(priority);
+            await db.SaveChangesAsync(CancellationToken);
+
+            var item = new TodoListItem { UserId = itemOwnerId, ActivityId = itemOwnerActivityId, TaskPriorityId = priority.Id };
+            db.Set<TodoListItem>().Add(item);
+            await db.SaveChangesAsync(CancellationToken);
+            itemId = item.Id;
+
+            // Both on today: the handler only follows the item onto the user's current day.
+            var itemOwnerCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, Today, itemOwnerId, CancellationToken);
+            var otherCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, Today, UserId, CancellationToken);
+
+            itemOwnerTaskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
+                db, itemOwnerActivityId, itemOwnerCalendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), itemOwnerId, ct: CancellationToken);
+
+            // The pre-SEC-1 row: another user's task carrying the item owner's item id. Seeded directly
+            // because POST /planner-task now refuses to write it.
+            otherUsersTaskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
+                db, otherActivityId, otherCalendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), UserId, ct: CancellationToken);
+
+            foreach (var id in new[] { itemOwnerTaskId, otherUsersTaskId })
+            {
+                var task = await db.Set<PlannerTask>().IgnoreQueryFilters().SingleAsync(t => t.Id == id, CancellationToken);
+                task.TodolistItemId = itemId;
+            }
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        await using var itemOwnerFactory = CreateFactory(["User"], itemOwnerId);
+        var response = await itemOwnerFactory.CreateClient().PatchAsJsonAsync(
+            "api/todo-list-item/toggle-is-done", new { Ids = new[] { itemId }, ForceValue = true }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var verifyDb = CreateDbContext();
+        var after = await verifyDb.Set<PlannerTask>().IgnoreQueryFilters()
+            .Where(t => t.Id == itemOwnerTaskId || t.Id == otherUsersTaskId)
+            .ToDictionaryAsync(t => t.Id, CancellationToken);
+
+        after[itemOwnerTaskId].Status.Should().Be(PlannerTaskStatus.Completed,
+            "the fan-out still has to reach the toggling user's own day — the control for the assertion below");
+        after[otherUsersTaskId].Status.Should().Be(PlannerTaskStatus.NotStarted,
+            "one user ticking their to-do item must not complete work on somebody else's day");
     }
 }

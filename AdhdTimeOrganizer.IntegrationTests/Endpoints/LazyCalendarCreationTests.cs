@@ -3,12 +3,15 @@ using System.Net.Http.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.IntegrationTests.Reminders;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
@@ -90,6 +93,10 @@ public class LazyCalendarCreationTests(AppDbContextFixture fixture) : PostgresTe
     [InlineData(2033, 4, 19, DayType.Workday, null)]
     // Slovak Constitution Day 2034, on a Friday — a workday that still carries its holiday name.
     [InlineData(2034, 9, 1, DayType.Workday, "Deň Ústavy Slovenskej republiky")]
+    // Christmas Day 2034 — a Monday. There is no Holiday member in DayType (DOC-2), and
+    // CalendarDayFactory:35-37 states the rule: "a holiday on a Tuesday is still a Workday row with a
+    // HolidayName." A day type derived from the holiday rather than the weekday would fail here.
+    [InlineData(2034, 12, 25, DayType.Workday, "Prvý sviatok vianočný")]
     public async Task ALazilyCreatedDay_CarriesTheSameMetadataTheSeederWouldHaveGivenIt(
         int year, int month, int day, DayType expectedDayType, string? expectedHoliday)
     {
@@ -221,6 +228,172 @@ public class LazyCalendarCreationTests(AppDbContextFixture fixture) : PostgresTe
         (await FindCalendarAsync(to)).Should().NotBeNull();
         (await GetPlanAsync(to)).Tasks.Should().HaveCount(1);
         (await GetPlanAsync(from)).Tasks.Should().BeEmpty();
+    }
+
+    // ─── the provisioner's race branch ───────────────────────────────────────
+
+    /// <summary>
+    /// Two devices starting the same morning's first task on a day nobody has planned. <c>(user_id, date)</c>
+    /// is unique, so one of the two inserts loses — and the loser must still land its task, because a race it
+    /// never knew it was in is not something the user can act on.
+    /// <para>
+    /// This is the endpoint-level shape of
+    /// <see cref="TheLoserOfTheCalendarRace_AdoptsTheWinnersRow_AndStagesNothingOnTheContext"/>, which forces
+    /// the same branch deterministically. Two requests may serialise and never actually collide, in which case
+    /// this passes vacuously rather than flaking — it is a regression pin, repeated over several dates to
+    /// raise the odds, and the deterministic test is the proof.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData(2029, 6, 14)]
+    [InlineData(2029, 6, 15)]
+    [InlineData(2029, 6, 16)]
+    public async Task TwoConcurrentTasksOnAnUnplannedDay_BothLand_OnOneSharedDay(int year, int month, int day)
+    {
+        var activityId = await SeedActivityAsync($"lazy-race-{year}-{month}-{day}");
+        var date = new DateOnly(year, month, day);
+
+        await AssertNoCalendarAsync(date);
+
+        var responses = await Task.WhenAll(new[] { 8, 10 }.Select(hour =>
+            CreateUserRoleClient().PostAsJsonAsync(
+                "api/planner-task", TaskBody(activityId, hour, date), JsonOpts, CancellationToken)));
+
+        responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.Created,
+            "the loser reads the existing row rather than failing a write the user has every right to make");
+
+        await using var verify = CreateDbContext();
+        var calendars = await verify.Set<Calendar>().IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.UserId == UserId && c.Date == date)
+            .ToListAsync(CancellationToken);
+        calendars.Should().ContainSingle("(user_id, date) is unique — one day, however many writers");
+
+        var tasks = await verify.Set<PlannerTask>().IgnoreQueryFilters().AsNoTracking()
+            .CountAsync(t => t.CalendarId == calendars.Single().Id, CancellationToken);
+        tasks.Should().Be(2,
+            "both tasks hang off the one day that survived; drop the detach and the loser's own task goes down "
+            + "with the calendar insert its request re-sends");
+    }
+
+    /// <summary>
+    /// The detach in <c>CalendarProvisioner</c>'s <c>DbUpdateException</c> branch, forced rather than raced:
+    /// the winner's row is committed from a second context, so the provisioner's read misses it and its insert
+    /// is the one that loses.
+    /// <para>
+    /// The assertion that matters is the last one. A failed insert stays <c>Added</c> on the change tracker,
+    /// so without the detach the <i>caller's</i> next <c>SaveChangesAsync</c> — the endpoint's own write, not
+    /// anything the provisioner does — re-sends the duplicate calendar and takes the user's task down with it.
+    /// Nothing about this method's return value shows that, which is why every single-writer test above misses
+    /// it.
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "The loser of the calendar race adopts the winner's row and stages nothing on the context")]
+    public async Task TheLoserOfTheCalendarRace_AdoptsTheWinnersRow_AndStagesNothingOnTheContext()
+    {
+        var activityId = await SeedActivityAsync("lazy-race-detach");
+        var date = new DateOnly(2029, 7, 2);
+
+        await using var scope = Fixture.AdminAndUserFactory.Services.CreateAsyncScope();
+        var provisioner = scope.ServiceProvider.GetRequiredService<ICalendarProvisioner>();
+        var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+
+        // The winner, committed from a context this scope knows nothing about.
+        long winnerId;
+        await using (var other = CreateDbContext())
+            winnerId = await PlanningTestSeedHelper.SeedCalendarAsync(other, date, UserId, CancellationToken);
+
+        var resolved = await provisioner.EnsureForDateAsync(UserId, date, CancellationToken);
+
+        resolved.Id.Should().Be(winnerId, "the loser adopts the row that exists instead of failing");
+
+        db.ChangeTracker.Entries<Calendar>().Should().NotContain(e => e.State == EntityState.Added,
+            "the failed insert has to be detached or it is still staged for whatever saves next");
+
+        // The caller's own write, on the caller's own context — the part the detach actually protects.
+        db.Set<PlannerTask>().Add(new PlannerTask
+        {
+            UserId = UserId,
+            ActivityId = activityId,
+            CalendarId = winnerId,
+            StartTime = new TimeOnly(9, 0),
+            EndTime = new TimeOnly(10, 0),
+            IsBackground = false,
+            Status = PlannerTaskStatus.NotStarted
+        });
+        await db.SaveChangesAsync(CancellationToken);
+
+        await using var verify = CreateDbContext();
+        (await verify.Set<Calendar>().IgnoreQueryFilters()
+            .CountAsync(c => c.UserId == UserId && c.Date == date, CancellationToken))
+            .Should().Be(1);
+        (await verify.Set<PlannerTask>().IgnoreQueryFilters()
+            .CountAsync(t => t.CalendarId == winnerId, CancellationToken))
+            .Should().Be(1, "losing the calendar race costs the request nothing but a wasted insert");
+    }
+
+    // ─── acting for a user who is not the signed-in one ──────────────────────
+
+    /// <summary>
+    /// <c>FindAsync</c> ignores the query filter and scopes by hand, deliberately: the provisioner is *told*
+    /// which user to act for. Filtered by whoever happens to be signed in, the read would find nothing for
+    /// anyone else and try to insert a duplicate onto <c>(user_id, date)</c> — a 500 on a row that already
+    /// exists.
+    /// </summary>
+    [Fact(DisplayName = "Provisioning for another user finds that user's existing day, not nothing")]
+    public async Task ProvisioningForAnotherUser_ReadsTheirExistingDay()
+    {
+        var date = new DateOnly(2029, 7, 9);
+
+        long otherUserId, theirCalendarId;
+        await using (var db = CreateDbContext())
+        {
+            otherUserId = (await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken)).Id;
+            theirCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, date, otherUserId, CancellationToken);
+        }
+
+        // The ambient logged user in this scope is the test user, not the one being acted for.
+        await using var scope = Fixture.AdminAndUserFactory.Services.CreateAsyncScope();
+        var provisioner = scope.ServiceProvider.GetRequiredService<ICalendarProvisioner>();
+
+        var resolved = await provisioner.EnsureForDateAsync(otherUserId, date, CancellationToken);
+
+        resolved.Id.Should().Be(theirCalendarId);
+
+        await using var verify = CreateDbContext();
+        (await verify.Set<Calendar>().IgnoreQueryFilters()
+            .CountAsync(c => c.UserId == otherUserId && c.Date == date, CancellationToken))
+            .Should().Be(1, "their day already existed; a filtered read would have inserted a second one");
+        (await verify.Set<Calendar>().IgnoreQueryFilters()
+            .CountAsync(c => c.UserId == UserId && c.Date == date, CancellationToken))
+            .Should().Be(0, "acting for someone else must not mint a day for the signed-in user");
+    }
+
+    /// <summary>
+    /// The mirror, and the control for the test above: with no row to find, the day it creates is owned by the
+    /// user it was told to act for — not by the one holding the scope.
+    /// </summary>
+    [Fact(DisplayName = "Provisioning for another user creates the day owned by them, not by the signed-in user")]
+    public async Task ProvisioningForAnotherUser_WithNoRow_CreatesOneOwnedByThem()
+    {
+        var date = new DateOnly(2029, 7, 10);
+
+        long otherUserId;
+        await using (var db = CreateDbContext())
+            otherUserId = (await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken)).Id;
+
+        await using var scope = Fixture.AdminAndUserFactory.Services.CreateAsyncScope();
+        var provisioner = scope.ServiceProvider.GetRequiredService<ICalendarProvisioner>();
+
+        var created = await provisioner.EnsureForDateAsync(otherUserId, date, CancellationToken);
+
+        created.UserId.Should().Be(otherUserId);
+
+        await using var verify = CreateDbContext();
+        var rows = await verify.Set<Calendar>().IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.Date == date)
+            .ToListAsync(CancellationToken);
+        rows.Should().ContainSingle("exactly one day, and only for the user it was asked about");
+        rows.Single().UserId.Should().Be(otherUserId);
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
