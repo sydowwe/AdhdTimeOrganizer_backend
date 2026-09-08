@@ -14,8 +14,14 @@ public static class TodoListExtensions
         if (groupFilter != null)
             query = query.Where(groupFilter);
 
-        var lastOrder = await query.MinAsync(e => (int?)e.DisplayOrder, ct) ?? 0;
-        return lastOrder != 0 ? lastOrder - settings.DisplayOrderGap : settings.DisplayOrderStart;
+        // (long?) not (int?): DisplayOrder is a bigint, and the cast would both overflow once the
+        // descending-by-gap scheme leaves int range and defeat the (user_id, task_priority_id,
+        // display_order) index, since CAST(...) is not sargable.
+        // HasValue, not a `!= 0` sentinel: MinAsync over long? already returns null for an empty
+        // group, and 0 is a legal DisplayOrder — the group whose lowest item sits at exactly 0 would
+        // otherwise be handed DisplayOrderStart again and collide with its own first item.
+        var lastOrder = await query.MinAsync(e => (long?)e.DisplayOrder, ct);
+        return lastOrder.HasValue ? lastOrder.Value - settings.DisplayOrderGap : settings.DisplayOrderStart;
     }
 
     public static async Task<long> GetNextDisplayOrder(this DbSet<TodoListItem> dbSet, TodoListSettings settings, long userId, long taskPriorityId, CancellationToken ct = default)

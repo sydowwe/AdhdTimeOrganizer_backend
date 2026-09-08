@@ -25,6 +25,12 @@ finding is confirmed at the file and line stated**, with the corrections listed 
 > note). `SEC-4` and `SEC-5` are untouched. Line numbers in `MoveTodoListItemEndpoint.cs`,
 > `ChangePriorityTodoListItemEndpoint.cs`, `CreateTodoListItemEndpoint.cs` and
 > `UpdateTodoListItemEndpoint.cs` are all stale below; the four files were rewritten.
+>
+> **Also 2026-09-09:** `CQ-2`, `CQ-3`, `PERF-6`, `CQ-13.3` and `DOC-1`'s leftover clause are **fixed as
+> one batch** — the first three are the same two lines of `TodoListExtensions.cs`, and `CQ-13.3`'s three
+> inlined copies had to go in the same commit or the fix would not have reached the seeder. Line numbers
+> in `TodoListExtensions.cs` and `seeder/dev/TodoListSeeder.cs` are stale below. `CQ-13.1` and `CQ-13.2`
+> remain open.
 
 | Change in this pass | Where |
 |---|---|
@@ -240,7 +246,7 @@ rest, matching the profile seam's precedent. Whatever is deleted must still be c
 
 `Doc impact: domain-map.md → Invariants (new: the (UserId, ActivityId, TodoListId) uniqueness is what the merge seam must collapse onto)`
 
-### CQ-2 🟠 `GetNextDisplayOrder`'s `!= 0` sentinel conflates "empty group" with "an item at order 0"
+### CQ-2 🟠 ✅ FIXED 2026-09-09 · `GetNextDisplayOrder`'s `!= 0` sentinel conflates "empty group" with "an item at order 0"
 
 `infrastructure/persistence/TodoListExtensions.cs:17-18`:
 
@@ -274,9 +280,20 @@ return lastOrder.HasValue ? lastOrder.Value - settings.DisplayOrderGap : setting
 
 Same change is needed in the three inlined copies in the dev seeder (CQ-13).
 
+**Fixed 2026-09-09** exactly as written, with `CQ-3`, `PERF-6` and `CQ-13.3` in the same commit — the
+two defects are one expression, and the seeder's three copies carried both, so a fix landing only in
+the extension would have left the seeder minting orders by the old rule. The reasoning for both halves
+now sits as a comment on the two lines, since the `?? 0` reads like a harmless default.
+
+Pinned by `TodoListDisplayOrderMintingTests` (`AdhdTimeOrganizer.IntegrationTests/Endpoints/`): seed one
+item at `DisplayOrder = 0`, create one through the API, assert the minted order is **below** the group's
+minimum. The assertion is on the row's order, not on the 201 — nothing throws in this case, the group's
+ordering just stops descending, so the status code would pass against the bug. It asserts `< 0` rather
+than `0 - DisplayOrderGap`, because the gap and the derived start are configuration.
+
 `Doc impact: none`
 
-### CQ-3 🟠 The same method casts a `bigint` column to `int` in SQL
+### CQ-3 🟠 ✅ FIXED 2026-09-09 · The same method casts a `bigint` column to `int` in SQL
 
 `infrastructure/persistence/TodoListExtensions.cs:17` — `MinAsync(e => (int?)e.DisplayOrder, ct)` on
 `BaseTodoListItem.DisplayOrder`, which is `long` (`domain/model/entity/BaseTodoListItem.cs:11`).
@@ -289,6 +306,12 @@ defeats any index on `display_order`, since the cast is not sargable.
 
 **Fix.** `(long?)`. Folded into CQ-2's fix; called out separately because the `int` cast is also
 present in the dev seeder and would survive a partial fix.
+
+**Fixed 2026-09-09** with `CQ-2`, and the reason it was called out separately is the reason the seeder
+went in the same commit. Pinned by its own case in `TodoListDisplayOrderMintingTests`: a group holding
+one row at `5_000_000_000` — past `int.MaxValue` — still accepts a new item. Before the fix that request
+died on `integer out of range`, so this half is the one case in the pair that is loud rather than silent.
+The non-sargable half (`PERF-6`) is not observable from a test and rides on the same one-word change.
 
 `Doc impact: none`
 
@@ -553,7 +576,12 @@ introduces them.
    dev, but the comment will mislead whoever next reads it for the per-user seeder contract.
 3. **`:80-93` inlines three copies of `GetNextDisplayOrder`** rather than calling the extension six
    lines away in the same project — carrying both CQ-2's `!= 0` sentinel and CQ-3's `(int?)` cast into a
-   third, fourth and fifth location. A fix to the extension will silently not reach them.
+   third, fourth and fifth location. A fix to the extension will silently not reach them. **✅ FIXED
+   2026-09-09** (`CQ-13.3`), in the same commit as `CQ-2`/`CQ-3` for the reason the finding gives: the
+   fourteen inlined lines are now three calls to the extension, so there is one copy of the rule again.
+   The `todayPriority != null ? todayPriority.Id : 0` ternaries collapse to `?.Id ?? 0` — a priority the
+   dev fixture did not find still yields no group and therefore `DisplayOrderStart`, unchanged. `CQ-13.1`
+   (the file name) and `CQ-13.2` (the comment) are still open.
 
 **Fix.** Rename the file; correct the comment; replace `:80-93` with three calls to
 `dbContext.Set<TodoListItem>().GetNextDisplayOrder(settings.Value, userId, priorityId, ct)`.
@@ -701,7 +729,7 @@ obvious home.
 | `TodoList.cs:17-18` | `ItemCount` / `CompletedCount` are unmapped computed properties over `TodoListItemColl` — a second, in-memory copy of the projection above | Nothing reads them today, but any caller that does silently triggers a full collection load per list | Delete them; the projection is the only correct source | `PERF-3` |
 | `GetFilterSortTodoListCategoryEndpoint.cs:35`, `:42-43` | The `HideEmpty` clause is a correlated `EXISTS` over `todo_list`, and a second `AnyAsync` round trip fires unconditionally on every call | Two queries where one would do; the `EXISTS` has no supporting index | Fold the uncategorized check into the same query as a `bool` column; add the index below | `PERF-4` |
 | `TaskPriorityConfiguration.cs:22` | `HasIndex(t => t.Priority)` — a non-leading-`UserId` index on a strictly user-scoped lookup | No query in the slice can use it (every read is filtered on `user_id` first); pure write and storage cost on a table with ~4 rows per user | Drop it; the composite at `:19` already serves every access path | `PERF-5` |
-| `TodoListExtensions.cs:17` | `CAST(display_order AS integer)` in the `MIN` projection | Not sargable — defeats any index on `(user_id, task_priority_id, display_order)`, so every item creation scans the group | Fixed by CQ-3 | `PERF-6` |
+| `TodoListExtensions.cs:17` | `CAST(display_order AS integer)` in the `MIN` projection | Not sargable — defeats any index on `(user_id, task_priority_id, display_order)`, so every item creation scans the group | Fixed by CQ-3 | `PERF-6` ✅ **FIXED 2026-09-09** (with `CQ-2`/`CQ-3`/`CQ-13.3`; the index itself is still only a recommendation below) |
 
 ### Indexes that should exist
 
@@ -736,7 +764,12 @@ One thing the original fix note asked for did **not** land, and is worth adding 
 `MaxItems` reads like a cap and is not enforced as one — it is only a multiplier. That confusion is the
 heart of `CQ-2`, and the row is the natural place to say so.
 
-`Doc impact: domain-map.md → Configuration table (one clause: MaxItems is a multiplier, not a cap)`
+**Done 2026-09-09**, with `CQ-2`, as the finding asks. `domain-map.md:53` now says outright that
+`MaxItems` is a multiplier and not a cap, and what it actually buys — how far above zero
+`DisplayOrderStart` begins, i.e. how many items fit before the descending gaps cross zero. That is the
+number `CQ-2` turns on, so the row states it rather than leaving the next reader to multiply.
+
+`Doc impact: domain-map.md → Configuration table (one clause: MaxItems is a multiplier, not a cap)` — **done**
 
 ### DOC-2 🟡 The dev seeder's file name — doc side fixed, code side open
 

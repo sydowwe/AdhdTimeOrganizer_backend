@@ -60,7 +60,7 @@ public static class TodoListTestSeedHelper
     public static async Task<long> SeedTodoListItemAsync(
         DbContext db, long activityId, long taskPriorityId, long todoListId,
         long userId = TestUserId, int? totalCount = null, int? doneCount = null, bool isDone = false,
-        List<TodoListStep>? steps = null, CancellationToken ct = default)
+        List<TodoListStep>? steps = null, long displayOrder = 1000, CancellationToken ct = default)
     {
         var entity = new TodoListItem
         {
@@ -71,7 +71,7 @@ public static class TodoListTestSeedHelper
             TotalCount = totalCount,
             DoneCount = doneCount,
             IsDone = isDone,
-            DisplayOrder = 1000,
+            DisplayOrder = displayOrder,
             Steps = steps ?? []
         };
         db.Set<TodoListItem>().Add(entity);

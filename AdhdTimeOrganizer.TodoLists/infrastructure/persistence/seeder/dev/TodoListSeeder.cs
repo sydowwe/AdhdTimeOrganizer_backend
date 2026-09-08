@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using Microsoft.Extensions.Options;
 using Sydowwe.Framework.config.dependencyInjection;
@@ -76,21 +77,12 @@ public class TodoListItemSeeder(
 
         var todoLists = new List<TodoListItem>();
 
-        // Get initial display order for each priority (simulate GetNextDisplayOrder logic)
-        var lastOrderToday = await dbContext.Set<TodoListItem>()
-            .Where(tl => tl.UserId == userId && tl.TaskPriorityId == (todayPriority != null ? todayPriority.Id : 0))
-            .MinAsync(tl => (int?)tl.DisplayOrder) ?? 0;
-        var nextOrderToday = lastOrderToday != 0 ? lastOrderToday - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
-
-        var lastOrderThisWeek = await dbContext.Set<TodoListItem>()
-            .Where(tl => tl.UserId == userId && tl.TaskPriorityId == (thisWeekPriority != null ? thisWeekPriority.Id : 0))
-            .MinAsync(tl => (int?)tl.DisplayOrder) ?? 0;
-        var nextOrderThisWeek = lastOrderThisWeek != 0 ? lastOrderThisWeek - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
-
-        var lastOrderThisMonth = await dbContext.Set<TodoListItem>()
-            .Where(tl => tl.UserId == userId && tl.TaskPriorityId == (thisMonthPriority != null ? thisMonthPriority.Id : 0))
-            .MinAsync(tl => (int?)tl.DisplayOrder) ?? 0;
-        var nextOrderThisMonth = lastOrderThisMonth != 0 ? lastOrderThisMonth - settings.Value.DisplayOrderGap : settings.Value.DisplayOrderStart;
+        // Get initial display order for each priority — the extension, not a copy of it: the inlined
+        // version carried its own `!= 0` sentinel and (int?) cast, so a fix to GetNextDisplayOrder
+        // silently did not reach the seeder.
+        var nextOrderToday = await dbContext.Set<TodoListItem>().GetNextDisplayOrder(settings.Value, userId, todayPriority?.Id ?? 0);
+        var nextOrderThisWeek = await dbContext.Set<TodoListItem>().GetNextDisplayOrder(settings.Value, userId, thisWeekPriority?.Id ?? 0);
+        var nextOrderThisMonth = await dbContext.Set<TodoListItem>().GetNextDisplayOrder(settings.Value, userId, thisMonthPriority?.Id ?? 0);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
