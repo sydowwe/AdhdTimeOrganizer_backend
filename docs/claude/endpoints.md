@@ -28,7 +28,7 @@ request: `TRequest : ICreateRequest<TEntity>` exposes `TEntity ToEntity`;
 |---|---|---|
 | `BaseCreateEndpoint<TEntity, TRequest>` | POST | Standard create — `req.ToEntity`, saves, returns new `Id` (201). Hooks: `BeforeMapping`/`AfterMapping`/`AfterSave` |
 | `BaseUpdateEndpoint<TEntity, TRequest>` | PUT `/{id}` | Standard full update — `req.UpdateEntity(entity)` (transactional). Hooks: `BeforeMapping`/`UpdateEntityAsync`/`AfterMapping`/`AfterSave` |
-| `BasePatchEndpoint<TEntity, TRequest, TResponse>` | PATCH `/{id}` | Partial update — implement `Mapping(entity, req)`. Hook: `AfterSave` |
+| `BasePatchEndpoint<TEntity, TRequest, TResponse>` | PATCH `/{id}` | Partial update — implement `Mapping(entity, req)`. Hooks: `AuthorizeAsync` (403 on the routed row) / `BeforeMapping` (verify caller-supplied FK ids, 404) / `AfterMapping` (derive from what `Mapping` wrote) / `AfterSave`. Never override `HandleAsync` — the exception mapping and the cancellation guard live there |
 | `BaseDeleteEndpoint<TEntity>` | DELETE `/{id}` | Single entity hard delete by id. Hooks: `BeforeDeleteAsync` (read what the delete/cascade is about to destroy) / `AfterSave` |
 | `BaseSoftDeleteEndpoint<TEntity>` | DELETE `/{id}` | Soft delete (`ISoftDeletable.IsActive = false`) |
 | `BaseBatchDeleteEndpoint<TEntity>` | POST `/batch-delete` | Delete multiple entities by id list. Hooks: `BeforeDeleteAsync` / `AfterSave`, both taking the whole batch |

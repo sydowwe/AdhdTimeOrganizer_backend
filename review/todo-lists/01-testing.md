@@ -200,6 +200,13 @@ Prompts are paste-ready and self-contained; each names the route, the file to cr
 and the KnownGap convention. They live beside this review because they are generated from it and are
 disposable — the real tests belong in `AdhdTimeOrganizer.IntegrationTests`.
 
+> **2026-09-09:** `TEST-1`, `TEST-2` and `TEST-8` are **partly landed** as
+> `AdhdTimeOrganizer.IntegrationTests/Endpoints/TodoListReferencedIdOwnershipTests.cs` (12 cases),
+> written alongside the `SEC-1`/`SEC-2`/`SEC-3`/`CQ-6`/`CQ-7` fixes. It covers the ownership half of all
+> three, the unique-index 409 on move, and the `DisplayOrder` recompute on both patches. The rest of
+> each prompt — the validation and no-op cases, and `TEST-2`'s untouched-siblings assertion — is still
+> open; the prompts stand.
+
 | ID | Gap | Sev | Related finding | Prompt |
 |---|---|---|---|---|
 | `TEST-1` | `PATCH /todo-list-item/{id}/move` — zero tests, incl. the unique-index 409 the endpoint hand-maps | 🟠 | SEC-3, CQ-7 | [MoveTodoListItem.md](testingPrompts/MoveTodoListItem.md) |

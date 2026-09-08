@@ -87,8 +87,8 @@ than in Framework: each is typed on `BaseTodoListItem`.
 | `CreateTodoListItemEndpoint` | Endpoint | Create | `…/todoListItem/command/CreateTodoListItemEndpoint.cs` |
 | `UpdateTodoListItemEndpoint` | Endpoint | Full update (the frontend round-trips the whole item, pairing included) | `…/todoListItem/command/UpdateTodoListItemEndpoint.cs` |
 | `DeleteTodoListItemEndpoint` | Endpoint | Delete | `…/todoListItem/command/DeleteTodoListItemEndpoint.cs` |
-| `MoveTodoListItemEndpoint` | Endpoint | `PATCH …/{id}/move` — move to another list and recompute `DisplayOrder`. Overrides `HandleAsync`, so it reproduces the base's exception mapping by hand to keep the 409 on the unique index | `…/todoListItem/command/MoveTodoListItemEndpoint.cs` |
-| `ChangePriorityTodoListItemEndpoint` | Endpoint | `PATCH …/{id}/priority` | `…/todoListItem/command/ChangePriorityTodoListItemEndpoint.cs` |
+| `MoveTodoListItemEndpoint` | Endpoint | `PATCH …/{id}/move` — verifies the destination list in `BeforeMapping`, moves, recomputes `DisplayOrder` in `AfterMapping`. Everything else, including the 409 on the unique index, comes from `BasePatchEndpoint` | `…/todoListItem/command/MoveTodoListItemEndpoint.cs` |
+| `ChangePriorityTodoListItemEndpoint` | Endpoint | `PATCH …/{id}/priority` — same three-hook shape. **`DisplayOrder` is grouped by `TaskPriorityId`, so the two columns move together**: changing the rank re-orders the item into the destination group | `…/todoListItem/command/ChangePriorityTodoListItemEndpoint.cs` |
 | `ChangeDisplayOrderTodoListItemEndpoint` | Endpoint | Reorder within a priority bucket | `…/todoListItem/command/ChangeDisplayOrderTodoListItemEndpoint.cs` |
 | `ToggleIsDoneTodoListItemEndpoint` | Endpoint | Tick / untick; publishes the Core completion event | `…/todoListItem/command/ToggleIsDoneTodoListItemEndpoint.cs` |
 | `ToggleStepIsDoneTodoListItemEndpoint` | Endpoint | Tick / untick one checklist step | `…/todoListItem/command/ToggleStepIsDoneTodoListItemEndpoint.cs` |
@@ -152,15 +152,30 @@ Which of these the database actually enforces, and which are only app-level:
    History: the daily recap reads logged time through Core's `ITodoListItemLoggedTimeSource` rather
    than touching `ActivityHistory`. *Compile-enforced*, and pinned from the other side by the route
    smoke tests.
-3. **Per-user scoping of *reads* is the DbContext's job**, via the named global filter on
-   `IEntityWithUser` — not the endpoints (`ApplyUserScoping` is a no-op virtual). *DB-enforced at
-   query time* as long as these entities stay `IEntityWithUser`. The seams and `TodoListExtensions`
-   deliberately pass an explicit `userId` on top of it.
-   **Reads only — any caller-supplied FK id is the endpoint's responsibility**, because writing a raw
-   `long` into an FK column satisfies the constraint whoever owns the target row.
-   `MoveTodoListItemEndpoint` shows the shape (look the row up through the caller's own filtered set,
-   404 when it is not there); Core's `CallerVisibleReferenceExtensions` is the same check generalised.
-   This slice's own create/update paths are **not** covered yet — that is its `SEC-1`.
+3. **Per-user scoping is two rules, not one**, and the second is the one that gets forgotten:
+
+   *(a) Reads* are the DbContext's job, via the named global filter on `IEntityWithUser` — not the
+   endpoints (`ApplyUserScoping` is a no-op virtual). *DB-enforced at query time* as long as these
+   entities stay `IEntityWithUser`. It is the **floor, not the ceiling**: the seams and
+   `TodoListExtensions` pass an explicit `userId` on top of it, because a filter can be lifted with
+   `IgnoreQueryFilters` and a query composed under one is then unscoped with no diff to show for it.
+
+   *(b) Every caller-supplied FK id on a **write** must be verified explicitly.* The filter does not
+   apply to writes at all: copying a raw `long` out of a request into an FK column satisfies the
+   constraint whoever owns the target row, and the row lands stamped with the caller's own `UserId`,
+   so nothing downstream can tell. The verification is Core's `CallerVisibleReferenceExtensions`
+   (`AllVisibleAsync` / `AllActivitiesVisibleAsync`), wrapped with its 404 answer by the slice's
+   `TodoListReferenceOwnershipExtensions` — **404, never 403**, because a 403 confirms the id exists
+   and makes another account's ids enumerable. It hangs off `BeforeMapping`, on `BaseCreateEndpoint`,
+   `BaseUpdateEndpoint` and — since `CQ-7` — `BasePatchEndpoint` too.
+   All four write paths are covered: create (`TodoListId`, `TaskPriorityId`,
+   `PairedLeisureActivityId`), update (`TaskPriorityId`, `PairedLeisureActivityId` — it carries no
+   `TodoListId`), change-priority (`PriorityId`) and move (`DestinationListId`); `ActivityId` on
+   create and update goes through `ActivityIdOwnershipExtensions`. Pinned by
+   `TodoListReferencedIdOwnershipTests`.
+   Still open on the *read* side: `SEC-4` — `BaseChangeDisplayOrderTodoListEndpoint:49` loads the
+   moved item on the filter alone, where every sibling lookup in the same request passes an explicit
+   `userId`.
 4. **`TodoListItem` is unique on `(UserId, ActivityId, TodoListId)`** — one item per activity per
    list. *DB-enforced* (unique index); surfaces as a 409 through the base endpoints' exception
    mapping.

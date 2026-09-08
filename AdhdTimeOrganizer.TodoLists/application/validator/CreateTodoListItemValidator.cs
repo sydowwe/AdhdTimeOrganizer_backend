@@ -24,8 +24,9 @@ public class CreateTodoListItemValidator : Validator<CreateTodoListItemRequest>
 
         // Bundling a task with its own activity is meaningless — the reward has to be a different
         // activity than the work. That the id exists and belongs to the caller is not checked here:
-        // the FK covers existence, and this slice cannot see ActivityProfiles to ask whether the
-        // activity is a leisure one. Offering only backlog entries is the picker's job.
+        // the FK covers existence, and ownership needs the principal, so it lives in the endpoint's
+        // BeforeMapping alongside the other three ids. This slice also cannot see ActivityProfiles to
+        // ask whether the activity is a leisure one — offering only backlog entries is the picker's job.
         RuleFor(x => x.PairedLeisureActivityId)
             .NotEqual(x => (long?)x.ActivityId)
             .When(x => x.PairedLeisureActivityId.HasValue)

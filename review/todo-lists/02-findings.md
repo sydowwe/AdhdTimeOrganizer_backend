@@ -18,6 +18,13 @@ finding is confirmed at the file and line stated**, with the corrections listed 
 >
 > **Also 2026-09-07:** `CQ-10` is **fixed**, all five sites. Line numbers in all five files have shifted.
 > The sentence above still holds for every other finding in this file.
+>
+> **2026-09-09:** `CQ-7`, `SEC-1`, `SEC-2`, `SEC-3`, `CQ-6` and `DOC-5` are **fixed as one batch** —
+> `CQ-7`'s framework hook is what made the other five cheap, exactly as it predicted. `SEC-1` was then
+> extended to the PUT surface, which the finding does not name but which has the same hole (see its
+> note). `SEC-4` and `SEC-5` are untouched. Line numbers in `MoveTodoListItemEndpoint.cs`,
+> `ChangePriorityTodoListItemEndpoint.cs`, `CreateTodoListItemEndpoint.cs` and
+> `UpdateTodoListItemEndpoint.cs` are all stale below; the four files were rewritten.
 
 | Change in this pass | Where |
 |---|---|
@@ -55,7 +62,7 @@ finding is confirmed at the file and line stated**, with the corrections listed 
 
 ## 5. Security & authorization
 
-### SEC-1 🟠 `CreateTodoListItemEndpoint` accepts another user's `TodoListId` and `TaskPriorityId`
+### SEC-1 🟠 ✅ FIXED 2026-09-09 · `CreateTodoListItemEndpoint` accepts another user's `TodoListId` and `TaskPriorityId`
 
 `AdhdTimeOrganizer.TodoLists/application/endpoint/todoListItem/command/CreateTodoListItemEndpoint.cs:27`
 (`entity.TodoListId = req.TodoListId;`), with the FK ids arriving unchecked from
@@ -80,9 +87,38 @@ a value they were allowed to send.
 on either miss. `AfterMapping` already returns `bool`, so the plumbing exists — the false path is what
 it is for.
 
-`Doc impact: domain-map.md → Invariants (3 — restate as "the filter scopes reads; FK ids on write must be verified explicitly")`
+**Fixed 2026-09-09** in `BeforeMapping` rather than `AfterMapping` — the hole is in the ids, not in the
+mapped entity, and checking before `req.ToEntity` runs keeps the rejected request from constructing
+anything. Core's `CallerVisibleReferenceExtensions.AllVisibleAsync` is the check, not a hand-rolled
+`AnyAsync`: the finding's fix and that helper are the same query, and there is one copy of it.
 
-### SEC-2 🟠 `ChangePriorityTodoListItemEndpoint` writes an unverified `TaskPriorityId`
+Two departures from the finding as written:
+
+- **A third id, `PairedLeisureActivityId`.** The same hole in the same expression, one line away, and
+  `CreateTodoListItemValidator:29-32` says outright that ownership is not its job. Checked through
+  `AllActivitiesVisibleAsync`, which lifts the archived filter — pairing with an activity the user
+  archived is legitimate, 404ing it would not be. (`ActivityId` was already covered by
+  `EnsureOwnsActivityAsync`; that call stays, first.)
+- **The PUT, on a follow-up.** `UpdateTodoListItemEndpoint` rewrites `TaskPriorityId` and
+  `PairedLeisureActivityId` with only the activity guard on them, so the same repoint was reachable on
+  an existing item — and worse, since it re-points a row that already exists rather than creating a new
+  one, so there is nothing new for anybody to notice. Out of this finding's scope as stated (it names
+  the create endpoint), so it was flagged rather than silently absorbed, then fixed on request in the
+  same batch. It carries no `TodoListId`, so it is two ids, not three.
+
+With four write paths and six ids between them, the check and its 404 answer are wrapped once in
+`application/endpoint/extensions/TodoListReferenceOwnershipExtensions.cs` — an `IEndpoint` extension, so
+the patch bases (`Endpoint<TRequest>`) and the create/update bases (`Endpoint<TRequest, long>`) share it.
+It reports on the offending **field**, the way `ActivityIdOwnershipExtensions` does, rather than a bare
+`AddError`.
+
+Pinned by `TodoListReferencedIdOwnershipTests` (`AdhdTimeOrganizer.IntegrationTests/Endpoints/`), which
+asserts on rows as well as status codes — the corrupted state this finding describes is a row, and a
+404 alone would not prove nothing was written.
+
+`Doc impact: domain-map.md → Invariants (3 — restate as "the filter scopes reads; FK ids on write must be verified explicitly")` — **done**, see `DOC-5`
+
+### SEC-2 🟠 ✅ FIXED 2026-09-09 · `ChangePriorityTodoListItemEndpoint` writes an unverified `TaskPriorityId`
 
 `application/endpoint/todoListItem/command/ChangePriorityTodoListItemEndpoint.cs:30`
 (`entity.TaskPriorityId = req.PriorityId;`), validator is `GreaterThan(0)` only
@@ -95,9 +131,14 @@ belongs in an `OnBeforeHandleAsync`/overridden handler or the validator gains a 
 **Fix.** Verify ownership before assigning; 404 on miss. If `BasePatchEndpoint` grows an async
 `ValidateAsync` hook, this and SEC-1 should both use it rather than each hand-rolling.
 
+**Fixed 2026-09-09**, and the conditional in that last sentence is what happened: `BasePatchEndpoint`
+grew the hook under `CQ-7`, so this is a `BeforeMapping` override calling the same
+`AllVisibleAsync` the create path uses. `Mapping` stays synchronous and untouched. `CQ-6` lands in the
+same file's `AfterMapping`, which is why the two were fixed together.
+
 `Doc impact: none`
 
-### SEC-3 🟠 `MoveTodoListItemEndpoint` swallows cancellation and bypasses the base's concurrency handling
+### SEC-3 🟠 ✅ FIXED 2026-09-09 · `MoveTodoListItemEndpoint` swallows cancellation and bypasses the base's concurrency handling
 
 `application/endpoint/todoListItem/command/MoveTodoListItemEndpoint.cs:70-78`.
 
@@ -114,6 +155,12 @@ treats it as a fact to work around rather than a smell.
 **Fix.** Exclude `OperationCanceledException` from the catch. Then either move the destination-list
 check into an async pre-handle hook and let the base run (preferred — see CQ-7), or stop deriving from
 `BasePatchEndpoint` and re-implement the concurrency check explicitly.
+
+**Fixed 2026-09-09** the preferred way, so the endpoint's own catch is gone rather than corrected. The
+`when (ex is not OperationCanceledException)` guard therefore had to land on **`BasePatchEndpoint`'s**
+catch instead — where it was missing too, and where it covers every patch endpoint in the solution
+rather than this one. That is the half of the finding that would have been silently lost by fixing only
+the copy: deleting a bad catch that shadows an identically bad one fixes nothing.
 
 `Doc impact: none`
 
@@ -301,7 +348,7 @@ already promise.
 
 `Doc impact: none`
 
-### CQ-6 🟠 Changing an item's priority moves it between `DisplayOrder` groups without reordering it
+### CQ-6 🟠 ✅ FIXED 2026-09-09 · Changing an item's priority moves it between `DisplayOrder` groups without reordering it
 
 `application/endpoint/todoListItem/command/ChangePriorityTodoListItemEndpoint.cs:28-31` sets
 `TaskPriorityId` and nothing else. But `DisplayOrder` is scoped *by* `TaskPriorityId` — see
@@ -318,9 +365,19 @@ hole. `MoveTodoListItemEndpoint:63-64` does exactly the right thing for the anal
 `entity.DisplayOrder = await dbSet.GetNextDisplayOrder(_settings, User.GetId(), req.PriorityId, ct)`.
 `MoveTodoListItemEndpoint` is the template.
 
-`Doc impact: domain-map.md → Navigation index (note that TaskPriorityId is the DisplayOrder grouping key, so the two columns move together)`
+**Fixed 2026-09-09** in `AfterMapping` — "`Mapping`'s async counterpart" is now a real hook rather than
+a wish (`CQ-7`), and it has to run *after* `Mapping`, since the new order is computed for the priority
+`Mapping` just assigned. The template held: the two endpoints are now the same three-hook shape.
 
-### CQ-7 🟠 `MoveTodoListItemEndpoint` derives from a base it then fully replaces
+The test asserts the moved item's order is **below the destination group's minimum**, not a literal —
+`DisplayOrderGap` and the derived `DisplayOrderStart` are configuration, and a test pinning
+`99_000_000` would fail on an `appsettings` change rather than on a regression. It also asserts the two
+items start on the *same* order, which is what makes the case meaningful: without that, an item that
+happened to sort correctly anyway would pass.
+
+`Doc impact: domain-map.md → Navigation index (note that TaskPriorityId is the DisplayOrder grouping key, so the two columns move together)` — **done**
+
+### CQ-7 🟠 ✅ FIXED 2026-09-09 · `MoveTodoListItemEndpoint` derives from a base it then fully replaces
 
 `application/endpoint/todoListItem/command/MoveTodoListItemEndpoint.cs:15-16` declares
 `BasePatchEndpoint<TodoListItem, MoveToListTodoListItemRequest>`, then overrides `HandleAsync` (`:37`)
@@ -340,7 +397,27 @@ in the framework, then this endpoint becomes ~15 lines and SEC-1/SEC-2/SEC-3 all
 That is one framework change paying for four findings — note that `framework/` is a submodule, so it is
 a two-repo commit.
 
-`Doc impact: none`
+**Fixed 2026-09-09**, and it did pay for four. `BasePatchEndpoint` gained `BeforeMapping` and
+`AfterMapping` — both `Task<bool>`, both with `BaseCreateEndpoint`'s contract that `false` means the
+response is already written — plus the `DbContext` property that base already exposes and the
+cancellation guard from `SEC-3`. `MoveTodoListItemEndpoint` is 68 lines to the old 84 and owns nothing
+but its three hooks; `HandleAsync`, `FindAsync`, the save and the `DbUtils.HandleException` copy are
+all gone.
+
+Ordering is the part worth keeping: `AuthorizeAsync` (the routed row, 403) → `BeforeMapping`
+(caller-supplied ids, 404) → `Mapping` → `AfterMapping` (anything derived from what `Mapping` wrote) →
+save → `AfterSave`. `CQ-6` needs the last hook specifically, and `SEC-1`/`SEC-2` need the first one
+specifically; a single combined hook would have served one of them badly.
+
+The 409 the old copied catch existed to preserve is now inherited, and
+`TodoListReferencedIdOwnershipTests` pins it directly (move an item onto a list already holding that
+activity) — the finding's claim that only the role gate came from the base is the reason that assertion
+is worth having rather than assuming.
+
+`Doc impact: none` *(in the slice's own docs. The solution-level `docs/claude/endpoints.md` row for
+`BasePatchEndpoint` listed only `AfterSave` and now lists all four hooks; `summary.md:148-150` told the
+next reader to copy the `DbUtils.HandleException` block, which is the advice that produced this
+finding, and now says the opposite.)*
 
 ### CQ-8 🟠 `GetFilterSortTodoListCategoryEndpoint` hand-rolls what its sibling gets from a base
 
@@ -712,7 +789,7 @@ in-slice write sites — `BaseToggleIsDoneTodoListEndpoint.IsDoneLogic`,
 
 `Doc impact: domain-map.md → Invariants (8); TodoListItem.cs + TodoListItemCompletionInterceptor.cs XML docs`
 
-### DOC-5 🟠 Invariant 3 asserts a scoping rule the slice does not follow in either direction
+### DOC-5 🟠 ✅ FIXED 2026-09-09 · Invariant 3 asserts a scoping rule the slice does not follow in either direction
 
 *Renumbered in the recheck: this was invariant 2 at `domain-map.md:84` before `6079f93`; it is now
 invariant **3**, at `domain-map.md:154-157`. The finding itself is unchanged — the doc rewrite appended
@@ -742,7 +819,18 @@ whose rows the response is built from, and **any FK id accepted on a write**, mu
 verified explicitly, because the filter can be lifted with `IgnoreQueryFilters` and does not apply to
 writes at all. Then fix SEC-4 so the exceptions list is empty.
 
-`Doc impact: domain-map.md → Invariants (3 — rewrite)`
+**Fixed 2026-09-09**, rewritten as the two-part rule and deliberately **after** the code it describes —
+as written the invariant was the reasoning that licensed `SEC-1`/`SEC-2`, so restating it first would
+have produced a doc claiming a guard nobody had written. Part *(b)* now names the helper
+(`CallerVisibleReferenceExtensions`), the hook it hangs off, the 404-not-403 rule, the three endpoints
+covered and the test that pins them.
+
+The exceptions list is **not** empty and the rewrite says so: `SEC-4` is still open, and the PUT
+surface is named as the remaining unguarded write. An invariant that lists its own exceptions is worth
+more than one that is aspirationally clean — the previous version was the latter, which is how it came
+to license the finding.
+
+`Doc impact: domain-map.md → Invariants (3 — rewrite)` — **done**
 
 ### DOC-6 🟡 `summary.md` says the API cannot produce `DoneCount` with a null `TotalCount`; two endpoints do *(new in the recheck)*
 

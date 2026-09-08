@@ -1,6 +1,8 @@
 using AdhdTimeOrganizer.Core.application.endpoint.extensions;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
+using AdhdTimeOrganizer.TodoLists.application.endpoint.extensions;
 using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.extensions;
@@ -27,12 +29,28 @@ public class CreateTodoListItemEndpoint(
     }
 
     /// <summary>
-    /// The item's <c>ActivityId</c> is client-supplied and unchecked by everything else — see
-    /// <see cref="ActivityIdOwnershipExtensions"/>. An item pointed at a stranger's activity is a task
-    /// of the caller's whose activity every read loses to the global filter.
+    /// Every id on this request is client-supplied and unchecked by everything else — the validator
+    /// sees magnitudes, and each FK is satisfied by whoever owns the target row. An item pointed at a
+    /// stranger's activity, list or rank is a task of the caller's whose other end every read loses to
+    /// the global filter: <c>TodoListItemResponse.Projection</c> reaches through the <em>required</em>
+    /// <c>TaskPriority</c> navigation, so the item comes back mangled or not at all.
     /// </summary>
-    protected override Task<bool> BeforeMapping(CreateTodoListItemRequest req, CancellationToken ct = default) =>
-        this.EnsureOwnsActivityAsync(req, ownership, _dbContext, ct);
+    /// <remarks>
+    /// 404 on all of them, never 403 — see <see cref="ActivityIdOwnershipExtensions"/> and
+    /// <see cref="CallerVisibleReferenceExtensions"/> for why the two cases have to be indistinguishable.
+    /// </remarks>
+    protected override async Task<bool> BeforeMapping(CreateTodoListItemRequest req, CancellationToken ct = default)
+    {
+        if (!await this.EnsureOwnsActivityAsync(req, ownership, _dbContext, ct))
+            return false;
+
+        return await this.EnsureReferenceVisibleAsync<TodoList>(
+                   _dbContext, nameof(req.TodoListId), req.TodoListId, ct)
+               && await this.EnsureReferenceVisibleAsync<TaskPriority>(
+                   _dbContext, nameof(req.TaskPriorityId), req.TaskPriorityId, ct)
+               && await this.EnsureActivityVisibleAsync(
+                   _dbContext, nameof(req.PairedLeisureActivityId), req.PairedLeisureActivityId, ct);
+    }
 
     protected override async Task<bool> AfterMapping(TodoListItem entity, CreateTodoListItemRequest req, CancellationToken ct = default)
     {

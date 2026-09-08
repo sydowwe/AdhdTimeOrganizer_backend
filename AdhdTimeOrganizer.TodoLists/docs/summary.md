@@ -145,9 +145,12 @@ project's bases.
 - **Add an endpoint:** check `framework/Sydowwe.Framework/application/endpoint/base/` first — most of
   this slice is `BaseCreate/Update/Delete/GetById/GetAll/GetSelectOptions/FilterSort/Patch`
   subclasses with a `Mapping` override. Convention is `<Verb><Entity>Endpoint`. Don't override
-  `AllowedRoles()` — nothing here is admin surface. If you override `HandleAsync` on a
-  `BasePatchEndpoint`, you lose the base's exception mapping; `MoveTodoListItemEndpoint` shows the
-  `DbUtils.HandleException` block you have to reproduce.
+  `AllowedRoles()` — nothing here is admin surface. **Don't override `HandleAsync` on a
+  `BasePatchEndpoint`**: you lose its exception mapping (the 409 on a unique index becomes a 500) and
+  its cancellation handling. Async work has hooks — `BeforeMapping` for verifying a caller-supplied
+  FK id, `AfterMapping` for anything derived from what `Mapping` just wrote, both returning `false`
+  when they have already answered. `MoveTodoListItemEndpoint` is the worked example; it used to be
+  the counter-example.
 - **Add something both to-do and routine items need:** put the abstract base here, typed on
   `BaseTodoListItem`, and subclass it in Routines — that is what the six existing bases are.
 - **Add a seeder:** band 100–199, `IPerUserDevSeeder` (may truncate) or `BasePerUserDefaultSeeder<T>`
