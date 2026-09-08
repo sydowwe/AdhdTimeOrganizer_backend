@@ -1,8 +1,16 @@
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.repeatingPlannerTask.command;
 
 public class UpdateRepeatingPlannerTaskEndpoint(DbContext dbContext)
-    : BaseUpdateEndpoint<RepeatingPlannerTask, RepeatingPlannerTaskRequest>(dbContext);
+    : BaseUpdateEndpoint<RepeatingPlannerTask, RepeatingPlannerTaskRequest>(dbContext)
+{
+    public override void Configure()
+    {
+        base.Configure();
+        Validator<RepeatingPlannerTaskValidator>();
+    }
+}

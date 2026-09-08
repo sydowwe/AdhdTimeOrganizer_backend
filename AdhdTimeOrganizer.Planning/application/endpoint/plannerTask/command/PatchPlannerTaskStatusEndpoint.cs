@@ -18,10 +18,12 @@ public class PatchPlannerTaskStatusEndpoint(
     IReminderRegistrationService reminders,
     IUserTimeZoneResolver timeZones) : Endpoint<PatchPlannerTaskStatusRequest>
 {
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
+
     public override void Configure()
     {
         Patch($"/{nameof(PlannerTask).Kebaberize()}/{{id:long:required}}/status");
-
+        Roles(AllowedRoles());
         Validator<PatchPlannerTaskStatusValidator>();
         Summary(s =>
         {
@@ -66,7 +68,10 @@ public class PatchPlannerTaskStatusEndpoint(
                     break;
             }
 
-            dbContext.Set<PlannerTask>().Update(entity);
+            // No Update() call: the entity came from the tracking query above, so SaveChanges already sees
+            // the two or three properties that changed. Update() would mark all ~15 Modified and rewrite the
+            // whole row — and once the audit interceptor is wired, record every column as changed on every
+            // status patch.
             await dbContext.SaveChangesAsync(ct);
 
             // Finishing or calling off a task retires the reminder attached to it: a nudge about something

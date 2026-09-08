@@ -10,6 +10,7 @@ using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using FastEndpoints;
 using Humanizer;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plannerTask.command;
@@ -25,10 +26,13 @@ public class ApplyTemplatePlannerTaskEndpoint(
     IReferencedIdOwnershipService ownership)
     : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
 {
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
+
     public override void Configure()
     {
         const string entityName = nameof(Calendar);
         Post($"/{entityName.Kebaberize()}/apply-planner-template");
+        Roles(AllowedRoles());
         Validator<ApplyTemplateToTaskPlannerValidator>();
 
         Summary(s =>
@@ -38,6 +42,7 @@ public class ApplyTemplatePlannerTaskEndpoint(
             s.Response<ApplyTemplatePlannerTaskResponse>(201, "Template applied successfully; new tasks created");
             s.Response(400, "Bad request");
             s.Response(404, "Calendar or template not found");
+            s.Response(409, "A concurrent write to the same day lost the row_version race");
         });
     }
 
@@ -100,9 +105,13 @@ public class ApplyTemplatePlannerTaskEndpoint(
         }
         catch (Exception ex)
         {
+            // The classification DbUtils already made, rather than collapsing everything to 400: two devices
+            // applying templates to the same day race on the calendar's row_version, and a client that retries
+            // on 409 but surfaces a validation message on 400 would show "invalid request" for a transient
+            // conflict. Same mapping PatchPlannerTaskStatusEndpoint uses.
             var result = DbUtils.HandleException(ex, "Create");
             AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
+            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
         }
     }
 }

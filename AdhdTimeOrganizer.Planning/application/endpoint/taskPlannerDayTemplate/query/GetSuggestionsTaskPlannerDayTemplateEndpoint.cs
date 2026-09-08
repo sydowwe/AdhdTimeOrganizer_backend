@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.suggestion;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.taskPlannerDayTemplate.query;
 
@@ -14,10 +15,12 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(DbContext dbContext)
     private static readonly string[] DayNames =
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
+
     public override void Configure()
     {
         Get("/task-planner-day-template/suggestions/{calendarId:long:required}");
-
+        Roles(AllowedRoles());
 
         Summary(s =>
         {

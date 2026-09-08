@@ -68,7 +68,9 @@ two pure services take `today` as a parameter rather than reading the clock. Two
 - **The auth matrix is broad but shallow.** `PlanningCrudAuthMatrixTests` wires 23 endpoints into the
   Framework base suites in one file, which is excellent leverage — but the base suites test the *base*
   behaviour. Nothing in the matrix exercises a Planning-specific validator, so a validator that is never
-  wired up (`CQ-8`) is invisible to it.
+  wired up (`CQ-8`) is invisible to it. **Partly closed 2026-09-08:** `RepeatingPlannerTaskValidationTests`
+  now exercises the one validator this pointed at, and settled the question — it *was* bound, by
+  convention. The structural gap stands: the matrix still cannot see a slice validator either way.
 - **No test asserts a validator rejects anything on the create/update planner-task path** except the
   exactly-one-of-`CalendarId`/`Date` rule. `PlannerTaskValidator` has ten rules; one is covered.
 - **`Trend_WithUntilBeforeFrom_IsRejected` and `TaskSummaries_RejectsInvertedRange` test the inverted
@@ -128,7 +130,7 @@ by the three by-date tests.
 
 | Endpoint | Happy | Edge | Auth | Test file |
 |---|---|---|---|---|
-| `Create/Update/Delete/GetByIdRepeatingPlannerTaskEndpoint` | ✅ | ❌ recurrence rules, `TEST-11` | ✅ | `PlanningCrudAuthMatrixTests` |
+| `Create/Update/Delete/GetByIdRepeatingPlannerTaskEndpoint` | ✅ | ✅ 2026-09-08 | ✅ | `PlanningCrudAuthMatrixTests`, `RepeatingPlannerTaskValidationTests` |
 | `GetAllRepeatingPlannerTaskEndpoint` | ❌ `TEST-12` | ❌ | ❌ | — |
 | `GetSuggestionsRepeatingPlannerTaskEndpoint` | ✅ (5) | ⚠ stale-view NRE `TEST-13` | ❌ | `RepeatingPlannerTaskSuggestionsTests` |
 | `Create/Update/Delete/BatchDelete/GetByIdTemplatePlannerTaskEndpoint` | ✅ | ✅ | ✅ | `PlanningCrudAuthMatrixTests` |
@@ -186,7 +188,9 @@ that is the hard 70%. The missing quarter is concentrated in three places, and t
    treating the remaining zero-coverage rows in the table above as findings-in-waiting rather than as
    merely untested.
 3. **Validator rules generally** — three of the recurrence/ordering rule sets are never exercised, and
-   one validator may not be wired at all (`CQ-8`).
+   one validator may not be wired at all (`CQ-8`). **Updated 2026-09-08:** the recurrence set is now
+   exercised end to end (`RepeatingPlannerTaskValidationTests`) and the wiring question is answered —
+   FastEndpoints bound it by convention, and both endpoints now wire it explicitly as well.
 
 ## 12. Missing tests — backlog
 
@@ -206,7 +210,7 @@ fixture, auth and seeding conventions every prompt assumes.
 | `TEST-8` | The duplicated midnight-wrap window predicate, both filter endpoints | `PlannerTaskFilterWindow.md` |
 | `TEST-9` | `FormSelectOptionsPlannerTaskEndpoint` scoping | `ReadSurfaceSweep.md` |
 | `TEST-10` | Reminder day-view recurrence expansion + DST composition | `ReminderRecurrenceAndDst.md` |
-| `TEST-11` | `RepeatingPlannerTaskValidator`'s four recurrence shapes | `RepeatingPlannerTaskValidatorWiring.md` |
+| ~~`TEST-11`~~ | ~~`RepeatingPlannerTaskValidator`'s four recurrence shapes~~ ✅ done 2026-09-08 → `Endpoints/RepeatingPlannerTaskValidationTests.cs` (44 tests). Verdict: the validator was bound by convention all along — untested, not dead — so `CQ-8` dropped to 🟡 | prompt consumed |
 | `TEST-12` | `GetAllRepeatingPlannerTaskEndpoint` scoping | `ReadSurfaceSweep.md` |
 | `TEST-13` | Both suggestion endpoints against a **stale** materialized view | `StaleSuggestionView.md` |
 | `TEST-14` | `TemplatePlannerTaskChangeSpanEndpoint` | `ReadSurfaceSweep.md` |

@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using FastEndpoints;
 using Npgsql;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plannerSettings;
 
@@ -20,10 +21,12 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 public class GetPlannerSettingsEndpoint(DbContext dbContext)
     : EndpointWithoutRequest<UserPlannerSettingsResponse>
 {
+    protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
+
     public override void Configure()
     {
         Get("/planner/settings");
-
+        Roles(AllowedRoles());
         Summary(s =>
         {
             s.Summary = "Get planner settings for the current user";

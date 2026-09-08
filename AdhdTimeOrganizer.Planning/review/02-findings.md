@@ -200,7 +200,7 @@ rejected `INSERT INTO planning.user_planner_settings` statements.
 
 `Doc impact: domain-map.md → Invariants (now states the real unique index, that the helper's index is not what makes it unique, and that both endpoints recover) and testing.md → The guards — done`
 
-### `SEC-4` 🟡 Six custom endpoints omit `Roles()` and lean on a host-side fallback
+### `SEC-4` 🟡 ✅ FIXED 2026-09-08 · Six custom endpoints omit `Roles()` and lean on a host-side fallback
 
 `plannerTask/command/PatchPlannerTaskStatusEndpoint.cs:16-31` ·
 `plannerTask/command/ApplyTemplatePlannerTaskEndpoint.cs:25-39` ·
@@ -223,9 +223,24 @@ error and no failing test. Every other custom endpoint in the slice declares
 
 **Fix.** Add the two lines to each of the six, for symmetry with the rest of the slice.
 
-> **One of the six left this list on 2026-09-08.** `UpdatePlannerSettingsEndpoint` now derives from
+> **One of the six left this list first.** `UpdatePlannerSettingsEndpoint` now derives from
 > `BaseUserSettingsUpsertEndpoint` (`SEC-3`), which calls `Roles(AllowedRoles())` itself with
-> `GetUserRole()` — the same User + Admin + Root set the host fallback was applying. Five to go.
+> `GetUserRole()` — the same User + Admin + Root set the host fallback was applying.
+
+**Fixed 2026-09-08.** The remaining five carry the slice's own two lines —
+`protected virtual string[] AllowedRoles() => this.GetDefaultRoles();` and `Roles(AllowedRoles())` — so no
+Planning route's gate is now decided in a file the slice cannot see. On the two suggestion endpoints the call
+went back into the blank line it had been removed from.
+
+The gate itself is unchanged, by construction: `GetDefaultRoles()` resolves through the same
+`FrameworkRoles.Configure(PortalRoleCatalog.Create(), RoleTier.User)` the host fallback resolves through, so
+this is the identical User + Admin + Root set arriving from the endpoint instead of from the configurator.
+
+**No test was added and none is the right shape.** `PlanningRouteSmokeTests` and `PlanningCrudAuthMatrixTests`
+already assert 200-for-User and 401-for-anonymous on these routes, and they passed **before** this change too —
+that is the point of the finding, not a gap in it. A test that could fail on the old code would have to assert
+the absence of the host fallback, which is the host's line to own; the fix's whole value is removing the
+dependency, not detecting it.
 
 `Doc impact: none`
 
@@ -507,7 +522,10 @@ its reminders perfectly correctly.
 
 `Doc impact: domain-map.md → Invariants — done (see DOC-1)`
 
-### `CQ-8` 🟠 The two `RepeatingPlannerTask` CRUD endpoints are the only ones that do not wire their validator
+### `CQ-8` 🟡 ✅ FIXED 2026-09-08 · The two `RepeatingPlannerTask` CRUD endpoints are the only ones that do not wire their validator
+
+> Downgraded 🟠 → 🟡 on the evidence `TEST-11` produced — see the verdict below. The severity was a hedge
+> against the validator being dead code; it is not.
 
 `application/endpoint/repeatingPlannerTask/command/CreateRepeatingPlannerTaskEndpoint.cs:3-4` ·
 `application/endpoint/repeatingPlannerTask/command/UpdateRepeatingPlannerTaskEndpoint.cs:3-4`
@@ -531,9 +549,26 @@ empty collection and never matches — so the user's recurrence silently never s
 **Fix.** Add the two-line `Configure()` override to both, matching every sibling. Then add `TEST-11`,
 which settles the question either way.
 
-`Doc impact: none`
+**Fixed 2026-09-08 — and the answer is "untested", not "dead".** `TEST-11` was written first and run against
+the **unwired** endpoints: all 44 cases were already green. FastEndpoints binds
+`Validator<RepeatingPlannerTaskRequest>` by convention from the scanned assemblies, so the eighty lines of
+recurrence rules have been running all along and the failure scenario above was never reachable. The finding
+is a symmetry defect, not a hole — hence the downgrade.
 
-### `CQ-9` 🟠 `ApplyTemplatePlannerTaskEndpoint` collapses every failure to 400
+The override went on both endpoints anyway, matching `CreateTemplatePlannerTaskEndpoint`'s shape. What it buys
+is not the rules but the *guarantee*: convention binding resolves only when there is exactly one validator for
+the request type, so these two were the only endpoints in the slice whose validation would have stopped —
+silently, with the endpoint still answering 201 — the day a second one appeared. The other eleven cannot fail
+that way.
+
+Pinned by `AdhdTimeOrganizer.IntegrationTests/Endpoints/RepeatingPlannerTaskValidationTests.cs` (44 tests:
+eighteen malformed cases × `POST` and `PUT`, plus a well-formed control per recurrence type on each verb). The
+measurement — that the table is green with the overrides removed too — is recorded in the class doc, since it
+is the thing a reader would otherwise have to re-derive before touching either endpoint.
+
+`Doc impact: testing.md → The guards (new row) and the Endpoints/ file list — done. The finding said none, but the suite is load-bearing in the way that section exists to record: it is the only thing standing between a second RepeatingPlannerTaskRequest validator and eighty rules silently ceasing to run`
+
+### `CQ-9` 🟠 ✅ FIXED 2026-09-08 · `ApplyTemplatePlannerTaskEndpoint` collapses every failure to 400
 
 `application/endpoint/plannerTask/command/ApplyTemplatePlannerTaskEndpoint.cs:92-97`
 
@@ -556,9 +591,24 @@ than the intent.
 
 **Fix.** Use `EndpointHelper.ToStatusCode(result.ErrorType)` and add `s.Response(409, …)` to the summary.
 
+**Fixed 2026-09-08.** Both halves as prescribed — `Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct)`
+and a `409` line in the `Summary` block, so the OpenAPI contract now matches the behaviour rather than the bug.
+The `catch` gained the comment naming the concurrency case, because the classification is the whole point of the
+call and a bare `400` is what it silently looked like for as long as nobody read `result.ErrorType`.
+
+The sibling batch endpoint was checked and needs nothing: `ApplyTemplateBatchPlannerTaskEndpoint` is one of the
+deliberately non-transactional batch surfaces, so a per-day failure is a `succeeded: false` row in a 200, never
+a status code.
+
+**No test.** The reachable trigger is a lost `row_version` race on the calendar's stamp, and racing it takes the
+two-client shape `UserPlannerSettingsTests` uses; the shape works, but what it would pin here is
+`DbUtils.HandleException`'s classification and `EndpointHelper.ToStatusCode`'s mapping, both of which are
+Framework code already pinned by `BasePatchEndpointTests` and `BaseUpdateEndpointTests`. This endpoint's own
+change is that it stopped discarding their answer.
+
 `Doc impact: none`
 
-### `CQ-10` 🟡 `PatchPlannerTaskStatusEndpoint` calls `.Update()` on an already-tracked entity
+### `CQ-10` 🟡 ✅ FIXED 2026-09-08 · `PatchPlannerTaskStatusEndpoint` calls `.Update()` on an already-tracked entity
 
 `application/endpoint/plannerTask/command/PatchPlannerTaskStatusEndpoint.cs:64`
 
@@ -567,6 +617,15 @@ every property `Modified`, so the `UPDATE` rewrites all ~15 columns instead of t
 changed. Harmless today, but it defeats the change-tracker's own diff and — once the audit interceptor
 is wired (CLAUDE.md: it exists but is not wired here) — it would record every column as changed on every
 status patch. Deleting the line is sufficient; `SaveChangesAsync` picks up the modifications.
+
+**Fixed 2026-09-08.** The line is gone, **replaced in place by a comment** rather than deleted silently: on a
+write endpoint an absent `Update()` reads as an omission, and this is the second such line in the slice this
+week (`PERF-5`'s three `HasIndex` calls were the first) where the fix is "the thing that looks missing is the
+fix". The comment names both consequences — the whole-row rewrite now, and the audit interceptor recording
+every column as changed once it is wired.
+
+Nothing needed a new test: `PlannerTaskStatusAndSpanTests` already covers what the patch must persist, and it
+is green — which is the whole assertion, since the change is that fewer columns travel to reach the same rows.
 
 `Doc impact: none`
 
