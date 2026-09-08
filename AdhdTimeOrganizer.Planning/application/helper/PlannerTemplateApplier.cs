@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Planning.application.dto.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 
 namespace AdhdTimeOrganizer.Planning.application.helper;
 
@@ -202,6 +203,28 @@ public static class PlannerTemplateApplier
         return result;
     }
 
+    /// <summary>
+    /// A carved segment is a <b>new block</b>, not a continuation of the task it came from — the same reading
+    /// <c>CopyToDaysPlannerTaskEndpoint.CopyOnto</c> takes, and for the same two reasons.
+    /// <para>
+    /// <c>Status</c> resets to <c>NotStarted</c> because the actual start/end times, skip reason and Google
+    /// event id do not come across: carrying <c>Completed</c> without them produces a task that claims to be
+    /// finished at times it was never worked, which <c>PlanVsActualTrendService</c> then counts as completed
+    /// but unmeasurable. And <c>TodolistItemId</c> is dropped because a to-do item pairs with the one planner
+    /// task it was planned as — copying the id onto both halves of a split would point two tasks at one item
+    /// and fan every done-toggle across both.
+    /// </para>
+    /// <para>
+    /// <c>SourceTemplateTaskId</c> <i>is</i> carried: it records which template line the block came from, which
+    /// is still true of every segment.
+    /// </para>
+    /// <para>
+    /// This applies to both merge modes, so a <i>new</i> task that <c>MergeIgnore</c> splits also comes out
+    /// <c>NotStarted</c> even if the request named another status. That is the same ruling, not an oversight:
+    /// the segment is a different span from the one the caller described, and a status that outlived the span
+    /// it was about is what the reset exists to prevent.
+    /// </para>
+    /// </summary>
     private static PlannerTask CloneTaskWithNewTimes(PlannerTask original, TimeOnly newStart, TimeOnly newEnd) =>
         new()
         {
@@ -213,9 +236,8 @@ public static class PlannerTemplateApplier
             ImportanceId = original.ImportanceId,
             ActivityId = original.ActivityId,
             CalendarId = original.CalendarId,
-            Status = original.Status,
+            Status = PlannerTaskStatus.NotStarted,
             SourceTemplateTaskId = original.SourceTemplateTaskId,
-            TodolistItemId = original.TodolistItemId,
             UserId = original.UserId
         };
 }

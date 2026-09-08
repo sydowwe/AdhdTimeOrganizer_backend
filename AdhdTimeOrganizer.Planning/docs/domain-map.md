@@ -75,6 +75,19 @@ is which table they were aggregated from. **The class names are decoupled from t
 every configuration pins its view with an explicit `ToView(...)`, so renaming an entity never touches
 the schema.
 
+**A view row may outlive its principal, and both endpoints must tolerate it.** The refresh is a
+host-side job, so between runs the aggregate can still name a template or an activity the user has just
+deleted — an activity delete even cascades its planner tasks away, leaving the row describing nothing.
+Each query therefore filters `p.Template != null` / `p.Activity != null` before projecting; without it
+the navigation is null and the read is a 500 on a page load, caused by the user's own last action.
+
+**All three are plain POCOs carrying exactly the view's columns — never an entity base.**
+`PlannerSuggestionFromDayTemplate` derived from `BaseEntityWithUser` until 2026-09-08, which made EF
+select `id` / `created_timestamp` / `modified_timestamp` from an aggregate that has no such columns:
+every call to its endpoint answered 500 (`42703`). The consequence to keep in mind is that none of the
+three is `IEntityWithUser`, so **no global query filter covers them** and each endpoint's own
+`p.UserId == userId` predicate is the whole of the scoping.
+
 ## Invariants
 
 | Invariant | Enforced by |
@@ -96,6 +109,8 @@ the schema.
 | `TaskImportance.OptionalMarkerValue` = 666 identifies the "optional" level | **App only, by value** — `BasePlannerTask.IsOptional` compares against the number. Nothing stops a user editing that row's rank; the guard is a test |
 | `Reminder.RemindAt` matches its task's instant | **App only** — recomputed by `ReminderRegistrationService` on every sync. Nothing detects drift |
 | A planner task's `Activity` / `TaskImportance` / `TodoListItem` belongs to the same user | **App only, per write endpoint** — `PlannerReferencedIdOwnershipExtensions`, called from `Create`/`UpdatePlannerTaskEndpoint`'s `BeforeMapping` and from both apply-template handlers. No FK spans the user column, so the database cannot express this. `TodolistItemId` is answered through Core's `IReferencedIdOwnershipService` over the `IUserOwnedReferenceVerifier` seam, which **fails closed** |
+| A recurrence's / template line's `Activity` and `TaskImportance` belong to the same user | **App only, per write endpoint** — `EnsureOwnsBasePlannerTaskReferencesAsync` on `Create`/`Update` for `RepeatingPlannerTask` and `TemplatePlannerTask`. The same two ids as the row above, inherited from `BasePlannerTaskRequest` |
+| A template line's `TemplateId` belongs to the same user | **App only** — the same two endpoints. Not integrity alone: unchecked, the line lands *inside* a stranger's day template and changes what applying it does to their day |
 | `UserPlannerSettings.DefaultApplyTemplateId` belongs to the same user | **App only** — `UpdatePlannerSettingsEndpoint`. Integrity, not disclosure: the response returns the bare id |
 | Every entity's schema is `planning` | **Model build** — `ModuleSchemas.Resolve` throws for an unmapped assembly |
 
@@ -263,6 +278,7 @@ cascaded-away tasks are captured.
 | `Overwrite` | The conflicting **existing** tasks are deleted whole; all new tasks are added |
 | `MergeIgnore` | New tasks are **carved** around existing ones — split when an existing task sits in the middle, shortened when it overlaps an edge |
 | `MergeOverwrite` | Existing tasks are carved around the new ones (removed and re-added as segments) |
+| *(both merge modes)* | **A carved segment carries the plan, not its execution.** Span, lane, location, notes, activity, importance and `SourceTemplateTaskId` come across; `Status` resets to `NotStarted`, and the actual times, skip reason, Google event id and **`TodolistItemId`** do not. Same ruling as `CopyToDaysPlannerTaskEndpoint.CopyOnto`, and forced by the same two facts: a segment that kept `Completed` would claim to be finished at times it never carried, and a to-do id on both halves of a split fans every done-toggle across both |
 
 **Both merge modes refuse to carve a task whose `EndTime` is not after its `StartTime`.** The carving walk
 assumes a strictly-forward same-day span; given a negative one it emits no segments at all, and the
@@ -426,9 +442,9 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `PlannerTemplateApplier` | Helper (static) | The template stamp and the four conflict modes. Stages only, never saves | `application/helper/PlannerTemplateApplier.cs` |
 | `CalendarDayTypeRule` | Helper (static) | The one weekday/day-type rule, returning a message rather than throwing | `application/helper/CalendarDayTypeRule.cs` |
 | `PlannerBatchLimits` | Helper (constants) | `MaxCalendarIds` / `MaxSummaryRangeDays`, both 366 | `application/helper/PlannerBatchLimits.cs` |
-| `TaskPlannerHelper` | Helper (extensions) | `WithIncludes` (importance + activity/role/category), `TasksOverlap` (assumes non-wrapping spans) and `TodayIn` (the one definition of "today" — the user's, never UTC's) | `application/helper/TaskPlannerHelper.cs` |
+| `TaskPlannerHelper` | Helper (extensions) | `WithIncludes` (importance + activity/role/category), `TasksOverlap` (assumes non-wrapping spans), `TodayIn` (the one definition of "today" — the user's, never UTC's) and `InTimeWindow` (the one definition of the day planner's time-of-day filter, shared by both filter endpoints) | `application/helper/TaskPlannerHelper.cs` |
 | `PlannerTaskActivityReferenceSource` | Core seam (keyed) | Publishes and repoints `ActivityId` across **all three** task tables. The suggestion views are deliberately absent — they'd double-count | `application/seam/PlannerTaskActivityReferenceSource.cs` |
-| `CalendarDayLookup` | Core seam (by type) | Day metadata for History's calendar dashboard. `DayIndex` is computed, so the projection happens in memory | `application/seam/CalendarDayLookup.cs` |
+| `CalendarDayLookup` | Core seam (by type) | Day metadata for History's calendar dashboard. Reads no-tracking and selects seven columns; `DayIndex` is the eighth and is computed (`Calendar.DayIndexOf`), so that one is projected in memory | `application/seam/CalendarDayLookup.cs` |
 | `RoutineTodoListIsDoneChangedEventHandler` | Event handler | A routine's done state onto today's planner tasks for the same activity, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows, exactly as the to-do handler below does — the two are the same rule and any difference between them is a bug, not a design | `application/eventHandler/` |
 | `TodoListItemIsDoneChangedEventHandler` | Event handler | A to-do item's done state onto today's linked tasks, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows so an unrelated endpoint never 500s | `application/eventHandler/` |
 | *(both handlers)* | — | "Today" is the **user's** date, resolved from the event's `UserId` through `IUserTimeZoneResolver` / `TaskPlannerHelper.TodayIn` — never `DateTime.UtcNow`'s. `PatchPlannerTaskStatusEndpoint` holds the same rule for deciding whether to publish at all | — |

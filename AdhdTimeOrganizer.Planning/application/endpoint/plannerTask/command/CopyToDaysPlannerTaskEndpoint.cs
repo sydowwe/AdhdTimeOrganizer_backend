@@ -72,14 +72,23 @@ public class CopyToDaysPlannerTaskEndpoint(DbContext dbContext)
             .ThenBy(t => t.EndTime)
             .ToListAsync(ct);
 
+        // One round trip for every target day's existence instead of an AnyAsync per iteration — at the
+        // PlannerBatchLimits ceiling that was 366 extra queries on top of the 366 saves. Scoped by the same
+        // global user filter, so a foreign id simply does not come back and is reported as failed, exactly as
+        // the per-day check did. The per-day save stays: target days are deliberately not transactional with
+        // each other.
+        var existingTargetIds = await dbContext.Set<Calendar>()
+            .Where(c => req.TargetCalendarIds.Contains(c.Id))
+            .Select(c => c.Id)
+            .ToHashSetAsync(ct);
+
         var results = new List<CalendarBatchResult>(req.TargetCalendarIds.Count);
 
         foreach (var targetCalendarId in req.TargetCalendarIds)
         {
             try
             {
-                var targetExists = await dbContext.Set<Calendar>().AnyAsync(c => c.Id == targetCalendarId, ct);
-                if (!targetExists)
+                if (!existingTargetIds.Contains(targetCalendarId))
                 {
                     results.Add(CalendarBatchResult.Failed(targetCalendarId));
                     continue;

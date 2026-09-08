@@ -29,6 +29,39 @@ public static class TaskPlannerHelper
             .ThenInclude(a => a.Category);
     }
 
+    /// <summary>
+    /// The tasks whose span meets the time-of-day window <c>[from, until]</c> — the day planner's only read
+    /// filter, and the template editor's. Written once here rather than per endpoint: it is eighteen lines of
+    /// three-way overlap logic over two different entities, and a second copy is how the two views start
+    /// disagreeing about which tasks a window contains.
+    ///
+    /// <para><b>A window with <c>until &lt;= from</c> wraps midnight</b> and is read as the union of
+    /// <c>[from, 23:59:59]</c> and <c>[00:00, until]</c> — which makes <c>00:00 → 00:00</c> mean "the whole
+    /// day", the window the home page sends.</para>
+    ///
+    /// <para><b>A task that itself wraps midnight matches every window.</b> No write path can create one any
+    /// more (see the <c>EndTime &gt; StartTime</c> invariant), but there is no CHECK constraint and older rows
+    /// may still carry the shape; showing such a row in every window is the deliberate choice over hiding it
+    /// from all of them, since the day planner is the only place the user can see and fix it.</para>
+    /// </summary>
+    public static IQueryable<T> InTimeWindow<T>(this IQueryable<T> query, TimeOnly from, TimeOnly until)
+        where T : BasePlannerTask
+    {
+        var windowWrapsAround = until <= from;
+
+        return windowWrapsAround
+            ? query.Where(task =>
+                // Overlaps [from, 23:59:59]
+                (task.StartTime <= new TimeOnly(23, 59, 59) && task.EndTime >= from) ||
+                // Overlaps [00:00:00, until]
+                (task.StartTime <= until && task.EndTime >= new TimeOnly(0, 0, 0)) ||
+                task.EndTime < task.StartTime)
+            : query.Where(task =>
+                // Overlaps [from, until]
+                (task.StartTime < until && task.EndTime > from) ||
+                task.EndTime < task.StartTime);
+    }
+
     // Assumes same-day, non-wrapping intervals (StartTime < EndTime). Every planner-task request validator
     // rejects EndTime <= StartTime, but there is no CHECK constraint and rows predating that rule may still
     // carry a negative span — this reads one as a same-day negative duration and simply reports no overlap,

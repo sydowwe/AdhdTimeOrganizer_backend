@@ -7,6 +7,8 @@ using AdhdTimeOrganizer.Planning.application.service.reminder;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.entity.reminder;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Testing;
@@ -274,6 +276,77 @@ public class ApplyTemplatePlannerTaskConflictResolutionTests(AppDbContextFixture
         await AssertReminderStillActiveAsync(reminderOnOvernight);
         await AssertReminderCancelledAsync(reminderOnOrdinary);
         await AssertTemplateStampAsync(template.Id, calendarId, expectedUsageCount: 1);
+    }
+
+    /// <summary>
+    /// <c>CQ-6</c>. A carved segment is a new block, so it carries the plan and not its execution — the same
+    /// ruling <c>CopyToDaysPlannerTaskEndpoint.CopyOnto</c> already made, and the only self-consistent one:
+    /// <c>CloneTaskWithNewTimes</c> never copied the actual times, the skip reason or the Google event id, so a
+    /// segment that kept <c>Completed</c> claimed to be finished at times it was never worked and the
+    /// plan-vs-actual trend counted it as completed-but-unmeasurable. The to-do link is dropped in the other
+    /// direction: copied onto both halves of a split it points two tasks at one item, and every done-toggle
+    /// then fans across both.
+    /// </summary>
+    [Fact(DisplayName = "CQ-6: a carved segment resets Status and drops the to-do link, keeping the template line")]
+    public async Task MergeOverwrite_CarvedSegments_CarryThePlanNotItsExecution()
+    {
+        var (activityId, template) = await SeedApplyFixtureAsync("carve-state");
+        var calendarId = await SeedCalendarAsync(new DateOnly(2029, 3, 6));
+
+        long carvedId, todoItemId, templateLineId;
+        await using (var db = CreateDbContext())
+        {
+            templateLineId = await PlanningTestSeedHelper.SeedTemplatePlannerTaskAsync(
+                db, template.Id, activityId, new TimeOnly(9, 0), new TimeOnly(12, 0), UserId, CancellationToken);
+
+            var priority = new TaskPriority { UserId = UserId, Text = "Normal", Color = "#556677", Priority = 1 };
+            db.Set<TaskPriority>().Add(priority);
+            await db.SaveChangesAsync(CancellationToken);
+
+            var item = new TodoListItem { UserId = UserId, ActivityId = activityId, TaskPriorityId = priority.Id };
+            db.Set<TodoListItem>().Add(item);
+            await db.SaveChangesAsync(CancellationToken);
+            todoItemId = item.Id;
+
+            // 09:00-12:00, already completed at 09:05-11:50, linked to the to-do item and to a template line.
+            carvedId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
+                db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(12, 0), UserId,
+                PlannerTaskStatus.Completed, ct: CancellationToken);
+
+            var task = await db.Set<PlannerTask>().SingleAsync(t => t.Id == carvedId, CancellationToken);
+            task.ActualStartTime = new TimeOnly(9, 5);
+            task.ActualEndTime = new TimeOnly(11, 50);
+            task.TodolistItemId = todoItemId;
+            task.SourceTemplateTaskId = templateLineId;
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        var response = await ApplyAsync(calendarId, template.Id, "MergeOverwrite",
+        [
+            NewTask(activityId, 10, 0, 11, 0) // lands in the middle -> two segments, 09:00-10:00 and 11:00-12:00
+        ]);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        await using (var db = CreateDbContext())
+        {
+            (await db.Set<PlannerTask>().IgnoreQueryFilters().AnyAsync(t => t.Id == carvedId, CancellationToken))
+                .Should().BeFalse("the original is removed and re-added as segments");
+
+            var segments = await db.Set<PlannerTask>()
+                .Where(t => t.CalendarId == calendarId && t.StartTime != new TimeOnly(10, 0))
+                .OrderBy(t => t.StartTime)
+                .ToListAsync(CancellationToken);
+
+            segments.Should().HaveCount(2);
+            segments.Should().OnlyContain(s => s.Status == PlannerTaskStatus.NotStarted,
+                "a segment carries no execution state, so it cannot claim to be completed at times it never had");
+            segments.Should().OnlyContain(s => s.ActualStartTime == null && s.ActualEndTime == null);
+            segments.Should().OnlyContain(s => s.TodolistItemId == null,
+                "one to-do item pairs with one planner task; two segments holding the id fan every toggle across both");
+            segments.Should().OnlyContain(s => s.SourceTemplateTaskId == templateLineId,
+                "which template line the block came from is still true of every segment");
+        }
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────

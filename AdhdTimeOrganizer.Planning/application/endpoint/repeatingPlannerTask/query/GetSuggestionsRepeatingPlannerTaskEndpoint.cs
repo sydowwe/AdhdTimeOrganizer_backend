@@ -58,28 +58,36 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
         // 1. User-set suggestions (RepeatingPlannerTask)
         var tasks = await dbContext.Set<RepeatingPlannerTask>()
             .Where(t => t.UserId == userId && t.IsActive)
+            // What SQL can decide, SQL decides. A DateRange recurrence is a plain column comparison, so it is
+            // answered here rather than by loading every active recurrence and discarding most of them. The
+            // other three match against ScheduledDays / ScheduledDates / ScheduledForDayTypes, which are
+            // value-converted collections with no translatable Contains — those stay in memory below.
+            .Where(t => t.RecurrenceType != RecurrenceType.DateRange
+                        || (t.ActiveFromDate != null && t.ActiveToDate != null
+                            && t.ActiveFromDate <= date && date <= t.ActiveToDate))
             .Include(t => t.Importance)
             .Include(t => t.Activity).ThenInclude(a => a.Role)
             .Include(t => t.Activity).ThenInclude(a => a.Category)
             .ToListAsync(ct);
 
-
-        foreach (var task in tasks)
+        var matchedTasks = tasks.Where(task => task.RecurrenceType switch
         {
-            var matches = task.RecurrenceType switch
-            {
-                RecurrenceType.DayOfWeek => task.ScheduledDays.Contains(date.DayOfWeek.ToString()),
-                RecurrenceType.DayOfMonth => task.ScheduledDates.Contains(date.Day),
-                RecurrenceType.DateRange => task.ActiveFromDate.HasValue && task.ActiveToDate.HasValue
-                                                                         && task.ActiveFromDate.Value <= date && date <= task.ActiveToDate.Value,
-                RecurrenceType.DayType => calendar != null
-                                          && task.ScheduledForDayTypes.Contains(calendar.DayType.ToString()),
-                _ => false
-            };
-            if (!matches)
-                continue;
+            RecurrenceType.DayOfWeek => task.ScheduledDays.Contains(date.DayOfWeek.ToString()),
+            RecurrenceType.DayOfMonth => task.ScheduledDates.Contains(date.Day),
+            RecurrenceType.DayType => task.ScheduledForDayTypes.Contains(calendar.DayType.ToString()),
+            // Already decided by the WHERE above — a DateRange row that got this far is in range.
+            RecurrenceType.DateRange => true,
+            _ => false
+        }).ToList();
 
-            var r = RepeatingPlannerTaskResponse.Projection(new[] { task }.AsQueryable()).Single();
+        // One projection for the whole matched set. Projecting per match — Projection(new[] { task }
+        // .AsQueryable()).Single() — built and compiled an expression tree per suggestion.
+        var projected = RepeatingPlannerTaskResponse.Projection(matchedTasks.AsQueryable()).ToList();
+
+        for (var i = 0; i < matchedTasks.Count; i++)
+        {
+            var task = matchedTasks[i];
+            var r = projected[i];
             result.Add(new SuggestionResponse
             {
                 RepeatingPlannerTaskId = task.Id,
@@ -108,6 +116,10 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
             .Where(p => p.UserId == userId &&
                         ((p.PatternType == (int)RecurrenceType.DayOfWeek && p.PatternValue == isoDayOfWeek) ||
                          (p.PatternType == (int)RecurrenceType.DayOfMonth && p.PatternValue == dayOfMonth)))
+            // A materialized-view row outlives its principal until the host-side refresh job runs again, and
+            // deleting an Activity cascades its planner tasks away — so the aggregate can name an activity
+            // that is gone. Dereferencing p.Activity.Role.Color would then 500 a page load.
+            .Where(p => p.Activity != null)
             .Include(p => p.Activity).ThenInclude(a => a.Role)
             .Include(p => p.Activity).ThenInclude(a => a.Category)
             .Include(p => p.Importance)
@@ -128,6 +140,8 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
             .Where(p => p.UserId == userId &&
                         ((p.PatternType == (int)RecurrenceType.DayOfWeek && p.PatternValue == isoDayOfWeek) ||
                          (p.PatternType == (int)RecurrenceType.DayOfMonth && p.PatternValue == dayOfMonth)))
+            // Same staleness as the planner-pattern view above.
+            .Where(p => p.Activity != null)
             .Include(p => p.Activity).ThenInclude(a => a.Role)
             .Include(p => p.Activity).ThenInclude(a => a.Category)
             .ToListAsync(ct);

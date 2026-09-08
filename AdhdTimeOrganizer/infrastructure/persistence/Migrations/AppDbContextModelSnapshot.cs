@@ -1370,9 +1370,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_calendar");
 
-                    b.HasIndex("DayType")
-                        .HasDatabaseName("ix_calendar_day_type");
-
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_calendar_user_id");
 
@@ -1489,9 +1486,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("ImportanceId")
                         .HasDatabaseName("ix_planner_task_importance_id");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_planner_task_status");
 
                     b.HasIndex("TodolistItemId")
                         .HasDatabaseName("ix_planner_task_todolist_item_id");
@@ -1674,9 +1668,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_task_importance");
 
-                    b.HasIndex("Importance")
-                        .HasDatabaseName("ix_task_importance_importance");
-
                     b.HasIndex("UserId", "Importance")
                         .IsUnique()
                         .HasDatabaseName("ix_task_importance_user_id_importance");
@@ -1758,9 +1749,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("suggested_location");
 
-                    b.Property<string>("Tags")
+                    b.PrimitiveCollection<string>("Tags")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("jsonb")
                         .HasColumnName("tags");
 
                     b.Property<int>("UsageCount")
@@ -2085,18 +2076,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.suggestion.PlannerSuggestionFromDayTemplate", b =>
                 {
-                    b.Property<DateTime>("CreatedTimestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_timestamp");
-
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("ModifiedTimestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_timestamp");
-
                     b.Property<int>("OccurrenceCount")
                         .HasColumnType("integer")
                         .HasColumnName("occurrence_count");
@@ -2119,9 +2098,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("TemplateId")
                         .HasDatabaseName("ix_planner_suggestions_from_day_template_template_id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_planner_suggestions_from_day_template_user_id");
 
                     b.ToTable((string)null);
 
@@ -5176,16 +5152,7 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_planner_suggestions_from_day_template_task_planner_day_temp");
 
-                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_planner_suggestions_from_day_template_user_user_id");
-
                     b.Navigation("Template");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.suggestion.PlannerSuggestionFromPlannerTask", b =>

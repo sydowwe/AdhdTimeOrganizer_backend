@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner.template;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using FastEndpoints;
 using FluentValidation.Results;
@@ -60,25 +61,7 @@ public static class PlannerReferencedIdOwnershipExtensions
         CancellationToken ct)
     {
         var userId = endpoint.HttpContext.User.GetId();
-        var failures = new List<ValidationFailure>();
-
-        foreach (var activityId in reqs.Select(r => r.ActivityId).Distinct())
-        {
-            if (!await ownership.OwnsActivityAsync(db, userId, activityId, ct))
-            {
-                failures.Add(new ValidationFailure(nameof(PlannerTaskRequest.ActivityId), "Activity not found."));
-                break;
-            }
-        }
-
-        foreach (var importanceId in reqs.Select(r => r.ImportanceId).OfType<long>().Distinct())
-        {
-            if (!await db.Set<TaskImportance>().AnyAsync(i => i.Id == importanceId && i.UserId == userId, ct))
-            {
-                failures.Add(new ValidationFailure(nameof(PlannerTaskRequest.ImportanceId), "Importance not found."));
-                break;
-            }
-        }
+        var failures = await CheckActivityAndImportanceAsync(db, ownership, userId, reqs, ct);
 
         foreach (var todolistItemId in reqs.Select(r => r.TodolistId).OfType<long>().Distinct())
         {
@@ -93,9 +76,70 @@ public static class PlannerReferencedIdOwnershipExtensions
     }
 
     /// <summary>
-    /// Verifies a day-template id the caller supplied is theirs. Used for
+    /// The same guard for the two request types that inherit <c>ActivityId</c> / <c>ImportanceId</c> from
+    /// <see cref="BasePlannerTaskRequest"/> without carrying a <c>TodolistId</c> — the recurrence and the
+    /// template line.
+    /// <para>
+    /// Not the narrower case it looks like: <c>RepeatingPlannerTaskResponse</c> projects
+    /// <c>Activity.Role.Color</c> and the activity's name exactly as <c>PlannerTaskResponse</c> does, and both
+    /// <c>GET /repeating-planner-task</c> and the suggestion feed return it — so an unguarded recurrence hands
+    /// the victim's role colour, name and category back on the attacker's own list, which is the same
+    /// disclosure as the planner-task hole and not a hypothetical one.
+    /// </para>
+    /// </summary>
+    /// <returns><c>true</c> to continue; <c>false</c> when the response has already been written.</returns>
+    public static async Task<bool> EnsureOwnsBasePlannerTaskReferencesAsync(
+        this IEndpoint endpoint,
+        DbContext db,
+        IReferencedIdOwnershipService ownership,
+        BasePlannerTaskRequest req,
+        CancellationToken ct)
+    {
+        var userId = endpoint.HttpContext.User.GetId();
+        return await endpoint.ReportAsync(await CheckActivityAndImportanceAsync(db, ownership, userId, [req], ct), ct);
+    }
+
+    /// <summary>
+    /// The two ids every planner write carries. Distinct-ed first: a template's lines commonly repeat one
+    /// activity, and the check is one query per distinct id. Reports the first offending value per field —
+    /// naming them all would enumerate which of the caller's guesses exist.
+    /// </summary>
+    private static async Task<List<ValidationFailure>> CheckActivityAndImportanceAsync(
+        DbContext db,
+        IReferencedIdOwnershipService ownership,
+        long userId,
+        IReadOnlyCollection<BasePlannerTaskRequest> reqs,
+        CancellationToken ct)
+    {
+        var failures = new List<ValidationFailure>();
+
+        foreach (var activityId in reqs.Select(r => r.ActivityId).Distinct())
+        {
+            if (!await ownership.OwnsActivityAsync(db, userId, activityId, ct))
+            {
+                failures.Add(new ValidationFailure(nameof(BasePlannerTaskRequest.ActivityId), "Activity not found."));
+                break;
+            }
+        }
+
+        foreach (var importanceId in reqs.Select(r => r.ImportanceId).OfType<long>().Distinct())
+        {
+            if (!await db.Set<TaskImportance>().AnyAsync(i => i.Id == importanceId && i.UserId == userId, ct))
+            {
+                failures.Add(new ValidationFailure(nameof(BasePlannerTaskRequest.ImportanceId), "Importance not found."));
+                break;
+            }
+        }
+
+        return failures;
+    }
+
+    /// <summary>
+    /// Verifies a day-template id the caller supplied is theirs. Two call sites:
     /// <c>UserPlannerSettingsRequest.DefaultApplyTemplateId</c>, which is stored as a bare id and returned as
-    /// one — an integrity defect rather than a leak, and still a stored pointer at a row the user cannot see.
+    /// one — an integrity defect rather than a leak, and still a stored pointer at a row the user cannot see —
+    /// and <c>TemplatePlannerTaskRequest.TemplateId</c>, where the consequence is larger: unchecked, a line
+    /// lands <i>inside</i> a stranger's template and changes what applying that template does to their day.
     /// </summary>
     /// <returns><c>true</c> to continue; <c>false</c> when the response has already been written.</returns>
     public static async Task<bool> EnsureOwnsDayTemplateAsync(

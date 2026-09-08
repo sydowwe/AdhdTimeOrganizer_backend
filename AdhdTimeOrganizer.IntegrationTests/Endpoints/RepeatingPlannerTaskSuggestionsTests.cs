@@ -170,6 +170,51 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
             "tier 2 already covers (activity, pattern type, pattern value), so tier 3's matching row is suppressed");
     }
 
+    /// <summary>
+    /// TEST-13 / <c>CQ-13</c>. A materialized view lags its base tables by design, so a row can name an
+    /// activity that is already gone — and deleting an activity <b>cascades its planner tasks away</b>
+    /// (<c>PlannerDeleteBehaviorTests</c>), so this is the case where the view row outlives both. Both tiers
+    /// dereference <c>p.Activity.Role.Color</c>; before the guard that was an unhandled
+    /// <c>NullReferenceException</c>, i.e. a 500 on a page load, from an action the user had just taken.
+    /// <para>
+    /// A second activity with the same pattern is seeded as the control: without it a guard that dropped every
+    /// pattern row would pass this test.
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "CQ-13: a pattern row whose activity was just deleted is skipped, not a 500")]
+    public async Task DeletedActivity_IsSkippedUntilTheViewCatchesUp()
+    {
+        var target = new DateOnly(2027, 6, 7);
+        long doomedActivityId, survivingActivityId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            doomedActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-doomed", ct: TestContext.Current.CancellationToken);
+            survivingActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-surviving", ct: TestContext.Current.CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: TestContext.Current.CancellationToken);
+
+            foreach (var activityId in new[] { doomedActivityId, survivingActivityId })
+            {
+                for (var weeksAgo = 1; weeksAgo <= 3; weeksAgo++)
+                {
+                    // Tier 2 and tier 3 for the same activity and weekday, so one delete exercises both views.
+                    await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo);
+                    await SeedActivityHistoryOnWeekdayAsync(db, activityId, target, weeksAgo);
+                }
+            }
+        }
+
+        await RefreshSuggestionViewsAsync();
+        (await GetSuggestionsAsync(calendarTargetId)).Should().HaveCount(2, "both activities have a pattern before the delete");
+
+        var delete = await CreateClient().DeleteAsync($"api/activity/{doomedActivityId}", CancellationToken);
+        delete.IsSuccessStatusCode.Should().BeTrue();
+
+        // Deliberately not refreshed: this is the state every read is in between refresh-job runs.
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        suggestions.Should().ContainSingle().Which.Activity.Id.Should().Be(survivingActivityId,
+            "the stale rows in both views are skipped and the day still gets its other suggestion");
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private async Task SeedSameWeekdayTaskAsync(

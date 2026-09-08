@@ -85,17 +85,34 @@ public class ReminderRegistrationService(
             }
 
             timezone ??= await ResolveTimezoneAsync(reminder.UserId, ct);
-            var derived = ComposeTaskInstant(task.Calendar.Date, task.StartTime, reminder.UserId, timezone);
-            if (reminder.RemindAt != derived)
-            {
-                // RemindAt is a cache of the task's instant so the day view can query one column; the task
-                // stays authoritative, which is why it is rewritten on every sync rather than trusted.
-                reminder.RemindAt = derived;
+            if (RefreshRemindAt(reminder, task, timezone))
                 await dbContext.SaveChangesAsync(ct);
-            }
         }
 
-        await registry.RegisterAsync(new ReminderRegistration
+        await RegisterAsync(reminder, ct);
+    }
+
+    /// <summary>
+    /// Rewrites <c>RemindAt</c> to the task's current instant, returning whether it moved. <b>Does not save</b>
+    /// — <see cref="SyncForPlannerTasksAsync"/> mutates a whole batch and then saves once, and a save per
+    /// reminder is the round trip its batch loading exists to avoid.
+    /// <para>
+    /// <c>RemindAt</c> is a cache of the task's instant so the day view can query one column; the task stays
+    /// authoritative, which is why it is recomputed on every sync rather than trusted.
+    /// </para>
+    /// </summary>
+    private bool RefreshRemindAt(Reminder reminder, PlannerTask task, TimeZoneInfo timezone)
+    {
+        var derived = ComposeTaskInstant(task.Calendar.Date, task.StartTime, reminder.UserId, timezone);
+        if (reminder.RemindAt == derived)
+            return false;
+
+        reminder.RemindAt = derived;
+        return true;
+    }
+
+    private Task RegisterAsync(Reminder reminder, CancellationToken ct) =>
+        registry.RegisterAsync(new ReminderRegistration
         {
             Key = KeyFor(reminder.Id),
             Schedule = BuildSchedule(reminder),
@@ -108,7 +125,6 @@ public class ReminderRegistrationService(
             RecipientMode = RecipientMode.ExplicitUsers,
             ExplicitRecipientUserIds = [reminder.UserId]
         }, ct);
-    }
 
     public async Task ApplyUserDefaultsAsync(Reminder reminder, bool leadOffsetsWereSpecified, CancellationToken ct = default)
     {
@@ -189,11 +205,37 @@ public class ReminderRegistrationService(
             .Select(u => new { u.Id, u.Timezone })
             .ToDictionaryAsync(u => u.Id, u => u.Timezone ?? TimeZoneInfo.Utc, ct);
 
+        // Mutate the whole batch, save once, then talk to the registry — rather than a save inside the loop,
+        // which is one round trip per reminder whose instant moved and undoes the batch loading above.
+        var toRegister = new List<Reminder>(reminders.Count);
+        var toCancel = new List<long>();
+        var anyInstantMoved = false;
+
         foreach (var reminder in reminders)
         {
             tasks.TryGetValue(reminder.PlannerTaskId!.Value, out var task);
-            await SyncCoreAsync(reminder, task, timezones.GetValueOrDefault(reminder.UserId, TimeZoneInfo.Utc), ct);
+
+            // Same ruling as SyncCoreAsync: finishing or calling off a task retires its nudge.
+            if (task is null || task.Status is PlannerTaskStatus.Completed or PlannerTaskStatus.Cancelled)
+            {
+                toCancel.Add(reminder.Id);
+                continue;
+            }
+
+            anyInstantMoved |= RefreshRemindAt(reminder, task, timezones.GetValueOrDefault(reminder.UserId, TimeZoneInfo.Utc));
+            toRegister.Add(reminder);
         }
+
+        if (anyInstantMoved)
+            await dbContext.SaveChangesAsync(ct);
+
+        foreach (var reminderId in toCancel)
+            await CancelAsync(reminderId, ct);
+
+        // After the save, never before: the registration carries the schedule built from RemindAt, so
+        // registering first would publish an instant the database might still reject.
+        foreach (var reminder in toRegister)
+            await RegisterAsync(reminder, ct);
     }
 
     public async Task<IReadOnlyList<long>> GetReminderIdsForPlannerTasksAsync(IReadOnlyCollection<long> plannerTaskIds, CancellationToken ct = default)

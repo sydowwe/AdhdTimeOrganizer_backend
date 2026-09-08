@@ -51,6 +51,10 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(DbContext dbContext)
             .Where(p => p.UserId == userId &&
                         ((p.PatternType == 0 && p.PatternValue == isoDayOfWeek) ||
                          (p.PatternType == 1 && p.PatternValue == (int)calendar.DayType)))
+            // The row is a materialized-view row and the view is refreshed by a host-side job, so it outlives
+            // its principal until the next refresh: a template the user deleted a moment ago is still in here,
+            // and projecting through a null navigation is a 500 on a page load caused by their own action.
+            .Where(p => p.Template != null)
             .Include(p => p.Template)
             .ToListAsync(ct);
 

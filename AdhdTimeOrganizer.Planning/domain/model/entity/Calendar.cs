@@ -35,7 +35,14 @@ public class Calendar : BaseEntityWithUser
     public virtual ICollection<PlannerTask> Tasks { get; set; } = [];
     // Future: Events, TodoLists, Habits, etc.
 
-    public int DayIndex => Date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)Date.DayOfWeek;
+    public int DayIndex => DayIndexOf(Date);
+
+    /// <summary>
+    /// ISO day index (Monday = 1 … Sunday = 7) for a date. Exposed as a static so a caller that projected the
+    /// date out of the row — <c>CalendarDayLookup</c> selects columns rather than entities — computes the same
+    /// index rather than writing the Sunday special case a second time.
+    /// </summary>
+    public static int DayIndexOf(DateOnly date) => date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
 
     public bool IsWeekend => DayIndex is 6 or 7;
 

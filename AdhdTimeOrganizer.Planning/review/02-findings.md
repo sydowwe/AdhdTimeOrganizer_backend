@@ -15,11 +15,11 @@ Recorded so nobody re-raises them, and so file 03 can rank around them.
 
 | Item | Where it is pinned | Status |
 |---|---|---|
-| `PlannerTaskValidator` accepts `EndTime <= StartTime` (overnight tasks) | portal review `CQ-14`; `PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsRejected` | ✅ **Fixed 2026-09-08** — see the `CQ-14` block below. `CQ-7` and `DOC-1` were fixed with it; **`MIG-3` (normalising the rows that predate the rule) is deliberately still open** |
-| `Reminder`, `RepeatingPlannerTask`, `TemplatePlannerTask`, `TaskImportance`, `UserPlannerSettings`, `PlannerSuggestionFromDayTemplate` absent from the user data export | `UserDataExportAndDeletionTests.KnownGaps` | Open, classified |
-| `GetSuggestionsTaskPlannerDayTemplateEndpoint` has no test | `docs/testing.md` known-gap list | Open → `TEST-13` |
+| `PlannerTaskValidator` accepts `EndTime <= StartTime` (overnight tasks) | portal review `CQ-14`; `PlannerTaskStatusAndSpanTests.CreatingAnOvernightTask_IsRejected` | ✅ **Fixed 2026-09-08** — see the `CQ-14` block below. `CQ-7` and `DOC-1` were fixed with it, and **`MIG-3` closed the same day** in `20260908164241_PlannerSpanNormalisationTagsJsonbAndDeadIndexes` |
+| `Reminder`, `RepeatingPlannerTask`, `TemplatePlannerTask`, `TaskImportance`, `UserPlannerSettings` absent from the user data export | `UserDataExportAndDeletionTests.KnownGaps` | Open, classified. `PlannerSuggestionFromDayTemplate` **left the list** on 2026-09-08 — it was only ever on it because it derived from `BaseEntityWithUser`, which is also what made its endpoint 500 (`CQ-13`) |
+| `GetSuggestionsTaskPlannerDayTemplateEndpoint` has no test | `docs/testing.md` known-gap list | ✅ **Closed 2026-09-08** by `TEST-13` / `TaskPlannerDayTemplateSuggestionsTests` — which immediately proved the gap's own warning right: the endpoint answered 500 to every call. See `CQ-13` |
 | `CalendarProvisioner`'s `DbUpdateException` race branch not exercised concurrently | `docs/testing.md` known-gap list | Open → `TEST-18` |
-| `PlannerBatchLimits` ceilings unpinned at their boundary | `docs/testing.md` known-gap list | Open → `TEST-3` |
+| `PlannerBatchLimits` ceilings unpinned at their boundary | `docs/testing.md` known-gap list | ✅ **Closed** — `PlanVsActualTrendTests.Range_*` pins both ceilings at 366 and 367 across all three range routes (`TEST-3`) |
 | `Calendar.Location` / `Weather` / `Notes` have no behavioural coverage | `docs/testing.md` known-gap list | Open, accepted |
 | `RepeatingPlannerTask` has no materialisation path | `docs/testing.md` known-gap list | Open, feature not built |
 | Case-sensitive `Contains` in grid text filters | Core review, `GridFilterCaseSensitivity.md` | Open, portal-wide family; `GridTaskImportanceEndpoint` is another instance |
@@ -83,10 +83,23 @@ Pinned by `AdhdTimeOrganizer.IntegrationTests/Endpoints/PlannerReferencedIdOwner
 each negative case with a control — the `TodolistId` control is also what catches the seam failing *closed*
 for everyone.
 
-**Not covered, deliberately:** `TemplatePlannerTaskRequest` and `RepeatingPlannerTaskRequest` inherit the same
-`ActivityId` / `ImportanceId` from `BasePlannerTaskRequest` and are unguarded for the same reason. They are
-outside this finding's fix list, and their consequence is narrower (neither feeds a read that projects through
-`Activity.Role`), but they are the same hole and should be closed with the same helper.
+~~**Not covered, deliberately:** `TemplatePlannerTaskRequest` and `RepeatingPlannerTaskRequest` inherit the same
+`ActivityId` / `ImportanceId` from `BasePlannerTaskRequest` and are unguarded for the same reason.~~
+**Closed 2026-09-08**, with the same helper as promised: `EnsureOwnsBasePlannerTaskReferencesAsync` (the two ids
+`BasePlannerTaskRequest` carries, sharing one private check with the `PlannerTaskRequest` form) on `BeforeMapping`
+of all four endpoints — `Create`/`Update` for `RepeatingPlannerTask` and for `TemplatePlannerTask`.
+
+**The severity note above ("their consequence is narrower — neither feeds a read that projects through
+`Activity.Role`") is wrong for `RepeatingPlannerTask`.** `RepeatingPlannerTaskResponse` projects
+`Activity.Role.Color` and the activity's name exactly as `PlannerTaskResponse` does, and both
+`GET /repeating-planner-task` and the suggestion feed return it — so this half was the same disclosure, not a
+weaker one. Only the template line is genuinely narrower.
+
+Auditing them turned up a **third** id in the same class that this finding never named:
+`TemplatePlannerTaskRequest.TemplateId`, written by both `ToEntity` and `UpdateEntity`. Unguarded it is worse
+than the two it sits beside — not a leak but a cross-user **write**: the line lands inside a stranger's day
+template, and applying that template then puts the attacker's task on their day. Both template endpoints now
+call `EnsureOwnsDayTemplateAsync` (already in the helper for `DefaultApplyTemplateId`) before the other two.
 
 `Doc impact: domain-map.md → Invariants (add a row: "a planner task's Activity / Importance / TodoListItem belongs to the same user — App only, per write endpoint") — done, plus a second row for DefaultApplyTemplateId and a Navigation-index row on the two handlers' scoping`
 
@@ -416,7 +429,7 @@ corrected, along with the class-doc bullet in `RoutineCompletionFanOutTests` tha
 
 `Doc impact: domain-map.md → Business rules — done, as a new § *Which "today" — the user's, everywhere* rather than a line per path: the rule is one rule and had already been restated three times. Both handler rows gained a shared navigation row, and the TaskPlannerHelper row names TodayIn. The day-plan section was left alone — that endpoint takes its date from the route and never asks what day it is`
 
-### `CQ-6` 🟠 Carved task segments inherit execution state and the to-do link
+### `CQ-6` 🟠 ✅ FIXED 2026-09-08 · Carved task segments inherit execution state and the to-do link
 
 `application/helper/PlannerTemplateApplier.cs:181-196`
 
@@ -439,7 +452,22 @@ The consistent reading, given `CopyOnto`: a carved segment is a *new* block, so 
 to `NotStarted` and carry no `TodolistItemId` — or, if preserving execution state is intended, carry the
 actual times too and keep the link on at most one segment.
 
-`Doc impact: domain-map.md → Business rules → Applying a day template (add a row to the four-mode table: what a carved segment inherits)`
+**Fixed 2026-09-08.** The first branch, and stated in `domain-map.md` as the finding asked. The second was not
+a real option: `CloneTaskWithNewTimes` would have had to start carrying `ActualStartTime` / `ActualEndTime` /
+`SkipReason` onto *both* halves of a split, which is a worse claim than the one being fixed — two tasks each
+asserting they were worked 09:05–11:50. So a carved segment is a new block, exactly as `CopyOnto` already had
+it: `Status` back to `NotStarted`, no `TodolistItemId`.
+
+`SourceTemplateTaskId` **is** kept, which is the one place the two paths differ in reasoning rather than in
+behaviour — "which template line this block came from" stays true of every segment, and `CopyOnto` carries it
+for the same reason.
+
+Pinned by `ApplyTemplatePlannerTaskConflictResolutionTests.MergeOverwrite_CarvedSegments_CarryThePlanNotItsExecution`,
+which seeds the finding's own failure scenario — a `Completed` 09:00–12:00 task with actual times, a to-do link
+and a template line — and asserts on all four properties of both segments, so a fix that reset the status but
+kept the link still fails.
+
+`Doc impact: domain-map.md → Business rules → Applying a day template — done (a row on the four-mode table, stated once for both merge modes since they share the carving)`
 
 ### `CQ-14` 🟠 ✅ FIXED 2026-09-08 · Three of the six planner-task validators had no `StartTime < EndTime` rule
 
@@ -461,19 +489,26 @@ The probe that pinned the old behaviour was flipped rather than deleted:
 not cover and which was the hole the span-patch endpoint's own rule could not close — plus that the
 rejected update left the row untouched.
 
-> ### ⚠️ `MIG-3` is deliberately **not** done — the rule guards the door, not the table
+> ### ✅ `MIG-3` landed 2026-09-08, in `20260908164241_PlannerSpanNormalisationTagsJsonbAndDeadIndexes`
 >
-> There is **no CHECK constraint**, so every `planner_task` / `repeating_planner_task` /
-> `template_planner_task` row created *before* this change can still carry `end_time <= start_time`, and
-> such a row now cannot round-trip through **any** write path (create, update and patch-span all refuse
-> it). The normalising data migration `MIG-3` prescribes — survey with
-> `SELECT count(*) FROM planning.planner_task WHERE end_time <= start_time` across all three tables, then
-> clamp — **is still outstanding and is being handled separately, after the rest of the findings are
-> fixed.** Until it lands:
+> There is still **no CHECK constraint** — the rule guards the door, not the table — but the rows that
+> predate it are normalised. One clamp per table (`start_time = LEAST(start_time, TIME '23:58')`,
+> `end_time = TIME '23:59'`, which also handles the 23:59-start edge the survey query cannot), each
+> announcing its row count with `RAISE NOTICE`: on a healthy database every count is 0, and a non-zero one
+> is the only trace these rows leave. Clamped rather than deleted — the row is the user's plan, and a wrong
+> end time is recoverable where a missing task is not. **`Down` deliberately does not reverse it**: the
+> original times are overwritten in place and nothing records them.
+>
+> Verified by applying the generated script to a scratch Postgres seeded with the shapes that matter
+> (`23:00→01:00`, `23:59→23:00`, `10:00→10:00`, and a well-formed control): three clamped, the control
+> untouched.
+>
+> The two coping mechanisms stay, and are still load-bearing — nothing stops a row of this shape arriving
+> from a `psql` session or a restored old backup:
 >
 > - `TaskPlannerHelper.TasksOverlap` reads such a row as a same-day negative span and reports no overlap;
 > - `PlannerTemplateApplier` screens for it (`IsCarvable`) and leaves it whole rather than deleting it —
->   that is the `CQ-7` fix below, and it is what makes the outstanding migration survivable;
+>   that is the `CQ-7` fix below;
 > - `docs/domain-map.md`'s invariant row says exactly this rather than claiming enforcement (`DOC-1`).
 
 `Doc impact: domain-map.md → Invariants — done (see DOC-1)`
@@ -653,15 +688,23 @@ is why the two nearby columns never needed one either.
 `DayOfWeek` names, so no element can contain the delimiter. That is the property the free-text column never had,
 and stating it is what stops the next reader "finishing the job" by converting a column that is already safe.
 
-> **`MIG-4` is now required, not optional, and is not a plain `ALTER … TYPE jsonb`.** The model says jsonb; a
-> migrated database still has `text`. Postgres cannot cast `productive,focused` to jsonb, so the migration needs
-> `USING to_jsonb(string_to_array(tags, ','))` — which is also the only thing that preserves the existing rows'
-> tags rather than erroring the deploy. The integration tests do not catch this: the fixture builds its schema
-> with `EnsureCreated`, so they have never seen the `text` column.
+> **`MIG-4` ✅ landed 2026-09-08**, in the same migration as `MIG-3`, and it was indeed not a plain
+> `ALTER … TYPE jsonb`: EF scaffolds exactly that, and Postgres refuses it (`42804`). The hand-written form is
+> `USING to_jsonb(CASE WHEN tags IS NULL OR tags = '' THEN ARRAY[]::text[] ELSE string_to_array(tags, ',') END)`
+> — the empty-string arm matters, because `string_to_array('', ',')` is `{""}` and would invent a single empty
+> tag on every template that has none. It is preceded by `ALTER COLUMN tags DROP DEFAULT`, since Postgres casts
+> the default too and fails on it before reaching the `USING`; this schema has no default, so that line is a
+> no-op here and insurance against a hand-added one.
+>
+> `Down` needs a second column rather than an `ALTER … USING`, because unpacking a jsonb array needs the
+> set-returning `jsonb_array_elements_text` and a transform expression may not contain a subquery. Both
+> directions were run against a scratch Postgres: `productive,focused` → `["productive","focused"]` → back.
+> The integration tests could not have caught any of this — the fixture builds its schema with
+> `EnsureCreated`, so it has never seen the `text` column.
 
 `Doc impact: none`
 
-### `CQ-12` 🟡 The midnight-wrap window predicate exists twice, verbatim
+### `CQ-12` 🟡 ✅ FIXED 2026-09-08 · The midnight-wrap window predicate exists twice, verbatim
 
 `application/endpoint/plannerTask/query/GetFilteredSortedPlannerTask.cs:14-37` ·
 `application/endpoint/templatePlannerTask/query/GetFilteredSortedTemplatePlannerTask.cs` (same block)
@@ -675,9 +718,21 @@ three other rule/query splits, and this one slipped through. Neither copy has a 
 `IQueryable<T> InTimeWindow<T>(this IQueryable<T>, TimeOnly from, TimeOnly until) where T : BasePlannerTask`.
 Both call sites already type over `BasePlannerTask` properties only.
 
-`Doc impact: domain-map.md → Navigation index (TaskPlannerHelper row gains the new extension)`
+**Fixed 2026-09-08.** Exactly that signature, with both endpoints reduced to the id predicate they do not share
+plus the call. `TEST-8` was written **first** and against the two copies, which is what made the lift safe and
+is also what it turned up: the prompt's own expectation table is wrong in one row. A `13:00 → 08:00` window
+matches an `08:00–09:00` task, because the wrapping branch compares inclusively (`Start <= until`) while the
+standard branch is strict (`Start < until`) — the same asymmetry that makes `00:00 → 00:00` mean "the whole
+day". The suite pins the behaviour as it is, since `CQ-12` is a lift and not a semantics change; the
+asymmetry is now written down in `InTimeWindow`'s own doc, where a reader meets it before the predicate.
 
-### `CQ-13` 🟡 Both suggestion endpoints dereference a materialized-view row's navigation without a null check
+Pinned by `PlannerTaskFilterWindowTests` (17): seven windows × both endpoints, plus the `StartTime` ordering
+and a foreign `CalendarId` reading as an empty day — the endpoint has no ownership check of its own and nothing
+else covered that.
+
+`Doc impact: domain-map.md → Navigation index — done (the TaskPlannerHelper row names InTimeWindow), and testing.md → The guards`
+
+### `CQ-13` 🟡 ✅ FIXED 2026-09-08 · Both suggestion endpoints dereference a materialized-view row's navigation without a null check
 
 `application/endpoint/taskPlannerDayTemplate/query/GetSuggestionsTaskPlannerDayTemplateEndpoint.cs:51,58` ·
 `application/endpoint/repeatingPlannerTask/query/GetSuggestionsRepeatingPlannerTaskEndpoint.cs:158,183`
@@ -695,20 +750,78 @@ projection NREs — an unhandled 500 on a page load, from an action the user the
 **Fix.** `.Where(p => p.Template != null)` / `.Where(p => p.Activity != null)` before projecting, or an
 inner join through the navigation. `TEST-13` pins it.
 
-`Doc impact: domain-map.md → Suggestion read-models (state that a view row may outlive its principal until the next refresh, and that the endpoints must tolerate it)`
+**Fixed 2026-09-08.** The first form, on all three queries (the day-template view, and both pattern views in the
+repeating endpoint).
+
+**`TEST-13` found a larger defect than the one it was written for, and it is the reason this finding's own
+severity was misleading.** `GetSuggestionsTaskPlannerDayTemplateEndpoint` did not merely 500 on a *stale* row —
+it answered **500 to every call it has ever received**. `PlannerSuggestionFromDayTemplate` derived from
+`BaseEntityWithUser` while its two siblings are plain POCOs, so EF selected `id`, `created_timestamp` and
+`modified_timestamp` from an aggregate view that has none of them: `42703: column m.created_timestamp does not
+exist`. Nothing caught it because, as `docs/testing.md` recorded, this endpoint had no test at all — the exact
+consequence the known-gap entry predicted. The entity is now a POCO carrying the view's five columns, matching
+its siblings.
+
+The consequence worth carrying forward: none of the three view mappings is `IEntityWithUser`, so **no global
+query filter covers them** and each endpoint's own `UserId` predicate is the whole of the scoping — now stated
+in `domain-map.md` and on the entity. `PlannerSuggestionFromDayTemplate` also left
+`UserDataExportAndDeletionTests.KnownGaps`, where it had been listed only because of the base class; a keyless
+view over already-exported base tables has nothing separate to export or erase.
+
+Pinned by `TaskPlannerDayTemplateSuggestionsTests` (7 — the endpoint's first coverage, including the deleted
+template) and `RepeatingPlannerTaskSuggestionsTests.DeletedActivity_IsSkippedUntilTheViewCatchesUp`. Both
+delete through the real endpoint and deliberately skip the refresh, and both keep a second row as the control
+against a guard that drops everything.
+
+`Doc impact: domain-map.md → Suggestion read-models — done (staleness, plus the two facts TEST-13 turned up: POCO not entity base, and no query filter), and testing.md → The guards + two known gaps closed`
+
+### `CQ-15` 🟠 ✅ FIXED 2026-09-08 · `UpdateCalendarEndpoint`'s day-type rejection was a 500, not a 400
+
+> Not from the 2026-08-31 pass — found on 2026-09-08 by running the full suite while closing the findings
+> above. Numbered 15 rather than 14 because `CQ-14` is the portal review's id, recorded in this file for the
+> reason the numbering note at the top gives.
+
+`application/endpoint/calendar/UpdateCalendarEndpoint.cs:18-34` ·
+`framework/…/endpoint/base/command/BaseUpdateEndpoint.cs:102-107`
+
+`AfterMapping` called `ThrowError(violation)` for a `CalendarDayTypeRule` breach. `BaseUpdateEndpoint.HandleAsync`
+wraps its whole body in `catch (Exception ex)` → `DbUtils.HandleException` → `EndpointHelper.ToStatusCode`, which
+does not know FastEndpoints' `ValidationFailureException` — so the 400 came back as a **500** carrying both the
+rule's message and "an unexpected error occurred during HandleAsync". The endpoint's own comment argued for the
+`ThrowError`, on the grounds that returning `false` would "silently discard the update and send no response";
+that is true only if nothing was sent, which is not what the base's contract says.
+
+`CalendarDayTypeRuleTests.DayTypeRule_DecidesTheSameOnBothRoutes` — the pin for the rule reaching the same
+decision on the PUT and the batch PATCH — **had been failing on three of its six cases**, which is how this
+surfaced.
+
+**Fixed** by writing the response in `AfterMapping` (`AddError` + `Send.ErrorsAsync(400)`) and returning
+`false`, the base's "the response is already written" path, which also returns before the save so the rejected
+day type is not persisted. Same shape the guards added on 2026-09-08 elsewhere in the slice use.
+
+`Doc impact: testing.md → The guards (the row now states that the PUT's rejection is a 400 and why that is not free)`
 
 ---
 
 ## 9. Performance hotspots
 
+**All six are fixed as of 2026-09-08** — `PERF-5` on its own (see below), the other five together. Each row's
+mitigation was applied as written; the two that needed a decision beyond it are noted in the row.
+
 | Where | Issue | Impact | Mitigation |
 |---|---|---|---|
-| `CopyToDaysPlannerTaskEndpoint.cs:81` | One `AnyAsync` per target day inside the loop | 366 round trips at the ceiling, on top of 366 saves | `PERF-1`: resolve all target ids in one `Where(c => ids.Contains(c.Id)).Select(c => c.Id).ToHashSetAsync()` before the loop; keep the per-day save |
-| `GetFilteredSortedCalendar.cs:14` | `From`/`Until` range is **uncapped**, unlike its two siblings | A client asking for 1900→2100 scans the user's whole calendar table and runs two correlated subqueries per row | `PERF-2`: apply `PlannerBatchLimits.MaxSummaryRangeDays` via a `CalendarFilter` validator, matching `CalendarTaskSummariesValidator` |
-| `CalendarResponse.Projection:62-63` | `TotalTasks` / `CompletedTasks` are two correlated subqueries per calendar row | 62 subqueries for a month grid | `PERF-2`: acceptable at 31 rows; becomes the cost driver once the range above is unbounded |
-| `ReminderRegistrationService.SyncCoreAsync:94` | `SaveChangesAsync` inside the per-reminder loop of `SyncForPlannerTasksAsync` | One round trip per reminder whose instant moved, after the batch loading at `:170-190` deliberately avoided exactly this | `PERF-3`: mutate all reminders, then save once after the loop, then register |
-| `GetSuggestionsRepeatingPlannerTaskEndpoint.cs:56-61` | Loads **every** active `RepeatingPlannerTask` with three `Include`s, filters recurrence in memory, then runs `Projection(new[]{task}.AsQueryable()).Single()` per match | Grows with the user's recurrence count; the per-row `AsQueryable()` projection allocates an expression tree per task | `PERF-4`: push the `DayOfWeek`/`DayOfMonth`/`DateRange` predicates into SQL where expressible, and project the matched set once instead of per row |
-| `CalendarDayLookup.cs:15-18` | Materialises full tracked `Calendar` entities to read eight fields | Every History calendar-dashboard read pays full-row I/O plus change-tracker entries it never uses | `PERF-6`: add `.AsNoTracking()`; keep the in-memory `DayIndex` projection (the comment is right that it cannot go to SQL) but select the eight columns |
+| `CopyToDaysPlannerTaskEndpoint.cs:81` | ✅ One `AnyAsync` per target day inside the loop | 366 round trips at the ceiling, on top of 366 saves | `PERF-1`: resolve all target ids in one `Where(c => ids.Contains(c.Id)).Select(c => c.Id).ToHashSetAsync()` before the loop; keep the per-day save. **Done as prescribed** — the set is read through the same global user filter, so a foreign id still comes back as `succeeded: false` rather than a 403, and the per-day save stays because the batch is deliberately not transactional |
+| `GetFilteredSortedCalendar.cs:14` | ✅ `From`/`Until` range is **uncapped**, unlike its two siblings | A client asking for 1900→2100 scans the user's whole calendar table and runs two correlated subqueries per row | `PERF-2`: apply `PlannerBatchLimits.MaxSummaryRangeDays` via a `CalendarFilter` validator, matching `CalendarTaskSummariesValidator`. **Done** — `CalendarFilterValidator`, wired explicitly on `FilterCalendarEndpoint` rather than left to convention binding (`CQ-8`'s lesson). The pins already existed and were **red**: `PlanVsActualTrendTests.Range_*` was written across all three range routes in advance, naming this validator |
+| `CalendarResponse.Projection:62-63` | ✅ `TotalTasks` / `CompletedTasks` are two correlated subqueries per calendar row | 62 subqueries for a month grid | `PERF-2`: acceptable at 31 rows; becomes the cost driver once the range above is unbounded. **Left as is, now that the range is bounded** — that was the condition |
+| `ReminderRegistrationService.SyncCoreAsync:94` | ✅ `SaveChangesAsync` inside the per-reminder loop of `SyncForPlannerTasksAsync` | One round trip per reminder whose instant moved, after the batch loading at `:170-190` deliberately avoided exactly this | `PERF-3`: mutate all reminders, then save once after the loop, then register. **Done in that order, which is load-bearing**: the registration carries a schedule built from `RemindAt`, so registering before the save would publish an instant the database might still reject. The mutation split out as `RefreshRemindAt`, which does not save, so the single-reminder path keeps its own save and the batch keeps one |
+| `GetSuggestionsRepeatingPlannerTaskEndpoint.cs:56-61` | ✅ Loads **every** active `RepeatingPlannerTask` with three `Include`s, filters recurrence in memory, then runs `Projection(new[]{task}.AsQueryable()).Single()` per match | Grows with the user's recurrence count; the per-row `AsQueryable()` projection allocates an expression tree per task | `PERF-4`: push the `DayOfWeek`/`DayOfMonth`/`DateRange` predicates into SQL where expressible, and project the matched set once instead of per row. **Both halves.** Only `DateRange` is expressible — the other three match against value-converted collections whose `Contains` has no translation — so the query narrows to "not a DateRange, or a DateRange covering this date" and the three collection tests stay in memory over the smaller set |
+| `CalendarDayLookup.cs:15-18` | ✅ Materialises full tracked `Calendar` entities to read eight fields | Every History calendar-dashboard read pays full-row I/O plus change-tracker entries it never uses | `PERF-6`: add `.AsNoTracking()`; keep the in-memory `DayIndex` projection (the comment is right that it cannot go to SQL) but select the eight columns. **Done** — seven selected, `DayIndex` computed in memory as the eighth, through a new `Calendar.DayIndexOf(date)` static so the Sunday special case is not written a second time (`CQ-12`'s lesson, applied to a two-line expression) |
+
+**No new tests for these five.** `PERF-2` already had its pins; the other four change how a result is reached
+and not what it is, and each is covered where it lives — `CalendarBatchEndpointTests` for the copy fan-out,
+`ReminderRegistrationTests` / `ReminderBatchLifecycleTests` for the reminder sync (including the
+finishing-a-task cancel path the batch loop had to keep), `RepeatingPlannerTaskSuggestionsTests` for the three
+suggestion tiers, and `HistoryCalendarDashboardTests` for the seam.
 
 ### Indexes that should exist
 
@@ -736,10 +849,9 @@ a bare `HasIndex(Status)` is the single most re-addable line in a configuration 
 Nothing needed a test: no query changes, and `PlanningCrudAuthMatrixTests` plus the filter/sort suites already
 cover every read that touches these three columns. The full suite is green (2203 passed, 0 failed).
 
-> **`MIG-5` is outstanding**, deliberately — same reason as `MIG-4` above. The model no longer declares the
-> three indexes; a migrated database still has them, and until the migration lands they keep costing writes
-> without the model knowing they exist. Unlike `MIG-4` this one is a pure `DROP INDEX` with no data step and
-> no failure mode.
+> **`MIG-5` ✅ landed 2026-09-08**, in the same migration as `MIG-3` and `MIG-4` — three `DROP INDEX`
+> statements, scaffolded by EF from the model change and left as generated, with no data step and no failure
+> mode. `Down` recreates all three.
 >
 > One index of the same shape is **left alone on purpose**: `task_planner_day_template (suggested_for_day_type)`
 > (`TaskPlannerDayTemplateConfiguration.cs:55`). It is not in `PERF-5`'s list, so it was not in this fix's
