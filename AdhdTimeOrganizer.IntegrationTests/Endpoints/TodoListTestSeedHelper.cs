@@ -104,7 +104,7 @@ public static class TodoListTestSeedHelper
     public static async Task<long> SeedRoutineTodoListAsync(
         DbContext db, long activityId, long timePeriodId, long userId = TestUserId,
         int? totalCount = null, int? doneCount = null, bool isDone = false, int streak = 0,
-        List<TodoListStep>? steps = null, CancellationToken ct = default)
+        List<TodoListStep>? steps = null, long displayOrder = 1000, CancellationToken ct = default)
     {
         var entity = new RoutineTodoList
         {
@@ -116,7 +116,7 @@ public static class TodoListTestSeedHelper
             IsDone = isDone,
             Streak = streak,
             BestStreak = streak,
-            DisplayOrder = 1000,
+            DisplayOrder = displayOrder,
             Steps = steps ?? []
         };
         db.Set<RoutineTodoList>().Add(entity);

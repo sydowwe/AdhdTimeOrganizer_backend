@@ -31,6 +31,14 @@ finding is confirmed at the file and line stated**, with the corrections listed 
 > inlined copies had to go in the same commit or the fix would not have reached the seeder. Line numbers
 > in `TodoListExtensions.cs` and `seeder/dev/TodoListSeeder.cs` are stale below. `CQ-13.1` and `CQ-13.2`
 > remain open.
+>
+> **Also 2026-09-09:** `CQ-5`, `SEC-4` and the empty-list nit are **fixed** in
+> `BaseChangeDisplayOrderTodoListEndpoint.cs`, and `CQ-4` turned out to have been fixed already by
+> `274e061` — which this recheck missed, because the base was rewritten from the Routines side. That
+> matters more than a bookkeeping correction: `CQ-5` was filed as "currently masked by `CQ-4`", so the
+> unmasking had already happened and the stack overflow was live. **Every "masked by" claim in this file
+> is only as good as the finding it leans on.** `PERF-2` is deliberately untouched — the rebalance branch
+> it rewrites still has no test (`TEST-3`), and it is not a rewrite to make blind.
 
 | Change in this pass | Where |
 |---|---|
@@ -190,6 +198,10 @@ from Routines, and the whole point of the defense-in-depth argument is that it s
 filter that a future `IgnoreQueryFilters()` could lift.
 
 **Fix.** `x => x.Id == req.MovedItemId && x.UserId == userId`.
+
+**Fixed 2026-09-09** exactly as written, with the same comment `TodoListExtensions.cs:32-34` carries, so
+the reason the predicate is there travels with it — an "unnecessary" clause next to a global query filter
+is the kind of thing a later reader deletes.
 
 `Doc impact: none`
 
@@ -351,6 +363,17 @@ building the predicate with `Expression.Lambda<Func<TEntity,bool>>(Expression.Eq
 Expression.Constant(groupId.Value)), GroupFilterExpression.Parameters)`. Cache it — it is fixed per
 closed generic type. `TEST-3` must cover the branch.
 
+**Already fixed by `274e061`** (the Routines suites commit), which this recheck missed — the base is
+subclassed from Routines, so it was rewritten there rather than under a `CQ-4` heading. The predicate is
+now composed in `InGroupExpression`, and the finding's own diagnosis is preserved as that method's XML
+doc. One deliberate departure from the fix above: the group id is spliced in as a captured closure member
+(`Expression<Func<long>> groupIdRef = () => groupId`) rather than an `Expression.Constant`, so EF still
+parameterises it — a constant would give every group its own query-plan cache entry, which is the cost
+the "cache it per closed generic type" advice was trying to avoid, arrived at from the other side.
+
+**`TEST-3` closed the same day** — `ChangeDisplayOrderTodoListItemTests` executes the rebalance branch
+for the first time, green, and asserts the re-spaced ladder rather than the 204.
+
 `Doc impact: none`
 
 ### CQ-5 🟠 `CalculateNewOrderAsync` recurses after a rebalance with no depth guard
@@ -368,6 +391,28 @@ a process crash.
 **Fix.** Thread a `depth` parameter (or a `bool alreadyRebalanced`) and return
 `Result<long>.Error(ResultErrorType.Conflict, …)` on the second failure, which is the 409 the docs
 already promise.
+
+**Fixed 2026-09-09** with the `bool alreadyRebalanced`, and it turned out not to be the *pre*-emptive fix
+this finding described: `CQ-4` had already been fixed by `274e061`, so the throw that was masking this one
+was gone and the stack overflow was live, not hypothetical. "Currently masked by CQ-4" above was true when
+written and had stopped being true before either was read again — which is the argument for fixing a pair
+like this together rather than in the order the severities suggest.
+
+The 409 now comes out of `EndpointHelper.ToStatusCode(ResultErrorType.Conflict)` through the existing
+failure branch in `HandleAsync`, so `Summary`'s `Responses[409]` is finally reachable and no new mapping
+was needed.
+
+`TEST-3` proves it, and writing that test corrected the finding's account of *how* the second failure is
+reached. `GetGroupIdById` cannot return null: it is `FirstOrDefaultAsync` over an `IQueryable<long>`, so a
+missing row yields `0`, and the row cannot be missing anyway — `GetDisplayOrderById` resolved it two lines
+earlier or the request already 404'd. The reachable path is a **preceding item in another group**. The
+rebalance only re-spaces the *following* item's group, so a preceding item sitting one above
+`DisplayOrderStart - DisplayOrderGap` — where a re-spaced group's top row always lands — meets the same
+exhausted gap on the retry. The endpoint validates that the neighbours share the moved item's group
+nowhere, so this is a payload a client can send today.
+
+That makes the guard's justification stronger than the finding's, not weaker: the early-return path it
+named is unreachable, and the recursion is still unbounded without it.
 
 `Doc impact: none`
 
@@ -838,7 +883,8 @@ The code disagrees both ways:
   invariant is not sufficient), `GetDailyRecapTodoListItemEndpoint.cs:53-59` (likewise, at length),
   `GetAllTodoListItemEndpoint.cs:34`, `GetFilterSortTodoListCategoryEndpoint.cs:32`, all three step
   endpoints' `GetParentQuery`, and `MoveTodoListItemEndpoint.cs:54`.
-- **Relies on the filter alone**: `BaseChangeDisplayOrderTodoListEndpoint.cs:49` (SEC-4),
+- **Relies on the filter alone**: ~~`BaseChangeDisplayOrderTodoListEndpoint.cs:49` (SEC-4)~~ *(fixed
+  2026-09-09; it now scopes by hand and belongs in the list above)*,
   `ToggleIsDoneTodoListItemEndpoint.cs:13-16`, `ToggleStepIsDoneTodoListItemEndpoint.cs:14-17`, and the
   four `GetById*` endpoints (which at least say so in a comment).
 
@@ -862,6 +908,10 @@ The exceptions list is **not** empty and the rewrite says so: `SEC-4` is still o
 surface is named as the remaining unguarded write. An invariant that lists its own exceptions is worth
 more than one that is aspirationally clean — the previous version was the latter, which is how it came
 to license the finding.
+
+**Amended later the same day**, when `SEC-4` was fixed: the reorder base has moved from the exceptions
+to the "scopes by hand" side, and invariant 3 now names the toggles and the four `GetById*` reads as
+what is left. The exceptions list is shorter, not gone — which is the point of keeping it.
 
 `Doc impact: domain-map.md → Invariants (3 — rewrite)` — **done**
 
@@ -905,8 +955,10 @@ that is not the intent, the fix is in the code instead: leave `DoneCount` null u
 - `infrastructure/persistence/configuration/ToDoListItemConfiguration.cs` — the file name says
   `ToDoList`, the class says `TodoListItem`. `domain-map.md:44` already notes this; renaming the file is
   a free fix now that the slice has moved once.
-- `BaseChangeDisplayOrderTodoListEndpoint.cs:100` returns `standardGap` for an empty list, where
-  creation uses `DisplayOrderStart` — two different "first item" values for the same column.
+- ~~`BaseChangeDisplayOrderTodoListEndpoint.cs:100` returns `standardGap` for an empty list, where
+  creation uses `DisplayOrderStart` — two different "first item" values for the same column.~~
+  **Fixed 2026-09-09** with `CQ-5`; it now returns `DisplayOrderStart`, the value `GetNextDisplayOrder`
+  hands a group's first row, so the descending-by-gap scheme starts from the same place either way.
 - `BaseToggleIsDoneTodoListEndpoint.cs:43` calls `UpdateRange` on entities that are already tracked and
   modified, forcing every column into the `UPDATE`. Same at `BaseToggleStepIsDoneEndpoint.cs:49` and
   `BaseChangeDisplayOrderTodoListEndpoint.cs:161`.

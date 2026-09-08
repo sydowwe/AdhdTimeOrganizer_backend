@@ -1,5 +1,30 @@
 # TEST-3 — `PATCH /api/todo-list-item/change-display-order`
 
+> **✅ Done 2026-09-09 — `AdhdTimeOrganizer.IntegrationTests/Endpoints/ChangeDisplayOrderTodoListItemTests.cs`,
+> 11 tests, all green.** Everything below is the prompt as written; three things it says are no longer
+> true and the file is left intact so the difference is visible:
+>
+> - **Scenario 4's premise is fixed, not pinned.** The empty-list value is now `DisplayOrderStart`, the
+>   same value creation mints, so the test asserts the agreement rather than pinning the discrepancy.
+> - **`CQ-4` was already fixed** by `274e061` before this suite was written, so scenario 6 went in green
+>   and needs no `KnownGap` trait. Its assertion list is also wrong on one point: after the retry the
+>   moved item sits at the *midpoint* of the two re-spaced neighbours, so consecutive orders do **not**
+>   all differ by `DisplayOrderGap`. What the test asserts instead is that the two untouched neighbours
+>   land on the ladder (`Start - gap`, `Start - 2*gap`), the moved item is strictly between them, and
+>   the group has no duplicates.
+> - **`CQ-5` needed a different setup than the one suggested.** `GetGroupIdById` cannot return null
+>   here: it is `FirstOrDefaultAsync` over an `IQueryable<long>`, so a missing row yields `0`, and the
+>   row cannot be missing anyway because `GetDisplayOrderById` already resolved it two lines earlier.
+>   The reachable path is a **preceding item in a different group**: the rebalance only re-spaces the
+>   *following* item's group, so a preceding item parked one above `DisplayOrderStart - DisplayOrderGap`
+>   — where the rebalance always puts that group's top row — hits the same exhausted gap on the retry.
+>   That is what the test does, and it also asserts the rebalance's writes roll back with the
+>   uncommitted transaction.
+>
+> One helper change came with it: `TodoListTestSeedHelper.SeedRoutineTodoListAsync` takes a
+> `displayOrder` parameter now, mirroring its `SeedTodoListItemAsync` sibling, which previously
+> hard-coded `1000`.
+
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first.
 
 **Status today: one test, and it asserts a 404.** `TodoListCrudAuthMatrixTests.cs:525`

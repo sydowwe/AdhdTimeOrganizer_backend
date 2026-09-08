@@ -46,8 +46,11 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
     {
         var userId = User.GetId();
 
+        // userId is defense-in-depth alongside the global IEntityWithUser query filter, matching what
+        // GetDisplayOrderById/GetGroupIdById do for every sibling lookup in this same request: the
+        // filter must not be the only thing standing between this and a cross-user row.
         var itemToMove = await _dbSet
-            .FirstOrDefaultAsync(x => x.Id == req.MovedItemId, ct);
+            .FirstOrDefaultAsync(x => x.Id == req.MovedItemId && x.UserId == userId, ct);
 
         if (itemToMove is null)
         {
@@ -60,7 +63,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
         await using (var tx = await dbContext.Database.BeginTransactionAsync(ct))
         {
             // Attempt to calculate new order. If conflict triggers, we'll rebalance and retry once.
-            var newOrderResult = await CalculateNewOrderAsync(req, userId, ct);
+            var newOrderResult = await CalculateNewOrderAsync(req, userId, false, ct);
 
             if (newOrderResult.Failed)
             {
@@ -87,17 +90,27 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
 
     /// <summary>
     /// Calculates the new DisplayOrder value based on the surrounding items using arithmetic of precedingOrder and followingOrder.
+    /// <para>
+    /// <paramref name="alreadyRebalanced"/> is what keeps the retry a retry. The recursion below re-enters with
+    /// identical arguments, so it only terminates if the rebalance actually opened a gap — and
+    /// <see cref="RebalanceDisplayOrdersAsync"/> returns early, doing nothing, whenever the following item's group
+    /// id cannot be read. Without the flag that case recurses until the stack overflows and takes the process down;
+    /// with it, the second failure answers the 409 the <c>Summary</c> block already advertises.
+    /// </para>
     /// </summary>
-    private async Task<Result<long>> CalculateNewOrderAsync(ChangeDisplayOrderRequest req, long userId, CancellationToken ct)
+    private async Task<Result<long>> CalculateNewOrderAsync(ChangeDisplayOrderRequest req, long userId, bool alreadyRebalanced, CancellationToken ct)
     {
         var standardGap = _settings.DisplayOrderGap;
 
         // Case 1: Move to the top of the list
         if (!req.PrecedingItemId.HasValue)
         {
-            // If the list is completely empty (no following), start with startOrder.
+            // If the list is completely empty (no following), start where creation starts:
+            // GetNextDisplayOrder hands the first row of a group DisplayOrderStart, and the scheme counts
+            // down from there by DisplayOrderGap. Returning the gap itself would give the same column two
+            // different "first item" values depending on which route wrote it.
             if (!req.FollowingItemId.HasValue)
-                return Result.Successful(standardGap);
+                return Result.Successful(_settings.DisplayOrderStart);
 
             var followingOrder = await _dbSet.GetDisplayOrderById(req.FollowingItemId.Value, userId, ct);
 
@@ -129,9 +142,12 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
         // If no gap (midpoint equals one of the endpoints) -> signal conflict and request rebalance
         if (newOrder == preOrder.Value || newOrder == folOrder.Value)
         {
+            if (alreadyRebalanced)
+                return Result<long>.Error(ResultErrorType.Conflict,
+                    "The items around the requested position have no gap left even after a re-index. The list needs a full re-index.");
+
             await RebalanceDisplayOrdersAsync(req.FollowingItemId.Value, userId, ct);
-            var newOrderResult = await CalculateNewOrderAsync(req, userId, ct);
-            return newOrderResult;
+            return await CalculateNewOrderAsync(req, userId, true, ct);
         }
 
         return Result.Successful(newOrder);

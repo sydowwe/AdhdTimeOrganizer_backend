@@ -141,7 +141,7 @@ Counts are tests that meaningfully exercise that endpoint (not incidental use as
 | `GET /todo-list-item/daily-recap` | ✅ 4 | ✅ 5 (UTC edges, zero-day, decline, double-count) | ✅ 1 | `TodoListItemDailyRecapTests` |
 | `PATCH /todo-list-item/toggle-is-done` | ✅ 3 | ✅ 4 incl. fuzz | ⚠️ via matrix only | `TodoListToggleAndDoneCountTests` |
 | `PATCH /todo-list-item/{id}/steps/{id}/toggle` | ✅ 2 | ✅ 1 (untick a fully-done item) | ❌ | `TodoListToggleAndDoneCountTests:99`, `:131` |
-| `PATCH /todo-list-item/change-display-order` | ❌ **`TEST-3`** | ❌ **rebalance branch never executed** | ✅ 1 | `TodoListCrudAuthMatrixTests:525` |
+| `PATCH /todo-list-item/change-display-order` | ✅ 4 (all three arithmetic cases + the no-neighbours one) | ✅ 4 (both rebalance outcomes, unknown neighbour ids, completion state) | ✅ 2 | `ChangeDisplayOrderTodoListItemTests`, `TodoListCrudAuthMatrixTests:525` |
 | `PATCH /todo-list-item/{id}/priority` | ❌ **`TEST-2`** | ❌ cross-group `DisplayOrder` | ❌ | — |
 | `PATCH /todo-list-item/{id}/move` | ❌ **`TEST-1`** | ❌ the 409 the endpoint hand-maps | ❌ | — |
 | `POST /todo-list-item/{id}/steps` | ✅ 2 | ✅ 1 (101 steps) | ⚠️ via update-step | `TodoListStepsCrudTests` |
@@ -177,7 +177,11 @@ number flatters the slice, because the coverage is not distributed where the ris
 
 - **The riskiest gap is the ordering machinery.** `change-display-order`, `move`, `priority` and
   `GetNextDisplayOrder` are four surfaces that mutate the same column, share the same arithmetic, and
-  between them have **one** test — which asserts a 404. Three of the five 🟠 findings in `02-findings.md`
+  between them have **one** test — which asserts a 404. *(Amended 2026-09-09: three of the four are now
+  covered — `GetNextDisplayOrder` by `TodoListDisplayOrderMintingTests`, `move`/`priority` by
+  `TodoListReferencedIdOwnershipTests`, and `change-display-order` by
+  `ChangeDisplayOrderTodoListItemTests`. The ~62% headline below is stale in the slice's favour and has
+  not been recomputed.)* Three of the five 🟠 findings in `02-findings.md`
   live on those paths, and one of them (CQ-4) means the rebalance branch throws at runtime and has
   simply never been reached. Read paths that were never exercised are the usual suspect in this repo;
   here it is a *write* path.
@@ -211,7 +215,7 @@ disposable — the real tests belong in `AdhdTimeOrganizer.IntegrationTests`.
 |---|---|---|---|---|
 | `TEST-1` | `PATCH /todo-list-item/{id}/move` — zero tests, incl. the unique-index 409 the endpoint hand-maps | 🟠 | SEC-3, CQ-7 | [MoveTodoListItem.md](testingPrompts/MoveTodoListItem.md) |
 | `TEST-2` | `PATCH /todo-list-item/{id}/priority` — zero tests; changes the `DisplayOrder` group without reordering | 🟠 | SEC-2, CQ-6 | [ChangePriorityTodoListItem.md](testingPrompts/ChangePriorityTodoListItem.md) |
-| `TEST-3` | `change-display-order` — no behavioural test; the rebalance branch has never executed | 🟠 | CQ-4, CQ-5, PERF-2 | [ChangeDisplayOrderTodoListItem.md](testingPrompts/ChangeDisplayOrderTodoListItem.md) |
+| `TEST-3` ✅ **DONE 2026-09-09** | `change-display-order` — 11 tests in `ChangeDisplayOrderTodoListItemTests`, including both rebalance outcomes and the Routines twin | 🟠 | CQ-4, CQ-5, PERF-2 | [ChangeDisplayOrderTodoListItem.md](testingPrompts/ChangeDisplayOrderTodoListItem.md) |
 | `TEST-4` | `GET /todo-list-item` — `todoListId` filter and `DisplayOrder` ordering unasserted | 🟡 | PERF-1 | [GetAllTodoListItem.md](testingPrompts/GetAllTodoListItem.md) |
 | `TEST-5` | `GET /todo-list-item/dashboard-widget` — zero tests; server-local `DateTime.Today` | 🟠 | CQ-18 | [GetDashboardTodoListItem.md](testingPrompts/GetDashboardTodoListItem.md) |
 | `TEST-6` | `POST /todo-list-category/filter-sort` — zero tests; synthetic `Id = -1` row, `HideEmpty` | 🟡 | CQ-8, PERF-4 | [GetFilterSortTodoListCategory.md](testingPrompts/GetFilterSortTodoListCategory.md) |

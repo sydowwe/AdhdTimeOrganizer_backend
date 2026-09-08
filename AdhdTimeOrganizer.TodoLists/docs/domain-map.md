@@ -173,9 +173,11 @@ Which of these the database actually enforces, and which are only app-level:
    `TodoListId`), change-priority (`PriorityId`) and move (`DestinationListId`); `ActivityId` on
    create and update goes through `ActivityIdOwnershipExtensions`. Pinned by
    `TodoListReferencedIdOwnershipTests`.
-   Still open on the *read* side: `SEC-4` — `BaseChangeDisplayOrderTodoListEndpoint:49` loads the
-   moved item on the filter alone, where every sibling lookup in the same request passes an explicit
-   `userId`.
+   On the *read* side the reorder base now matches its own helpers:
+   `BaseChangeDisplayOrderTodoListEndpoint` loads the moved item with an explicit
+   `x.UserId == userId`, as `GetDisplayOrderById` and
+   `GetGroupIdById` already did for every sibling in the same request. The remaining entries relying
+   on the filter alone are the toggle endpoints and the four `GetById*` reads.
 4. **`TodoListItem` is unique on `(UserId, ActivityId, TodoListId)`** — one item per activity per
    list. *DB-enforced* (unique index); surfaces as a 409 through the base endpoints' exception
    mapping.
@@ -229,8 +231,11 @@ complete item reopens it and steps `DoneCount` back by one.
 **Display order is a sparse midpoint list, descending.** New items get
 `min(DisplayOrder) - DisplayOrderGap`, or `DisplayOrderStart` on an empty group. A reorder takes the
 midpoint between the two siblings; when the gap closes the whole group is rebalanced and the midpoint
-is retried once. The grouping column differs per subclass — `TaskPriorityId` for to-do items,
-`TimePeriodId` for routine ones.
+is retried **once** — a second failure is a 409, not another rebalance, because the rebalance does
+nothing at all when the following item's group id cannot be read and the retry would otherwise recurse
+forever. Reordering into an empty list yields `DisplayOrderStart`, the same value creation uses. The
+grouping column differs per subclass — `TaskPriorityId` for to-do items, `TimePeriodId` for routine
+ones.
 
 **Temptation bundling is intentionally unvalidated beyond the FK.** The picker is populated from
 backlog profiles, but what is stored is the plain `Activity` id, and nothing checks that the paired
