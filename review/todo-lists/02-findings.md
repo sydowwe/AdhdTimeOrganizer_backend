@@ -51,6 +51,19 @@ finding is confirmed at the file and line stated**, with the corrections listed 
 > is only as good as the finding it leans on.** `PERF-2` is deliberately untouched — the rebalance branch
 > it rewrites still has no test (`TEST-3`), and it is not a rewrite to make blind.
 
+> **Also 2026-09-09:** `CQ-13.1`+`DOC-2`, `CQ-13.2`, `CQ-12`, `CQ-17` and five of the nits are **fixed as
+> one batch** — the housekeeping pass. `CQ-13` and `DOC-2` are now **closed** in full, as is `CQ-12`.
+> `DOC-4` needed no work: it was already closed by the `CQ-16`/`CQ-19` batch and all three enumerations
+> were re-read against the source and agree.
+>
+> Two files were renamed, so paths below are stale: `seeder/dev/TodoListSeeder.cs` →
+> `TodoListItemSeeder.cs`, and `configuration/ToDoListItemConfiguration.cs` →
+> `TodoListItemConfiguration.cs`. The three name filters moved to `EF.Functions.ILike` over Core's
+> `FreeTextFilterExtensions`, which **required rewriting two tests that pinned the case-sensitive
+> behaviour deliberately** (`FilterSortTodoListTests.NameFilter_…`, `GridTaskPriorityTests.TextFilter_…`)
+> — their own comments asked for exactly that, and both now also pin the `%` escape, which is the half
+> that fails silently.
+
 | Change in this pass | Where |
 |---|---|
 | `DOC-1` **resolved** by `6079f93` — the settings row now reads `MaxItems` / `DisplayOrderGap` with `DisplayOrderStart` derived | `domain-map.md:53` |
@@ -645,7 +658,7 @@ un-tick/re-tick case that confirms `UpdateItemStreak`'s once-per-cycle guard hol
 naming the override and the test — deliberately at the declaration, since that is where the next reader
 will conclude it is dead.`
 
-### CQ-12 🟡 `TodoListGroupedByCategoryResponse` is dead
+### CQ-12 🟡 ✅ FIXED 2026-09-09 · `TodoListGroupedByCategoryResponse` is dead
 
 `application/dto/response/TodoListGroupedByCategoryResponse.cs` — zero references across the whole
 solution (verified by search, excluding `bin`/`obj`). No endpoint returns it and no test names it.
@@ -653,9 +666,13 @@ solution (verified by search, excluding `bin`/`obj`). No endpoint returns it and
 **Fix.** Delete it. If grouped-by-category reads are planned, the shape belongs with the endpoint that
 introduces them.
 
+**Deleted 2026-09-09.** The search was re-run before removing it and still finds nothing outside `bin`
+/ `obj` — no endpoint, no test, no doc. `MIG-9` in [03-risks-rollout.md](03-risks-rollout.md) covers the
+frontend question: the type is serialized by nothing, so the wire format is unchanged.
+
 `Doc impact: none`
 
-### CQ-13 🟡 The dev seeder's name, its comment and its arithmetic are all wrong
+### CQ-13 🟡 ✅ FIXED 2026-09-09 (all three) · The dev seeder's name, its comment and its arithmetic are all wrong
 
 `infrastructure/persistence/seeder/dev/TodoListSeeder.cs`. Three separate things:
 
@@ -663,9 +680,15 @@ introduces them.
    files are assigned by what the type *is* — but here the type and the file disagree with each other.
    Rename the file. *(Recheck: `domain-map.md:142` now documents the mismatch instead of getting it
    wrong — see DOC-2 — so this is the only side still open. Call it `CQ-13.1` when scheduling it.)*
+   **✅ FIXED 2026-09-09** (`CQ-13.1`) — `git mv` to `TodoListItemSeeder.cs`, with `DOC-2`'s clause
+   dropped from `domain-map.md` in the same commit. No code referenced the file name; the `.csproj`
+   globs, so nothing else had to move.
 2. **`:28` says "TruncateTable already removed existing data for this user".** It did not:
    `TruncateTableCascadeAsync<TodoListItem>()` (`:22`) truncates the table for *every* user. Harmless in
    dev, but the comment will mislead whoever next reads it for the per-user seeder contract.
+   **✅ FIXED 2026-09-09** (`CQ-13.2`) — the comment now says what the truncate actually is (a separate,
+   table-wide step) and warns against reading it as a per-user precondition, which is the misreading the
+   finding is about.
 3. **`:80-93` inlines three copies of `GetNextDisplayOrder`** rather than calling the extension six
    lines away in the same project — carrying both CQ-2's `!= 0` sentinel and CQ-3's `(int?)` cast into a
    third, fourth and fifth location. A fix to the extension will silently not reach them. **✅ FIXED
@@ -679,6 +702,8 @@ introduces them.
 `dbContext.Set<TodoListItem>().GetNextDisplayOrder(settings.Value, userId, priorityId, ct)`.
 
 `Doc impact: domain-map.md → Seeding (drop the "the file is named TodoListSeeder.cs" clause once renamed)`
+— **done**; the Seeding row now gives the real path and says nothing about a mismatch, because there
+isn't one.
 
 ### CQ-14 🟡 ✅ FIXED 2026-09-09 · `TaskPriorityRequest.Priority` is `short` where everything around it is `int`
 
@@ -815,7 +840,7 @@ and the reconcile is genuinely three-way, adding the id-less and dropping the om
 
 `Doc impact: domain-map.md → Entities (TodoListStep row: say the client-supplied Guid is a stable public key, since three routes take it)` — **done**, naming the three routes and the shared helper.
 
-### CQ-17 🟡 Validators are attached inconsistently
+### CQ-17 🟡 ✅ FIXED 2026-09-09 · Validators are attached inconsistently
 
 `Validator<T>()` is called explicitly in `Configure()` for the create/update/patch endpoints
 (`CreateTodoListItemEndpoint.cs:21`, `MoveTodoListItemEndpoint.cs:25`, and six others) but never for the
@@ -826,6 +851,14 @@ in one slice means a reader cannot tell from the endpoint whether validation run
 ("an unattached one is not a build error").
 
 **Fix.** Attach all of them explicitly in `Configure()`, matching the majority pattern.
+
+**Fixed 2026-09-09**, all three, in the base's own `Configure()` rather than in the four leaf endpoints
+— the request type is the same for both parents, so the attachment belongs where the route is declared
+and both `TodoListItem` and `RoutineTodoList` inherit it.
+
+The fourth step route, `BaseToggleStepIsDoneEndpoint`, is deliberately not in the list: it is an
+`EndpointWithoutRequest`, so there is no request type to validate and no validator exists for it. The
+finding's count of three is right for that reason, not by omission.
 
 `Doc impact: none`
 
@@ -911,7 +944,7 @@ number `CQ-2` turns on, so the row states it rather than leaving the next reader
 
 `Doc impact: domain-map.md → Configuration table (one clause: MaxItems is a multiplier, not a cap)` — **done**
 
-### DOC-2 🟡 The dev seeder's file name — doc side fixed, code side open
+### DOC-2 🟡 ✅ FIXED 2026-09-09 · The dev seeder's file name — doc side fixed, code side open
 
 The first pass found `domain-map.md:79` naming a `dev/TodoListSeeder` type that does not exist.
 `6079f93` fixed the doc the honest way: `domain-map.md:142` now names the class `TodoListItemSeeder` and
@@ -925,7 +958,10 @@ renamed.
 **Which side is wrong:** now the code only. **Fix:** rename `TodoListSeeder.cs` → `TodoListItemSeeder.cs`,
 then drop the "the file is named…" clause from the doc, which exists only to describe the mismatch.
 
-`Doc impact: domain-map.md → Seeding (remove the mismatch clause after the rename)`
+**Fixed 2026-09-09** in that order, one commit, with `CQ-13.1`. `summary.md:12` needed no change — it
+names the class, not the file.
+
+`Doc impact: domain-map.md → Seeding (remove the mismatch clause after the rename)` — **done**
 
 ### DOC-3 ✅ Resolved by `6079f93` — navigation-index paths
 
@@ -1079,9 +1115,12 @@ copy in `domain-map.md` said the same thing in one line and was corrected with i
 
 ## 🟡 Nits appendix
 
-- `infrastructure/persistence/configuration/ToDoListItemConfiguration.cs` — the file name says
+- ~~`infrastructure/persistence/configuration/ToDoListItemConfiguration.cs` — the file name says
   `ToDoList`, the class says `TodoListItem`. `domain-map.md:44` already notes this; renaming the file is
-  a free fix now that the slice has moved once.
+  a free fix now that the slice has moved once.~~ **Fixed 2026-09-09** — renamed to
+  `TodoListItemConfiguration.cs`, and the two doc notes that existed only to describe the mismatch
+  (`domain-map.md`'s configuration row, `summary.md`'s folder-lies gotcha) lost that clause. The
+  gotcha itself stays: the endpoint namespaces still carry a `todoList` segment the folders don't.
 - ~~`BaseChangeDisplayOrderTodoListEndpoint.cs:100` returns `standardGap` for an empty list, where
   creation uses `DisplayOrderStart` — two different "first item" values for the same column.~~
   **Fixed 2026-09-09** with `CQ-5`; it now returns `DisplayOrderStart`, the value `GetNextDisplayOrder`
@@ -1091,13 +1130,32 @@ copy in `domain-map.md` said the same thing in one line and was corrected with i
   `BaseChangeDisplayOrderTodoListEndpoint.cs:161`.
 - `BaseToggleIsDoneTodoListEndpoint.cs:30-35` returns 404 only when *no* requested id resolved; a batch
   with one valid and one foreign id silently succeeds on the subset.
-- `GetSelectOptionsTaskPriorityEndpoint.cs:8` and `GetSelectOptionsTodoListEndpoint.cs:7` name their
+- ~~`GetSelectOptionsTaskPriorityEndpoint.cs:8` and `GetSelectOptionsTodoListEndpoint.cs:7` name their
   constructor parameter `appDbContext` — the one name `docs/summary.md:39-43` says never appears in this
-  project. *(Line ref repaired in the recheck; `summary.md` was rewritten by `6079f93`.)*
-- `GridTaskPriorityEndpoint.cs:15` and `FilterSortTodoListEndpoint.cs:14` use case-sensitive
-  `Contains` for name search; `GetFilterSortTodoListCategoryEndpoint.cs:38` does the same. Postgres
-  `LIKE` is case-sensitive, so all three name filters miss on capitalisation.
-- `TodoListSeeder.cs:116-118` seeds a "Bug fixing" item with `TotalCount = 3`, `DoneCount = 0` and one
-  step already `IsDone = true` — an internally inconsistent fixture that no toggle path can produce.
-- `TodoListStepsCrudTests.cs:34` uses `Random.Shared.Next(1000, 999_000)` for a column with a unique
-  index in a shared-database suite. Low-probability flake; a monotonic counter would be free.
+  project.~~ **Fixed 2026-09-09** — both are `dbContext` now. A slice cannot see `AppDbContext`, so the
+  name was claiming a type that isn't in scope.
+- ~~`GridTaskPriorityEndpoint.cs:15` and `FilterSortTodoListEndpoint.cs:14` use case-sensitive
+  `Contains` for name search; `GetFilterSortTodoListCategoryEndpoint.cs:38` does the same.~~
+  **Fixed 2026-09-09**, all three, through Core's `FreeTextFilterExtensions` — `ToContainsPattern`
+  outside the lambda, `EF.Functions.ILike(x, pattern, FreeTextFilterExtensions.EscapeCharacter)` inside
+  it — which is what the Core grids already do, so there is one copy of the rule and the three-argument
+  `ESCAPE` trap that class documents is not re-stepped-in here.
+
+  **Two tests pinned the old behaviour on purpose and had to be rewritten**:
+  `FilterSortTodoListTests.NameFilter_MatchesSubstring_CaseSensitively` and
+  `GridTaskPriorityTests.TextFilter_MatchesSubstring_CaseSensitively` both asserted the lowercase query
+  came back empty, the first with a comment asking for exactly this rewrite if the route were ever
+  brought in line. Both now assert the match instead, and both gained a `%` case — an unescaped
+  wildcard matches everything and an over-escaped one matches nothing, and neither shows up as an
+  error, only as a wrong grid.
+- ~~`TodoListSeeder.cs:116-118` seeds a "Bug fixing" item with `TotalCount = 3`, `DoneCount = 0` and one
+  step already `IsDone = true` — an internally inconsistent fixture that no toggle path can produce.~~
+  **Fixed 2026-09-09** — `DoneCount = 1`, matching the one ticked step, with the reason on the line.
+  The other fixtures were checked in the same pass and are consistent: `Steps` and `TotalCount` are
+  independent tracks (see *Previously known*), so a `DoneCount` that matches the ticked-step count is
+  the only thing that had to hold.
+- ~~`TodoListStepsCrudTests.cs:34` uses `Random.Shared.Next(1000, 999_000)` for a column with a unique
+  index in a shared-database suite. Low-probability flake; a monotonic counter would be free.~~
+  **Fixed 2026-09-09** — `Interlocked.Increment` over a static counter based at 1000, which is a block
+  no other class in the collection uses (every other file picks ranks below 1000 by hand, and the file
+  headers already treat those as claimed bands).

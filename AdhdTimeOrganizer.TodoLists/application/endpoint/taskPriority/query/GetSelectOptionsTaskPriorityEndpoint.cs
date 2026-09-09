@@ -5,8 +5,8 @@ using Sydowwe.Framework.application.endpoint.@base.read;
 namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.taskPriority.query;
 
 public class GetSelectOptionsTaskPriorityEndpoint(
-    DbContext appDbContext)
-    : BaseGetSelectOptionsEndpoint<TaskPriority>(appDbContext)
+    DbContext dbContext)
+    : BaseGetSelectOptionsEndpoint<TaskPriority>(dbContext)
 {
     protected override IQueryable<SelectOptionResponse> Map(IQueryable<TaskPriority> query)
     {

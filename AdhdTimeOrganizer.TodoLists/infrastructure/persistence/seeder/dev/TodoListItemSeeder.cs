@@ -26,7 +26,9 @@ public class TodoListItemSeeder(
 
     public async Task SeedForUser(long userId)
     {
-        // Note: TruncateTable already removed existing data for this user
+        // Note: TruncateTable is a separate, table-wide step — TruncateTableCascadeAsync<TodoListItem>()
+        // empties the table for *every* user, not just this one. Harmless in a dev fixture, but this is a
+        // per-user seeder, so don't read the truncate as a per-user precondition.
 
         // Get activities and task priorities for this user
         var activities = await dbContext.Set<Activity>()
@@ -95,7 +97,9 @@ public class TodoListItemSeeder(
                 TaskPriorityId = todayPriority.Id,
                 TodoListId = defaultTodoList.Id,
                 IsDone = false,
-                DoneCount = 0,
+                // One of the three steps below is ticked, so DoneCount is 1 — a fixture with
+                // DoneCount = 0 next to a done step is a state no toggle path can produce.
+                DoneCount = 1,
                 TotalCount = 3,
                 DisplayOrder = nextOrderToday,
                 UserId = userId,

@@ -4,7 +4,7 @@ using Sydowwe.Framework.application.endpoint.@base.read;
 
 namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoList.query;
 
-public class GetSelectOptionsTodoListEndpoint(DbContext appDbContext) : BaseGetSelectOptionsEndpoint<TodoList>(appDbContext)
+public class GetSelectOptionsTodoListEndpoint(DbContext dbContext) : BaseGetSelectOptionsEndpoint<TodoList>(dbContext)
 {
     protected override IQueryable<SelectOptionResponse> Map(IQueryable<TodoList> query)
     {

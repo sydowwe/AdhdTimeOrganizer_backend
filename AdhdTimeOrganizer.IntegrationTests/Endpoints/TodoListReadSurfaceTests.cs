@@ -41,8 +41,8 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 [Collection("Postgres")]
 public class FilterSortTodoListTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
 {
-    [Fact(DisplayName = "The Name filter matches by substring -- and case-sensitively, because Contains renders as LIKE")]
-    public async Task NameFilter_MatchesSubstring_CaseSensitively()
+    [Fact(DisplayName = "The Name filter matches by substring, case-insensitively -- it runs as ILIKE, not LIKE")]
+    public async Task NameFilter_MatchesSubstring_CaseInsensitively()
     {
         await using (var db = CreateDbContext())
         {
@@ -54,11 +54,15 @@ public class FilterSortTodoListTests(AppDbContextFixture fixture) : PostgresTest
         var matches = await FilterAsync(new { Name = "Work" });
         matches.Select(l => l.Name).Should().BeEquivalentTo(["Work", "Workout"]);
 
-        // Pinned as-is rather than as a defect: PERF-2 made the three *grid* text filters ILIKE, and
-        // this route was not part of that change. If it is ever brought in line, this is the assertion
-        // that has to be rewritten deliberately instead of the behaviour changing unobserved.
+        // Rewritten deliberately, as the previous version of this comment asked: the filter now runs as
+        // EF.Functions.ILike over FreeTextFilterExtensions.ToContainsPattern, in line with the grids.
         var lowercase = await FilterAsync(new { Name = "work" });
-        lowercase.Should().BeEmpty("Postgres LIKE is case-sensitive and this filter still uses Contains");
+        lowercase.Select(l => l.Name).Should().BeEquivalentTo(["Work", "Workout"], "the filter is ILIKE, so case does not narrow it");
+
+        // The escape has to survive the switch too — an unescaped % would turn this into a wildcard and
+        // match every list, which is the failure mode FreeTextFilterExtensions' XML doc warns about.
+        var wildcard = await FilterAsync(new { Name = "%" });
+        wildcard.Should().BeEmpty("% is escaped to a literal, so it matches no list name");
     }
 
     /// <summary>
@@ -261,14 +265,17 @@ public class GridTaskPriorityTests(AppDbContextFixture fixture) : PostgresTestBa
         await db.SaveChangesAsync(CancellationToken);
     }
 
-    [Fact(DisplayName = "The Text filter matches by substring -- and case-sensitively, because Contains renders as LIKE")]
-    public async Task TextFilter_MatchesSubstring_CaseSensitively()
+    [Fact(DisplayName = "The Text filter matches by substring, case-insensitively -- it runs as ILIKE, not LIKE")]
+    public async Task TextFilter_MatchesSubstring_CaseInsensitively()
     {
         var matches = await GridAsync(new { Text = "Rush" });
         matches.Items.Select(p => p.Priority).Should().Equal(SprintRank, SteadyRank);
 
         var lowercase = await GridAsync(new { Text = "rush" });
-        lowercase.Items.Should().BeEmpty("this grid was not part of PERF-2's ILIKE change");
+        lowercase.Items.Select(p => p.Priority).Should().Equal(SprintRank, SteadyRank);
+
+        var wildcard = await GridAsync(new { Text = "%" });
+        wildcard.Items.Should().BeEmpty("% is escaped to a literal, so it matches no priority text");
     }
 
     /// <summary>

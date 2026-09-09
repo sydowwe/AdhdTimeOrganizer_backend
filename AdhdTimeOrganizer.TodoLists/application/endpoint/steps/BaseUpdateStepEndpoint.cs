@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
+using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
 using Humanizer;
@@ -17,6 +18,7 @@ public abstract class BaseUpdateStepEndpoint<TParent>(DbContext dbContext)
     public override void Configure()
     {
         Put($"/{typeof(TParent).Name.Kebaberize()}/{{itemId}}/steps/{{stepId}}");
+        Validator<UpdateStepValidator>();
 
         Summary(s =>
         {

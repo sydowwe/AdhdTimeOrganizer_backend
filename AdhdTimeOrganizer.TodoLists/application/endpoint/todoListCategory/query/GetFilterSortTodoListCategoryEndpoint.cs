@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.TodoLists.application.dto.filter;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
@@ -35,7 +36,10 @@ public class GetFilterSortTodoListCategoryEndpoint(DbContext dbContext)
             query = query.Where(c => dbContext.Set<TodoList>().Any(tl => tl.UserId == userId && tl.CategoryId == c.Id));
 
         if (req is { UseFilter: true, Filter: not null } && !string.IsNullOrWhiteSpace(req.Filter.Name))
-            query = query.Where(c => c.Name.Contains(req.Filter.Name));
+        {
+            var pattern = req.Filter.Name.ToContainsPattern();
+            query = query.Where(c => EF.Functions.ILike(c.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
+        }
 
         var result = await TodoListCategoryResponse.Projection(query.SortByMany(req.SortBy)).ToListAsync(ct);
 

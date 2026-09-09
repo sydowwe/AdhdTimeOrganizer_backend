@@ -28,10 +28,18 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 [Collection("Postgres")]
 public class TodoListStepsCrudTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
 {
+    /// <summary>
+    /// <c>(UserId, Priority)</c> is uniquely indexed and this suite shares its database with the rest of the
+    /// Postgres collection, so every seeded rank has to be distinct. A monotonic counter over a block no other
+    /// class uses (everything else picks ranks below 1000 by hand) is exact where a random draw was only
+    /// unlikely to collide.
+    /// </summary>
+    private static int _nextPriorityRank = 1000;
+
     private async Task<long> SeedItemAsync(DbContext db, string label, int? totalCount = null, List<TodoListStep>? steps = null, long userId = TodoListTestSeedHelper.TestUserId)
     {
         var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, $"{label}-activity", userId);
-        var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, Random.Shared.Next(1000, 999_000), userId, text: $"{label}-priority");
+        var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, Interlocked.Increment(ref _nextPriorityRank), userId, text: $"{label}-priority");
         var listId = await TodoListTestSeedHelper.SeedTodoListAsync(db, userId, $"{label}-list");
         return await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, listId, userId, totalCount: totalCount, steps: steps);
     }

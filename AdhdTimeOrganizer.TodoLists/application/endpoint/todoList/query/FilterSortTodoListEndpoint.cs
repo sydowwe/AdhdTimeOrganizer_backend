@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.TodoLists.application.dto.filter;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
@@ -11,7 +12,10 @@ public class FilterSortTodoListEndpoint(DbContext dbContext)
     protected override IQueryable<TodoList> ApplyCustomFiltering(IQueryable<TodoList> query, TodoListFilterRequest filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Name))
-            query = query.Where(tl => tl.Name.Contains(filter.Name));
+        {
+            var pattern = filter.Name.ToContainsPattern();
+            query = query.Where(tl => EF.Functions.ILike(tl.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
+        }
 
         if (filter.CategoryId.HasValue)
             query = filter.CategoryId.Value == -1

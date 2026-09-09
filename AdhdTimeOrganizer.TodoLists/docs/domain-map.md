@@ -45,7 +45,7 @@ Files are flat in that folder; the namespace is `AdhdTimeOrganizer.TodoLists.dom
 | File | Covers |
 |---|---|
 | `persistence/configuration/TodoListConfiguration.cs` | Unique `(UserId, Name)`; items cascade from the list. |
-| `persistence/configuration/ToDoListItemConfiguration.cs` | Note the `ToDoList` spelling in the file name; the class is `TodoListItemConfiguration`. The FK family, `SuggestedTime`'s converter, and four indexes — see *Invariants*. |
+| `persistence/configuration/TodoListItemConfiguration.cs` | The FK family, `SuggestedTime`'s converter, and four indexes — see *Invariants*. |
 | `persistence/configuration/TodoListCategoryConfiguration.cs` | Unique `(UserId, Name)`; lists **SetNull** on category delete. |
 | `persistence/configuration/TaskPriorityConfiguration.cs` | Unique `(UserId, Priority)` + a sort index on `Priority`. Moved here from `configuration/activityPlanning/` — the folder was lying about which domain owns it. The `TaskPriority → TodoListItem` relationship is declared **once**, from the dependent side, not here. |
 | `persistence/TodoListEntityConfigurationExtensions.cs` | `BaseTodoListConfigure<TEntity>()` — the three check constraints, `DisplayOrder` / `IsDone` / `Note`, and the `OwnsMany(Steps).ToJson()` mapping. Applied by the Routines configurations too. |
@@ -140,7 +140,7 @@ Band **100–199**; the contract is
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `TaskPrioritySeeder` | Per-user default seeder (Order 100) | The four default ranks — Today / This week / This month / This year. `Collides` keys on `Priority`, not `Text`. **Does not truncate** | `…/seeder/userDefault/TaskPrioritySeeder.cs` |
-| `TodoListItemSeeder` | Per-user **dev** seeder (Order 100) | Fixture items across the three near-term priorities, with steps and due dates. Only dev seeders truncate. **The file is named `TodoListSeeder.cs`; the class is `TodoListItemSeeder`** | `…/seeder/dev/TodoListSeeder.cs` |
+| `TodoListItemSeeder` | Per-user **dev** seeder (Order 100) | Fixture items across the three near-term priorities, with steps and due dates. Only dev seeders truncate. | `…/seeder/dev/TodoListItemSeeder.cs` |
 
 ## Invariants
 

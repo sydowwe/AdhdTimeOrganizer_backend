@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.TodoLists.application.dto.filter;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
@@ -12,7 +13,10 @@ public class GridTaskPriorityEndpoint(
     protected override IQueryable<TaskPriority> ApplyCustomFiltering(IQueryable<TaskPriority> query, TaskPriorityFilterRequest filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Text))
-            query = query.Where(tu => tu.Text.Contains(filter.Text));
+        {
+            var pattern = filter.Text.ToContainsPattern();
+            query = query.Where(tu => EF.Functions.ILike(tu.Text, pattern, FreeTextFilterExtensions.EscapeCharacter));
+        }
 
         if (!string.IsNullOrWhiteSpace(filter.Color))
             query = query.Where(tu => tu.Color == filter.Color);

@@ -118,8 +118,7 @@ project's bases.
   `configuration/activityPlanning/` while the entity belongs here. The folder structure lies; assign
   files to projects by what the type *is*, never by directory. The same caution applies inside this
   project — the endpoint namespaces (`…endpoint.todoList.todoListItem.command`) carry an extra
-  `todoList` segment the folders don't, and `ToDoListItemConfiguration.cs` holds a class named
-  `TodoListItemConfiguration`.
+  `todoList` segment the folders don't.
 
 - **Registering the slice with the host is four places, none of which break the build.**
   FastEndpoints `o.Assemblies` in `Program.cs` (missing → every to-do route silently 404s);
@@ -142,7 +141,7 @@ project's bases.
 
 ## Extension playbook
 
-- **Add a field to `TodoListItem`:** entity → `ToDoListItemConfiguration` → the request DTOs
+- **Add a field to `TodoListItem`:** entity → `TodoListItemConfiguration` → the request DTOs
   (`CreateTodoListItemRequest` / `UpdateTodoListItemRequest`, mapping lives on the DTO) → the
   response projection → validator → migration **in the host**. If it is user-scoped data, check
   whether `UserDataExportAndDeletionTests` needs it in `Exported`.
