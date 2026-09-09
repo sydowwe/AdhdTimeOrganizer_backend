@@ -136,7 +136,7 @@ Counts are tests that meaningfully exercise that endpoint (not incidental use as
 | ↳ step identity survives the PUT | ❌ **`TEST-14`** | — | — | — |
 | `DELETE /todo-list-item/{id}` | ✅ 1 | ✅ history `SetNull` survives | ✅ 3 | `:293`, `TodoListItemDailyRecapTests:316` |
 | `GET /todo-list-item/{id}` | ✅ 1 | ✅ pairing projected | ✅ 3 | `:318`, `TodoListItemPairingTests:85` |
-| `GET /todo-list-item` (GetAll) | ⚠️ smoke + 1 incidental | ❌ `todoListId` filter, ordering | ❌ | `TodoListItemPairingTests:85` — `TEST-4` |
+| `GET /todo-list-item` (GetAll) | ✅ 5 | ✅ required `todoListId` (400 both ways), `DisplayOrder` ordering, foreign list id | ✅ 1 | `GetAllTodoListItemTests` |
 | `GET /todo-list-item/dashboard-widget` | ❌ | ❌ 3-day window, server-vs-user TZ | ❌ | — **`TEST-5`** |
 | `GET /todo-list-item/daily-recap` | ✅ 4 | ✅ 5 (UTC edges, zero-day, decline, double-count) | ✅ 1 | `TodoListItemDailyRecapTests` |
 | `PATCH /todo-list-item/toggle-is-done` | ✅ 3 | ✅ 4 incl. fuzz | ⚠️ via matrix only | `TodoListToggleAndDoneCountTests` |
@@ -224,7 +224,7 @@ disposable — the real tests belong in `AdhdTimeOrganizer.IntegrationTests`.
 | `TEST-1` | `PATCH /todo-list-item/{id}/move` — zero tests, incl. the unique-index 409 the endpoint hand-maps | 🟠 | SEC-3, CQ-7 | [MoveTodoListItem.md](testingPrompts/MoveTodoListItem.md) |
 | `TEST-2` | `PATCH /todo-list-item/{id}/priority` — zero tests; changes the `DisplayOrder` group without reordering | 🟠 | SEC-2, CQ-6 | [ChangePriorityTodoListItem.md](testingPrompts/ChangePriorityTodoListItem.md) |
 | `TEST-3` ✅ **DONE 2026-09-09** | `change-display-order` — 11 tests in `ChangeDisplayOrderTodoListItemTests`, including both rebalance outcomes and the Routines twin | 🟠 | CQ-4, CQ-5, PERF-2 | [ChangeDisplayOrderTodoListItem.md](testingPrompts/ChangeDisplayOrderTodoListItem.md) |
-| `TEST-4` | `GET /todo-list-item` — `todoListId` filter and `DisplayOrder` ordering unasserted | 🟡 | PERF-1 | [GetAllTodoListItem.md](testingPrompts/GetAllTodoListItem.md) |
+| `TEST-4` ✅ **DONE 2026-09-09** | `GET /todo-list-item` — 5 tests in `GetAllTodoListItemTests`, written with `PERF-1`: the filter is now **required**, so they also pin the 400 and the empty page a foreign list id answers | 🟡 | PERF-1 | [GetAllTodoListItem.md](testingPrompts/GetAllTodoListItem.md) |
 | `TEST-5` | `GET /todo-list-item/dashboard-widget` — zero tests; server-local `DateTime.Today` | 🟠 | CQ-18 | [GetDashboardTodoListItem.md](testingPrompts/GetDashboardTodoListItem.md) |
 | `TEST-6` | `POST /todo-list-category/filter-sort` — zero tests; synthetic `Id = -1` row, `HideEmpty` | 🟡 | CQ-8, PERF-4 | [GetFilterSortTodoListCategory.md](testingPrompts/GetFilterSortTodoListCategory.md) |
 | `TEST-7` | The five remaining read routes (`todo-list/filter-sort`, `task-priority/grid`, 3× `all-options`) | 🟡 | PERF-5 | [ReadSurfaceSweep.md](testingPrompts/ReadSurfaceSweep.md) |

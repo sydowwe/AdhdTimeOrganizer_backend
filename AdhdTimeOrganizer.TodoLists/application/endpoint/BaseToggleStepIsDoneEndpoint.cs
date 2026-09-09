@@ -49,8 +49,10 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(DbContext dbContext)
         ApplyStepToggle(item, step, now, wasReset);
 
         // See BaseToggleIsDoneTodoListEndpoint: mapped rather than bare, so a row_version loser gets a 409
-        // instead of a 500, and the event below only fires on a save that actually committed (CQ-10).
-        var result = await dbContext.UpdateEntityAsync(item, ct);
+        // instead of a 500, and the event below only fires on a save that actually committed (CQ-10) — and
+        // tracked rather than Update()d, so ticking one step writes the columns that changed instead of the
+        // whole row.
+        var result = await dbContext.SaveTrackedChangesAsync(ct);
         if (result.Failed)
         {
             AddError(result.ErrorMessage ?? "An error occurred while toggling the step.");

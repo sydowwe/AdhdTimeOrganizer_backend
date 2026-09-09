@@ -64,6 +64,23 @@ finding is confirmed at the file and line stated**, with the corrections listed 
 > — their own comments asked for exactly that, and both now also pin the `%` escape, which is the half
 > that fails silently.
 
+> **Also 2026-09-09:** `PERF-1`, `PERF-2`, both `PERF-3` rows and the last two nits are **fixed as one
+> batch** — the performance pass, which closes this file. Two of the four prescribed fixes were **not**
+> applied as written, and in both cases the prescription would have introduced a defect:
+>
+> - `PERF-2`'s `ExecuteUpdateAsync` rewrite would make **every** rebalance answer a conflict. `row_version`
+>   is `xmin`; a tracker-bypassing update bumps it on every row it re-spaces, including the moved item's own
+>   row, and the save two lines later is then holding a token this same request invalidated. The finding's
+>   own ChangeTracker caveat named the interceptor and missed the concurrency token.
+> - `PERF-3`'s grouped join needed its aggregates projected as `int?`. On the outer join's empty side every
+>   column reads NULL, and a non-nullable `int` there throws while materialising — a 500 on exactly the
+>   empty-list case the finding warned the rewrite could drop. It failed that way on the first run.
+>
+> `PERF-1` was decided against the **frontend** (`AntiProcrastinationApp-frontend`) rather than in the
+> abstract, which is what made "require `TodoListId`" affordable: the home widget already reads its own
+> endpoint, the list view always sends the id, and the one unfiltered caller was a picker's cleared filter.
+> That repo is edited alongside this one — see the finding.
+
 | Change in this pass | Where |
 |---|---|
 | `DOC-1` **resolved** by `6079f93` — the settings row now reads `MaxItems` / `DisplayOrderGap` with `DisplayOrderStart` derived | `domain-map.md:53` |
@@ -266,7 +283,7 @@ exactly the body a stale client sends, and re-adding either property to the reco
 
 ## 6. Code quality
 
-### CQ-1 🟠 Merging two activities that both have an item on one list violates the unique index
+### CQ-1 🟠 ✅ FIXED 2026-09-09 · Merging two activities that both have an item on one list violates the unique index
 
 `application/seam/TodoListActivityReferenceSource.cs:42-72`.
 
@@ -296,7 +313,23 @@ repointing, keep one per key (the survivor's own item if it exists, else the old
 rest, matching the profile seam's precedent. Whatever is deleted must still be counted in the returned
 `repointed` total so the snackbar count stays honest.
 
-`Doc impact: domain-map.md → Invariants (new: the (UserId, ActivityId, TodoListId) uniqueness is what the merge seam must collapse onto)`
+**✅ FIXED 2026-09-09.** `RepointAsync` now collects the items whose `ActivityId` it moved and hands them
+to a new `CollapseListCollisionsAsync`: it skips null `TodoListId` (Postgres indexes nulls as distinct,
+so those never collide), reads the survivor's own items on the affected lists — scoped by `UserId` by
+hand, since the seam takes a plain `DbContext` and a missed incumbent is precisely the row the index then
+rejects — and per `(UserId, TodoListId)` keeps the incumbent, else the lowest-id repointed item, deleting
+the rest. `repointed` still counts every moved row, deleted ones included, matching the dropped pairing's
+rule. The repointed items are invisible to the incumbent query on purpose: their new `ActivityId` lives
+only in the change tracker, so the SQL sees the survivor's stored rows and nothing else.
+
+Pinned by three new cases in `ActivityMergeTests` (`TEST-9`): the collision itself (one row survives,
+`repointedCount` still 2), the positive control on two different lists (both survive — without it a fix
+that deletes too eagerly passes), and the survivor's own item winning the three-way tie, seeded *first*
+so "the survivor wins" can't be confused with "the lowest id wins". `TodoListItemDailyRecapTests` stays
+green: recorded time survives the collapse via `ActivityHistory.TodoListItemId`'s `SetNull`.
+
+`Doc impact: domain-map.md → Invariants (new: the (UserId, ActivityId, TodoListId) uniqueness is what the merge seam must collapse onto)` —
+**done**, folded into invariant 4 rather than added as a new one, plus the seam's row in the navigation index.
 
 ### CQ-2 🟠 ✅ FIXED 2026-09-09 · `GetNextDisplayOrder`'s `!= 0` sentinel conflates "empty group" with "an item at order 0"
 
@@ -367,7 +400,7 @@ The non-sargable half (`PERF-6`) is not observable from a test and rides on the 
 
 `Doc impact: none`
 
-### CQ-4 🟠 The rebalance path builds an untranslatable LINQ expression and throws at runtime
+### CQ-4 🟠 ✅ FIXED 2026-09-08 by `274e061` · The rebalance path builds an untranslatable LINQ expression and throws at runtime
 
 `application/endpoint/BaseChangeDisplayOrderTodoListEndpoint.cs:152`:
 
@@ -416,7 +449,7 @@ for the first time, green, and asserts the re-spaced ladder rather than the 204.
 
 `Doc impact: none`
 
-### CQ-5 🟠 `CalculateNewOrderAsync` recurses after a rebalance with no depth guard
+### CQ-5 🟠 ✅ FIXED 2026-09-09 · `CalculateNewOrderAsync` recurses after a rebalance with no depth guard
 
 `application/endpoint/BaseChangeDisplayOrderTodoListEndpoint.cs:129-135`. The comment at `:62` says
 "we'll rebalance and retry **once**"; the code recurses unconditionally. If the rebalance does not
@@ -527,7 +560,7 @@ is worth having rather than assuming.
 next reader to copy the `DbUtils.HandleException` block, which is the advice that produced this
 finding, and now says the opposite.)*
 
-### CQ-8 🟠 `GetFilterSortTodoListCategoryEndpoint` hand-rolls what its sibling gets from a base
+### CQ-8 🟠 ✅ FIXED 2026-09-09 · `GetFilterSortTodoListCategoryEndpoint` hand-rolls what its sibling gets from a base
 
 `application/endpoint/todoListCategory/query/GetFilterSortTodoListCategoryEndpoint.cs:11-56` is a raw
 `Endpoint<BaseFilterSortRequest<…>, List<…>>` doing manual user scoping, manual filter application and
@@ -543,7 +576,38 @@ sentinel that also appears in `TodoListFilterRequest.CategoryId` (`dto/filter/To
 override whatever post-projection hook the base offers to append the sentinel row (add one if it has
 none). Promote `-1` to a named constant shared by the filter DTO and the response.
 
-`Doc impact: domain-map.md → Glossary (add the -1 "uncategorized" sentinel; it is currently only in a DTO comment)`
+**Fixed 2026-09-09**, together with `PERF-4`. The endpoint now derives from
+`BaseFilterSortEndpoint<TodoListCategory, TodoListCategoryResponse, TodoListCategoryFilterRequest>` and
+is four overrides long: `Configure` (the summary only — the route the base generates,
+`/todo-list-category/filter-sort`, is the one it already had), `ApplyUserScoping`, `ApplyCustomFiltering`
+(`HideEmpty` + the `ILike` name arm) and `PostProcessItemsAsync` (the sentinel).
+
+**The base had no post-projection hook, so it got the one its siblings already have.**
+`PostProcessItems` / `PostProcessItemsAsync` are copied from `BaseGridEndpoint` and `BaseGetAllEndpoint`
+verbatim in shape and naming rather than invented — the third base in that family is no longer the odd
+one out. They run *after* `SortByMany`, which is what makes an appended row land last; the XML doc says
+so, because the grid's version of that doc warns about the opposite case (a field filled in afterwards
+sorts on its default) and both warnings are the same fact. **Framework submodule edit — commit there
+first.**
+
+**Two things changed behaviour, neither of them cosmetic.** The base calls `Roles(AllowedRoles())`,
+which the hand-rolled endpoint never did: the route was authenticated but not role-gated, and is now
+User + Admin + Root like everything else. And `ApplyUserScoping` is overridden rather than left to the
+global query filter — the sibling `FilterSortTodoListEndpoint` leans on the filter, but this endpoint
+already scoped by hand and dropping that would have widened it silently, which is exactly what the base's
+own XML doc tells you not to do.
+
+`-1` is now `TodoListCategoryResponse.UncategorizedId`, with `UncategorizedName` and an
+`Uncategorized` factory for the row itself. Both ends use it: this endpoint appends
+`TodoListCategoryResponse.Uncategorized`, `FilterSortTodoListEndpoint` compares against
+`UncategorizedId`, and `TodoListFilterRequest`'s doc comment `<see cref>`s it instead of spelling the
+number. The constant's own doc says what the sentinel *isn't* — no category row has that id and no
+`TodoList.CategoryId` holds it.
+
+`FilterSortTodoListCategoryTests` (8 tests) is new: the endpoint had none. It pins the two halves of the
+sentinel, both hand-written `UserId` clauses, and the `%`-escaping the `ILike` arm inherits.
+
+`Doc impact: domain-map.md → Glossary (add the -1 "uncategorized" sentinel; it is currently only in a DTO comment)` — **done**, plus the `docs/claude/endpoints.md` row for `BaseFilterSortEndpoint`, which now names its two hooks.
 
 ### CQ-9 🟡 ✅ FIXED 2026-09-09 · `IsDoneLogic` compares `DoneCount` to `TotalCount` with `==` in one arm and `>=` in another
 
@@ -862,7 +926,7 @@ finding's count of three is right for that reason, not by omission.
 
 `Doc impact: none`
 
-### CQ-18 🟠 `GetDashboardTodoListItemEndpoint` uses server-local `DateTime.Today`
+### CQ-18 🟠 ✅ FIXED 2026-09-09 · `GetDashboardTodoListItemEndpoint` uses server-local `DateTime.Today`
 
 `application/endpoint/todoListItem/query/GetDashboardTodoListItemEndpoint.cs:13`:
 
@@ -883,7 +947,17 @@ obvious home.
 **Fix.** Take the user's zone the way the History dashboards do, and move the horizon to
 `TodoListSettings`.
 
-`Doc impact: domain-map.md → Navigation index (dashboard-widget row should note the user-zone dependency)`
+**Fixed 2026-09-09.** The endpoint now takes `IUserTimeZoneResolver` and `IOptions<TodoListSettings>`,
+and the horizon is `DashboardHorizonDays` (3, defaulted on the record and stated in `appsettings.json`)
+days past the user's own date.
+
+`BaseGetAllEndpoint.Filter` is synchronous and resolving the zone is a database read, so the horizon is
+computed in an `override HandleAsync` that calls `base.HandleAsync` — the same "resolve in the async
+step, read in the sync filter" shape `FilterActivityHistoryEndpoint:19-30` uses against
+`ApplyUserScoping`. No framework hook was added: that base is a submodule type, and one endpoint
+needing an async pre-step is not enough to change the shared contract.
+
+`Doc impact: domain-map.md → Navigation index — done (dashboard-widget row now names the settings key and the user-zone dependency)`
 
 ---
 
@@ -891,13 +965,99 @@ obvious home.
 
 | Where | Issue | Impact | Mitigation | ID |
 |---|---|---|---|---|
-| `GetAllTodoListItemEndpoint.cs:33-38` | Unpaged read of every item the user owns, projecting the full `Activity` → `Role` → `Category` graph plus the owned `Steps` JSON per row | Payload and query cost grow without bound; this is the route the main to-do view renders from | Page it, or at minimum require `TodoListId`; project `Role`/`Category` as ids and let the client join against the lookup it already holds | `PERF-1` |
-| `BaseChangeDisplayOrderTodoListEndpoint.cs:151-162` | Rebalance loads the whole priority group, mutates in memory, `UpdateRange`s it → one `UPDATE` per row, on the request thread, inside the open transaction | O(n) round trips while holding row locks; with 100 items/group that is 100 statements a user waits on | Single `ExecuteUpdateAsync` with a computed `row_number()` — **but** see the ChangeTracker caveat below | `PERF-2` |
-| `TodoListResponse.Projection:23-24` | Two correlated subqueries per list (`Count()` and `Count(i => i.IsDone)`) | Two extra scans per row on every list read and every `filter-sort` page | One grouped join, or a `FILTER (WHERE is_done)` aggregate; needs the index below | `PERF-3` |
-| `TodoList.cs:17-18` | `ItemCount` / `CompletedCount` are unmapped computed properties over `TodoListItemColl` — a second, in-memory copy of the projection above | Nothing reads them today, but any caller that does silently triggers a full collection load per list | Delete them; the projection is the only correct source | `PERF-3` |
-| `GetFilterSortTodoListCategoryEndpoint.cs:35`, `:42-43` | The `HideEmpty` clause is a correlated `EXISTS` over `todo_list`, and a second `AnyAsync` round trip fires unconditionally on every call | Two queries where one would do; the `EXISTS` has no supporting index | Fold the uncategorized check into the same query as a `bool` column; add the index below | `PERF-4` |
+| `GetAllTodoListItemEndpoint.cs:33-38` | Unpaged read of every item the user owns, projecting the full `Activity` → `Role` → `Category` graph plus the owned `Steps` JSON per row | Payload and query cost grow without bound; this is the route the main to-do view renders from | Page it, or at minimum require `TodoListId`; project `Role`/`Category` as ids and let the client join against the lookup it already holds | `PERF-1` ✅ **FIXED 2026-09-09** (`TodoListId` is now required, both repos — see below) |
+| `BaseChangeDisplayOrderTodoListEndpoint.cs:151-162` | Rebalance loads the whole priority group, mutates in memory, `UpdateRange`s it → one `UPDATE` per row, on the request thread, inside the open transaction | O(n) round trips while holding row locks; with 100 items/group that is 100 statements a user waits on | Single `ExecuteUpdateAsync` with a computed `row_number()` — **but** see the ChangeTracker caveat below | `PERF-2` ⚠️ **PARTLY FIXED / PRESCRIPTION REJECTED 2026-09-09** (the `UpdateRange` is gone; the `ExecuteUpdateAsync` rewrite would break every rebalance — see below) |
+| `TodoListResponse.Projection:23-24` | Two correlated subqueries per list (`Count()` and `Count(i => i.IsDone)`) | Two extra scans per row on every list read and every `filter-sort` page | One grouped join, or a `FILTER (WHERE is_done)` aggregate; needs the index below | `PERF-3` ✅ **FIXED 2026-09-09** (it is both: one grouped `LEFT JOIN` emitting `count(*) FILTER (WHERE is_done)`) |
+| `TodoList.cs:17-18` | `ItemCount` / `CompletedCount` are unmapped computed properties over `TodoListItemColl` — a second, in-memory copy of the projection above | Nothing reads them today, but any caller that does silently triggers a full collection load per list | Delete them; the projection is the only correct source | `PERF-3` ✅ **FIXED 2026-09-09** (deleted; a comment on the collection says why they are not coming back) |
+| `GetFilterSortTodoListCategoryEndpoint.cs:35`, `:42-43` | The `HideEmpty` clause is a correlated `EXISTS` over `todo_list`, and a second `AnyAsync` round trip fires unconditionally on every call | Two queries where one would do; the `EXISTS` has no supporting index | Fold the uncategorized check into the same query as a `bool` column; add the index below | `PERF-4` ✅ **FIXED 2026-09-09** (index landed in `TodoListsIndexRefresh`; the probe is now conditional, **not** folded — see below) |
 | `TaskPriorityConfiguration.cs:22` | `HasIndex(t => t.Priority)` — a non-leading-`UserId` index on a strictly user-scoped lookup | No query in the slice can use it (every read is filtered on `user_id` first); pure write and storage cost on a table with ~4 rows per user | Drop it; the composite at `:19` already serves every access path | `PERF-5` ✅ **FIXED 2026-09-09** (dropped in `TodoListsIndexRefresh`) |
 | `TodoListExtensions.cs:17` | `CAST(display_order AS integer)` in the `MIN` projection | Not sargable — defeats any index on `(user_id, task_priority_id, display_order)`, so every item creation scans the group | Fixed by CQ-3 | `PERF-6` ✅ **FIXED 2026-09-09** (with `CQ-2`/`CQ-3`/`CQ-13.3`; the supporting index landed the same day in `TodoListsIndexRefresh`) |
+
+**`PERF-4`'s prescribed fix does not survive the empty case, so it was not applied as written.** Folding
+the uncategorized check in as a `bool` column on the category rows removes the round trip only while
+there *are* category rows: the flag rides on the rows, so a user with zero categories gets zero rows and
+the flag vanishes with them. That user is precisely the one the "Other" bucket exists for — a brand-new
+account whose lists are all uncategorized would stop seeing its own lists. The alternatives were worse:
+`Concat`-ing a sentinel-producing leg into the same statement puts the sorted query inside a `UNION ALL`
+leg, where the ordering EF just applied is not guaranteed to survive.
+
+What landed instead: the probe is **conditional**. It runs only when the "Other" row could survive the
+request's own name filter — the C# check mirrors the `ILike` arm exactly (`ToContainsPattern` escapes
+wildcards, so a plain `Contains` is the same predicate). A name-filtered call issues one query, not two.
+The unfiltered call still issues two, and that is now the honest state of this row.
+
+That change also fixes a bug the finding did not name: the sentinel used to be appended
+*unconditionally*, so filtering categories by "work" returned "Other" alongside the matches. Both arms
+are pinned by `FilterSortTodoListCategoryTests.OtherRow_ObeysTheNameFilter`.
+
+The `EXISTS` keeps its own `UserId` clause even though the outer query is already scoped — it is the
+leading column of `ix_todo_list_user_id_category_id`, which the correlated subquery cannot use without
+it. There is a comment saying so at the call site, and a test that fails if the clause is dropped.
+
+**`PERF-1` — the read is bounded by requiring `TodoListId`, and the decision was made against the real
+client.** The finding offers three fixes; which of them is affordable is a question about callers, and the
+callers live in `AntiProcrastinationApp-frontend`, so that is where it was answered:
+
+- the **home widget** (`TodoListWidget.vue:121`) already reads `todo-list-item/dashboard-widget`, the
+  endpoint `CQ-18` fixed — so no new "today" endpoint was needed, which was the open question;
+- the **to-do view** (`useTodoListItemCrud(...).fetchAll`) always sends `todoListId`;
+- the **planner activity picker** was the only unfiltered caller, and only in one state: clearing its list
+  filter passed `null` (`PlannerActivitySourcePicker.vue:208`, watched at `:228`). Its *initial* load already
+  fanned out one request per list (`:169`).
+
+So `GetAllTodoListItemRequest.TodoListId` is now a non-nullable `long` with a `GreaterThan(0)` validator
+attached in `Configure()` per `CQ-17`, and the unfiltered call is a 400. Not a silent "all lists" default:
+that would be the same unbounded read with nothing naming it. The id is deliberately **not**
+ownership-checked — the query is scoped to the caller's items, so another user's list id is an empty page,
+and `GetAllTodoListItemTests` pins that rather than leaving it to be re-derived.
+
+The frontend half landed with it: `fetchTodoListItems` takes a required `number`, and the picker's cleared
+filter now asks for every list by id through one `loadTodoItemsFor` helper — the fan-out its own initial
+load already performed, so the two paths are one function instead of two shapes.
+
+The other half of the finding — projecting `Role`/`Category` as ids — was **not** taken. It is a breaking
+change for every consumer of `TodoListItemEntity.activity.role`, and with the read bounded to one list the
+graph is now paid for per list rather than per account. Recorded here rather than silently dropped.
+
+**`PERF-2` — the `UpdateRange` is gone; the `ExecuteUpdateAsync` rewrite is refused, and the reason is not
+the one the caveat below gives.** `row_version` is Postgres' `xmin`, and `ExecuteUpdateAsync` bypasses the
+ChangeTracker: every row it re-spaced would get a fresh `xmin` while the tracker still held the old one. The
+moved item is normally *in* the group being re-spaced — that is what "no gap left between its neighbours"
+means — so the save that writes its new position immediately afterwards would lose on a concurrency token
+this same request had just invalidated. Every rebalance would answer a conflict, and `TEST-3` would have
+caught it. The group column is also a per-subclass `Expression`, not a name this generic base knows, and
+`ModifiedTimestamp` would have to be re-stamped by hand.
+
+What did change: `dbContext.Set<TEntity>().UpdateRange(items)` is deleted. The items are tracked and already
+modified, so it only re-marked every property, turning a one-column re-space into a full-row rewrite per
+row. And the finding's "O(n) round trips" is one round trip — EF batches the group into a single command;
+what is O(n) is the statement count inside it. The reasoning sits on `RebalanceDisplayOrdersAsync` as an XML
+doc, since the next reader will arrive with the same `ExecuteUpdateAsync` idea.
+
+The rebalance's bare `SaveChangesAsync` went through the `Result` path in the same edit — a re-index losing
+a `row_version` race was a 500 where the rest of this endpoint answers 409.
+
+**`PERF-3` — both rows, and the first one had to be verified rather than assumed.** The SQL was read before
+and after (`ToQueryString`, from a throwaway test) instead of trusting that EF would combine the aggregates.
+Before: two correlated `SELECT count(*)` subqueries per row. After:
+
+```sql
+LEFT JOIN (
+    SELECT todo_list_id, count(*)::int, count(*) FILTER (WHERE is_done)::int
+    FROM todo.todo_list_item GROUP BY todo_list_id) AS s ON t.id = s.todo_list_id
+```
+
+— one scan for the whole page, and EF chose the `FILTER` aggregate the finding named without being asked.
+
+**The aggregates are projected as `int?`, and that is not tidiness.** On the outer join's empty side every
+column of the group row reads NULL, and materialising a non-nullable `int` from it throws
+`Nullable object must have a value` — a 500 on exactly the empty-list case, which is the failure the finding
+predicted for this rewrite in a different form. It failed that way on the first run and
+`ItemAndCompletedCounts_AreComputedPerList` caught it, which is what that test was written for.
+
+The entity-side row is a straight deletion, with a comment in the properties' place: nothing outside the
+projection ever read them, and the next reader's instinct on seeing a response field with no entity
+counterpart is to add one back.
 
 ### Indexes that should exist — ✅ **ALL FOUR ADDED 2026-09-09**
 
@@ -917,10 +1077,15 @@ partial — `HasFilter("NOT is_done")`, following `RoutineTimePeriodConfiguratio
 `ToDoListItemConfiguration.cs:52-55`. `(paired_leisure_activity_id)` exists for the `SetNull` and is
 likewise justified (`:44-45`). Both are good precedent for the four above.
 
-**Caveat on `PERF-2`.** The obvious `ExecuteUpdateAsync` fix for the rebalance would bypass the
-ChangeTracker — which is safe *here*, because the rebalance touches only `DisplayOrder` and
-`TodoListItemCompletionInterceptor` watches only `IsDone`. Say so in a comment if you do it, because
-`docs/summary.md` and the interceptor's own XML doc both state the general rule the other way round.
+**Caveat on `PERF-2` — as written, and then corrected.** The original caveat read: *"The obvious
+`ExecuteUpdateAsync` fix for the rebalance would bypass the ChangeTracker — which is safe here, because the
+rebalance touches only `DisplayOrder` and `TodoListItemCompletionInterceptor` watches only `IsDone`."*
+
+That is true and not sufficient. Bypassing the ChangeTracker is not only about interceptors: it is also
+about **`row_version`**, which every row in the group carries and which Postgres bumps on any update,
+including one the tracker never sees. The rebalanced group contains the moved item, whose tracked token is
+then stale for the save that follows in the same request. A caveat that clears one hazard reads as clearing
+the class of them — which is how this one nearly licensed the rewrite. See the `PERF-2` note above.
 
 ---
 
@@ -1125,11 +1290,30 @@ copy in `domain-map.md` said the same thing in one line and was corrected with i
   creation uses `DisplayOrderStart` — two different "first item" values for the same column.~~
   **Fixed 2026-09-09** with `CQ-5`; it now returns `DisplayOrderStart`, the value `GetNextDisplayOrder`
   hands a group's first row, so the descending-by-gap scheme starts from the same place either way.
-- `BaseToggleIsDoneTodoListEndpoint.cs:43` calls `UpdateRange` on entities that are already tracked and
+- ~~`BaseToggleIsDoneTodoListEndpoint.cs:43` calls `UpdateRange` on entities that are already tracked and
   modified, forcing every column into the `UPDATE`. Same at `BaseToggleStepIsDoneEndpoint.cs:49` and
-  `BaseChangeDisplayOrderTodoListEndpoint.cs:161`.
-- `BaseToggleIsDoneTodoListEndpoint.cs:30-35` returns 404 only when *no* requested id resolved; a batch
-  with one valid and one foreign id silently succeeds on the subset.
+  `BaseChangeDisplayOrderTodoListEndpoint.cs:161`.~~ **Fixed 2026-09-09**, all three — plus the fourth in
+  the same file (`BaseChangeDisplayOrderTodoListEndpoint`'s save of the moved item), which the nit does not
+  list but which is the same shape and would have been the only forced-column write left in a file that had
+  just stopped doing it.
+
+  The fix is a new framework helper, not four bare `SaveChangesAsync` calls: `CQ-10` moved these very sites
+  onto the `Result` helpers so a `DbUpdateException` maps to 409 instead of escaping as a 500, and undoing
+  that to save a few columns would have traded one finding for another. `DbContextHelper.SaveTrackedChangesAsync`
+  is `UpdateEntityAsync` without the `Update` call — same `Result`, same `DbUtils.HandleException` mapping.
+  It carries **no "0 rows affected" check**, deliberately: that check exists to catch a *detached* entity
+  whose row is gone, and on a tracked one 0 rows means only that nothing changed, while a row that moved
+  underneath it loses on `row_version` anyway. **Framework submodule edit — commit there first.**
+- ~~`BaseToggleIsDoneTodoListEndpoint.cs:30-35` returns 404 only when *no* requested id resolved; a batch
+  with one valid and one foreign id silently succeeds on the subset.~~ **Fixed 2026-09-09** — every
+  requested id must resolve or the whole batch is a 404, on distinct ids. Both subclasses return exactly the
+  subset they could load (Routines' by way of its period fan-out), so the count comparison means the same
+  thing on both sides of the base.
+
+  Pinned by `TodoListToggleAndDoneCountTests.ToggleBatch_WithAForeignId_TogglesNothing`, which asserts on
+  the **row**: an endpoint that answers 404 and applies the subset anyway is the same defect in a different
+  envelope, and the status code alone cannot tell them apart. An empty `Ids` array stays a 404 rather than
+  becoming a vacuous 204.
 - ~~`GetSelectOptionsTaskPriorityEndpoint.cs:8` and `GetSelectOptionsTodoListEndpoint.cs:7` name their
   constructor parameter `appDbContext` — the one name `docs/summary.md:39-43` says never appears in this
   project.~~ **Fixed 2026-09-09** — both are `dbContext` now. A slice cannot see `AppDbContext`, so the

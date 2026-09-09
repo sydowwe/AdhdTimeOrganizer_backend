@@ -73,12 +73,16 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
             }
 
             itemToMove.DisplayOrder = newOrderResult.Data;
-            var result = await dbContext.UpdateEntityAsync(itemToMove, ct);
+            // Tracked save: itemToMove was loaded above, so Update() would re-mark every property modified and
+            // write the whole row to move one column (PERF-2's sibling in this same file).
+            var result = await dbContext.SaveTrackedChangesAsync(ct);
 
             if (result.Failed)
             {
                 AddError(result.ErrorMessage ?? "An error occurred during update.");
-                await Send.ErrorsAsync(500, ct);
+                // Mapped, not a flat 500: a row_version loser on this save is the same 409 the calculation
+                // branch above already answers with, and the Summary block advertises.
+                await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
                 return;
             }
 
@@ -146,7 +150,10 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
                 return Result<long>.Error(ResultErrorType.Conflict,
                     "The items around the requested position have no gap left even after a re-index. The list needs a full re-index.");
 
-            await RebalanceDisplayOrdersAsync(req.FollowingItemId.Value, userId, ct);
+            var rebalance = await RebalanceDisplayOrdersAsync(req.FollowingItemId.Value, userId, ct);
+            if (rebalance.Failed)
+                return rebalance.ToFailed<long>();
+
             return await CalculateNewOrderAsync(req, userId, true, ct);
         }
 
@@ -179,11 +186,29 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
             groupFilter.Parameters[0]);
     }
 
-    private async Task RebalanceDisplayOrdersAsync(long followingId, long userId, CancellationToken ct)
+    /// <summary>
+    /// Re-spaces one group's <c>DisplayOrder</c> ladder so the caller's midpoint has somewhere to land.
+    /// <para>
+    /// <b>Why this is still a tracked read-modify-save, and not the single <c>ExecuteUpdateAsync</c> with a
+    /// <c>row_number()</c> that <c>PERF-2</c> proposes.</b> <c>row_version</c> is Postgres' <c>xmin</c>, and
+    /// <c>ExecuteUpdateAsync</c> bypasses the ChangeTracker: every row it re-spaced would get a new <c>xmin</c>
+    /// while the tracker still held the old one. The moved item is normally <i>in</i> the group being
+    /// re-spaced, so the <c>SaveTrackedChangesAsync</c> that writes its new position immediately afterwards
+    /// would lose on a concurrency token this same request had just invalidated — turning every rebalance into
+    /// a conflict. The <c>ModifiedTimestamp</c> stamp and the group column (which is a per-subclass expression,
+    /// not a name this generic base knows) would both have to be reconstructed by hand besides.
+    /// </para>
+    /// <para>
+    /// What the tracked path costs is one <c>UPDATE</c> statement per row — but they are one <i>round trip</i>:
+    /// EF batches the whole group into a single command. Dropping the <c>UpdateRange</c> call is what makes each
+    /// of those statements carry <c>display_order</c> alone rather than every column of the row.
+    /// </para>
+    /// </summary>
+    private async Task<Result> RebalanceDisplayOrdersAsync(long followingId, long userId, CancellationToken ct)
     {
         var groupId = await _dbSet.GetGroupIdById(followingId, userId, GroupFilterExpression, ct);
         if (groupId is null)
-            return;
+            return Result.Successful();
 
         var query = _dbSet.AsQueryable()
             .Where(e => e.UserId == userId);
@@ -195,10 +220,10 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
         for (var i = 0; i < items.Count; i++)
             items[i].DisplayOrder = _settings.DisplayOrderStart - (i + 1) * _settings.DisplayOrderGap;
 
-        dbContext.Set<TEntity>().UpdateRange(items);
-
-
-        await dbContext.SaveChangesAsync(ct);
+        // Mapped rather than bare, like every other save on this path: a re-index that loses a row_version race
+        // is a 409, not the 500 an escaping DbUpdateConcurrencyException would give. The transaction opened in
+        // HandleAsync rolls back either way.
+        return await dbContext.SaveTrackedChangesAsync(ct);
     }
 
     private static long ArithmeticNewOrderNumber(long precedingOrder, long followingOrder) => precedingOrder + (followingOrder - precedingOrder) / 2;

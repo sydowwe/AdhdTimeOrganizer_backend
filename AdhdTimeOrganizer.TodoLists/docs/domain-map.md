@@ -34,7 +34,7 @@ Files are flat in that folder; the namespace is `AdhdTimeOrganizer.TodoLists.dom
 | Type | Notes |
 |---|---|
 | `BaseTodoListItem` | The shared base (`BaseEntityWithIsDone`, `IEntityWithDoneAndTotalCount`): `DisplayOrder`, `DoneCount` / `TotalCount`, `Note`, `SuggestedTime`, the `TodoListStep` collection. **Routines derives from this**, which is why it lives here and not in Core. `SetDone` snaps `IsDone`, `DoneCount` and every step together, and only rewrites `DoneCount` when `TotalCount.HasValue` — deliberate. |
-| `TodoList` | Grouped by an optional `TodoListCategory`. Carries computed `ItemCount` / `CompletedCount` off the loaded collection — not mapped, so they are zero on a projection that didn't include the items. |
+| `TodoList` | Grouped by an optional `TodoListCategory`. **No computed `ItemCount` / `CompletedCount` on the entity** — those two numbers exist only on `TodoListResponse`, where one grouped subquery over `todo_list_item` computes both (`PERF-3`). The entity-level copies were unmapped properties that loaded the whole collection per list to answer them. |
 | `TodoListItem` | `BaseTodoListItem` + `TaskPriorityId` (required), `TodoListId` (optional), `ActivityId`, `DueDate` / `DueTime`, `PairedLeisureActivityId`, `CompletedTimestamp`. **No `PlannerTask` navigation** — the relationship is owned from Planning. **No navigation for the paired activity either** — reads carry the bare id. `CompletedTimestamp` is written **only** by `TodoListItemCompletionInterceptor`, never by hand. |
 | `TodoListCategory` | Per-user lookup, unique on `(UserId, Name)`. |
 | `TodoListStep` | The checklist sub-items. **Not an entity** — an owned type serialised `ToJson` into the parent's row, keyed by a client-supplied `Guid` (`ValueGeneratedNever`). There is no steps table. That `Guid` is a **stable public key**: three routes take it in the path (`PATCH …/steps/{stepId}/toggle`, `PUT …/steps/{stepId}`, `DELETE …/steps/{stepId}`), so it must survive an edit of the parent — which is why both PUTs reconcile the collection through `StepRequestExtensions.ReconcileStepsFrom` instead of rebuilding it from fresh instances. |
@@ -63,7 +63,7 @@ comes from `Sydowwe.Framework`; the `IsManyWithOneUser` / `IsManyWithOneActivity
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `TodoListActivityMembershipSource` | Seam impl (keyed) | "This activity is on a to-do list", faceted by `TaskPriorityId`. Composed into the caller's query, so it does no user scoping of its own | `application/seam/TodoListActivityMembershipSource.cs` |
-| `TodoListActivityReferenceSource` | Seam impl (keyed) | Counts + repoints both activity columns on an activity merge, including the self-pairing collapse | `application/seam/TodoListActivityReferenceSource.cs` |
+| `TodoListActivityReferenceSource` | Seam impl (keyed) | Counts + repoints both activity columns on an activity merge, including the self-pairing collapse and the `(UserId, ActivityId, TodoListId)` row collapse | `application/seam/TodoListActivityReferenceSource.cs` |
 | `TodoListItemOwnedReferenceVerifier` | Seam impl (keyed) | "Is this `TodoListItem` id the caller's?", so a slice writing `TodoListItemId` can refuse a stranger's. Filters on the supplied user id, **not** the ambient filter | `application/seam/TodoListItemOwnedReferenceVerifier.cs` |
 
 ### Shared endpoint bases — `application/endpoint/`
@@ -73,7 +73,7 @@ than in Framework: each is typed on `BaseTodoListItem`.
 
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
-| `BaseToggleIsDoneTodoListEndpoint<T>` | Endpoint base | `PATCH /{entity}/toggle-is-done`. Owns `IsDoneLogic` — the step-counted tick/untick state machine — with `FetchAndPrepare` / `AfterItemToggled` / `AfterSave` / `PublishEvent` hooks | `application/endpoint/BaseToggleIsDoneTodoListEndpoint.cs` |
+| `BaseToggleIsDoneTodoListEndpoint<T>` | Endpoint base | `PATCH /{entity}/toggle-is-done`. Owns `IsDoneLogic` — the step-counted tick/untick state machine — with `FetchAndPrepare` / `AfterItemToggled` / `AfterSave` / `PublishEvent` hooks. **The batch is all-or-nothing**: every requested id must resolve, or the whole request is a 404 and nothing is toggled | `application/endpoint/BaseToggleIsDoneTodoListEndpoint.cs` |
 | `BaseToggleStepIsDoneEndpoint<T>` | Endpoint base | `PATCH /{entity}/{itemId}/steps/{stepId}/toggle`. Toggles one step and reconciles the parent's `IsDone` / `DoneCount`; `BeforeToggle` lets Routines reset an expired period first | `application/endpoint/BaseToggleStepIsDoneEndpoint.cs` |
 | `BaseChangeDisplayOrderTodoListEndpoint<T>` | Endpoint base | `PATCH /{entity}/change-display-order`. Midpoint reordering between two siblings, transactional, with a rebalance-and-retry when the gap closes. `GroupFilterExpression` is the subclass's grouping column | `application/endpoint/BaseChangeDisplayOrderTodoListEndpoint.cs` |
 | `BaseCreateStepEndpoint<T>` | Endpoint base | Append a checklist step | `application/endpoint/steps/BaseCreateStepEndpoint.cs` |
@@ -92,9 +92,9 @@ than in Framework: each is typed on `BaseTodoListItem`.
 | `ChangeDisplayOrderTodoListItemEndpoint` | Endpoint | Reorder within a priority bucket | `…/todoListItem/command/ChangeDisplayOrderTodoListItemEndpoint.cs` |
 | `ToggleIsDoneTodoListItemEndpoint` | Endpoint | Tick / untick; publishes the Core completion event | `…/todoListItem/command/ToggleIsDoneTodoListItemEndpoint.cs` |
 | `ToggleStepIsDoneTodoListItemEndpoint` | Endpoint | Tick / untick one checklist step | `…/todoListItem/command/ToggleStepIsDoneTodoListItemEndpoint.cs` |
-| `GetAllTodoListItemEndpoint` | Endpoint | `GET /todo-list-item` — the to-do view's list read | `…/todoListItem/query/GetAllTodoListItemEndpoint.cs` |
+| `GetAllTodoListItemEndpoint` | Endpoint | `GET /todo-list-item?todoListId=` — the to-do view's list read. **`TodoListId` is required** (`GetAllTodoListItemValidator`): the unfiltered call is a 400, not every item the caller owns (`PERF-1`). Ordered by `DisplayOrder`; the list id is not ownership-checked because the query is scoped to the caller's items, so a foreign id is an empty page | `…/todoListItem/query/GetAllTodoListItemEndpoint.cs` |
 | `GetByIdTodoListItemEndpoint` | Endpoint | Single read | `…/todoListItem/query/GetByIdTodoListItemEndpoint.cs` |
-| `GetDashboardTodoListItemEndpoint` | Endpoint | `GET …/dashboard-widget` — open items due within 3 days, by due date | `…/todoListItem/query/GetDashboardTodoListItemEndpoint.cs` |
+| `GetDashboardTodoListItemEndpoint` | Endpoint | `GET …/dashboard-widget` — open items due within `TodoListSettings.DashboardHorizonDays` (3) days, by due date; the window closes on **the user's own date**, resolved via `IUserTimeZoneResolver` | `…/todoListItem/query/GetDashboardTodoListItemEndpoint.cs` |
 | `GetDailyRecapTodoListItemEndpoint` | Endpoint | `GET …/daily-recap` — items completed on a day + per-item logged time via `ITodoListItemLoggedTimeSource`. Half-open UTC day range; explicit `UserId` filter | `…/todoListItem/query/GetDailyRecapTodoListItemEndpoint.cs` |
 | `CreateStepTodoListItemEndpoint` | Endpoint | Checklist step create (subclasses the base) | `…/todoListItem/steps/CreateStepTodoListItemEndpoint.cs` |
 | `UpdateStepTodoListItemEndpoint` | Endpoint | Checklist step update | `…/todoListItem/steps/UpdateStepTodoListItemEndpoint.cs` |
@@ -180,7 +180,13 @@ Which of these the database actually enforces, and which are only app-level:
    on the filter alone are the toggle endpoints and the four `GetById*` reads.
 4. **`TodoListItem` is unique on `(UserId, ActivityId, TodoListId)`** — one item per activity per
    list. *DB-enforced* (unique index); surfaces as a 409 through the base endpoints' exception
-   mapping.
+   mapping. **This is also the key an activity merge has to collapse onto** (`CQ-1`): two items on one
+   list, one per merged activity, is the ordinary shape of a duplicate, and repointing both would
+   otherwise trip the index and roll the whole merge back.
+   `TodoListActivityReferenceSource` keeps one item per `(UserId, TodoListId)` — the survivor's own
+   pre-existing item where there is one, else the lowest id — and deletes the rest, still counting them
+   as repointed. Null `TodoListId` never collides (Postgres indexes nulls as distinct). Pinned by three
+   cases in `ActivityMergeTests`.
 5. **`TaskPriority` is unique on `(UserId, Priority)`.** *DB-enforced*, checked immediately rather
    than deferred — so a rank swap needs a temporary unused value.
 6. **`TodoListCategory` and `TodoList` are each unique on `(UserId, Name)`.** *DB-enforced.*
@@ -268,3 +274,4 @@ zero seconds; declining the prompt is an ordinary outcome, not a gap.
 | Temptation bundling | Pairing a task with a leisure activity to make starting it easier | `TodoListItem.PairedLeisureActivityId` |
 | Daily recap | "What did I finish today, and how long did it take" | `GetDailyRecapTodoListItemEndpoint` |
 | Display order | Sparse descending sort key with gaps, so a reorder is one row's update | `BaseTodoListItem.DisplayOrder`, `TodoListSettings.DisplayOrderGap` |
+| "Other" / uncategorized | Synthetic category id `-1` for lists with no category. Not a row anywhere: `GetFilterSortTodoListCategoryEndpoint` appends it to its list when the user has uncategorized lists (and the name filter does not exclude it), and `FilterSortTodoListEndpoint` reads it back as `CategoryId is null` | `TodoListCategoryResponse.UncategorizedId` / `.Uncategorized` — both ends use the constant, never a literal |

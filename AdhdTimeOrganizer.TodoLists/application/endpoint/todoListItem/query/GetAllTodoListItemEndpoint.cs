@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
+using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
@@ -8,7 +9,11 @@ namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListItem
 
 public class GetAllTodoListItemRequest
 {
-    public long? TodoListId { get; set; }
+    /// <summary>
+    /// Required — see <see cref="GetAllTodoListItemValidator"/>. This route reads one list, not the caller's
+    /// whole to-do universe.
+    /// </summary>
+    public long TodoListId { get; set; }
 }
 
 public class GetAllTodoListItemEndpoint(DbContext dbContext)
@@ -17,12 +22,14 @@ public class GetAllTodoListItemEndpoint(DbContext dbContext)
     public override void Configure()
     {
         Get("/todo-list-item");
+        Validator<GetAllTodoListItemValidator>();
 
         Summary(s =>
         {
-            s.Summary = "Get all todo list items";
-            s.Description = "Retrieves all todo list items, optionally filtered by todo list";
+            s.Summary = "Get one to-do list's items";
+            s.Description = "Retrieves the caller's items on the given to-do list, in DisplayOrder. TodoListId is required.";
             s.Response<List<TodoListItemResponse>>(200, "Success");
+            s.Response(400, "TodoListId missing or not positive");
         });
     }
 
@@ -32,7 +39,7 @@ public class GetAllTodoListItemEndpoint(DbContext dbContext)
 
         var query = dbContext.Set<TodoListItem>()
             .FilteredByUser(loggedUserId)
-            .Where(tdl => req.TodoListId == null || tdl.TodoListId == req.TodoListId)
+            .Where(tdl => tdl.TodoListId == req.TodoListId)
             .OrderBy(td => td.DisplayOrder);
 
         var items = await TodoListItemResponse.Projection(query).ToListAsync(ct);

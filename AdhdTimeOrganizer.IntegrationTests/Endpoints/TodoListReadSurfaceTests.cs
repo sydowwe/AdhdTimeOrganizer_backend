@@ -693,3 +693,176 @@ public class TodoListUniqueNameTests(AppDbContextFixture fixture) : PostgresTest
         (await verifyDb.Set<TodoListCategory>().IgnoreQueryFilters().CountAsync(c => c.Name == "Chores", CancellationToken)).Should().Be(2);
     }
 }
+
+/// <summary>
+/// CQ-8 / PERF-4 — <c>GetFilterSortTodoListCategoryEndpoint</c>, which had no test of its own while it
+/// was a hand-rolled <c>Endpoint&lt;,&gt;</c> and now rides <c>BaseFilterSortEndpoint</c>.
+/// <para>
+/// Two things here fail silently. The synthetic "Other" row
+/// (<see cref="TodoListCategoryResponse.UncategorizedId"/>) is not a database row, so nothing in the
+/// model or the migrations pins it — it exists only because this endpoint appends it and
+/// <c>FilterSortTodoListEndpoint</c> reads it back as <c>CategoryId is null</c>; if the append stops
+/// happening the route still answers 200 with a list that is simply missing a bucket. And the user
+/// scoping is two separate clauses — <c>ApplyUserScoping</c> on the categories, a hand-written
+/// <c>UserId</c> on the uncategorized probe and on the <c>HideEmpty</c> EXISTS — each of which can go
+/// away on its own.
+/// </para>
+/// </summary>
+[Collection("Postgres")]
+public class FilterSortTodoListCategoryTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
+{
+    [Fact(DisplayName = "Every category comes back by default, empty ones included")]
+    public async Task NoFilter_ReturnsEveryCategory()
+    {
+        await using (var db = CreateDbContext())
+        {
+            var used = await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Chores", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Empty", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "Dishes", categoryId: used, ct: CancellationToken);
+        }
+
+        var categories = await FilterAsync(null);
+
+        categories.Select(c => c.Name).Should().BeEquivalentTo(["Chores", "Empty"]);
+    }
+
+    [Fact(DisplayName = "HideEmpty drops the categories no list points at")]
+    public async Task HideEmpty_DropsUnusedCategories()
+    {
+        await using (var db = CreateDbContext())
+        {
+            var used = await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Chores", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Empty", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "Dishes", categoryId: used, ct: CancellationToken);
+        }
+
+        var categories = await FilterAsync(new { HideEmpty = true });
+
+        categories.Select(c => c.Name).Should().BeEquivalentTo(["Chores"]);
+    }
+
+    /// <summary>
+    /// The EXISTS behind <c>HideEmpty</c> carries its own <c>UserId</c> clause so it can use
+    /// <c>ix_todo_list_user_id_category_id</c>. Drop that clause and this category comes back as "used" on
+    /// the strength of a list belonging to someone else.
+    /// </summary>
+    [Fact(DisplayName = "HideEmpty does not count another user's lists as usage")]
+    public async Task HideEmpty_IgnoresAnotherUsersLists()
+    {
+        await using (var db = CreateDbContext())
+        {
+            await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
+            var mine = await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Mine", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, ReminderSeedHelper.OtherUserId, "Theirs", mine, CancellationToken);
+        }
+
+        var categories = await FilterAsync(new { HideEmpty = true });
+
+        categories.Should().BeEmpty("only the other user's list points at that category");
+    }
+
+    [Fact(DisplayName = "The Name filter matches by substring, case-insensitively")]
+    public async Task NameFilter_MatchesSubstring_CaseInsensitively()
+    {
+        await using (var db = CreateDbContext())
+        {
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Chores", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Choir", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Work", ct: CancellationToken);
+        }
+
+        (await FilterAsync(new { Name = "cho" })).Select(c => c.Name).Should().BeEquivalentTo(["Chores", "Choir"]);
+        (await FilterAsync(new { Name = "%" })).Should().BeEmpty("% is escaped to a literal, so it matches no category name");
+    }
+
+    [Fact(DisplayName = "The 'Other' row is appended when, and only when, an uncategorised list exists")]
+    public async Task OtherRow_TracksUncategorisedLists()
+    {
+        await using (var db = CreateDbContext())
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Chores", ct: CancellationToken);
+
+        (await FilterAsync(null)).Should().OnlyContain(c => c.Id != TodoListCategoryResponse.UncategorizedId);
+
+        await using (var db = CreateDbContext())
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "Loose list", ct: CancellationToken);
+
+        var withOther = await FilterAsync(null);
+
+        withOther.Last().Should().BeEquivalentTo(new
+        {
+            Id = TodoListCategoryResponse.UncategorizedId,
+            Name = TodoListCategoryResponse.UncategorizedName
+        }, "the row is appended after sorting, so it lands last");
+    }
+
+    /// <summary>
+    /// PERF-4: the probe behind the "Other" row is a second round trip, so it is skipped whenever the
+    /// request's own name filter would throw the row away anyway. Both arms matter — the first is the
+    /// saving, the second is the bug that made it safe (the row used to be appended to name-filtered
+    /// results it could not possibly match).
+    /// </summary>
+    [Fact(DisplayName = "The 'Other' row obeys the Name filter it is appended alongside")]
+    public async Task OtherRow_ObeysTheNameFilter()
+    {
+        await using (var db = CreateDbContext())
+        {
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Chores", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "Loose list", ct: CancellationToken);
+        }
+
+        (await FilterAsync(new { Name = "cho" })).Select(c => c.Id)
+            .Should().NotContain(TodoListCategoryResponse.UncategorizedId, "'Other' does not contain 'cho'");
+
+        (await FilterAsync(new { Name = "the" })).Select(c => c.Id)
+            .Should().Contain(TodoListCategoryResponse.UncategorizedId, "'Other' does contain 'the', case-insensitively");
+    }
+
+    /// <summary>
+    /// The categories are scoped by <c>ApplyUserScoping</c>; the "Other" probe is scoped by a clause of its
+    /// own. This covers both — the other user owns a category and an uncategorised list, and neither may
+    /// show up.
+    /// </summary>
+    [Fact(DisplayName = "Neither another user's categories nor their uncategorised lists leak")]
+    public async Task DoesNotLeakAnotherUsersCategoriesOrOtherRow()
+    {
+        await using (var db = CreateDbContext())
+        {
+            await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Mine", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, ReminderSeedHelper.OtherUserId, "Theirs", CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, ReminderSeedHelper.OtherUserId, "Their loose list", ct: CancellationToken);
+        }
+
+        var categories = await FilterAsync(null);
+
+        categories.Select(c => c.Name).Should().BeEquivalentTo(["Mine"]);
+    }
+
+    [Fact(DisplayName = "Unauthenticated category filter-sort is 401")]
+    public async Task Unauthenticated_Returns401()
+    {
+        var response = await CreateUnauthenticatedClient().PostAsJsonAsync("api/todo-list-category/filter-sort", new
+        {
+            SortBy = Array.Empty<object>(),
+            UseFilter = false,
+            Filter = (object?)null
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private async Task<List<TodoListCategoryResponse>> FilterAsync(object? filter)
+    {
+        var response = await CreateClient().PostAsJsonAsync("api/todo-list-category/filter-sort", new
+        {
+            SortBy = Array.Empty<object>(),
+            UseFilter = filter is not null,
+            Filter = filter
+        }, JsonOpts, CancellationToken);
+
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+
+        return JsonSerializer.Deserialize<List<TodoListCategoryResponse>>(body, JsonOpts)!;
+    }
+}

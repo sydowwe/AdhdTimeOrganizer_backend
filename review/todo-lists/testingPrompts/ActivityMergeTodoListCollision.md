@@ -1,5 +1,11 @@
 # TEST-9 — Activity merge collides with `todo_list_item`'s unique index
 
+**✅ DONE 2026-09-09, with the `CQ-1` fix.** All three cases below live in `ActivityMergeTests` —
+`Merge_TwoItemsOnOneList_CollapseToOneRow`, `Merge_TwoItemsOnDifferentLists_BothSurvive`,
+`Merge_WhenTheSurvivorAlreadyHasAnItemOnThatList_ItsOwnItemWins` — and pass without the `KnownGap`
+trait; `CollapseListCollisionsAsync` in the seam is what they pin. `TodoListItemDailyRecapTests`
+confirmed green. The rest of this file is the original prompt.
+
 Read [`_SHARED-CONTEXT.md`](_SHARED-CONTEXT.md) first.
 
 **Status today:** `ActivityMergeTests.cs:196`

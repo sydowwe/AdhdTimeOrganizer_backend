@@ -6,6 +6,9 @@ public record TodoListFilterRequest : IFilterRequest
 {
     public string? Name { get; set; }
 
-    /// <summary>null = all, -1 = uncategorized, &gt;0 = specific category</summary>
+    /// <summary>
+    /// null = all, <see cref="response.todoList.TodoListCategoryResponse.UncategorizedId"/> = uncategorized,
+    /// &gt;0 = specific category.
+    /// </summary>
     public long? CategoryId { get; set; }
 }

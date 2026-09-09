@@ -18,7 +18,7 @@ public class FilterSortTodoListEndpoint(DbContext dbContext)
         }
 
         if (filter.CategoryId.HasValue)
-            query = filter.CategoryId.Value == -1
+            query = filter.CategoryId.Value == TodoListCategoryResponse.UncategorizedId
                 ? query.Where(tl => tl.CategoryId == null)
                 : query.Where(tl => tl.CategoryId == filter.CategoryId.Value);
 

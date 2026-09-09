@@ -27,9 +27,15 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(DbContext dbCont
     public override async Task HandleAsync(ToggleIsDoneRequest request, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var itemsToToggle = await FetchAndPrepare(request.Ids, now, ct);
+        var requestedIds = request.Ids.Distinct().ToList();
+        var itemsToToggle = await FetchAndPrepare(requestedIds, now, ct);
 
-        if (itemsToToggle.Count == 0)
+        // Every requested id has to resolve, not merely one of them. Both subclasses return exactly the subset
+        // they could load, and an id belonging to another user matches nothing under the global filter — so the
+        // old "empty means 404" test answered 204 for a batch that was only partly applied, which the client
+        // cannot tell from a complete one. "Uncheck all" sends the whole done set at once, so this is the
+        // request most likely to carry a stale id.
+        if (requestedIds.Count == 0 || itemsToToggle.Count != requestedIds.Count)
         {
             AddError($"{typeof(TEntity).Name} not found.");
             await Send.ErrorsAsync(404, ct);
@@ -46,7 +52,11 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(DbContext dbCont
         // two clients toggling the same item is an ordinary DbUpdateConcurrencyException, and Routines' override
         // adds a period whose reset can collide besides. Unmapped, either escapes as a 500 indistinguishable
         // from a real fault; mapped, the loser gets the 409 the rest of the API returns (CQ-10).
-        var result = await dbContext.UpdateRangeAsync(itemsToToggle, ct);
+        //
+        // SaveTrackedChangesAsync rather than UpdateRangeAsync: FetchAndPrepare loads these items tracked, so
+        // UpdateRange would re-mark every property modified and write the whole row — steps JSON and all — to
+        // change one flag and one counter.
+        var result = await dbContext.SaveTrackedChangesAsync(ct);
         if (result.Failed)
         {
             AddError(result.ErrorMessage ?? "An error occurred while toggling.");

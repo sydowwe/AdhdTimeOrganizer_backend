@@ -45,7 +45,7 @@ request: `TRequest : ICreateRequest<TEntity>` exposes `TEntity ToEntity`;
 | `BaseGetSelectOptionsEndpoint<TEntity>` | GET `/all-options` | `id + text` select options — implement `Map(query)` |
 | `BaseFilterEndpoint<TEntity, TResponse, TFilter>` | POST `/filter` | List filtered by a custom `IFilterRequest` — implement `ApplyCustomFiltering` |
 | `BaseSortEndpoint<TEntity, TResponse>` | POST `/sort` | List with dynamic sort columns |
-| `BaseFilterSortEndpoint<TEntity, TResponse, TFilter>` | POST `/filter-sort` | Filter + sort without pagination — implement `ApplyCustomFiltering` |
+| `BaseFilterSortEndpoint<TEntity, TResponse, TFilter>` | POST `/filter-sort` | Filter + sort without pagination — implement `ApplyCustomFiltering`; hooks `ApplyUserScoping`, `PostProcessItems(Async)` (runs after sorting, so an appended row lands last) |
 | `BaseGridEndpoint<TEntity, TResponse, TFilter>` | POST `/filtered-table` | Filter + sort + paginate — implement `ApplyCustomFiltering` |
 
 ## Auth endpoints

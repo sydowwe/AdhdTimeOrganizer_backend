@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.IntegrationTests.Reminders;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Testing;
@@ -284,5 +285,42 @@ public class TodoListToggleAndDoneCountTests(AppDbContextFixture fixture) : Post
         var saved = await verifyDb.Set<TodoListItem>().SingleAsync(i => i.Id == entity.Id, CancellationToken);
         saved.DoneCount.Should().Be(50);
         saved.TotalCount.Should().BeNull();
+    }
+
+    /// <summary>
+    /// The batch toggle answered 404 only when <b>no</b> id resolved, so a batch mixing an owned id with one
+    /// the caller does not own toggled the subset and answered 204 — which a client cannot tell from having
+    /// toggled all of them. "Uncheck all" sends the whole done set at once, so it is the request most likely
+    /// to carry an id that has since been deleted or was never the caller's.
+    /// <para>
+    /// The assertion that matters is the row, not the status code: an endpoint that answers 404 and applies
+    /// the subset anyway is the same defect in a different envelope.
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "A batch holding one foreign id is a 404 for the whole batch, and toggles nothing")]
+    public async Task ToggleBatch_WithAForeignId_TogglesNothing()
+    {
+        long mineId, theirsId;
+        await using (var db = CreateDbContext())
+        {
+            (mineId, _, _, _) = await SeedStepCountedItemAsync(db, totalCount: 3, stepCount: 3, "batch-mine");
+
+            await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
+            var theirActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "batch-theirs", ReminderSeedHelper.OtherUserId, CancellationToken);
+            var theirPriorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 902, ReminderSeedHelper.OtherUserId, "batch-theirs", CancellationToken);
+            var theirListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, ReminderSeedHelper.OtherUserId, "batch-theirs-list", ct: CancellationToken);
+            theirsId = await TodoListTestSeedHelper.SeedTodoListItemAsync(
+                db, theirActivityId, theirPriorityId, theirListId, ReminderSeedHelper.OtherUserId, ct: CancellationToken);
+        }
+
+        var response = await CreateClient().PatchAsJsonAsync("api/todo-list-item/toggle-is-done",
+            new { Ids = new[] { mineId, theirsId } }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await using var verifyDb = CreateDbContext();
+        var mine = await verifyDb.Set<TodoListItem>().SingleAsync(i => i.Id == mineId, CancellationToken);
+        mine.IsDone.Should().BeFalse("a batch that cannot be applied in full applies to nothing");
+        mine.DoneCount.Should().Be(0);
     }
 }

@@ -222,6 +222,112 @@ public class ActivityMergeTests(AppDbContextFixture fixture) : PostgresTestBase(
     }
 
     /// <summary>
+    /// Two to-do items on ONE list, each pointing at a different merged activity, must end up as one row
+    /// on that list — not as a unique-index violation that rolls the whole merge back. This is the
+    /// ordinary shape of a duplicate activity ("Reading" / "reading"), not an exotic one: if the user kept
+    /// a task for each, the merge they are trying to perform is precisely the thing that collides.
+    /// </summary>
+    [Fact]
+    public async Task Merge_TwoItemsOnOneList_CollapseToOneRow()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Reading Survivor");
+        var duplicateAId = await SeedActivityAsync(db, "Reading Duplicate");
+        var duplicateBId = await SeedActivityAsync(db, "reading duplicate");
+
+        var categoryId = await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, ct: CancellationToken);
+        var todoListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, categoryId: categoryId, ct: CancellationToken);
+        var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 350, ct: CancellationToken);
+        await TodoListTestSeedHelper.SeedTodoListItemAsync(db, duplicateAId, priorityId, todoListId, ct: CancellationToken);
+        await TodoListTestSeedHelper.SeedTodoListItemAsync(db, duplicateBId, priorityId, todoListId, ct: CancellationToken);
+
+        var response = await MergeAsync(survivorId, duplicateAId, duplicateBId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "the unique (UserId, ActivityId, TodoListId) index must be collapsed onto, not tripped over: {0}",
+            await response.Content.ReadAsStringAsync(CancellationToken));
+
+        var result = (await response.Content.ReadFromJsonAsync<MergeResult>(JsonOpts, CancellationToken))!;
+        result.RepointedCount.Should().Be(2,
+            "the count the snackbar shows is rows moved — a collapsed row was still moved, same rule as a dropped pairing");
+
+        await using var assertDb = CreateDbContext();
+        var items = await assertDb.Set<TodoListItem>().Where(i => i.TodoListId == todoListId).ToListAsync(CancellationToken);
+
+        items.Should().ContainSingle("two rows cannot share (UserId, ActivityId, TodoListId)");
+        items[0].ActivityId.Should().Be(survivorId);
+
+        (await assertDb.Set<Activity>().IgnoreQueryFilters().AnyAsync(a => a.Id == duplicateAId, CancellationToken))
+            .Should().BeFalse();
+        (await assertDb.Set<Activity>().IgnoreQueryFilters().AnyAsync(a => a.Id == duplicateBId, CancellationToken))
+            .Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The positive control for the collapse above: items on <em>different</em> lists share no key, so
+    /// nothing may be deleted. Without this, a fix that deletes too eagerly passes the collision test.
+    /// </summary>
+    [Fact]
+    public async Task Merge_TwoItemsOnDifferentLists_BothSurvive()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Reading Survivor");
+        var duplicateAId = await SeedActivityAsync(db, "Reading Duplicate");
+        var duplicateBId = await SeedActivityAsync(db, "reading duplicate");
+
+        var categoryId = await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, ct: CancellationToken);
+        var firstListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, categoryId: categoryId, ct: CancellationToken);
+        var secondListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, categoryId: categoryId, ct: CancellationToken);
+        var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 350, ct: CancellationToken);
+        var firstItemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, duplicateAId, priorityId, firstListId, ct: CancellationToken);
+        var secondItemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, duplicateBId, priorityId, secondListId, ct: CancellationToken);
+
+        var response = await MergeAsync(survivorId, duplicateAId, duplicateBId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var assertDb = CreateDbContext();
+        var items = await assertDb.Set<TodoListItem>()
+            .Where(i => i.Id == firstItemId || i.Id == secondItemId)
+            .ToListAsync(CancellationToken);
+
+        items.Should().HaveCount(2, "one task per list is a legal shape the collapse must leave alone");
+        items.Should().OnlyContain(i => i.ActivityId == survivorId);
+    }
+
+    /// <summary>
+    /// Three rows onto one key: the survivor already has an item on the list both duplicates' items sit
+    /// on. The <c>ActivityProfiles</c> precedent decides the tie — the survivor's own row is the one the
+    /// user chose to keep, so it is the row that stays.
+    /// </summary>
+    [Fact]
+    public async Task Merge_WhenTheSurvivorAlreadyHasAnItemOnThatList_ItsOwnItemWins()
+    {
+        await using var db = CreateDbContext();
+        var survivorId = await SeedActivityAsync(db, "Reading Survivor");
+        var duplicateAId = await SeedActivityAsync(db, "Reading Duplicate");
+        var duplicateBId = await SeedActivityAsync(db, "reading duplicate");
+
+        var categoryId = await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, ct: CancellationToken);
+        var todoListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, categoryId: categoryId, ct: CancellationToken);
+        var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 350, ct: CancellationToken);
+
+        // Seeded first, so "the survivor's item wins" cannot be confused with "the lowest id wins".
+        var survivorItemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(db, survivorId, priorityId, todoListId, ct: CancellationToken);
+        await TodoListTestSeedHelper.SeedTodoListItemAsync(db, duplicateAId, priorityId, todoListId, ct: CancellationToken);
+        await TodoListTestSeedHelper.SeedTodoListItemAsync(db, duplicateBId, priorityId, todoListId, ct: CancellationToken);
+
+        var response = await MergeAsync(survivorId, duplicateAId, duplicateBId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "three rows collapsing onto one key is still a merge the user must be able to perform: {0}",
+            await response.Content.ReadAsStringAsync(CancellationToken));
+
+        await using var assertDb = CreateDbContext();
+        var items = await assertDb.Set<TodoListItem>().Where(i => i.TodoListId == todoListId).ToListAsync(CancellationToken);
+
+        items.Should().ContainSingle();
+        items[0].Id.Should().Be(survivorItemId, "the survivor's own row wins, as it does for the activity profiles");
+    }
+
+    /// <summary>
     /// The three activity profiles are unique per activity, so two of them cannot both land on the
     /// survivor. The survivor's own profile wins and the merged one is deleted.
     /// </summary>

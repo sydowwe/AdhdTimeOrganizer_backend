@@ -12,8 +12,9 @@ public class TodoList : BaseEntityWithUser, IBaseNameTextEntity
     public long? CategoryId { get; set; }
     public TodoListCategory? Category { get; set; }
 
+    // No ItemCount / CompletedCount properties here on purpose (PERF-3). They existed as unmapped
+    // computed properties over TodoListItemColl — a second, in-memory copy of what
+    // TodoListResponse.Projection already computes in SQL, and reading one loads the whole collection
+    // per list. The projection is the only source of those two numbers.
     public ICollection<TodoListItem> TodoListItemColl { get; set; } = new List<TodoListItem>();
-
-    public int ItemCount => TodoListItemColl.Count;
-    public int CompletedCount => TodoListItemColl.Count(i => i.IsDone);
 }

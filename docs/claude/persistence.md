@@ -190,7 +190,12 @@ It exposes `DbContextHelper` — Result-returning CRUD helpers that wrap `SaveCh
   entries. Called by the `SaveChangesAsync()` override and inside the helper methods — you do not need
   to call it manually.
 - `AddEntityAsync`, `AddRangeAsync` (transactional, chunks of 300)
-- `UpdateEntityAsync`, `UpdateRangeAsync`
+- `UpdateEntityAsync`, `UpdateRangeAsync` — for **detached** entities: both call `Update`/`UpdateRange`
+  first, which marks every property modified.
+- `SaveTrackedChangesAsync()` — for entities loaded in this same request and mutated in place. Same
+  `Result` and the same exception mapping, without the `Update` call, so the `UPDATE` carries the columns
+  that changed instead of the whole row. No "0 rows affected" check: on a tracked entity 0 rows means
+  nothing changed, and a row that moved underneath it loses on `row_version` instead.
 - `DeleteEntityAsync`, `DeleteRangeAsync`, `DeleteByIdAsync`
 - `SetActiveStatusAsync`, `SetActiveStatusRangeAsync` — for `ISoftDeletable` (`IsActive`).
 
