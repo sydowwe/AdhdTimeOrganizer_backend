@@ -1,5 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
-using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.domain.entityInterface;
 using Sydowwe.Framework.infrastructure.persistence;

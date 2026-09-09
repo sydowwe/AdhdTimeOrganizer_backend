@@ -3,7 +3,7 @@ using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
-using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.domain.helper;

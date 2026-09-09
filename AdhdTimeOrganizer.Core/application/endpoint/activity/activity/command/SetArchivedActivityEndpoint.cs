@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.Core.application.dto.request.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
-using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.domain.helper;

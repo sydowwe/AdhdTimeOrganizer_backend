@@ -1,4 +1,4 @@
-using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.calendar;
+using AdhdTimeOrganizer.History.application.dto.request.calendar;
 using AdhdTimeOrganizer.Core.application.dto.dto;
 using FastEndpoints;
 using FluentValidation;

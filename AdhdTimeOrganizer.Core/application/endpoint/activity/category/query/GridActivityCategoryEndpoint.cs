@@ -2,7 +2,7 @@ using AdhdTimeOrganizer.Core.application.dto.filter;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
-using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using Humanizer;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.request.generic;

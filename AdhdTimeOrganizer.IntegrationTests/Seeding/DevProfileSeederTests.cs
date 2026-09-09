@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using System.Security.Claims;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;

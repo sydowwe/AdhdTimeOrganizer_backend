@@ -1,11 +1,19 @@
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using System.Security.Claims;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.timer;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.entity.suggestion;
+using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -143,6 +151,116 @@ public class NamedQueryFilterTests(AppDbContextFixture fixture) : PostgresTestBa
             "activity together with its profiles -- named per entity, the principal reappears and the " +
             "dependent stays filtered, which reads as a row whose include is empty");
     }
+
+    /// <summary>
+    /// The converse of <see cref="ArchivalFilter_UsesTheSameNameOnThePrincipalAndEveryDependent"/>:
+    /// <b>every</b> entity holding a foreign key into <see cref="Activity"/> is explicitly classified as
+    /// either hiding with an archived activity or surviving it, and nothing else in the model carries the
+    /// archival name at all.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The gap this closes.</b> Which dependents mirror <c>ActivityArchived</c> is a cross-slice policy
+    /// decided entirely in <c>AppDbContext.OnModelCreating</c> — a host file the author of a new slice
+    /// entity is not editing, and cannot see from the slice. The entity itself carries no signal either
+    /// way, so a new table hanging off <c>Activity</c> silently defaults to <em>surviving</em>, which is
+    /// only sometimes right. The test above pinned that the six known dependents carry the filter; it
+    /// could not notice a seventh dependent that should have.
+    /// </para>
+    /// <para>
+    /// <b>Why it matters beyond tidiness.</b> <c>IActivityReferenceSource</c> implementations must lift
+    /// this filter in <c>ReferencingActivityIds</c> if their table carries it, or an archived activity
+    /// under-reports <c>usageCount</c> — and <c>canDelete</c> is <c>usageCount == 0</c> over a family of
+    /// FKs that cascade. So "does my table mirror archival?" is a question a slice author has to answer
+    /// correctly while looking at a file that does not tell them. This turns it into a failing test.
+    /// </para>
+    /// <para>
+    /// <b>The rule behind the split.</b> Archival hides an activity from every <em>picker</em> while
+    /// keeping the rows that reference it rendering its name. So a dependent mirrors the filter only when
+    /// it is itself picker-like or descriptive of the activity — the three profiles, and the two
+    /// suggestion read-models that feed the planner's pickers. Everything recording that something
+    /// <em>happened</em> must survive: that is the whole reason archiving exists rather than deleting.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void EveryActivityDependent_IsClassifiedAgainstTheArchivalFilter()
+    {
+        var model = HostModel();
+
+        var dependents = model.GetEntityTypes()
+            .SelectMany(entityType => entityType.GetForeignKeys())
+            .Where(fk => fk.PrincipalEntityType.ClrType == typeof(Activity))
+            .Select(fk => fk.DeclaringEntityType.ClrType)
+            .Distinct()
+            .ToList();
+
+        dependents.Should().NotBeEmpty("a model with no activity dependents means this guard is vacuous");
+
+        var unclassified = dependents
+            .Where(type => !ArchivalFilteredTypes.Contains(type) && !SurvivesArchivingTypes.Contains(type))
+            .Select(type => type.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        unclassified.Should().BeEmpty(
+            "a new table hanging off Activity has to declare which side of archiving it is on, and the " +
+            "entity carries no signal either way -- the decision lives in AppDbContext.OnModelCreating. " +
+            "Add it to ArchivalFilteredTypes (and mirror the filter in AppDbContext) if it must vanish " +
+            "with an archived activity, or to SurvivesArchivingTypes if it records that something " +
+            "happened. Read the rule in this test's remarks first, and check whether its " +
+            "IActivityReferenceSource has to lift the filter");
+
+        var unexpected = model.GetEntityTypes()
+            .Where(entityType => entityType.FindDeclaredQueryFilter(AppQueryFilters.ActivityArchived) is not null)
+            .Select(entityType => entityType.ClrType)
+            .Except(ArchivalFilteredTypes)
+            .Select(type => type.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        unexpected.Should().BeEmpty(
+            "ArchivalFilteredTypes is the inventory of the archival concern, so an entity carrying the " +
+            "filter without appearing in it means the two have drifted -- and every reader of that table " +
+            "is now silently missing an archived activity's rows");
+    }
+
+    /// <summary>
+    /// The other side of the classification: activity dependents that deliberately stay visible when
+    /// their activity is archived, because each records that something <b>happened</b>. Hiding any of
+    /// them would make archiving destructive in effect while claiming not to be — an archived activity's
+    /// history would vanish from the dashboards it is the whole point of keeping.
+    /// </summary>
+    /// <remarks>
+    /// The timer presets are the least obvious three. A preset naming an archived activity still renders
+    /// that activity's name in the timer list, which is the intended behaviour of archiving; it is the
+    /// activity <em>pickers</em> that exclude it, per-endpoint, not the rows pointing at it.
+    /// </remarks>
+    private static readonly Type[] SurvivesArchivingTypes =
+    [
+        // Core — the presets keep naming the activity; the exclusion lives in the four pickers.
+        typeof(TimerPreset),
+        typeof(PomodoroTimerPreset),
+
+        // History — the rows archiving exists to preserve.
+        typeof(ActivityHistory),
+
+        // Planning — the three concrete task shapes. A planned or completed task is a record of intent.
+        typeof(PlannerTask),
+        typeof(RepeatingPlannerTask),
+        typeof(TemplatePlannerTask),
+
+        // Routines / TodoLists.
+        typeof(RoutineTodoList),
+        typeof(TodoListItem),
+
+        // Tracking — raw ingest mappings; a mapping that stopped resolving would re-attribute new entries.
+        typeof(TrackerAndroidMappingByPattern),
+        typeof(TrackerDesktopMappingByPattern),
+
+        // ActivityProfiles — these two are records, not profiles: a drawn suggestion and a memory.
+        typeof(LeisureSuggestionRecord),
+        typeof(MemoryAnchor)
+    ];
 
     /// <summary>
     /// The behavioural half, asserted on rows: lifting the archival concern by name must reveal

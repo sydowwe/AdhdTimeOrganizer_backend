@@ -1,6 +1,6 @@
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.Core.application.seam;
-using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.domain.entityInterface;

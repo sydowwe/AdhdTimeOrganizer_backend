@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.infrastructure.persistence.configuration;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;

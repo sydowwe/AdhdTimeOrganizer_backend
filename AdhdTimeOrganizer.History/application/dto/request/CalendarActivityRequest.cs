@@ -1,4 +1,4 @@
-namespace AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.calendar;
+namespace AdhdTimeOrganizer.History.application.dto.request.calendar;
 
 public record CalendarActivityRequest
 {

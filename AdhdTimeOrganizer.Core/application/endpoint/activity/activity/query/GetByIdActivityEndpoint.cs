@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
-using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.read;
 

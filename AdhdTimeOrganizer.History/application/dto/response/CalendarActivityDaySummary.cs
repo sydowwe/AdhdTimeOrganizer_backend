@@ -1,7 +1,7 @@
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using Sydowwe.Framework.application.dto.dto;
 
-namespace AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard.calendar;
+namespace AdhdTimeOrganizer.History.application.dto.response.calendar;
 
 public record CalendarActivityDaySummary
 {

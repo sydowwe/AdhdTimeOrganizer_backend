@@ -1,5 +1,5 @@
-using AdhdTimeOrganizer.application.dto.request.activityHistory.dashboard.calendar;
-using AdhdTimeOrganizer.application.dto.response.activityHistory.dashboard.calendar;
+using AdhdTimeOrganizer.History.application.dto.request.calendar;
+using AdhdTimeOrganizer.History.application.dto.response.calendar;
 using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;

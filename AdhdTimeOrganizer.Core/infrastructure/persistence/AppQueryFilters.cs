@@ -1,4 +1,4 @@
-namespace AdhdTimeOrganizer.infrastructure.persistence;
+namespace AdhdTimeOrganizer.Core.infrastructure.persistence;
 
 /// <summary>
 /// Names of this host's own global query filters (EF 10 named filters). The per-user concern is not
