@@ -6,7 +6,7 @@ namespace AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
 
 public record TaskPriorityRequest : TextColorRequest, IMyRequest<TaskPriority>
 {
-    public short Priority { get; init; }
+    public int Priority { get; init; }
 
     public TaskPriority ToEntity => new()
     {

@@ -8,7 +8,9 @@ public class TaskPriorityValidator : Validator<TaskPriorityRequest>
 {
     public TaskPriorityValidator()
     {
+        // The DTO is int, like the entity and the response. The ceiling is stated rather than
+        // implied by the wire type: it used to be short.MaxValue only because the DTO was a short.
         RuleFor(x => x.Priority)
-            .GreaterThanOrEqualTo((short)1);
+            .InclusiveBetween(1, short.MaxValue);
     }
 }

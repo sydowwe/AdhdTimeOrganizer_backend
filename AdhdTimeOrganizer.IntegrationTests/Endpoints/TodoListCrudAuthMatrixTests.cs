@@ -171,7 +171,7 @@ public class CreateTaskPriorityEndpointTests(AppDbContextFixture fixture) : Base
     {
         Text = $"Priority-{Guid.NewGuid():N}",
         Color = "#ff00ff",
-        Priority = (short)42
+        Priority = 42
     });
 }
 
@@ -223,7 +223,7 @@ public class UpdateTaskPriorityEndpointTests(AppDbContextFixture fixture) : Base
     {
         Text = "update-bug",
         Color = "#abcdef",
-        Priority = (short)61
+        Priority = 61
     });
 
     protected override async Task<long?> SeedEntityOwnedByOtherUserAsync(DbContext db)

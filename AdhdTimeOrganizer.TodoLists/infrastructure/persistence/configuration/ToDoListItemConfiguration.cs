@@ -47,7 +47,19 @@ public class TodoListItemConfiguration : IEntityTypeConfiguration<TodoListItem>
         builder.HasIndex(t => new { t.UserId, t.ActivityId, t.TodoListId })
             .IsUnique();
 
-        builder.HasIndex(t => new { t.UserId, t.TaskPriorityId });
+        // DisplayOrder is part of the key, not a tie-breaker: GetNextDisplayOrder takes MIN over the
+        // group and the rebalance walks it ORDER BY display_order DESC. Filter columns alone would
+        // leave both as sorts.
+        builder.HasIndex(t => new { t.UserId, t.TaskPriorityId, t.DisplayOrder });
+
+        // GetAllTodoListItemEndpoint filters by list and orders by DisplayOrder; TodoListResponse's
+        // two count subqueries probe the same leading columns.
+        builder.HasIndex(t => new { t.UserId, t.TodoListId, t.DisplayOrder });
+
+        // The dashboard widget's only query. Partial, because it never reads done items — which are
+        // the majority of the table over time.
+        builder.HasIndex(t => new { t.UserId, t.IsDone, t.DueDate })
+            .HasFilter("NOT is_done");
 
         // The daily recap's only query: this user's items completed within one day. Without it the
         // scan is the user's whole item set, filtered on a column that is null for everything still

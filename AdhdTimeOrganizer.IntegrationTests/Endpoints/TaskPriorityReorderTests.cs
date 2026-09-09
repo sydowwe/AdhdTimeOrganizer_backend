@@ -39,7 +39,7 @@ public class TaskPriorityReorderTests(AppDbContextFixture fixture) : PostgresTes
         {
             Text = "Low",
             Color = "#abcdef",
-            Priority = (short)2 // collides with `highId`'s live rank
+            Priority = 2 // collides with `highId`'s live rank
         }, JsonOpts, CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict,
@@ -66,15 +66,15 @@ public class TaskPriorityReorderTests(AppDbContextFixture fixture) : PostgresTes
 
         // Step 1: park `lowId` on a rank nothing else holds. TaskPriorityValidator requires Priority >= 1
         // (unlike TaskImportance), so the temporary value has to be a large unused rank, not a negative one.
-        (await client.PutAsJsonAsync($"api/task-priority/{lowId}", new { Text = "Low", Color = "#abcdef", Priority = (short)9999 }, JsonOpts, CancellationToken))
+        (await client.PutAsJsonAsync($"api/task-priority/{lowId}", new { Text = "Low", Color = "#abcdef", Priority = 9999 }, JsonOpts, CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Step 2: `highId` can now take the vacated rank 1.
-        (await client.PutAsJsonAsync($"api/task-priority/{highId}", new { Text = "High", Color = "#abcdef", Priority = (short)1 }, JsonOpts, CancellationToken))
+        (await client.PutAsJsonAsync($"api/task-priority/{highId}", new { Text = "High", Color = "#abcdef", Priority = 1 }, JsonOpts, CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Step 3: `lowId` moves off the temporary value onto the now-vacated rank 2.
-        (await client.PutAsJsonAsync($"api/task-priority/{lowId}", new { Text = "Low", Color = "#abcdef", Priority = (short)2 }, JsonOpts, CancellationToken))
+        (await client.PutAsJsonAsync($"api/task-priority/{lowId}", new { Text = "Low", Color = "#abcdef", Priority = 2 }, JsonOpts, CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         await using var verifyDb = CreateDbContext();

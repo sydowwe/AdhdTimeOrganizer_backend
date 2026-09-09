@@ -2576,8 +2576,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_task_priority");
 
-                    b.HasIndex("Priority")
-                        .HasDatabaseName("ix_task_priority_priority");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_task_priority_user_id");
 
                     b.HasIndex("UserId", "Priority")
                         .IsUnique()
@@ -2647,6 +2647,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_todo_list_user_id");
+
+                    b.HasIndex("UserId", "CategoryId")
+                        .HasDatabaseName("ix_todo_list_user_id_category_id");
 
                     b.HasIndex("UserId", "Name")
                         .IsUnique()
@@ -2830,12 +2833,19 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("UserId", "CompletedTimestamp")
                         .HasDatabaseName("ix_todo_list_item_user_id_completed_timestamp");
 
-                    b.HasIndex("UserId", "TaskPriorityId")
-                        .HasDatabaseName("ix_todo_list_item_user_id_task_priority_id");
-
                     b.HasIndex("UserId", "ActivityId", "TodoListId")
                         .IsUnique()
                         .HasDatabaseName("ix_todo_list_item_user_id_activity_id_todo_list_id");
+
+                    b.HasIndex("UserId", "IsDone", "DueDate")
+                        .HasDatabaseName("ix_todo_list_item_user_id_is_done_due_date")
+                        .HasFilter("NOT is_done");
+
+                    b.HasIndex("UserId", "TaskPriorityId", "DisplayOrder")
+                        .HasDatabaseName("ix_todo_list_item_user_id_task_priority_id_display_order");
+
+                    b.HasIndex("UserId", "TodoListId", "DisplayOrder")
+                        .HasDatabaseName("ix_todo_list_item_user_id_todo_list_id_display_order");
 
                     b.ToTable("todo_list_item", "todo", t =>
                         {

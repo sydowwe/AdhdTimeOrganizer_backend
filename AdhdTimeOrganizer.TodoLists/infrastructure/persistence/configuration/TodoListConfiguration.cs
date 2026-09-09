@@ -13,6 +13,10 @@ public class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
         builder.IsManyWithOneUser();
         builder.HasIndex(r => new { r.UserId, r.Name }).IsUnique();
 
+        // Serves GetFilterSortTodoListCategoryEndpoint's HideEmpty EXISTS and its uncategorized
+        // probe, plus FilterSortTodoListEndpoint's CategoryId arm.
+        builder.HasIndex(r => new { r.UserId, r.CategoryId });
+
         builder.Property(r => r.Icon).HasMaxLength(255);
 
         builder.HasMany(r => r.TodoListItemColl)

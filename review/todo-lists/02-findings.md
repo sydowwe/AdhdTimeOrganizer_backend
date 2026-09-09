@@ -680,7 +680,13 @@ introduces them.
 
 `Doc impact: domain-map.md → Seeding (drop the "the file is named TodoListSeeder.cs" clause once renamed)`
 
-### CQ-14 🟡 `TaskPriorityRequest.Priority` is `short` where everything around it is `int`
+### CQ-14 🟡 ✅ FIXED 2026-09-09 · `TaskPriorityRequest.Priority` is `short` where everything around it is `int`
+
+*The DTO is now `int` and `TaskPriorityValidator` states `InclusiveBetween(1, short.MaxValue)` — the same
+effective range as before, but declared rather than implied by the wire type, so the ceiling is now a
+product decision someone can change in one place. The six `(short)` casts in `TaskPriorityReorderTests`
+and `TodoListCrudAuthMatrixTests` are gone.*
+
 
 `application/dto/request/taskPriority/TaskPriorityRequest.cs:9` declares `short Priority`, assigned at
 `:16` to `TaskPriority.Priority`, which is `int` (`domain/model/entity/TaskPriority.cs:10`), and
@@ -696,7 +702,14 @@ the product cap actually is.
 
 `Doc impact: none`
 
-### CQ-15 🟡 `TaskPriorityConfiguration` skips `IsManyWithOneUser()` that its siblings call
+### CQ-15 🟡 ✅ FIXED 2026-09-09 · `TaskPriorityConfiguration` skips `IsManyWithOneUser()` that its siblings call
+
+*`builder.IsManyWithOneUser()` added. **The migration was not empty**: it emits
+`CREATE INDEX ix_task_priority_user_id`. The FK itself and its delete behaviour were unchanged, so
+convention and helper did agree there — but the helper's FK index was missing, which is exactly what
+the three siblings have (`ix_todo_list_user_id`, `ix_todo_list_category_user_id`,
+`ix_todo_list_item_user_id`). Shipped in `TodoListsIndexRefresh` with `PERF-5` and the four indexes below.*
+
 
 `infrastructure/persistence/configuration/TaskPriorityConfiguration.cs:11-12` calls
 `BaseTextColorEntityConfigure()` and then goes straight to indexes.
@@ -850,10 +863,15 @@ obvious home.
 | `TodoListResponse.Projection:23-24` | Two correlated subqueries per list (`Count()` and `Count(i => i.IsDone)`) | Two extra scans per row on every list read and every `filter-sort` page | One grouped join, or a `FILTER (WHERE is_done)` aggregate; needs the index below | `PERF-3` |
 | `TodoList.cs:17-18` | `ItemCount` / `CompletedCount` are unmapped computed properties over `TodoListItemColl` — a second, in-memory copy of the projection above | Nothing reads them today, but any caller that does silently triggers a full collection load per list | Delete them; the projection is the only correct source | `PERF-3` |
 | `GetFilterSortTodoListCategoryEndpoint.cs:35`, `:42-43` | The `HideEmpty` clause is a correlated `EXISTS` over `todo_list`, and a second `AnyAsync` round trip fires unconditionally on every call | Two queries where one would do; the `EXISTS` has no supporting index | Fold the uncategorized check into the same query as a `bool` column; add the index below | `PERF-4` |
-| `TaskPriorityConfiguration.cs:22` | `HasIndex(t => t.Priority)` — a non-leading-`UserId` index on a strictly user-scoped lookup | No query in the slice can use it (every read is filtered on `user_id` first); pure write and storage cost on a table with ~4 rows per user | Drop it; the composite at `:19` already serves every access path | `PERF-5` |
-| `TodoListExtensions.cs:17` | `CAST(display_order AS integer)` in the `MIN` projection | Not sargable — defeats any index on `(user_id, task_priority_id, display_order)`, so every item creation scans the group | Fixed by CQ-3 | `PERF-6` ✅ **FIXED 2026-09-09** (with `CQ-2`/`CQ-3`/`CQ-13.3`; the index itself is still only a recommendation below) |
+| `TaskPriorityConfiguration.cs:22` | `HasIndex(t => t.Priority)` — a non-leading-`UserId` index on a strictly user-scoped lookup | No query in the slice can use it (every read is filtered on `user_id` first); pure write and storage cost on a table with ~4 rows per user | Drop it; the composite at `:19` already serves every access path | `PERF-5` ✅ **FIXED 2026-09-09** (dropped in `TodoListsIndexRefresh`) |
+| `TodoListExtensions.cs:17` | `CAST(display_order AS integer)` in the `MIN` projection | Not sargable — defeats any index on `(user_id, task_priority_id, display_order)`, so every item creation scans the group | Fixed by CQ-3 | `PERF-6` ✅ **FIXED 2026-09-09** (with `CQ-2`/`CQ-3`/`CQ-13.3`; the supporting index landed the same day in `TodoListsIndexRefresh`) |
 
-### Indexes that should exist
+### Indexes that should exist — ✅ **ALL FOUR ADDED 2026-09-09**
+
+*Migration `20260909…_TodoListsIndexRefresh` carries all four, plus the `PERF-5` drop and the
+`ix_task_priority_user_id` that `CQ-15` turned up. The `(user_id, task_priority_id, display_order)`
+one replaces the two-column index rather than joining it, as recommended. The dashboard index is
+partial — `HasFilter("NOT is_done")`, following `RoutineTimePeriodConfiguration.cs:88`.*
 
 | Table | Index | Serves |
 |---|---|---|
