@@ -31,7 +31,7 @@ No module-specific setup — see the root README. A few things worth knowing bef
   lives in the host (`AdhdTimeOrganizer/Migrations/`).
 - Its tables live in the **`todo`** schema (`ModuleSchemas.TodoLists`). You never pass a schema to
   `ToTable` — a finalizing convention applies it.
-- `TodoListSettings` is bound from configuration (`MaxItems`, `DisplayOrderGap`) in `Program.cs`.
+- `TodoListSettings` is bound from configuration (`MaxItems`, `DisplayOrderGap`, `DashboardHorizonDays`) in `Program.cs`.
   `DisplayOrderStart` is derived from the two, not configured.
 - Seeders own the **100–199** band. Read
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md` before adding one.

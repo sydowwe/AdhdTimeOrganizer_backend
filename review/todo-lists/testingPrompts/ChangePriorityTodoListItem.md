@@ -51,8 +51,11 @@ first and second items.
 
 ```csharp
 [Fact(DisplayName = "CQ-6: moving an item to another priority re-orders it into the destination group")]
-[Trait("Status", "KnownGap")]
 ```
+
+**`CQ-6` is fixed** — `ChangePriorityTodoListItemEndpoint.AfterMapping` re-mints `DisplayOrder` through
+`GetNextDisplayOrder(settings, userId, req.PriorityId, ct)`, so the test is a green regression pin, not a
+`KnownGap`.
 
 Assert the ordering the user would actually see: read P2's items ordered by `DisplayOrder` descending
 and assert the moved item is **last**. That assertion survives any change to the exact arithmetic.
@@ -81,10 +84,10 @@ assignable:
 
 ```csharp
 [Fact(DisplayName = "SEC-2: a TaskPriorityId belonging to another user is rejected, not written")]
-[Trait("Status", "KnownGap")]
 ```
 
-Today this returns `204` and writes the foreign FK. Also assert the follow-on damage, because it is
+**`SEC-2` is fixed too** — `BeforeMapping` calls `EnsureReferenceVisibleAsync<TaskPriority>`, which answers
+404 on a foreign id, so this is also a green pin. Still assert the follow-on damage, because it is
 what makes the severity concrete: after the patch, `GET /api/todo-list-item` must still return the
 item. `TodoListItemResponse.Projection` projects `e.TaskPriority.Text` through a **required**
 navigation that the global query filter excludes, so the read is expected to fail or to drop the row —
@@ -92,11 +95,10 @@ capture whichever it does in the assertion message.
 
 ### 8. `row_version` / concurrency
 
-`BasePatchEndpoint` is used properly here, so unlike the Move endpoint this path should honour the
-concurrency token. Worth one test if the base exposes it: load the item, patch it twice with a stale
-token, expect the second to 409. Check `framework/Sydowwe.Framework/application/endpoint/base/command/BasePatchEndpoint.cs`
-for whether the request carries `RowVersion` before writing this — if it does not, skip the scenario and
-note it here rather than inventing one.
+**Skipped — there is no concurrency token on this path.** `IPatchRequest` carries no `RowVersion`, and
+`BasePatchEndpoint.HandleAsync` never reads one: it `Find`s the entity, maps, and saves. So there is no
+stale-token request an HTTP test could send, and nothing to assert a 409 on. `ChangePriorityTodoListItemTests`
+records this in its class remarks rather than inventing a scenario.
 
 ## Related findings
 

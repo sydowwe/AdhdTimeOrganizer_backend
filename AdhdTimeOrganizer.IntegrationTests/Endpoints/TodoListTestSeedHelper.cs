@@ -57,10 +57,14 @@ public static class TodoListTestSeedHelper
         return entity.Id;
     }
 
+    // dueDate and pairedLeisureActivityId trail the cancellation token deliberately, the same way
+    // SeedCalendarAsync' dayType does: several callers already pass ct positionally, so a new parameter
+    // ahead of it would rebind their token.
     public static async Task<long> SeedTodoListItemAsync(
         DbContext db, long activityId, long taskPriorityId, long todoListId,
         long userId = TestUserId, int? totalCount = null, int? doneCount = null, bool isDone = false,
-        List<TodoListStep>? steps = null, long displayOrder = 1000, CancellationToken ct = default)
+        List<TodoListStep>? steps = null, long displayOrder = 1000, CancellationToken ct = default,
+        DateOnly? dueDate = null, long? pairedLeisureActivityId = null)
     {
         var entity = new TodoListItem
         {
@@ -72,7 +76,9 @@ public static class TodoListTestSeedHelper
             DoneCount = doneCount,
             IsDone = isDone,
             DisplayOrder = displayOrder,
-            Steps = steps ?? []
+            Steps = steps ?? [],
+            DueDate = dueDate,
+            PairedLeisureActivityId = pairedLeisureActivityId
         };
         db.Set<TodoListItem>().Add(entity);
         await db.SaveChangesAsync(ct);
