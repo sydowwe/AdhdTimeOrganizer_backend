@@ -37,9 +37,9 @@ public class UpdateRoutineTodoListEndpoint(
     protected override async Task<bool> AfterMapping(RoutineTodoList entity, UpdateRoutineTodoListRequest req, CancellationToken ct = default)
     {
         if (req.Steps is not null)
-            entity.Steps = ReconcileSteps(entity.Steps, req.Steps);
+            entity.ReconcileStepsFrom(req.Steps);
 
-        // TotalCount is client-owned, DoneCount is not (see UpdateRoutineTodoListRequest), so the count is
+        // TotalCount is client-owned, DoneCount is not (see BaseUpdateTodoListRequest), so the count is
         // re-derived rather than taken from the body: an item that becomes counted starts at zero, and
         // lowering the total must not leave a count above it — CK_RoutineTodoList_DoneCount_LessOrEqual_TotalCount
         // would refuse the save.
@@ -55,30 +55,5 @@ public class UpdateRoutineTodoListEndpoint(
                 .GetNextDisplayOrder(_settings, User.GetId(), entity.TimePeriodId, ct);
 
         return true;
-    }
-
-    /// <summary>
-    /// Reconciles the steps in place: a request step carrying an id keeps that id and its <c>IsDone</c> while
-    /// its name, order and note are overwritten, one without an id is new, and one the request omits is gone.
-    /// </summary>
-    /// <remarks>
-    /// Rebuilding the collection from fresh <see cref="TodoListStep"/> instances instead would mint a new
-    /// <see cref="Guid"/> per step on every save — <c>Id</c> defaults to <c>Guid.NewGuid()</c> and the column
-    /// is <c>ValueGeneratedNever()</c> — and three step routes take that id in the path, so an unrelated note
-    /// edit would 404 every step id the client is holding.
-    /// </remarks>
-    private static List<TodoListStep> ReconcileSteps(ICollection<TodoListStep> existing, List<StepRequest> requested)
-    {
-        return requested.Select(s =>
-        {
-            var step = s.Id.HasValue ? existing.FirstOrDefault(e => e.Id == s.Id.Value) : null;
-            if (step is null)
-                return new TodoListStep { Name = s.Name, Order = s.Order, Note = s.Note };
-
-            step.Name = s.Name;
-            step.Order = s.Order;
-            step.Note = s.Note;
-            return step;
-        }).ToList();
     }
 }

@@ -168,6 +168,45 @@ public class TodoListToggleAndDoneCountTests(AppDbContextFixture fixture) : Post
         item.DoneCount.Should().Be(2, "ForceValue == false on a done item sets DoneCount = TotalCount - 1 per IsDoneLogic");
     }
 
+    /// <summary>
+    /// CQ-9. The no-force tick arm used <c>DoneCount == TotalCount</c> where the forced arm and
+    /// <c>ApplyStepToggle</c> both use <c>&gt;=</c>. An item already sitting at its total but not marked
+    /// done — reachable because <c>DoneCount</c> and <c>IsDone</c> are separate columns, and the step
+    /// toggle can raise the count without flipping the flag — was incremented past the total instead of
+    /// being ticked, and the save then failed
+    /// <c>CK_TodoListItem_DoneCount_LessOrEqual_TotalCount</c>.
+    /// </summary>
+    /// <remarks>
+    /// Asserted on the row, not just the status: with <c>==</c> restored this fails at the request (the
+    /// check constraint rejects <c>DoneCount = 4</c> against <c>TotalCount = 3</c>), but if the constraint
+    /// were ever relaxed it would fail silently instead — the item would simply never reach done, one
+    /// increment further out of range on every tap.
+    /// </remarks>
+    [Fact(DisplayName = "CQ-9: a no-force tick on an item already at TotalCount marks it done instead of overshooting")]
+    public async Task ToggleTick_WhenDoneCountAlreadyAtTotal_MarksDoneWithoutOvershooting()
+    {
+        const int totalCount = 3;
+        long activityId, priorityId, listId, itemId;
+        await using (var db = CreateDbContext())
+        {
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "cq9-activity", ct: CancellationToken);
+            priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 902, text: "cq9-priority", ct: CancellationToken);
+            listId = await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "cq9-list", ct: CancellationToken);
+
+            // The state the arm mishandles: count already at the total, IsDone still false.
+            itemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(
+                db, activityId, priorityId, listId,
+                totalCount: totalCount, doneCount: totalCount, isDone: false, ct: CancellationToken);
+        }
+
+        (await ToggleAsync(CreateClient(), itemId, null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var verifyDb = CreateDbContext();
+        var item = await verifyDb.Set<TodoListItem>().SingleAsync(i => i.Id == itemId, CancellationToken);
+        item.IsDone.Should().BeTrue("DoneCount had already reached TotalCount, so the tick completes the item");
+        item.DoneCount.Should().Be(totalCount, "the count is clamped to the total rather than incremented past it");
+    }
+
     [Fact(DisplayName = "Invariant fuzz: DoneCount never exceeds TotalCount nor goes below 0 across a seeded-random toggle sequence")]
     public async Task InvariantFuzz_DoneCountNeverEscapesBounds()
     {
@@ -203,8 +242,13 @@ public class TodoListToggleAndDoneCountTests(AppDbContextFixture fixture) : Post
     /// CQ-19: <c>CK_{Entity}_DoneCount_LessOrEqual_TotalCount</c> reads
     /// <c>done_count IS NULL OR total_count IS NULL OR done_count &lt;= total_count</c> — a NULL on either
     /// side is treated by Postgres as satisfying the check. This creates a row with DoneCount set and
-    /// TotalCount left NULL directly via EF (bypassing the create endpoint's validator, which never accepts
-    /// this combination through the API surface) to record what the DB itself actually allows.
+    /// TotalCount left NULL directly via EF to record what the DB itself actually allows.
+    /// <para>
+    /// The API reaches the same combination routinely, but only at <c>DoneCount = 0</c> — creating an item
+    /// with steps and no <c>TotalCount</c>, or adding a step to a plain checkbox item — which is inert
+    /// because the state machine branches on <c>TotalCount</c>, never on <c>DoneCount</c>. What no endpoint
+    /// can produce is the **non-zero** count seeded here, which is why it is seeded rather than posted.
+    /// </para>
     /// </summary>
     [Fact(DisplayName = "CQ-19: DoneCount set with TotalCount NULL is accepted at the DB layer (the check constraint doesn't catch it)")]
     public async Task CheckConstraint_BypassedWhenTotalCountIsNull()

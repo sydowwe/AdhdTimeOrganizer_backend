@@ -32,6 +32,17 @@ finding is confirmed at the file and line stated**, with the corrections listed 
 > in `TodoListExtensions.cs` and `seeder/dev/TodoListSeeder.cs` are stale below. `CQ-13.1` and `CQ-13.2`
 > remain open.
 >
+> **Also 2026-09-09:** `SEC-5`, `CQ-9`, `CQ-16`, `CQ-19` and `DOC-6` are **fixed as one batch** — the
+> whole PUT-owns-what story. `SEC-5` is what makes `CQ-9`'s overshoot unreachable from the API rather
+> than merely defended against, and `CQ-16`/`CQ-19` are two halves of one `AfterMapping`. The step
+> reconciliation `CQ-19` asks for already existed in Routines, so it moved to
+> `StepRequestExtensions.ReconcileStepsFrom` in this slice and both PUTs now call it — one copy, per
+> `CLAUDE.md`. Line numbers in `UpdateTodoListItemEndpoint.cs`, `UpdateTodoListItemRequest.cs`,
+> `BaseUpdateTodoListRequest.cs`, `UpdateTodoListItemValidator.cs` and
+> `BaseToggleIsDoneTodoListEndpoint.cs` are stale below. `DOC-4`'s two enumerations were corrected as
+> collateral (the writer this batch moved was one of the five they disagreed about); the finding is
+> **closed** by that.
+>
 > **Also 2026-09-09:** `CQ-5`, `SEC-4` and the empty-list nit are **fixed** in
 > `BaseChangeDisplayOrderTodoListEndpoint.cs`, and `CQ-4` turned out to have been fixed already by
 > `274e061` — which this recheck missed, because the base was rewritten from the Routines side. That
@@ -205,7 +216,7 @@ is the kind of thing a later reader deletes.
 
 `Doc impact: none`
 
-### SEC-5 🟡 `UpdateTodoListItemRequest` lets the client set `DisplayOrder` and `DoneCount` directly
+### SEC-5 🟡 ✅ FIXED 2026-09-09 · `UpdateTodoListItemRequest` lets the client set `DisplayOrder` and `DoneCount` directly
 
 `application/dto/request/base/BaseUpdateTodoListRequest.cs:8-11`, applied at
 `application/dto/request/UpdateTodoListItemRequest.cs:19-20`.
@@ -220,7 +231,23 @@ client-enforced.
 `DoneCount` rather than accepting it. If the frontend genuinely round-trips them, note that in the DTO
 rather than leaving it implicit.
 
-`Doc impact: domain-map.md → Invariants (new: DisplayOrder is owned by the reorder endpoints)`
+**Fixed 2026-09-09.** Both fields are gone from `BaseUpdateTodoListRequest`, not from the leaf — the
+base is where they lived, and the other subclass (`UpdateRoutineTodoListRequest`) was already
+carrying a twelve-line comment explaining that it accepts and then ignores them, which is a worse
+answer than not accepting them. Nothing round-trips them: there is no frontend in this repo, and the
+only other readers were the two validators' `DoneCount` rules, now deleted with a note in their place.
+
+`DoneCount` is derived in each endpoint's `AfterMapping` instead —
+`Math.Min(entity.DoneCount ?? 0, totalCount)`, which is the rule Routines already used: an item that
+becomes counted starts at zero, and lowering the total clamps rather than hitting
+`CK_TodoListItem_DoneCount_LessOrEqual_TotalCount` on an ordinary edit.
+
+Pinned by `TodoListItemUpdateOwnedFieldsTests` (five of its ten cases), which posts `displayOrder`
+and `doneCount` anyway — unknown properties bind to nothing, so the tests assert on the row under
+exactly the body a stale client sends, and re-adding either property to the record fails them.
+
+`Doc impact: domain-map.md → Invariants (new: DisplayOrder is owned by the reorder endpoints)` —
+**done**, as invariant 8; the old 9–12 shifted to 10–13.
 
 ---
 
@@ -505,7 +532,7 @@ none). Promote `-1` to a named constant shared by the filter DTO and the respons
 
 `Doc impact: domain-map.md → Glossary (add the -1 "uncategorized" sentinel; it is currently only in a DTO comment)`
 
-### CQ-9 🟡 `IsDoneLogic` compares `DoneCount` to `TotalCount` with `==` in one arm and `>=` in another
+### CQ-9 🟡 ✅ FIXED 2026-09-09 · `IsDoneLogic` compares `DoneCount` to `TotalCount` with `==` in one arm and `>=` in another
 
 `application/endpoint/BaseToggleIsDoneTodoListEndpoint.cs:94` (`if (entity.DoneCount >= entity.TotalCount)`)
 versus `:113` (`if (entity.DoneCount == entity.TotalCount)`).
@@ -519,7 +546,27 @@ agree and one does not.
 **Fix.** `>=` at `:113`. The invariant fuzz test at `TodoListToggleAndDoneCountTests:171` should be
 extended to seed an already-overshot row.
 
-`Doc impact: none`
+**Fixed 2026-09-09**, `>=` and clamped, so the arm now matches the forced-true arm above it
+line for line.
+
+**The finding's reachability argument does not survive its own fix, and the test had to change
+shape because of it.** A row where `DoneCount > TotalCount` cannot exist:
+`CK_TodoListItem_DoneCount_LessOrEqual_TotalCount` rejects it on the way in, so neither of the two
+routes named above — the PUT, and lowering `TotalCount` — could ever have persisted one. Seeding an
+overshot row, as the fix suggests, throws in the seeder. What *is* reachable, and is what the `==`
+actually broke, is the boundary: `DoneCount == TotalCount` with `IsDone` still false. The next
+no-force tick incremented past the total, `==` failed, `IsDone` stayed false, and the save then hit
+the check constraint — so the user's tap 500s instead of completing the item. Pinned by
+`TodoListToggleAndDoneCountTests.ToggleTick_WhenDoneCountAlreadyAtTotal_MarksDoneWithoutOvershooting`,
+asserting on the row rather than the status: with `==` restored it fails at the request today, but a
+relaxed constraint would make it fail silently instead, which is the version worth catching.
+
+The clamp is the half the finding does not ask for and is why the boundary case now passes rather
+than merely not-500ing: `>=` alone would tick `IsDone` while leaving `DoneCount` one past the total,
+which the constraint still refuses.
+
+`Doc impact: none` — but `domain-map.md`'s state-machine table said `IsDone` only at
+`DoneCount == TotalCount`, so that row was corrected too.
 
 ### CQ-10 🟡 ✅ FIXED 2026-09-07 · The step endpoints call `SaveChangesAsync` directly instead of the Result helpers
 
@@ -667,7 +714,7 @@ conventions happened to agree and the call is now a guard; if it is not, that di
 
 `Doc impact: none`
 
-### CQ-16 🟡 The update path bypasses `SetDone`, and it is split across two files
+### CQ-16 🟡 ✅ FIXED 2026-09-09 · The update path bypasses `SetDone`, and it is split across two files
 
 *Rewritten in the recheck.* The original text said `UpdateEntity` writes the `Steps` collection. It does
 not — `UpdateTodoListItemRequest.UpdateEntity` (`application/dto/request/UpdateTodoListItemRequest.cs:15-28`)
@@ -691,12 +738,27 @@ unaffected; the damage is confined to the item's own display.
 **Fix.** Leave `UpdateEntity` to the non-done fields, and end `AfterMapping` — after the steps have been
 replaced — with `entity.SetDone(req.IsDone)`. That is the one ordering in which the helper can do its job.
 
-`Doc impact: none`
+**Fixed 2026-09-09**, in that ordering — steps reconciled, `DoneCount` re-derived from `TotalCount`,
+then the completion write last. `UpdateEntity` is left with the non-done fields and carries a comment
+saying why the other three are not there.
+
+**Guarded on the flip, not called unconditionally**, which the fix as written would have done. `SetDone`
+is a snap, not a merge: it rewrites `DoneCount` and every step's `IsDone` from the one boolean. Calling
+it on an edit that never touched completion — the ordinary case, a typo in the note, `isDone` echoed
+back as the `false` it already was — would clear the count and untick a half-finished checklist, on
+every save. So it fires only when `entity.IsDone != req.IsDone`, and that flip then matches what the
+toggle does with no forced value in both directions. `TodoListItemUpdateOwnedFieldsTests` pins all
+three: completing snaps the count and the steps, un-completing resets them, and an edit that leaves
+`IsDone` alone leaves 2-of-3 progress standing. The middle test is the one that would have failed the
+literal fix.
+
+`Doc impact: none` — but see the `DOC-4` note: this batch moved the write site those two enumerations
+were arguing about, so both were corrected while the file was open.
 
 *(`CQ-19`, immediately below, is the other half of this endpoint's problem and shares its one-line fix.
 It is numbered out of sequence because it was found in the second pass; `CQ-17` and `CQ-18` follow it.)*
 
-### CQ-19 🟠 A PUT regenerates every step's `Guid`, breaking the step routes *(new in the recheck)*
+### CQ-19 🟠 ✅ FIXED 2026-09-09 · A PUT regenerates every step's `Guid`, breaking the step routes *(new in the recheck)*
 
 `application/endpoint/todoListItem/command/UpdateTodoListItemEndpoint.cs:20-26` rebuilds the collection
 with `new TodoListStep { Name = …, Order = …, Note = …, IsDone = … }` — and never assigns `Id`.
@@ -723,7 +785,22 @@ exercises the PUT, but no test does a PUT *and then* uses a step id.
 place — update the steps that came back with an id, add the ones without, remove the ones the request
 dropped — so a step's identity survives an edit the way its parent's does.
 
-`Doc impact: domain-map.md → Entities (TodoListStep row: say the client-supplied Guid is a stable public key, since three routes take it)`
+**Fixed 2026-09-09** with the "better still" option, and it cost nothing: **Routines had already
+written it.** `UpdateRoutineTodoListEndpoint.ReconcileSteps` was doing the three-way reconcile, with a
+remark explaining the `Guid.NewGuid()` / `ValueGeneratedNever()` trap in the same words this finding
+uses — the two PUTs had the same collection to rebuild and only one of them was rebuilding it
+correctly. So rather than write a second copy, it moved down into this slice as
+`StepRequestExtensions.ReconcileStepsFrom` (an extension on `BaseTodoListItem`, which both entities
+derive from) and both endpoints call it. The Routines→TodoLists edge already exists, so no new seam.
+
+Worth noting for the next review pass: a finding filed against one slice can be a *diff* against
+another. This one read as new code to write and was really a missing call.
+
+Pinned by three cases in `TodoListItemUpdateOwnedFieldsTests` — ids survive a PUT and the toggle route
+still resolves against one; two consecutive PUTs keep a ticked step (the "works exactly once" half);
+and the reconcile is genuinely three-way, adding the id-less and dropping the omitted.
+
+`Doc impact: domain-map.md → Entities (TodoListStep row: say the client-supplied Guid is a stable public key, since three routes take it)` — **done**, naming the three routes and the shared helper.
 
 ### CQ-17 🟡 Validators are attached inconsistently
 
@@ -843,7 +920,7 @@ Spot-checked every path in the table against disk — all resolve. No action.
 
 `Doc impact: none`
 
-### DOC-4 🟡 The interceptor's five documented `IsDone` writers are not the five that exist *(narrowed)*
+### DOC-4 🟡 ✅ FIXED 2026-09-09 · The interceptor's five documented `IsDone` writers are not the five that exist *(narrowed)*
 
 Two copies remain, not three. `summary.md` was rewritten today and its interceptor bullet
 (`summary.md:63-72`) no longer enumerates the writers at all, which is the right call. Still listing
@@ -865,7 +942,21 @@ in-slice write sites — `BaseToggleIsDoneTodoListEndpoint.IsDoneLogic`,
 `BaseToggleStepIsDoneEndpoint.ApplyStepToggle`, `UpdateTodoListItemRequest.UpdateEntity`, and the host's
 `ActivityTimeRecordedEventHandler` — and name `SetDone` separately as the helper the host's handlers use.
 
+**Fixed 2026-09-09, as collateral of the `CQ-16`/`CQ-19` batch** rather than on its own: that batch
+moved the very write site the two enumerations disagreed about, so leaving them would have made three
+copies wrong instead of two.
+
+All three now say the same four in-slice sites. One correction to the prescribed list: the third is
+`UpdateTodoListItemEndpoint.AfterMapping`, not `UpdateTodoListItemRequest.UpdateEntity` — `CQ-16` moved
+the completion write out of the request DTO, which is what let it go through `SetDone` at all. And the
+finding's central point now reads differently: `SetDone` is no longer "the helper nothing in this slice
+calls". The update path calls it, which was `CQ-16`'s whole fix. It is still not a peer of the endpoints,
+so it is named as the shared helper the last two go through — explicitly "not itself a fifth site", since
+that ambiguity is what produced the original miscount.
+
 `Doc impact: domain-map.md → Invariants (8); TodoListItem.cs + TodoListItemCompletionInterceptor.cs XML docs`
+— **done** in all three. The invariant is now numbered **9**, `SEC-5`'s new `DisplayOrder` invariant
+having taken 8.
 
 ### DOC-5 🟠 ✅ FIXED 2026-09-09 · Invariant 3 asserts a scoping rule the slice does not follow in either direction
 
@@ -915,7 +1006,7 @@ what is left. The exceptions list is shorter, not gone — which is the point of
 
 `Doc impact: domain-map.md → Invariants (3 — rewrite)` — **done**
 
-### DOC-6 🟡 `summary.md` says the API cannot produce `DoneCount` with a null `TotalCount`; two endpoints do *(new in the recheck)*
+### DOC-6 🟡 ✅ FIXED 2026-09-09 · `summary.md` says the API cannot produce `DoneCount` with a null `TotalCount`; two endpoints do *(new in the recheck)*
 
 `docs/summary.md:90-96`, on the check-constraint hole: "`CK_{Entity}_DoneCount_LessOrEqual_TotalCount`
 is `done_count IS NULL OR total_count IS NULL OR …`, so Postgres accepts `DoneCount` set with
@@ -946,7 +1037,25 @@ theoretical.
 `TotalCount`, and that what remains unreachable is a **non-zero** `DoneCount` without a `TotalCount`. If
 that is not the intent, the fix is in the code instead: leave `DoneCount` null unless `TotalCount` is set.
 
-`Doc impact: summary.md → Gotchas (the "DoneCount is step-counted" bullet)`
+**Fixed 2026-09-09 on the doc side**, as prescribed: the bullet now names both producing sites, says
+the value is inert because the state machine branches on `TotalCount` and never on `DoneCount`, and
+draws the line where it actually is — a **non-zero** `DoneCount` without a `TotalCount` still needs a
+direct EF write. The code side was deliberately not taken: `DoneCount = 0` on a plain checkbox item is
+harmless, and suppressing it would mean two more conditionals guarding a value nothing reads.
+
+Fixing this batch made the claim *more* true, which is why the wording had to be about reachability
+rather than about validators. The PUT is no longer a way in at all — `DoneCount` is not on the request
+(`SEC-5`), so the remaining producers are only the two create-side sites, and the sentence now says
+so. The stale half of the original claim, that "the create validator rejects the combination", is gone;
+no validator ever had such a rule.
+
+`TodoListToggleAndDoneCountTests.CheckConstraint_BypassedWhenTotalCountIsNull` is cited beside the
+bullet and repeated the same falsehood in its own XML doc ("which never accepts this combination
+through the API surface"). Corrected there too, with the reason it seeds the row instead of posting
+it: the count it needs is non-zero, and that is the part no endpoint can produce.
+
+`Doc impact: summary.md → Gotchas (the "DoneCount is step-counted" bullet)` — **done**; the invariant-7
+copy in `domain-map.md` said the same thing in one line and was corrected with it.
 
 ---
 

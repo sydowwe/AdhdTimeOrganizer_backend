@@ -35,19 +35,28 @@ public class UpdateTodoListItemEndpoint(DbContext dbContext, IReferencedIdOwners
                    DbContext, nameof(req.PairedLeisureActivityId), req.PairedLeisureActivityId, ct);
     }
 
+    /// <summary>
+    /// Everything the PUT owns but does not take from the body, in the one order that works: the steps have
+    /// to be in their final shape before the completion state can be snapped across them.
+    /// </summary>
     protected override Task<bool> AfterMapping(TodoListItem entity, UpdateTodoListItemRequest req, CancellationToken ct = default)
     {
         if (req.Steps is not null)
-            entity.Steps = req.Steps.Select(s => new TodoListStep
-            {
-                Name = s.Name,
-                Order = s.Order,
-                Note = s.Note,
-                IsDone = s.Id.HasValue && entity.Steps.FirstOrDefault(e => e.Id == s.Id.Value)?.IsDone == true
-            }).ToList();
+            entity.ReconcileStepsFrom(req.Steps);
 
-        if (req is { TotalCount: not null, DoneCount: null })
-            entity.DoneCount = 0;
+        // TotalCount is client-owned, DoneCount is not (see BaseUpdateTodoListRequest), so the count is
+        // re-derived rather than taken from the body: an item that becomes counted starts at zero, and
+        // lowering the total must not leave a count above it — CK_TodoListItem_DoneCount_LessOrEqual_TotalCount
+        // would refuse the save.
+        if (entity.TotalCount is { } totalCount)
+            entity.DoneCount = Math.Min(entity.DoneCount ?? 0, totalCount);
+
+        // Only on a flip. SetDone is a snap, not a merge — it rewrites DoneCount and every step's IsDone —
+        // so calling it on an edit that did not touch completion would silently untick a half-finished
+        // checklist every time the user changed the note. The flip itself matches what the toggle endpoint
+        // does with no forced value: done -> not done clears the count and the steps, and back again fills them.
+        if (entity.IsDone != req.IsDone)
+            entity.SetDone(req.IsDone);
 
         return Task.FromResult(true);
     }

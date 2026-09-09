@@ -37,7 +37,7 @@ Files are flat in that folder; the namespace is `AdhdTimeOrganizer.TodoLists.dom
 | `TodoList` | Grouped by an optional `TodoListCategory`. Carries computed `ItemCount` / `CompletedCount` off the loaded collection — not mapped, so they are zero on a projection that didn't include the items. |
 | `TodoListItem` | `BaseTodoListItem` + `TaskPriorityId` (required), `TodoListId` (optional), `ActivityId`, `DueDate` / `DueTime`, `PairedLeisureActivityId`, `CompletedTimestamp`. **No `PlannerTask` navigation** — the relationship is owned from Planning. **No navigation for the paired activity either** — reads carry the bare id. `CompletedTimestamp` is written **only** by `TodoListItemCompletionInterceptor`, never by hand. |
 | `TodoListCategory` | Per-user lookup, unique on `(UserId, Name)`. |
-| `TodoListStep` | The checklist sub-items. **Not an entity** — an owned type serialised `ToJson` into the parent's row, keyed by a client-supplied `Guid` (`ValueGeneratedNever`). There is no steps table. |
+| `TodoListStep` | The checklist sub-items. **Not an entity** — an owned type serialised `ToJson` into the parent's row, keyed by a client-supplied `Guid` (`ValueGeneratedNever`). There is no steps table. That `Guid` is a **stable public key**: three routes take it in the path (`PATCH …/steps/{stepId}/toggle`, `PUT …/steps/{stepId}`, `DELETE …/steps/{stepId}`), so it must survive an edit of the parent — which is why both PUTs reconcile the collection through `StepRequestExtensions.ReconcileStepsFrom` instead of rebuilding it from fresh instances. |
 | `TaskPriority` | Per-user lookup; unique key is `(user_id, priority)`, **not** `Text`. Matters for `Collides` in its seeder and for any reorder. |
 
 ## Configuration — `infrastructure/`
@@ -186,22 +186,31 @@ Which of these the database actually enforces, and which are only app-level:
 6. **`TodoListCategory` and `TodoList` are each unique on `(UserId, Name)`.** *DB-enforced.*
 7. **`DoneCount` bounds:** `>= 0`, `TotalCount` between 2 and 99, `DoneCount <= TotalCount`.
    *DB-enforced (check constraints) — with one hole*: all three are `IS NULL OR …`, so `DoneCount`
-   set alongside a NULL `TotalCount` passes. Only reachable by bypassing the validators.
-8. **`CompletedTimestamp` is stamped from the ChangeTracker, not at the call sites.** *App-enforced
-   only, by an interceptor registered in the host.* There are five places that write `IsDone` and a
-   sixth is always one feature away; a site that forgot to stamp would break nothing visible — the
+   set alongside a NULL `TotalCount` passes. The API reaches that hole routinely but only at
+   `DoneCount = 0` (create-with-steps, and adding a step to any item), which is inert because the
+   state machine keys off `TotalCount`; a **non-zero** `DoneCount` with no `TotalCount` still needs a
+   direct EF write. See the gotcha in `summary.md`.
+8. **`DisplayOrder` is owned by the server, and specifically by the reorder endpoints.** *App-enforced
+   only* — nothing in the database stops two siblings sharing an order. Neither PUT can carry one
+   (`BaseUpdateTodoListRequest` does not have the field), so the only writers are the create path's
+   `GetNextDisplayOrder`, `BaseChangeDisplayOrderTodoListEndpoint`, and `UpdateRoutineTodoListEndpoint`
+   re-deriving it when an edit moves an item to another period. Likewise `DoneCount`: not on either
+   PUT, derived in `AfterMapping` from `TotalCount` and `IsDone`.
+9. **`CompletedTimestamp` is stamped from the ChangeTracker, not at the call sites.** *App-enforced
+   only, by an interceptor registered in the host.* There are four places that write `IsDone` and a
+   fifth is always one feature away; a site that forgot to stamp would break nothing visible — the
    item would just never appear in a daily recap. Anything bypassing the ChangeTracker —
    `ExecuteUpdateAsync` in particular — bypasses the stamp.
-9. **Delete behaviour is deliberate per FK:** owning `Activity` → **Cascade** (the item goes);
-   `PairedLeisureActivityId` → **SetNull** (the task is unpaired, not deleted); `TodoList` →
-   **Cascade**; `TaskPriority` → **Restrict** (409 while items reference it); `TodoListCategory` →
-   **SetNull**. *DB-enforced*, and pinned by `ActivityForeignKeyInventoryTests` and
-   `TodoListDeleteBehaviorTests`.
-10. **A to-do item is never paired with its own activity.** *App-enforced* — rejected by the create
+10. **Delete behaviour is deliberate per FK:** owning `Activity` → **Cascade** (the item goes);
+    `PairedLeisureActivityId` → **SetNull** (the task is unpaired, not deleted); `TodoList` →
+    **Cascade**; `TaskPriority` → **Restrict** (409 while items reference it); `TodoListCategory` →
+    **SetNull**. *DB-enforced*, and pinned by `ActivityForeignKeyInventoryTests` and
+    `TodoListDeleteBehaviorTests`.
+11. **A to-do item is never paired with its own activity.** *App-enforced* — rejected by the create
     and update validators, and collapsed to null by the merge repoint.
-11. **The shared bases stay in this project.** Routines depends on them from here; moving them to
+12. **The shared bases stay in this project.** Routines depends on them from here; moving them to
     Core would grow the thing that is supposed to shrink. *Convention only.*
-12. **Class names are table names, in the `todo` schema.** Renaming a type here is a migration;
+13. **Class names are table names, in the `todo` schema.** Renaming a type here is a migration;
     moving it is not — but see the pinned FK constraint name in `summary.md` for the one case where
     *ordering* changed a name.
 
@@ -213,7 +222,7 @@ finish). `IsDoneLogic` in `BaseToggleIsDoneTodoListEndpoint` is the state machin
 
 | Call | Item state | Effect |
 |---|---|---|
-| no `ForceValue` | not done | `DoneCount++`; `IsDone` only at `DoneCount == TotalCount` |
+| no `ForceValue` | not done | `DoneCount++`; `IsDone` (and `DoneCount` clamped) at `DoneCount >= TotalCount` |
 | no `ForceValue` | done | `DoneCount = 0`, `IsDone = false` — a full reset, not a step back |
 | `ForceValue = true` | any | `DoneCount++` — it does **not** jump straight to done |
 | `ForceValue = false` | done | `DoneCount = TotalCount - 1`, `IsDone = false` |

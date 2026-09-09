@@ -15,9 +15,6 @@ public record UpdateTodoListItemRequest : BaseUpdateTodoListRequest, IUpdateRequ
     public void UpdateEntity(TodoListItem e)
     {
         e.ActivityId = ActivityId;
-        e.IsDone = IsDone;
-        e.DisplayOrder = DisplayOrder;
-        e.DoneCount = DoneCount;
         e.TotalCount = TotalCount;
         e.Note = Note;
         e.SuggestedTime = SuggestedTime;
@@ -25,5 +22,15 @@ public record UpdateTodoListItemRequest : BaseUpdateTodoListRequest, IUpdateRequ
         e.DueDate = DueDate;
         e.DueTime = DueTime;
         e.PairedLeisureActivityId = PairedLeisureActivityId;
+
+        // IsDone is not written here, and DoneCount and DisplayOrder are not on the request at all
+        // (see BaseUpdateTodoListRequest). The three of them used to be three independent assignments
+        // in this method plus a fourth in AfterMapping, so a PUT could produce IsDone = true with every
+        // step unticked, or DoneCount = 3 on an item whose steps were all open.
+        //
+        // "Done" has three representations — IsDone, DoneCount and each step's IsDone — and only
+        // BaseTodoListItem.SetDone snaps all three together. It needs the steps to be in their final
+        // shape first, which is only true after AfterMapping has reconciled them, so that is where the
+        // completion write lives now.
     }
 }

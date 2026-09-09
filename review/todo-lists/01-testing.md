@@ -210,6 +210,14 @@ disposable — the real tests belong in `AdhdTimeOrganizer.IntegrationTests`.
 > three, the unique-index 409 on move, and the `DisplayOrder` recompute on both patches. The rest of
 > each prompt — the validation and no-op cases, and `TEST-2`'s untouched-siblings assertion — is still
 > open; the prompts stand.
+>
+> **Also 2026-09-09:** `TEST-14` is **landed in full** as `TodoListItemUpdateOwnedFieldsTests.cs` (10
+> cases), with the `SEC-5`/`CQ-9`/`CQ-16`/`CQ-19`/`DOC-6` batch. It closes the recheck's fourth blind
+> spot above — "no test crosses two endpoints on one item" — by doing a PUT and *then* using a step id,
+> which is the sequence the whole finding turned on. `TodoListToggleAndDoneCountTests` also gained one
+> case for `CQ-9`'s boundary; note that the overshot row the finding asks it to seed cannot exist (the
+> check constraint refuses it), so the test pins `DoneCount == TotalCount` with `IsDone` false instead —
+> see the `CQ-9` fix note in `02-findings.md`.
 
 | ID | Gap | Sev | Related finding | Prompt |
 |---|---|---|---|---|
@@ -226,4 +234,4 @@ disposable — the real tests belong in `AdhdTimeOrganizer.IntegrationTests`.
 | `TEST-11` | `TodoList` / `TodoListCategory` unique `(UserId, Name)` — no 409 test on create or update | 🟡 | — | folded into `ReadSurfaceSweep.md` |
 | `TEST-12` | `DELETE /todo-list/{id}` cascades its items — asserted nowhere | 🟡 | — | folded into `ReadSurfaceSweep.md` |
 | `TEST-13` | Dev `TodoListItemSeeder` — no test; carries its own copy of the CQ-2/CQ-3 arithmetic | 🟡 | CQ-13 | folded into `GetNextDisplayOrderBoundary.md` |
-| `TEST-14` | A PUT of an item regenerates every step's `Guid`, 404-ing the three step routes afterwards | 🟠 | CQ-19, CQ-16 | [StepIdentityAcrossUpdate.md](testingPrompts/StepIdentityAcrossUpdate.md) |
+| `TEST-14` ✅ **DONE 2026-09-09** | 10 tests in `TodoListItemUpdateOwnedFieldsTests`, landed with the `SEC-5`/`CQ-9`/`CQ-16`/`CQ-19`/`DOC-6` batch: step identity across a PUT (incl. the toggle route afterwards and the two-PUT case), the three-way reconcile, and the fields the PUT must not own | 🟠 | CQ-19, CQ-16, SEC-5 | [StepIdentityAcrossUpdate.md](testingPrompts/StepIdentityAcrossUpdate.md) |

@@ -28,8 +28,9 @@ public class TodoListItem : BaseTodoListItem
     /// <remarks>
     /// ⚠ <b>Do not set this by hand.</b> <c>TodoListItemCompletionInterceptor</c> stamps it from the
     /// ChangeTracker on every save where <c>IsDone</c> actually flips, and clears it when the item is
-    /// un-done. There are five-odd places that write <c>IsDone</c> — the two toggle bases, the step
-    /// toggle, the update request and the host's <c>ActivityTimeRecordedEventHandler</c> — and a site
+    /// un-done. There are four places that write <c>IsDone</c> — <c>BaseToggleIsDoneTodoListEndpoint</c>,
+    /// <c>BaseToggleStepIsDoneEndpoint</c>, <c>UpdateTodoListItemEndpoint.AfterMapping</c> and the host's
+    /// <c>ActivityTimeRecordedEventHandler</c> (the last two through <c>SetDone</c>) — and a site
     /// that forgot to stamp would not fail to build or throw; the item would simply stop appearing in
     /// its day's recap. Centralising it is what makes that unmissable.
     /// <para>

@@ -20,8 +20,9 @@ public record UpdateRoutineTodoListRequest : BaseUpdateTodoListRequest, IUpdateR
         e.SuggestedDays = SuggestedDays;
         e.SuggestedDayOfMonth = SuggestedDayOfMonth;
 
-        // IsDone, DoneCount and DisplayOrder arrive on the inherited request shape but are deliberately not
-        // mapped — they are server-owned on a routine item.
+        // IsDone arrives on the inherited request shape but is deliberately not mapped; DoneCount and
+        // DisplayOrder are not on the shape at all (see BaseUpdateTodoListRequest). All three are
+        // server-owned on a routine item.
         //
         // Completion belongs to the toggle endpoint: BaseToggleIsDoneTodoListEndpoint reconciles IsDone,
         // DoneCount and every step together, RoutineToggleIsDoneTodoListEndpoint then advances the item

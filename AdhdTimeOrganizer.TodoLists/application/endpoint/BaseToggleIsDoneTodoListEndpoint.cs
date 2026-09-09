@@ -123,8 +123,15 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(DbContext dbCont
                 else
                 {
                     entity.DoneCount = (entity.DoneCount ?? 0) + 1;
-                    if (entity.DoneCount == entity.TotalCount)
+                    // >=, not ==, and clamped — matching the forced arm above and ApplyStepToggle. An item
+                    // whose DoneCount has overshot its TotalCount would otherwise never tick to done; it
+                    // would just keep incrementing, one increment further out of range on every tap.
+                    if (entity.DoneCount >= entity.TotalCount)
+                    {
+                        entity.DoneCount = entity.TotalCount;
                         entity.IsDone = true;
+                    }
+
                     ResetSteps(entity);
                 }
             }

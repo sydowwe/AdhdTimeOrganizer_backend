@@ -15,15 +15,8 @@ public class UpdateTodoListItemValidator : Validator<UpdateTodoListItemRequest>
             .InclusiveBetween(2, 99)
             .When(x => x.TotalCount.HasValue);
 
-        RuleFor(x => x.DoneCount)
-            .GreaterThanOrEqualTo(0)
-            .When(x => x.DoneCount.HasValue);
-
-        RuleFor(x => x)
-            .Must(x => x.DoneCount <= x.TotalCount)
-            .When(x => x.DoneCount.HasValue && x.TotalCount.HasValue)
-            .WithMessage("DoneCount must not exceed TotalCount.")
-            .OverridePropertyName(nameof(UpdateTodoListItemRequest.DoneCount));
+        // No DoneCount rules: the request no longer carries one (see BaseUpdateTodoListRequest) — the
+        // endpoint's AfterMapping derives the count from TotalCount, so there is nothing here to bound.
 
         RuleFor(x => x.PairedLeisureActivityId)
             .GreaterThan(0L)

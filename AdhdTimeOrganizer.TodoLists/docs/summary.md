@@ -93,11 +93,19 @@ project's bases.
   bundle. That drop still counts as a repoint.
 
 - **`DoneCount` is step-counted, and the check constraint has a hole.** `BaseTodoListItem.SetDone`
-  only rewrites `DoneCount` when `TotalCount.HasValue` — deliberate, a `DoneCount` without a
-  `TotalCount` is not a state the app can produce. But
+  only rewrites `DoneCount` when `TotalCount.HasValue`, and `IsDoneLogic` branches on
+  `TotalCount.HasValue` too — the state machine keys off `TotalCount`, never off `DoneCount`. But
   `CK_{Entity}_DoneCount_LessOrEqual_TotalCount` is `done_count IS NULL OR total_count IS NULL OR …`,
-  so Postgres accepts `DoneCount` set with `TotalCount` NULL. The API surface never produces it
-  (the create validator rejects the combination); direct EF writes can. Pinned by
+  so Postgres accepts `DoneCount` set with `TotalCount` NULL.
+
+  **The API does produce that combination, benignly**: `CreateTodoListItemEndpoint` sets
+  `DoneCount = 0` in its "has steps" arm before it considers `TotalCount` at all, and
+  `BaseCreateStepEndpoint` defaults a null `parent.DoneCount` to 0 on any item. So every plain
+  checkbox item that has ever had a step attached carries `DoneCount = 0` with `TotalCount = null`,
+  and nothing misreads it. What stays unreachable through the API is a **non-zero** `DoneCount`
+  without a `TotalCount` — the PUT surface cannot set `DoneCount` at all (it is not on the request;
+  see `BaseUpdateTodoListRequest`) and both toggle paths only count under a `TotalCount`. Direct EF
+  writes can still reach it. Pinned by
   `TodoListToggleAndDoneCountTests.CheckConstraint_BypassedWhenTotalCountIsNull`.
 
 - **`TaskPriority`'s unique key is `(user_id, priority)`, not `Text`.** Text is free to repeat. This
