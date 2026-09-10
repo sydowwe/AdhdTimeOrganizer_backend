@@ -47,7 +47,7 @@ public class CoreEndpointAuthMatrixTests(AppDbContextFixture fixture) : AuthTest
     [InlineData("GET", "api/activity/1")]
     [InlineData("GET", "api/activity/all-options")]
     [InlineData("GET", "api/activity/form-select-options")]
-    [InlineData("POST", "api/activity/filtered-table")]
+    [InlineData("POST", "api/activity/grid")]
     [InlineData("POST", "api/activity")]
     [InlineData("PUT", "api/activity/1")]
     [InlineData("DELETE", "api/activity/1")]

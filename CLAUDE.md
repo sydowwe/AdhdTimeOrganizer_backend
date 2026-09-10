@@ -18,7 +18,9 @@ Deeper reference, in `docs/claude/` — open the one your task touches:
 
 > The root `docs/extendingVanillaForCustomers.md`, `docs/testing.md` and `docs/architecture.md` are
 > leftover copies from the MojaDigitalnaFirma solution and describe modules/types that do **not**
-> exist here. Don't trust them. `docs/modules.md` **was** rewritten for this solution and is accurate.
+> exist here. Don't trust them. `docs/modules.md` **was** rewritten for this solution and is accurate,
+> as is `docs/e2eTestSeed.md` (the unauthenticated, database-truncating `POST /api/test/seed` — read
+> it before touching that endpoint or its gate).
 
 ## Solution layout
 

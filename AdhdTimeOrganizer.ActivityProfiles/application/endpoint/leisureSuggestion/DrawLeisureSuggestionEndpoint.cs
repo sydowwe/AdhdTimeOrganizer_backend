@@ -29,7 +29,7 @@ namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.leisureSuggest
 /// <c>LeisureSuggestionRecord</c> — the half of this feature that could not be fixed client-side at all.</para>
 ///
 /// <para><b>POST for a read, deliberately.</b> The body is a constraint set rather than a resource path, and
-/// it is the same shape the three <c>filtered-table</c> endpoints this replaces already take.</para>
+/// it is the same shape the three <c>grid</c> endpoints this replaces already take.</para>
 ///
 /// <para>The rule itself is <see cref="LeisureDrawRanker"/>. This endpoint only decides which rows reach it,
 /// and turns what comes back into cards.</para>

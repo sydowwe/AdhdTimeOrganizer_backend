@@ -173,3 +173,21 @@ worth copying the shape of:
   `RunningSince` is on no response DTO, so "stuck" vs "merely slow", which is the difference between paging
   someone and waiting, is a distinction no client can make for itself. Also pins the replay preconditions on
   the run-detail read against the 409 `ReplayJobRunEndpoint` documents.
+- `TestSeedEndpointTests` + `TestSeedGateTests` + `TestSeedRouteRegistrationTests` — `POST /api/test/seed`,
+  the e2e fixture reset (see [endpoints.md](endpoints.md#the-e2e-fixture-endpoint)). Split three ways because
+  the failure modes are unrelated. The **gate** tests are pure decisions with no host, and the load-bearing
+  one is `NoConfiguration_CanAdmitARemoteDatabase`: the database half of the gate is "is this host this
+  machine", it deliberately takes no configuration, and that test fails the moment a key appears that could
+  widen it. An environment-only gate would be one edited `ASPNETCORE_ENVIRONMENT` away from truncating
+  production, and neither the port nor the database name could have substituted — this solution's dev and
+  prod databases are the same name on the same remote host, differing only by port. The **registration**
+  test pins that a closed gate leaves nothing to reach — asserted as "the same status as an undefined path",
+  not as a literal 404, because `IdentityServiceExtensions` sets an authorization `FallbackPolicy` and
+  ASP.NET applies that to unmatched requests too, so every unknown path here answers 401 to an anonymous
+  caller. The **fixture** tests assert on rows, one per gap the fixture exists to close: an item with a
+  non-zero `suggestedTime` whose activity also has history (five of them, or the header ratio line stays
+  hidden), several overdue not-done items, a counter at 2 of 5, an archived activity that the archival query
+  filter really hides, a planner day with tasks beside one without, and one profile of each leisure kind
+  plus its memory anchor. Every one of those surfaces is fully built and simply never rendered before,
+  which is precisely why a 200 from the endpoint proves nothing. Idempotency is asserted by snapshotting
+  every id and value out of the database, seeding again, and comparing — not by counting rows.

@@ -45,11 +45,11 @@ public class ActivityProfilesRouteSmokeTests(AppDbContextFixture fixture) : Post
     /// paths are derived rather than written down — a rename of the entity silently moves the route.
     /// </summary>
     [Theory]
-    [InlineData("/api/activity-location-type/filtered-table")]
-    [InlineData("/api/activity-weather-dependency/filtered-table")]
-    [InlineData("/api/activity-expected-cost-tier/filtered-table")]
-    [InlineData("/api/activity-experience-type/filtered-table")]
-    [InlineData("/api/memory-anchor/filtered-table")]
+    [InlineData("/api/activity-location-type/grid")]
+    [InlineData("/api/activity-weather-dependency/grid")]
+    [InlineData("/api/activity-expected-cost-tier/grid")]
+    [InlineData("/api/activity-experience-type/grid")]
+    [InlineData("/api/memory-anchor/grid")]
     public async Task LookupAndAnchorGridRoutes_AreRegistered(string route)
     {
         var response = await CreateUserRoleClient()

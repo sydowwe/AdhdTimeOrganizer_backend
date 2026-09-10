@@ -12,12 +12,12 @@ using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
-// Tests BaseGridEndpoint via GridActivityCategoryEndpoint ("/activity-category/filtered-table")
+// Tests BaseGridEndpoint via GridActivityCategoryEndpoint ("/activity-category/grid")
 [Collection("Postgres")]
 public class GridActivityCategoryEndpointTests(AppDbContextFixture fixture)
     : BaseGridEndpointTests(fixture)
 {
-    protected override string EndpointUrl => "api/activity-category/filtered-table";
+    protected override string EndpointUrl => "api/activity-category/grid";
 
     // ActivityCategory is user-owned data; the endpoint does not override AllowedRoles(), so plain
     // Users can reach it.

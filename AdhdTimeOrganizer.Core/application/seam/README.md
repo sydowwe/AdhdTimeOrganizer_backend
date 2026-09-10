@@ -13,7 +13,7 @@ if the two ever drift apart.
 
 | Seam | Kind | Resolution | Implemented by | Consumed by |
 |---|---|---|---|---|
-| `IActivityMembershipSource` | read | keyed `IEnumerable<>` | TodoLists (`todoList`), Routines (`routineTodoList`) | **nobody** — its one consumer, History's `gird` grid, was deleted with `CQ-1`. Kept for the next one |
+| `IActivityMembershipSource` | read | keyed `IEnumerable<>` | TodoLists (`todoList`), Routines (`routineTodoList`) | **nobody** — its one consumer, History's `grid` grid, was deleted with `CQ-1`. Kept for the next one |
 | `IActivityReferenceSource` | read **+ write**, in the caller's transaction | keyed `IEnumerable<>` | Core (`timerPreset`), History (`activityHistory`), TodoLists (`todoList`), Routines (`routineTodoList`), Planning (`plannerTask`), Tracking (`trackerMapping`), ActivityProfiles (`activityProfile`) | Core — `GridActivityEndpoint`, `GetByIdActivityEndpoint`, `MergeActivityEndpoint`, all through `IActivityReferenceService` |
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint` |

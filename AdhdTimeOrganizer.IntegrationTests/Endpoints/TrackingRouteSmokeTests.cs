@@ -106,11 +106,11 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     /// folder-driven move.
     /// <para>
     /// Note the two shapes are not the same. The distinct-entry grids are hand-written endpoints that
-    /// <c>Post("/gird")</c> straight onto the group prefix (<c>gird</c> is the shipped spelling — see
+    /// <c>Post("/grid")</c> straight onto the group prefix (<c>grid</c> is the shipped spelling — see
     /// <c>AdhdTimeOrganizer.History/docs/domain-map.md</c>). The settings grids derive from
     /// <c>BaseGridEndpoint</c>, whose route is <c>{entity-name}/{EndpointPath}</c> with
-    /// <c>EndpointPath</c> defaulting to <c>filtered-table</c> — so they answer under the entity name,
-    /// not under <c>gird</c>.
+    /// <c>EndpointPath</c> defaulting to <c>grid</c> — so they answer under the entity name,
+    /// not under <c>grid</c>.
     /// </para>
     /// <para>
     /// Asserting on <c>OK</c> rather than "not 404" is what makes this case mean anything, and the two
@@ -124,10 +124,10 @@ public class TrackingRouteSmokeTests(AppDbContextFixture fixture) : PostgresTest
     /// </para>
     /// </summary>
     [Theory]
-    [InlineData("/api/activity-tracking/desktop/settings/tracker-desktop-mapping-by-pattern/filtered-table")]
-    [InlineData("/api/activity-tracking/android/settings/tracker-android-mapping-by-pattern/filtered-table")]
-    [InlineData("/api/activity-tracking/desktop/gird")]
-    [InlineData("/api/activity-tracking/android/gird")]
+    [InlineData("/api/activity-tracking/desktop/settings/tracker-desktop-mapping-by-pattern/grid")]
+    [InlineData("/api/activity-tracking/android/settings/tracker-android-mapping-by-pattern/grid")]
+    [InlineData("/api/activity-tracking/desktop/grid")]
+    [InlineData("/api/activity-tracking/android/grid")]
     public async Task TrackingGridRoutes_AreRegistered(string route)
     {
         var response = await CreateUserRoleClient()

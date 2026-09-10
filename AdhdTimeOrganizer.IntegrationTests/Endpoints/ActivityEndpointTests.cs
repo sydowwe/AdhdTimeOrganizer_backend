@@ -131,7 +131,7 @@ public class ActivityGetByIdTests(AppDbContextFixture fixture) : BaseGetByIdEndp
 [Collection("Postgres")]
 public class ActivityGridTests(AppDbContextFixture fixture) : BaseGridEndpointTests(fixture)
 {
-    protected override string EndpointUrl => "api/activity/filtered-table";
+    protected override string EndpointUrl => "api/activity/grid";
     protected override bool IsAdminOnly => false;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.ActivityAsync(db, FakeLoggedUserService.TestUserId, "Grid Activity");
 }
@@ -215,7 +215,7 @@ public class ActivityRoleGetByIdTests(AppDbContextFixture fixture) : BaseGetById
 [Collection("Postgres")]
 public class ActivityRoleGridTests(AppDbContextFixture fixture) : BaseGridEndpointTests(fixture)
 {
-    protected override string EndpointUrl => "api/activity-role/filtered-table";
+    protected override string EndpointUrl => "api/activity-role/grid";
     protected override bool IsAdminOnly => false;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.RoleAsync(db, FakeLoggedUserService.TestUserId, "Grid Role");
 }
@@ -291,7 +291,7 @@ public class ActivityCategoryGetByIdTests(AppDbContextFixture fixture) : BaseGet
 [Collection("Postgres")]
 public class ActivityCategoryGridTests(AppDbContextFixture fixture) : BaseGridEndpointTests(fixture)
 {
-    protected override string EndpointUrl => "api/activity-category/filtered-table";
+    protected override string EndpointUrl => "api/activity-category/grid";
     protected override bool IsAdminOnly => false;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.CategoryAsync(db, FakeLoggedUserService.TestUserId, "Grid Category");
 }
@@ -406,7 +406,7 @@ public class MemoryAnchorGetByIdTests(AppDbContextFixture fixture) : BaseGetById
 [Collection("Postgres")]
 public class MemoryAnchorGridTests(AppDbContextFixture fixture) : BaseGridEndpointTests(fixture)
 {
-    protected override string EndpointUrl => "api/memory-anchor/filtered-table";
+    protected override string EndpointUrl => "api/memory-anchor/grid";
     protected override bool IsAdminOnly => false;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.MemoryAnchorAsync(db, FakeLoggedUserService.TestUserId);
 }
@@ -533,7 +533,7 @@ public class ActivityExpectedCostTierGetByIdTests(AppDbContextFixture fixture) :
 [Collection("Postgres")]
 public class ActivityExpectedCostTierGridTests(AppDbContextFixture fixture) : BaseGridEndpointTests(fixture)
 {
-    protected override string EndpointUrl => "api/activity-expected-cost-tier/filtered-table";
+    protected override string EndpointUrl => "api/activity-expected-cost-tier/grid";
     protected override bool IsAdminOnly => false;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.LookupAsync<ActivityExpectedCostTier>(db, FakeLoggedUserService.TestUserId, "Grid CostTier");
 }
@@ -602,7 +602,7 @@ public class ActivityExperienceTypeGetByIdTests(AppDbContextFixture fixture) : B
 [Collection("Postgres")]
 public class ActivityExperienceTypeGridTests(AppDbContextFixture fixture) : BaseGridEndpointTests(fixture)
 {
-    protected override string EndpointUrl => "api/activity-experience-type/filtered-table";
+    protected override string EndpointUrl => "api/activity-experience-type/grid";
     protected override bool IsAdminOnly => false;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.LookupAsync<ActivityExperienceType>(db, FakeLoggedUserService.TestUserId, "Grid ExperienceType");
 }
@@ -670,7 +670,7 @@ public class ActivityLocationTypeGetByIdTests(AppDbContextFixture fixture) : Bas
 [Collection("Postgres")]
 public class ActivityLocationTypeGridTests(AppDbContextFixture fixture) : BaseGridEndpointTests(fixture)
 {
-    protected override string EndpointUrl => "api/activity-location-type/filtered-table";
+    protected override string EndpointUrl => "api/activity-location-type/grid";
     protected override bool IsAdminOnly => false;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.LookupAsync<ActivityLocationType>(db, FakeLoggedUserService.TestUserId, "Grid LocationType");
 }
@@ -738,7 +738,7 @@ public class ActivityWeatherDependencyGetByIdTests(AppDbContextFixture fixture) 
 [Collection("Postgres")]
 public class ActivityWeatherDependencyGridTests(AppDbContextFixture fixture) : BaseGridEndpointTests(fixture)
 {
-    protected override string EndpointUrl => "api/activity-weather-dependency/filtered-table";
+    protected override string EndpointUrl => "api/activity-weather-dependency/grid";
     protected override bool IsAdminOnly => false;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.LookupAsync<ActivityWeatherDependency>(db, FakeLoggedUserService.TestUserId, "Grid WeatherDependency");
 }
@@ -791,7 +791,7 @@ public class ActivityWeatherDependencyBatchDeleteTests(AppDbContextFixture fixtu
 // =====================================================================================================
 // TEST-6: the four lookups' GetAll routes. They were the only lookup verb with no suite of any kind --
 // not even proof that FastEndpoints registers them, since ActivityProfilesRouteSmokeTests probes only
-// /filtered-table. BaseGetAllLookupEndpoint has no scoping of its own (SEC-1), so every one of these
+// /grid. BaseGetAllLookupEndpoint has no scoping of its own (SEC-1), so every one of these
 // routes is user-safe purely because AppDbContext's global IEntityWithUser filter reaches it; that is
 // invisible in a single-user test and would survive an "optimising" IgnoreQueryFilters silently.
 // =====================================================================================================

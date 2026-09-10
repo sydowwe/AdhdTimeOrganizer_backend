@@ -18,7 +18,7 @@ public class FetchTableDistinctDesktopEntry(DbContext dbContext)
     public override void Configure()
     {
         const string entityName = "Distinct desktop entries";
-        Post("/gird");
+        Post("/grid");
         Summary(s =>
         {
             s.Summary = $"Get filtered and paginated {entityName} list";

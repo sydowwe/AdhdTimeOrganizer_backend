@@ -274,8 +274,8 @@ public class ActivityLookupDeleteCascadeTests(AppDbContextFixture fixture) : Pos
 
         var client = CreateClient();
 
-        await AssertRowAsync("api/activity-role/filtered-table", roleName, roleId);
-        await AssertRowAsync("api/activity-category/filtered-table", categoryName, categoryId);
+        await AssertRowAsync("api/activity-role/grid", roleName, roleId);
+        await AssertRowAsync("api/activity-category/grid", categoryName, categoryId);
         return;
 
         async Task AssertRowAsync(string url, string name, long id)

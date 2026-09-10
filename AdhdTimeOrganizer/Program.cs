@@ -5,6 +5,8 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.service;
 using AdhdTimeOrganizer.ActivityProfiles.infrastructure.extService.weather;
 using AdhdTimeOrganizer.application.endpoint.@base;
+using AdhdTimeOrganizer.application.endpoint.testSupport;
+using AdhdTimeOrganizer.infrastructure.testSupport;
 using AdhdTimeOrganizer.config;
 using AdhdTimeOrganizer.config.dependencyInjection;
 using AdhdTimeOrganizer.config.swagger;
@@ -87,14 +89,30 @@ try
     builder.Logging.ClearProviders();
     SerilogConfig.ConfigureSerilog(builder.Configuration, builder.Host, DatabaseStringsHelper.GetLogDatabaseConnectionString);
 
+    // Whether this process may expose POST /api/test/seed, decided once, here, from the hosting
+    // environment and the database the app is pointed at. Evaluated before ConfigureServices because
+    // the answer decides whether the endpoint type is discovered at all — see TestSeedGate.
+    var testSeedGate = TestSeedGate.Evaluate(
+        builder.Environment.EnvironmentName,
+        builder.Configuration,
+        DatabaseStringsHelper.GetDefaultDatabaseConnectionString);
+
     // Configure services
-    ConfigureServices(builder.Configuration, builder.Services, builder.Environment.IsDevelopment());
+    ConfigureServices(builder.Configuration, builder.Services, builder.Environment.IsDevelopment(), testSeedGate);
     LoadSettingsFromConfiguration(builder.Configuration, builder.Services);
 
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<AdhdTimeOrganizer.Program>>();
 
     logger.LogInformation("Backend starting.");
+
+    // Logged either way. When the gate is open this is the only notice that a route which truncates the
+    // database is live in this process; when it is closed it is the only place the reason is visible,
+    // since a closed gate leaves nothing to return a reason from.
+    if (testSeedGate.IsOpen)
+        logger.LogWarning("POST /api/test/seed IS ENABLED — {Reason}. It resets the database on every call.", testSeedGate.Reason);
+    else
+        logger.LogInformation("POST /api/test/seed is not registered: {Reason}.", testSeedGate.Reason);
 
     // Configure the HTTP request pipeline
     ConfigurePipeline(app, logger);
@@ -177,10 +195,13 @@ static void EnsureFieldEncryptionKey()
             $"{keyName} must decode to 32 bytes for AES-256; got {key.Length}. {howTo}");
 }
 
-static void ConfigureServices(IConfiguration configuration, IServiceCollection services, bool isDevelopment)
+static void ConfigureServices(IConfiguration configuration, IServiceCollection services, bool isDevelopment, TestSeedGateDecision testSeedGate)
 {
     // HTTP context accessor
     services.AddHttpContextAccessor();
+
+    // The endpoint reads this back as defence in depth; the registration filter below is the control.
+    services.AddSingleton(testSeedGate);
 
     services.AddSingleton<ISuggestionPatternRefreshQueue, SuggestionPatternRefreshQueue>();
     services.AddScoped<SuggestionPatternRefreshInterceptor>();
@@ -205,8 +226,9 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             .AddInterceptors(
                 sp.GetRequiredService<SuggestionPatternRefreshInterceptor>(),
                 sp.GetRequiredService<TodoListItemCompletionInterceptor>());
-        if (isDevelopment)
-            options.LogTo(Console.WriteLine);
+        // No LogTo() here on purpose. EF's LogTo writes directly to stdout, bypassing Serilog's
+        // MinimumLevel, and defaults to Debug -- which is what flooded the debug console. EF's own
+        // events reach the Serilog console sink through the ILoggerFactory anyway, at Information.
     });
 
     // Dependency injection
@@ -269,6 +291,17 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
             typeof(ReminderDefinition).Assembly,
             typeof(ScheduledJob).Assembly
         ];
+
+        // SeedTestDataEndpoint truncates the database and requires no authentication, so outside the
+        // environments and databases TestSeedGate admits it must not EXIST — not 403, which would
+        // confirm it is there. Filtering at discovery is the earliest point that is possible: the type
+        // is never turned into an EndpointDefinition, so nothing routes to it and it never appears in
+        // Swagger. Returning true is "keep this discovered type", so every other endpoint, validator
+        // and event handler in the scan is unaffected.
+        //
+        // ⚠ Do not replace this with a role gate, a config flag or an in-handler check. Pinned by
+        // TestSeedRouteGateTests, which asserts the route 404s in a non-Development host.
+        o.Filter = discoveredType => testSeedGate.IsOpen || discoveredType != typeof(SeedTestDataEndpoint);
     });
     services.AddSingleton<IGlobalPostProcessor, ErrorLoggingPostProcessor>();
     if (isDevelopment)

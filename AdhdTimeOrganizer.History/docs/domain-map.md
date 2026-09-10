@@ -98,7 +98,7 @@ on an unknown session, never a 404** — a partially-registered set is the norma
 mid-flight. `schedule` is idempotent by `sessionId` and drops boundaries already in the past rather
 than firing them immediately.
 
-⚠ **There is no grid route.** `/activity-history/gird` was deleted with `CQ-1` — it applied neither
+⚠ **There is no grid route.** `/activity-history/grid` was deleted with `CQ-1` — it applied neither
 paging nor sorting, and nothing in the frontend ever called it (the claim that "the SPA calls it that
 way" was never true). `/activity-history/filter` is the only list read on this entity.
 
@@ -270,7 +270,7 @@ owns. Neither names `ActivityHistory`.
 
 ### The membership seam — declared, implemented, unconsumed
 
-The four filters that used to reach into TodoLists and Routines. They lived on the `gird` grid, which
+The four filters that used to reach into TodoLists and Routines. They lived on the `grid` grid, which
 `CQ-1` deleted, so **nothing consumes this seam today**; the sources stay registered and guarded for
 the next consumer:
 

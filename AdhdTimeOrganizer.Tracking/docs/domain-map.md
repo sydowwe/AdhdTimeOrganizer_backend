@@ -143,13 +143,13 @@ assuming a path.
 | Area | Route prefix | Endpoints |
 |---|---|---|
 | Desktop ingest | `/activity-tracking/desktop` | `DesktopActivityHeartbeatEndpoint` (`/heartbeat`) — ⚠ ingest only, see `summary.md` |
-| Desktop dashboards | `/activity-tracking/desktop` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, process-details, distinct-processes, `gird` |
-| Desktop mappings | `/activity-tracking/desktop/settings` | create / update / delete / `gird`, plus `fetch-categories-and-roles-by-pattern`. Update is a **full replace including the target** (see Invariants) |
+| Desktop dashboards | `/activity-tracking/desktop` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, process-details, distinct-processes, `grid` |
+| Desktop mappings | `/activity-tracking/desktop/settings` | create / update / delete / `grid`, plus `fetch-categories-and-roles-by-pattern`. Update is a **full replace including the target** (see Invariants) |
 | Web-extension ingest | `/activity-tracking/web-extension` | `WebExtensionDataHeartbeatEndpoint` (`/heartbeat`) |
 | Web-extension dashboards | `/activity-tracking/web-extension` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, domain-details |
 | Android ingest | `/activity-tracking/android` | `AndroidSyncEndpoint` (`/sync`) |
-| Android dashboards | `/activity-tracking/android` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, `gird` |
-| Android mappings | `/activity-tracking/android/settings` | create / update / delete / `gird`; update as above |
+| Android dashboards | `/activity-tracking/android` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, `grid` |
+| Android mappings | `/activity-tracking/android/settings` | create / update / delete / `grid`; update as above |
 | Unified dashboards | `/activity-tracking/unified` | sources, pie-chart, summary-cards, stacked-bars, timeline, focus-metrics — see **The unified dashboards** below |
 
 **Request shape (all twenty-one dashboards; the six unified ones add `sources` and nothing else):**

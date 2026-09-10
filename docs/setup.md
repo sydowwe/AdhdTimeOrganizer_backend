@@ -136,3 +136,10 @@ With `app-backend` on the `10.0.0.0/8` Docker network, set
   forwarded header, so `TestWebApplicationFactory` assigns each request a synthetic client IP
   (unique per request, or a constant one taken from a test-supplied `X-Forwarded-For`) so the
   IP-keyed throttle behaves deterministically. See `docs/testing.md`.
+- **`POST /api/test/seed`** resets the database to the SPA's Playwright fixture. It is unauthenticated
+  and it truncates, so it only exists in an allow-listed environment *and* when `DB_HOST` is **this
+  machine** (loopback or `host.docker.internal`). There is no configuration that admits a remote host.
+  ⚠ Dev and prod here are the same database name on the same remote host, differing only by port, so
+  neither the name nor the port could separate them — "is it local" is the only check that can. Run
+  e2e against a local Postgres; note the integration-test container pins host port **5432**, so use
+  5433 for yours. Full reference: **`docs/e2eTestSeed.md`**.

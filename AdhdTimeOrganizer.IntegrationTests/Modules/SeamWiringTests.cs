@@ -30,7 +30,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Modules;
 /// </para>
 /// <para>
 /// ⚠ <see cref="IActivityMembershipSource"/> currently has <b>no consumer</b>: its only one was
-/// History's <c>gird</c> endpoint, deleted with <c>CQ-1</c> because no client ever called it. The two
+/// History's <c>grid</c> endpoint, deleted with <c>CQ-1</c> because no client ever called it. The two
 /// implementations and the guards over them are kept deliberately — see
 /// <see cref="TodoListMembershipSource_NarrowsToActivitiesOnAList"/>.
 /// </para>
@@ -80,7 +80,7 @@ public class SeamWiringTests(AppDbContextFixture fixture) : PostgresTestBase(fix
     /// first. Comparing against the constants (rather than a hard-coded count) also means adding a key
     /// without shipping an implementation fails here rather than in production.
     /// <para>
-    /// The consumer that made this load-bearing (History's <c>gird</c> endpoint) is gone; the guard
+    /// The consumer that made this load-bearing (History's <c>grid</c> endpoint) is gone; the guard
     /// stays because the sources and their keys are still registered and still exported to whatever
     /// consumes them next.
     /// </para>

@@ -18,7 +18,7 @@ public class FetchTableDistinctAndroidEntry(DbContext dbContext)
     public override void Configure()
     {
         const string entityName = "Distinct android entries";
-        Post("/gird");
+        Post("/grid");
         Summary(s =>
         {
             s.Summary = $"Get filtered and paginated {entityName} list";

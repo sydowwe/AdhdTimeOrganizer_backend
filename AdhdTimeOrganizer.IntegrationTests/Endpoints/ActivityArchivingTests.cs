@@ -61,7 +61,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
 
     private async Task<GridPage> FetchTableAsync(object? filter)
     {
-        var response = await CreateClient().PostAsJsonAsync("api/activity/filtered-table", new
+        var response = await CreateClient().PostAsJsonAsync("api/activity/grid", new
         {
             Page = 1,
             ItemsPerPage = 100,
@@ -265,7 +265,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
             .Should().Be(1, "the refused clone must not have written a copy under either account");
     }
 
-    // ---- POST /activity/filtered-table ----------------------------------------------------------
+    // ---- POST /activity/grid ----------------------------------------------------------
 
     /// <summary>
     /// The rule that lets the settings table's default view keep sending exactly the request it sent
@@ -592,7 +592,7 @@ public class ActivityArchivingTests(AppDbContextFixture fixture) : PostgresTestB
         db.Set<TimerPreset>().Add(new TimerPreset { UserId = UserId, Duration = 120, ActivityId = twoId });
         await db.SaveChangesAsync(CancellationToken);
 
-        var response = await CreateClient().PostAsJsonAsync("api/activity/filtered-table", new
+        var response = await CreateClient().PostAsJsonAsync("api/activity/grid", new
         {
             Page = 1,
             ItemsPerPage = 100,

@@ -23,7 +23,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// 404s rather than 403s -- same reasoning as <see cref="ActivityEndpointTests"/>'s header, which this
 /// follows in shape.
 /// <para>
-/// There is no grid case here. GetFilteredTableActivityHistoryEndpoint ("gird") was deleted with CQ-1 --
+/// There is no grid case here. GetFilteredTableActivityHistoryEndpoint ("grid") was deleted with CQ-1 --
 /// no client ever called it -- so FilterActivityHistoryEndpoint ("filter") below is the only list read
 /// on this entity, and it carries the cross-user assertion the grid case used to hold.
 /// </para>

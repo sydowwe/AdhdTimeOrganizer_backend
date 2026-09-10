@@ -49,7 +49,7 @@ public class GridTextFilterTests(AppDbContextFixture fixture) : PostgresTestBase
         await using (var db = CreateDbContext())
             activityId = await SeedActivityAsync(db, $"Deep Work {Guid.NewGuid():N}");
 
-        var ids = await FetchIdsAsync("api/activity/filtered-table", new { Name = typed });
+        var ids = await FetchIdsAsync("api/activity/grid", new { Name = typed });
 
         ids.Should().Contain(activityId,
             "Postgres LIKE is case-sensitive, so a Contains-based filter would answer an empty grid for every casing but the row's own");
@@ -66,14 +66,14 @@ public class GridTextFilterTests(AppDbContextFixture fixture) : PostgresTestBase
         await using (var db = CreateDbContext())
             await SeedActivityAsync(db, $"Deep Work {Guid.NewGuid():N}");
 
-        var ids = await FetchIdsAsync("api/activity/filtered-table", new { Name = "Shallow" });
+        var ids = await FetchIdsAsync("api/activity/grid", new { Name = "Shallow" });
 
         ids.Should().BeEmpty("case-insensitivity is not a licence to match more rows");
     }
 
     [Theory(DisplayName = "PERF-2: the role and category grids filter case-insensitively too")]
-    [InlineData("api/activity-role/filtered-table")]
-    [InlineData("api/activity-category/filtered-table")]
+    [InlineData("api/activity-role/grid")]
+    [InlineData("api/activity-category/grid")]
     public async Task LookupGrids_NameFilter_IsCaseInsensitive(string route)
     {
         long id;
@@ -104,11 +104,11 @@ public class GridTextFilterTests(AppDbContextFixture fixture) : PostgresTestBase
             underscoreDecoyId = await SeedActivityAsync(db, $"deepXwork {Guid.NewGuid():N}");
         }
 
-        var percentMatches = await FetchIdsAsync("api/activity/filtered-table", new { Name = "100%" });
+        var percentMatches = await FetchIdsAsync("api/activity/grid", new { Name = "100%" });
         percentMatches.Should().Contain(literalId).And.NotContain(decoyId,
             "an unescaped % is a wildcard, and '1005 Focus' is the row that makes that visible");
 
-        var underscoreMatches = await FetchIdsAsync("api/activity/filtered-table", new { Name = "deep_work" });
+        var underscoreMatches = await FetchIdsAsync("api/activity/grid", new { Name = "deep_work" });
         underscoreMatches.Should().Contain(underscoreId).And.NotContain(underscoreDecoyId,
             "an unescaped _ matches any single character");
     }

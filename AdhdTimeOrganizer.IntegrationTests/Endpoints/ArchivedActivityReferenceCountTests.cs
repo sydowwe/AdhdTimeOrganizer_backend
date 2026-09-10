@@ -159,7 +159,7 @@ public class ArchivedActivityReferenceCountTests(AppDbContextFixture fixture) : 
 
     private async Task<GridPage> FetchTableAsync(object? filter)
     {
-        var response = await CreateClient().PostAsJsonAsync("api/activity/filtered-table", new
+        var response = await CreateClient().PostAsJsonAsync("api/activity/grid", new
         {
             Page = 1,
             ItemsPerPage = 100,

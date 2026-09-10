@@ -32,7 +32,7 @@ public class TrackingPatternMatchSemanticsTests(AppDbContextFixture fixture) : P
 {
     private const long UserId = FakeLoggedUserService.TestUserId;
 
-    private const string DesktopGridRoute = "/api/activity-tracking/desktop/gird";
+    private const string DesktopGridRoute = "/api/activity-tracking/desktop/grid";
 
     /// <summary>The wire value of <c>PatternMatchType.Regex</c>; the converter binds the integer.</summary>
     private const int RegexMatchType = 3;

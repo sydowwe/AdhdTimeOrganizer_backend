@@ -126,7 +126,7 @@ renderer that reads them is in the Notification module, which cannot see a slice
 
 ### ⚠ The membership seam — no consumer today, still not to undo
 
-The deleted `gird` grid filtered on to-do / routine membership (`IsFromTodoList`, `TaskPriorityId`,
+The deleted `grid` grid filtered on to-do / routine membership (`IsFromTodoList`, `TaskPriorityId`,
 `IsFromRoutineTodoList`, `RoutineTimePeriodId`). It used to do that by querying
 `dbContext.TodoListItems` / `dbContext.RoutineTodoLists` directly, which made History depend on
 TodoLists *and* Routines and forced a fixed extraction order across three slices.
@@ -198,11 +198,11 @@ Archived activities pass; archival is not ownership. Guarded by
   fails with 42P01. The app installs them via `SuggestionPatternViewInstaller` (embedded resources);
   the test fixture applies `sqlScripts/*.sql` in `AppDbContextFixture.OnSchemaCreatedAsync`. If
   history tests start failing with 42P01, that plumbing is what broke — not this slice.
-- **There is no grid endpoint.** `/activity-history/gird` (`GetFilteredTableActivityHistoryEndpoint`)
+- **There is no grid endpoint.** `/activity-history/grid` (`GetFilteredTableActivityHistoryEndpoint`)
   was deleted with `CQ-1`: it ignored the `ItemsPerPage`/`Page`/`SortBy` its own request declared
   `required`, returned the caller's entire ledger on every call — and **no client ever called it**.
   The SPA's only list read is `POST /activity-history/filter`. The doc note that used to sit here,
-  "the SPA calls it that way, do not fix the typo", was simply wrong: `gird` appears nowhere in the
+  "the SPA calls it that way, do not fix the typo", was simply wrong: `grid` appears nowhere in the
   frontend repo. The to-do / routine membership filters went with it and exist on no endpoint today.
 - **Four registration sites, none of which break the build if missed:** FastEndpoints `o.Assemblies`
   in `Program.cs` (miss → routes 404), `ModuleAssemblies` in `ModuleServiceExtensions` (miss → the

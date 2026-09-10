@@ -406,7 +406,7 @@ public class TrackerDesktopMappingGridTests(AppDbContextFixture fixture) : Postg
         await using var db = CreateDbContext();
         var id = await Seed.DesktopMappingAsync(db, FakeLoggedUserService.TestUserId, "grid");
 
-        var response = await CreateClient().PostAsJsonAsync($"{Seed.DesktopUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
+        var response = await CreateClient().PostAsJsonAsync($"{Seed.DesktopUrl}/grid", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, CancellationToken);
@@ -422,7 +422,7 @@ public class TrackerDesktopMappingGridTests(AppDbContextFixture fixture) : Postg
         var otherUserId = await Seed.SecondUserAsync(Fixture, $"desktop-mapping-grid-{Guid.NewGuid():N}@test.com");
         var foreignId = await Seed.DesktopMappingAsync(db, otherUserId, "grid-foreign");
 
-        var response = await CreateClient().PostAsJsonAsync($"{Seed.DesktopUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
+        var response = await CreateClient().PostAsJsonAsync($"{Seed.DesktopUrl}/grid", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, CancellationToken);
@@ -436,7 +436,7 @@ public class TrackerDesktopMappingGridTests(AppDbContextFixture fixture) : Postg
     public async Task Grid_Unauthenticated_Returns401()
     {
         var response = await CreateUnauthenticatedClient()
-            .PostAsJsonAsync($"{Seed.DesktopUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
+            .PostAsJsonAsync($"{Seed.DesktopUrl}/grid", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -453,7 +453,7 @@ public class TrackerAndroidMappingGridTests(AppDbContextFixture fixture) : Postg
         await using var db = CreateDbContext();
         var id = await Seed.AndroidMappingAsync(db, FakeLoggedUserService.TestUserId, "grid");
 
-        var response = await CreateClient().PostAsJsonAsync($"{Seed.AndroidUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
+        var response = await CreateClient().PostAsJsonAsync($"{Seed.AndroidUrl}/grid", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, CancellationToken);
@@ -469,7 +469,7 @@ public class TrackerAndroidMappingGridTests(AppDbContextFixture fixture) : Postg
         var otherUserId = await Seed.SecondUserAsync(Fixture, $"android-mapping-grid-{Guid.NewGuid():N}@test.com");
         var foreignId = await Seed.AndroidMappingAsync(db, otherUserId, "grid-foreign");
 
-        var response = await CreateClient().PostAsJsonAsync($"{Seed.AndroidUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
+        var response = await CreateClient().PostAsJsonAsync($"{Seed.AndroidUrl}/grid", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, CancellationToken);
@@ -483,7 +483,7 @@ public class TrackerAndroidMappingGridTests(AppDbContextFixture fixture) : Postg
     public async Task Grid_Unauthenticated_Returns401()
     {
         var response = await CreateUnauthenticatedClient()
-            .PostAsJsonAsync($"{Seed.AndroidUrl}/filtered-table", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
+            .PostAsJsonAsync($"{Seed.AndroidUrl}/grid", Seed.UnfilteredGridBody(), JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

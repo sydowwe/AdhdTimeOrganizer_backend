@@ -129,6 +129,52 @@ already expired, so the refresh token is never revoked and the cookies stay set.
 `Program.cs`, with `DisableAutoDiscovery = true`), so every endpoint there must be `abstract` — a
 concrete one would never be routed. Don't widen `o.Assemblies` to "reuse" one; subclass it instead.
 
+## The e2e fixture endpoint
+
+`POST /api/test/seed` (`application/endpoint/testSupport/SeedTestDataEndpoint.cs`) resets the database
+to the fixture the SPA's Playwright suite expects. It is the one endpoint in this solution that is
+**unauthenticated and destructive**, so read this before touching any of it.
+
+> **The full reference is [`docs/e2eTestSeed.md`](../e2eTestSeed.md)** — how to switch it on, the id
+> table the SPA specs hardcode, what the fixture contains, and what the reset destroys. That file was
+> written for this solution and is accurate; it is not one of the leftover copies. What follows here
+> is only the part that constrains how you *change* the code.
+
+- **What decides it exists is `TestSeedGate`, not a role and not a config flag.** Two conditions, both
+  required: the hosting environment is on an allow-list (`Development` always; `Production` and
+  `Staging` are refused even if named in `TestSeed:AllowedEnvironments`), *and* the database host is
+  **this machine** — loopback or `host.docker.internal`.
+- **The database half takes no configuration, and must not grow any.** There is no key that admits a
+  remote host, because any such key is a way to point a truncating endpoint at a shared database.
+  `DB_PORT` and `DB_NAME` are not consulted either, and neither could help: this solution's dev and
+  prod databases are both `main_db` on one remote host and differ only by port
+  (`AdhdTimeOrganizer/.env`), so a name check separates nothing and a port check would admit any host
+  serving on that port. DNS is not consulted either — an unrecognised hostname is refused, not
+  resolved, so the answer cannot change without the connection string changing.
+- **Outside the gate the route is not registered.** `Program.ConfigureServices` filters the type out of
+  FastEndpoints discovery via `EndpointDiscoveryOptions.Filter`, so there is no endpoint to authorize
+  and none in Swagger. Do not "simplify" this into a check inside `HandleAsync`: a 403 confirms the
+  endpoint is there, and the in-handler check that does exist is defence in depth, not the control.
+- **What "absent" looks like here is 401, not 404.** `IdentityServiceExtensions` sets an authorization
+  `FallbackPolicy` of `RequireAuthenticatedUser`, and ASP.NET applies the fallback to requests matching
+  no endpoint too — so *every* undefined path in this app answers 401 to an anonymous caller. That is
+  the behaviour a closed gate has to be indistinguishable from.
+- **The fixture is `E2eFixtureSeeder`, and it is deliberately not a dev seeder.** It does not implement
+  `IPerUserDevSeeder`, has no `Order`, and has no entry in `SeederOrderBands.md`. Dev seeders are one
+  log-and-continue chain over the root admin producing a lived-in dataset with incidental ids; a spec
+  needs two named accounts, ids it can hardcode, and a hard failure when any part did not land. It does
+  reuse `IAppWideDefaultSeederManager` (roles + root admin) and `IUserDefaultsService` (each account's
+  per-user defaults), so a fixture account is shaped exactly like one the app created.
+- **The ids it guarantees live in `E2eFixtureIds`** and are echoed in the response body. They are a
+  contract with the SPA repo — add an id rather than renumbering one.
+- The reset is `TRUNCATE … RESTART IDENTITY CASCADE` over every table **in the model**, derived from
+  `dbContext.Model` so it cannot drift from the mapping, minus the `scheduler` schema (operational
+  state; its registrars only run at boot). `__EFMigrationsHistory` is not an entity and so can never
+  enter that list.
+
+Guards: `TestSeedGateTests`, `TestSeedRouteRegistrationTests`, `TestSeedEndpointTests` — see
+[testing.md](testing.md#things-that-only-a-behavioural-test-catches).
+
 ## Roles
 
 Override `AllowedRoles()` on any base endpoint. **Default is User + Admin + Root** — every account in

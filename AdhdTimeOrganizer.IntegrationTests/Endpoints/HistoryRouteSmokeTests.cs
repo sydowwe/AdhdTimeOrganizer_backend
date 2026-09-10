@@ -25,7 +25,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// </para>
 /// <para>
 /// This class used to carry <c>Grid_MembershipFilter_NarrowsThroughTheSeam</c>, which drove Core's
-/// <c>IActivityMembershipSource</c> through the <c>gird</c> endpoint. That endpoint is gone (<c>CQ-1</c>
+/// <c>IActivityMembershipSource</c> through the <c>grid</c> endpoint. That endpoint is gone (<c>CQ-1</c>
 /// — no client ever called it), so the seam's narrowing behaviour is now pinned directly on the source
 /// in <c>SeamWiringTests.TodoListMembershipSource_NarrowsToActivitiesOnAList</c>.
 /// </para>

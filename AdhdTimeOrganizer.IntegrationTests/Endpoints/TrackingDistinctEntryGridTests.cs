@@ -39,15 +39,15 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// nothing here carries that trait.
 /// </para>
 /// <para>
-/// <c>PERF-4</c>: neither <c>gird</c> query has a date bound, so every row the caller owns is in scope
+/// <c>PERF-4</c>: neither <c>grid</c> query has a date bound, so every row the caller owns is in scope
 /// regardless of when it was recorded. Cases that assert a <c>itemsCount</c> narrow to their own rows with
 /// an exact-match filter on a GUID-tokened process/package name rather than trusting a total.
 /// </para>
 /// </summary>
 file static class DistinctSeed
 {
-    public const string DesktopGridUrl = "/api/activity-tracking/desktop/gird";
-    public const string AndroidGridUrl = "/api/activity-tracking/android/gird";
+    public const string DesktopGridUrl = "/api/activity-tracking/desktop/grid";
+    public const string AndroidGridUrl = "/api/activity-tracking/android/grid";
     public const string DistinctProcessesUrl = "/api/activity-tracking/desktop/distinct-processes";
     public const string CategoriesAndRolesUrl = "/api/activity-tracking/desktop/fetch-categories-and-roles-by-pattern";
 
@@ -194,7 +194,7 @@ file static class DistinctSeed
 }
 
 // =====================================================================================================
-// POST /api/activity-tracking/desktop/gird
+// POST /api/activity-tracking/desktop/grid
 // =====================================================================================================
 
 [Collection("Postgres")]
@@ -358,7 +358,7 @@ public class DesktopDistinctEntryGridTests(AppDbContextFixture fixture) : Postgr
 }
 
 // =====================================================================================================
-// POST /api/activity-tracking/android/gird
+// POST /api/activity-tracking/android/grid
 // =====================================================================================================
 
 [Collection("Postgres")]

@@ -366,7 +366,7 @@ public class GridTaskPriorityTests(AppDbContextFixture fixture) : PostgresTestBa
     [Fact(DisplayName = "Unauthenticated grid is 401")]
     public async Task Unauthenticated_Returns401()
     {
-        var response = await CreateUnauthenticatedClient().PostAsJsonAsync("api/task-priority/filtered-table", new
+        var response = await CreateUnauthenticatedClient().PostAsJsonAsync("api/task-priority/grid", new
         {
             Page = 1,
             ItemsPerPage = 100,
@@ -380,7 +380,7 @@ public class GridTaskPriorityTests(AppDbContextFixture fixture) : PostgresTestBa
 
     private async Task<BaseGridResponse<TaskPriorityResponse>> GridAsync(object? filter, int itemsPerPage = 100, int page = 1)
     {
-        var response = await CreateClient().PostAsJsonAsync("api/task-priority/filtered-table", new
+        var response = await CreateClient().PostAsJsonAsync("api/task-priority/grid", new
         {
             Page = page,
             ItemsPerPage = itemsPerPage,

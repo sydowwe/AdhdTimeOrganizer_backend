@@ -45,7 +45,7 @@ public class CrossSliceFilterSortTests(AppDbContextFixture fixture) : PostgresTe
     private static long UserId => FakeLoggedUserService.TestUserId;
 
     private const string BacklogGridRoute = "api/activity-backlog-profile/grid";
-    private const string ActivityGridRoute = "api/activity/filtered-table";
+    private const string ActivityGridRoute = "api/activity/grid";
 
     private sealed record GridResponse(JsonElement[] Items, int ItemsCount, int PageCount);
 

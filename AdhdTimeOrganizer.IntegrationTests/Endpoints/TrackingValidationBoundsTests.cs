@@ -32,8 +32,8 @@ public class TrackingValidationBoundsTests(AppDbContextFixture fixture) : Postgr
     private const string HeartbeatRoute = "/api/activity-tracking/desktop/heartbeat";
     private const string DesktopMappingRoute = "/api/activity-tracking/desktop/settings/tracker-desktop-mapping-by-pattern";
     private const string AndroidMappingRoute = "/api/activity-tracking/android/settings/tracker-android-mapping-by-pattern";
-    private const string DesktopGridRoute = "/api/activity-tracking/desktop/gird";
-    private const string AndroidGridRoute = "/api/activity-tracking/android/gird";
+    private const string DesktopGridRoute = "/api/activity-tracking/desktop/grid";
+    private const string AndroidGridRoute = "/api/activity-tracking/android/grid";
 
     private static readonly string[] TrackingRoles = ["User", "ActivityTracking"];
 
@@ -176,7 +176,7 @@ public class TrackingValidationBoundsTests(AppDbContextFixture fixture) : Postgr
         var (activeId, inactiveId) = await SeedTwoDesktopMappingsAsync();
 
         var response = await CreateTrackingClient().PostAsJsonAsync(
-            $"{DesktopMappingRoute}/filtered-table",
+            $"{DesktopMappingRoute}/grid",
             new
             {
                 useFilter = true,
@@ -206,7 +206,7 @@ public class TrackingValidationBoundsTests(AppDbContextFixture fixture) : Postgr
     public async Task MappingGrid_RejectsAnUndefinedTargetShape()
     {
         var response = await CreateTrackingClient().PostAsJsonAsync(
-            $"{DesktopMappingRoute}/filtered-table",
+            $"{DesktopMappingRoute}/grid",
             new
             {
                 useFilter = true,
