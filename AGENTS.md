@@ -91,7 +91,10 @@ The portal has been fully split into vertical slices; **the split is finished**.
   no exceptions — an unnamed one can't be selectively lifted with `IgnoreQueryFilters` and silently
   replaces any filter already on that entity instead of coexisting with it. See
   [persistence.md](docs/Codex/persistence.md#named-query-filters--one-name-per-concern).
-- **Time-of-day** is `TimeDto` in portal DTOs, `MyIntTime` in module DTOs. Don't mix them.
+- **Time-of-day** is `TimeDto` in DTOs and `TimeOnly` in entities; a **duration** is `IntTime` in both.
+  Both serialize as `{hours, minutes}` — pick by meaning, not by shape, because the rules are opposite
+  (a duration may exceed a day, a time of day may not). `MyIntTime` was a third, unused copy and is
+  deleted. See [endpoints.md](docs/claude/endpoints.md#dto-conventions).
 - **Seeders**: pick the kind by owner (app-wide / per-user) × purpose (production / dev fixture); only
   dev seeders truncate. Read `AdhdTimeOrganizer.Core/.../seeder/SeederOrderBands.md` before adding one
   anywhere in the solution.

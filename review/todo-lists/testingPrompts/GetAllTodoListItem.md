@@ -87,17 +87,25 @@ them, not just the paired id.
 `401` unauthenticated; `200` for `CreateUserRoleClient()`. As with the dashboard widget, roles come from
 the global configurator rather than the endpoint, so one test records that.
 
-### 8. `SuggestedTime` is absent from the response — record it
+### 8. `SuggestedTime` is absent from the response — record it ✅ **done, and since resolved**
 
 `TodoListItem.SuggestedTime` is an `IntTime`, is accepted on create and update, is validated
 (`CreateTodoListItemValidator:38-41`), is persisted via `NullableIntTimeConverter`
-(`ToDoListItemConfiguration.cs:19-20`) — and is **not in `TodoListItemResponse`**. Neither is
+(`ToDoListItemConfiguration.cs:19-20`) — and was **not in `TodoListItemResponse`**. Neither is
 `CompletedTimestamp` (deliberately — the recap owns that) nor `TodoListId`.
 
-Write it as an explicit pin, not a bug report: seed an item with a `SuggestedTime`, assert the response
-JSON has no such property, and put the observation in the `DisplayName`
-(`"SuggestedTime is accepted and stored but never projected — write-only today"`). Whether that is a
-gap or intentional is a product question this review cannot settle; the test makes it visible.
+The pin was written as asked, and on **2026-09-11 it did its job**: the open product question was
+settled as a gap and the field was added to `BaseTodoListResponse`, which forced the deliberate edit in
+this test. The estimate is what the SPA's estimate-vs-actual chip and header calibration ratio read, and
+the e2e fixture had been seeding rows for both surfaces that the response then dropped on the floor.
+
+The test is now `Projection_CarriesSuggestedTime_AndOmitsTheDeliberateAbsences`, asserting the field
+**is** present on the raw JSON — raw, because a dropped field deserialises to null, which is exactly
+what an item with no estimate looks like. The two absences it also covers are still deliberate.
+
+**The transferable lesson**, written up in `docs/e2eTestSeed.md`: a row-level assertion and a
+projection-level assertion are different claims. Every row test in `TestSeedEndpointTests` passed for as
+long as this field was invisible to every client.
 
 ## Note on `PERF-1`
 

@@ -10,6 +10,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
@@ -278,10 +279,16 @@ public class TodoListItemDashboardWidgetTests(AppDbContextFixture fixture) : Pos
     /// <summary>
     /// The widget shares <c>TodoListItemResponse.Projection</c> with the list read, and a field dropped from
     /// that projection reads back as null rather than failing — indistinguishable from "not set", as
-    /// <c>TodoListItemPairingTests</c> already notes for the pairing id. These three are the ones the widget
+    /// <c>TodoListItemPairingTests</c> already notes for the pairing id. These four are the ones the widget
     /// renders and the list read would not miss.
     /// </summary>
-    [Fact(DisplayName = "TEST-5: the widget's rows carry TaskPriority, Steps and PairedLeisureActivityId")]
+    /// <remarks>
+    /// <c>SuggestedTime</c> was added here after being the exact defect this test describes, missed because
+    /// nothing asserted on it: it sat on the entity and on both request DTOs but was declared on no to-do
+    /// response at all, so it never reached the client and the SPA's estimate-vs-actual chip and header
+    /// calibration ratio had nothing to render. Every row-level test passed the whole time.
+    /// </remarks>
+    [Fact(DisplayName = "TEST-5: the widget's rows carry TaskPriority, Steps, PairedLeisureActivityId and SuggestedTime")]
     public async Task Projection_CarriesTheFieldsTheWidgetRenders()
     {
         long leisureActivityId;
@@ -290,6 +297,7 @@ public class TodoListItemDashboardWidgetTests(AppDbContextFixture fixture) : Pos
 
         await SeedItemAsync("fully-populated", UtcToday,
             pairedLeisureActivityId: leisureActivityId,
+            suggestedTime: new IntTime(1, 30),
             steps:
             [
                 new TodoListStep { Name = "Open the draft", Order = 0 },
@@ -303,6 +311,9 @@ public class TodoListItemDashboardWidgetTests(AppDbContextFixture fixture) : Pos
         item.Steps.Select(s => s.Name).Should().Equal("Open the draft", "Send it");
         item.PairedLeisureActivityId.Should().Be(leisureActivityId,
             "a dropped pairing id reads back as null, which is exactly what an unpaired task looks like");
+        item.SuggestedTime.Should().NotBeNull(
+            "a dropped estimate reads back as null, which is exactly what an item with no estimate looks like")
+            .And.Be(new IntTime(1, 30));
     }
 
     // ---------------------------------------------------------------- helpers
@@ -312,7 +323,7 @@ public class TodoListItemDashboardWidgetTests(AppDbContextFixture fixture) : Pos
     /// the activity's name is how every case above identifies its rows.
     /// </summary>
     private async Task<long> SeedItemAsync(string name, DateOnly? dueDate, bool isDone = false,
-        long? pairedLeisureActivityId = null, List<TodoListStep>? steps = null)
+        long? pairedLeisureActivityId = null, List<TodoListStep>? steps = null, IntTime? suggestedTime = null)
     {
         await using var db = CreateDbContext();
 
@@ -320,7 +331,8 @@ public class TodoListItemDashboardWidgetTests(AppDbContextFixture fixture) : Pos
 
         return await TodoListTestSeedHelper.SeedTodoListItemAsync(
             db, activityId, _priorityId, _listId, UserId, steps: steps, isDone: isDone,
-            ct: CancellationToken, dueDate: dueDate, pairedLeisureActivityId: pairedLeisureActivityId);
+            ct: CancellationToken, dueDate: dueDate, pairedLeisureActivityId: pairedLeisureActivityId,
+            suggestedTime: suggestedTime);
     }
 
     /// <summary>

@@ -3,7 +3,6 @@ using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
 using Sydowwe.Framework.application.dto.response;
-using Sydowwe.Framework.domain.valueObject;
 
 namespace AdhdTimeOrganizer.Routines.application.dto.response.todoList;
 
@@ -14,7 +13,10 @@ public record RoutineTodoListResponse : BaseTodoListResponse,
     public int Streak { get; init; }
     public int BestStreak { get; init; }
     public DateTime LastCompletedAt { get; init; }
-    public IntTime? SuggestedTime { get; init; }
+
+    // SuggestedTime is inherited from BaseTodoListResponse — it was declared here while the to-do
+    // response had none, which is exactly how GET /api/todo-list-item came to omit it entirely.
+
     public List<DayOfWeek> SuggestedDays { get; init; } = [];
     public int? SuggestedDayOfMonth { get; init; }
 

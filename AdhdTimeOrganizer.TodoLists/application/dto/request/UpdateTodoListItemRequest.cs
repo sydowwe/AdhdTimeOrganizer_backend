@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
@@ -8,7 +9,12 @@ public record UpdateTodoListItemRequest : BaseUpdateTodoListRequest, IUpdateRequ
     public long TaskPriorityId { get; init; }
 
     public DateOnly? DueDate { get; init; }
-    public TimeOnly? DueTime { get; init; }
+
+    /// <summary>
+    /// <c>{hours, minutes}</c>, per the portal's time-of-day convention — see the remarks on
+    /// <see cref="CreateTodoListItemRequest.DueTime"/> for why this stopped being a <c>TimeOnly</c>.
+    /// </summary>
+    public TimeDto? DueTime { get; init; }
 
     public long? PairedLeisureActivityId { get; init; }
 
@@ -20,7 +26,7 @@ public record UpdateTodoListItemRequest : BaseUpdateTodoListRequest, IUpdateRequ
         e.SuggestedTime = SuggestedTime;
         e.TaskPriorityId = TaskPriorityId;
         e.DueDate = DueDate;
-        e.DueTime = DueTime;
+        e.DueTime = DueTime?.ToTimeOnly();
         e.PairedLeisureActivityId = PairedLeisureActivityId;
 
         // IsDone is not written here, and DoneCount and DisplayOrder are not on the request at all

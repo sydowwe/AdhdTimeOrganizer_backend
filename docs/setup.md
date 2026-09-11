@@ -141,5 +141,5 @@ With `app-backend` on the `10.0.0.0/8` Docker network, set
   machine** (loopback or `host.docker.internal`). There is no configuration that admits a remote host.
   ⚠ Dev and prod here are the same database name on the same remote host, differing only by port, so
   neither the name nor the port could separate them — "is it local" is the only check that can. Run
-  e2e against a local Postgres; note the integration-test container pins host port **5432**, so use
-  5433 for yours. Full reference: **`docs/e2eTestSeed.md`**.
+  e2e against a local Postgres, on whatever port suits you — the gate does not look at the port, and
+  the integration-test container no longer takes a fixed one. Full reference: **`docs/e2eTestSeed.md`**.

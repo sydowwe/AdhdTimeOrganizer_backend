@@ -217,11 +217,22 @@ See also the query-filter caching trap in `docs/claude/persistence.md`.
 ## DTO conventions
 
 - **Time-of-day values** in portal requests and responses use `TimeDto`
-  (`AdhdTimeOrganizer/application/dto/dto/TimeDto.cs`) instead of `TimeOnly`. Call `.ToTimeOnly()` when
-  assigning to an entity — which throws on an out-of-range value, so **every request validator that
-  carries one must call `RuleFor(x => x.SomeTime).ApplyTimeOfDayRules()`**
+  (`framework/Sydowwe.Framework/application/dto/dto/TimeDto.cs`) instead of `TimeOnly`. Call
+  `.ToTimeOnly()` when assigning to an entity — which throws on an out-of-range value, so **every
+  request validator that carries one must call `RuleFor(x => x.SomeTime).ApplyTimeOfDayRules()`**
   (`AdhdTimeOrganizer.Core/application/validator/TimeDtoRules.cs`). There is deliberately no
   `Validator<TimeDto>`: FastEndpoints resolves validators by exact request type, so one would never run.
+  The entity keeps `TimeOnly`; only the DTO edge converts, the way `PlannerTaskResponse` does. Note
+  `TimeOnly.ToDto` cannot appear in an EF projection (CS9296) — inline
+  `new TimeDto(x.Hour, x.Minute)` there.
+
+  > ⚠ **What mixing costs, since the rule reads like style and is not.** `TodoListItem.DueTime` was a
+  > bare `TimeOnly` on both requests and the response until 2026-09-11 — the last one in any portal DTO.
+  > It serialised as `"15:09"` into an SPA that parses *every* time of day as `{hours, minutes}`, so
+  > every due time read back as 00:00 and the zeroed value was then rejected on write. **Nothing on this
+  > side failed**: entity, requests and response were all `TimeOnly`, so the backend was perfectly
+  > self-consistent and every test passed. Only a client could see it. An off-convention type is
+  > therefore not caught by round-trip tests — the guard is the convention itself.
 - **Date ranges** in the history dashboards use `DateRangeDto`
   (`AdhdTimeOrganizer.Core/application/dto/dto/DateRangeDto.cs`): a `Date`, a `RangeType`, and an
   `EndDate` that **only `CustomRange` reads** — it is the range end, inclusive, capped at
@@ -232,8 +243,20 @@ See also the query-filter caching trap in `docs/claude/persistence.md`.
   FastEndpoints resolves validators by exact request type, so an abstract or open-generic base is never
   discovered and the request goes through unvalidated with no sign of it
   (`AdhdTimeOrganizer.History/application/validator/HistorySummaryDateRangeValidators.cs`).
-- **Module** (`Sydowwe.Framework`-based) DTOs use `MyIntTime`
-  (`framework/Sydowwe.Framework/domain/helper/MyIntTime.cs`) — `Hours` / `Minutes` / `Seconds`,
-  serialized as those three fields, persisted as an `int` count of seconds via `MyIntTimeConverter`
-  (`framework/Sydowwe.Framework/infrastructure/persistence/converter/`). Use `new MyIntTime(seconds)` /
-  `.GetInSeconds()` to convert. Don't introduce it into portal DTOs.
+- **Durations** — as opposed to times of day — are `IntTime`
+  (`framework/Sydowwe.Framework/domain/valueObject/IntTime.cs`): `Hours` / `Minutes`, persisted as an
+  `int` count of seconds via `IntTimeConverter` / `NullableIntTimeConverter`. `new IntTime(seconds)`
+  and `.TotalSeconds` convert; `TotalSeconds` is `[JsonIgnore]`d, so the wire shape is
+  `{hours, minutes}` — the same shape as `TimeDto`, deliberately a different type. A duration may
+  exceed a day and may be added to another duration; a time of day may do neither, and `ToTimeOnly()`
+  throws past 23:59. Pick by meaning, not by shape. `ActivityHistory.Length` and
+  `BaseTodoListItem.SuggestedTime` are the two durations in the model.
+
+  > `IntTime` is currently used directly in DTOs as well as entities, which couples the wire to an
+  > EF-mapped domain type. `review/duration-dto-split.md` is the queued task to put a `DurationDto` at
+  > that boundary, the way `TimeDto` already sits in front of `TimeOnly`.
+
+  > ⚠ **`MyIntTime` is gone** (deleted 2026-09-11). This bullet used to name it as the module-DTO
+  > convention, with a `MyIntTimeConverter` that was never written. It had zero usages in the solution:
+  > a third copy of `IntTime`'s idea, differing only by a `Seconds` field. If you find it referenced
+  > anywhere, that reference is stale.

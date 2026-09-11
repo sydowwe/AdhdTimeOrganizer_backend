@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.Testing;
 using Xunit;
@@ -190,7 +191,9 @@ public class GetAllTodoListItemTests(AppDbContextFixture fixture) : PostgresTest
         item.TotalCount.Should().Be(3);
         item.Note.Should().Be("item note");
         item.DueDate.Should().Be(new DateOnly(2026, 3, 14));
-        item.DueTime.Should().Be(new TimeOnly(15, 9));
+        // A TimeDto since 2026-09-11, not a TimeOnly — the entity still stores TimeOnly, the response
+        // converts. The 15:09 the row carries has to survive that conversion intact.
+        item.DueTime.Should().Be(new TimeDto(15, 9));
         item.IsDone.Should().BeTrue();
         item.DisplayOrder.Should().Be(4200);
         item.PairedLeisureActivityId.Should().Be(seeded.PairedActivityId);
@@ -214,18 +217,26 @@ public class GetAllTodoListItemTests(AppDbContextFixture fixture) : PostgresTest
     }
 
     /// <summary>
-    /// A pin on today's shape, not a bug report. <c>SuggestedTime</c> is accepted on create and update,
-    /// validated (<c>CreateTodoListItemValidator:38-41</c>) and persisted through
-    /// <c>NullableIntTimeConverter</c> (<c>TodoListItemConfiguration.cs:19-20</c>) — and then never read
-    /// back by any response. Whether that is a gap or intentional is a product question this review cannot
-    /// settle; the assertion makes it visible, and turns adding the field into a deliberate edit here.
+    /// <c>SuggestedTime</c> is accepted on create and update, validated
+    /// (<c>CreateTodoListItemValidator:38-41</c>), persisted through <c>NullableIntTimeConverter</c>
+    /// (<c>TodoListItemConfiguration.cs:19-20</c>) — and now read back, which it was not until
+    /// 2026-09-11.
     /// <para>
-    /// <c>CompletedTimestamp</c> and <c>TodoListId</c> are absent too, but deliberately: the daily recap owns
-    /// the first, and the caller already knows the second — it is the parameter it just passed.
+    /// This assertion was the inverse until then: a pin on the write-only shape, deliberately phrased so
+    /// that adding the field had to be a deliberate edit *here*. This is that edit. The product question
+    /// it left open — gap or intentional — is settled as a gap: the field is the estimate behind the SPA's
+    /// estimate-vs-actual chip and its header calibration ratio, and both had rows to read and nothing in
+    /// the response to read them from. <c>SuggestedTime</c> now lives on <c>BaseTodoListResponse</c>, where
+    /// the column already lives on <c>BaseTodoListItem</c>, so both item kinds carry it.
+    /// </para>
+    /// <para>
+    /// <c>CompletedTimestamp</c> and <c>TodoListId</c> stay absent, and those absences are still
+    /// deliberate: the daily recap owns the first, and the caller already knows the second — it is the
+    /// parameter it just passed.
     /// </para>
     /// </summary>
-    [Fact(DisplayName = "TEST-4: SuggestedTime is accepted and stored but never projected — write-only today")]
-    public async Task Projection_OmitsSuggestedTime()
+    [Fact(DisplayName = "TEST-4: SuggestedTime is projected; CompletedTimestamp and TodoListId stay absent")]
+    public async Task Projection_CarriesSuggestedTime_AndOmitsTheDeliberateAbsences()
     {
         var seeded = await SeedProjectionListAsync();
 
@@ -235,7 +246,7 @@ public class GetAllTodoListItemTests(AppDbContextFixture fixture) : PostgresTest
                 .IgnoreQueryFilters()
                 .SingleAsync(i => i.Id == seeded.ItemId, CancellationToken);
 
-            stored.SuggestedTime.Should().NotBeNull("the column is written — this test is about the read, not the write");
+            stored.SuggestedTime.Should().NotBeNull("the read below is only meaningful if the column was written");
             stored.SuggestedTime!.Hours.Should().Be(1);
             stored.SuggestedTime.Minutes.Should().Be(30);
         }
@@ -244,7 +255,13 @@ public class GetAllTodoListItemTests(AppDbContextFixture fixture) : PostgresTest
         var element = doc.RootElement.EnumerateArray()
             .Single(e => e.GetProperty("id").GetInt64() == seeded.ItemId);
 
-        element.TryGetProperty("suggestedTime", out _).Should().BeFalse();
+        // Asserted on the raw JSON, not the deserialised DTO: a field dropped from the projection
+        // deserialises to null, which is indistinguishable from an item that has no estimate.
+        element.TryGetProperty("suggestedTime", out var suggestedTime).Should().BeTrue(
+            "the calibration chip and the header ratio read the estimate off this response");
+        suggestedTime.GetProperty("hours").GetInt32().Should().Be(1);
+        suggestedTime.GetProperty("minutes").GetInt32().Should().Be(30);
+
         element.TryGetProperty("completedTimestamp", out _).Should().BeFalse();
         element.TryGetProperty("todoListId", out _).Should().BeFalse();
     }

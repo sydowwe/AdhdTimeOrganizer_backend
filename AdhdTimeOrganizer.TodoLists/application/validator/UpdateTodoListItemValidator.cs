@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
 using FastEndpoints;
 using FluentValidation;
@@ -37,6 +38,12 @@ public class UpdateTodoListItemValidator : Validator<UpdateTodoListItemRequest>
             .Must(t => t!.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
             .When(x => x.SuggestedTime != null)
             .WithMessage("SuggestedTime hours must be 0–23 and minutes 0–59.");
+
+        // Same rule as on create, and for the same reason: UpdateEntity calls TimeDto.ToTimeOnly(),
+        // which throws out of range, so an unvalidated DueTime is a 500 rather than a 400.
+        RuleFor(x => x.DueTime!)
+            .ApplyTimeOfDayRules()
+            .When(x => x.DueTime != null);
 
         RuleForEach(x => x.Steps)
             .ChildRules(step =>

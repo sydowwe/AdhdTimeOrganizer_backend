@@ -89,7 +89,7 @@ actually breaks:
 - **Result pattern** — CRUD via the `DbContextHelper` Result-returning helpers, not
   raw `SaveChangesAsync`.
 - **DTO boundaries** — entities not leaking through endpoints; time values use
-  `MyIntTime`, not raw ints/`TimeSpan`.
+  `TimeDto` (time of day) or `IntTime` (duration), not raw ints/`TimeSpan`.
 - **Concurrency** — `row_version` token respected on update paths.
 - **User-scoping** — user-scoped reads filter by `User.GetId()`; `{id}` endpoints
   assert ownership (IDOR).

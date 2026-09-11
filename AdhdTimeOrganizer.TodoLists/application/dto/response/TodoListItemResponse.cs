@@ -1,5 +1,7 @@
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
+using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.dto.response;
 
 namespace AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
@@ -9,7 +11,13 @@ public record TodoListItemResponse : BaseTodoListResponse,
 {
     public required TaskPriorityResponse TaskPriority { get; init; }
     public DateOnly? DueDate { get; init; }
-    public TimeOnly? DueTime { get; init; }
+
+    /// <summary>
+    /// <c>{hours, minutes}</c>, per the portal's time-of-day convention — see the remarks on
+    /// <see cref="CreateTodoListItemRequest.DueTime"/>. The entity is still a <c>TimeOnly</c>; this is
+    /// the boundary that converts, the same one <c>PlannerTaskResponse</c> uses.
+    /// </summary>
+    public TimeDto? DueTime { get; init; }
 
     /// <summary>Activity id of the paired leisure activity, or null when the task is unpaired.</summary>
     public long? PairedLeisureActivityId { get; init; }
@@ -49,6 +57,7 @@ public record TodoListItemResponse : BaseTodoListResponse,
             DoneCount = e.DoneCount,
             TotalCount = e.TotalCount,
             Note = e.Note,
+            SuggestedTime = e.SuggestedTime,
             Steps = e.Steps.Select(s => new TodoListStepResponse
             {
                 Id = s.Id,
@@ -65,7 +74,9 @@ public record TodoListItemResponse : BaseTodoListResponse,
                 Priority = e.TaskPriority.Priority
             },
             DueDate = e.DueDate,
-            DueTime = e.DueTime,
+            // Inlined rather than TimeOnly.ToDto: extension properties can't appear in an expression
+            // tree (CS9296) — the same note TemplatePlannerTaskResponse carries.
+            DueTime = e.DueTime != null ? new TimeDto(e.DueTime.Value.Hour, e.DueTime.Value.Minute) : null,
             PairedLeisureActivityId = e.PairedLeisureActivityId
         });
     }

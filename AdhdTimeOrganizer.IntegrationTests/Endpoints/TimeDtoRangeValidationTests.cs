@@ -132,6 +132,52 @@ public class TimeDtoRangeValidationTests(AppDbContextFixture fixture) : Postgres
             .Should().Contain(name => string.Equals(name, field, StringComparison.OrdinalIgnoreCase), body);
     }
 
+    /// <summary>
+    /// The fourth shape, and a different one from the three above: <c>TodoListItem.DueTime</c> needed no
+    /// <c>TimeDto</c> rule before 2026-09-11 because it was not a <c>TimeDto</c> — it was the last bare
+    /// <c>TimeOnly</c> in any portal DTO, and it serialised as <c>"15:09"</c> into an SPA that parses every
+    /// time of day as <c>{hours, minutes}</c>. Converting it to the convention fixed that and inherited this
+    /// class's hazard in the same move: <c>UpdateEntity</c> now calls <c>TimeDto.ToTimeOnly()</c>, so an
+    /// out-of-range hour is an unhandled 500 unless the validator rejects it first.
+    ///
+    /// <para>Asserted on the PUT against an id that does not exist, the same trick the Planning theory uses:
+    /// validation runs before the handler, so the 400 is the validator's answer and does not depend on the id
+    /// resolving — which matters here, because this endpoint's <c>BeforeMapping</c> would reject the
+    /// made-up <c>activityId</c> anyway.</para>
+    ///
+    /// <para>No accepted-boundary arm, for the reason the Tracking theory gives: a real 15:09 already makes
+    /// the full round trip in <see cref="GetAllTodoListItemTests"/>, which reads it back off the projection
+    /// as a <c>TimeDto</c>. The over-fix that rejects a valid time of day is pinned there.</para>
+    /// </summary>
+    [Theory(DisplayName = "CQ-2: a to-do item's DueTime is range-checked now that it is a TimeDto")]
+    [InlineData(24, 0)]
+    [InlineData(99, 0)]
+    [InlineData(-1, 0)]
+    [InlineData(0, 60)]
+    [InlineData(0, -1)]
+    public async Task UpdateTodoListItem_OutOfRangeDueTime_IsRejected(int hours, int minutes)
+    {
+        var response = await CreateClient().PutAsJsonAsync(
+            "api/todo-list-item/999999999",
+            new
+            {
+                activityId = 999999999L,
+                taskPriorityId = 999999999L,
+                isDone = false,
+                dueTime = new { hours, minutes }
+            },
+            JsonOpts,
+            CancellationToken);
+
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "ToTimeOnly() throws on this value, so without the validator rule this is a 500. Body: " + body);
+
+        JsonDocument.Parse(body).RootElement.GetProperty("errors").EnumerateObject().Select(e => e.Name)
+            .Should().Contain(name => string.Equals(name, "dueTime", StringComparison.OrdinalIgnoreCase), body);
+    }
+
     private Task<HttpResponseMessage> PostStackedBarsAsync(
         (int Hours, int Minutes) startTime, (int Hours, int Minutes) endTime) =>
         CreateUserRoleClient().PostAsJsonAsync(StackedBarsRoute, new

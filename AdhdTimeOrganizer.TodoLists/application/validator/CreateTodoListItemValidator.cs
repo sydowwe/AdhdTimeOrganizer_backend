@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.validator;
 using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
 using FastEndpoints;
 using FluentValidation;
@@ -40,6 +41,15 @@ public class CreateTodoListItemValidator : Validator<CreateTodoListItemRequest>
             .Must(t => t!.Hours is >= 0 and <= 23 && t.Minutes is >= 0 and <= 59)
             .When(x => x.SuggestedTime != null)
             .WithMessage("SuggestedTime hours must be 0–23 and minutes 0–59.");
+
+        // Load-bearing, not defensive: DueTime became a TimeDto on 2026-09-11, and the mapping calls
+        // TimeDto.ToTimeOnly() — which is new TimeOnly(Hours, Minutes) and *throws* out of range. Without
+        // this rule an hours: 99 request is an unhandled 500 instead of a 400. A Validator<TimeDto> would
+        // not cover it: FastEndpoints resolves validators by the endpoint's exact request type, so one
+        // declared over a member DTO never runs. See TimeDtoRules and TimeDtoRangeValidationTests.
+        RuleFor(x => x.DueTime!)
+            .ApplyTimeOfDayRules()
+            .When(x => x.DueTime != null);
 
         RuleForEach(x => x.Steps)
             .ChildRules(step =>

@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.Testing;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
@@ -64,10 +65,11 @@ public static class TodoListTestSeedHelper
         DbContext db, long activityId, long taskPriorityId, long todoListId,
         long userId = TestUserId, int? totalCount = null, int? doneCount = null, bool isDone = false,
         List<TodoListStep>? steps = null, long displayOrder = 1000, CancellationToken ct = default,
-        DateOnly? dueDate = null, long? pairedLeisureActivityId = null)
+        DateOnly? dueDate = null, long? pairedLeisureActivityId = null, IntTime? suggestedTime = null)
     {
         var entity = new TodoListItem
         {
+            SuggestedTime = suggestedTime,
             UserId = userId,
             ActivityId = activityId,
             TaskPriorityId = taskPriorityId,
