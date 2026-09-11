@@ -1,13 +1,21 @@
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.Core.application.dto.response.activity;
+using AdhdTimeOrganizer.Core.application.dto.response.extendable;
 using Sydowwe.Framework.application.dto.response;
-using Sydowwe.Framework.application.dto.response.@base;
+using Sydowwe.Framework.application.dto.response.generic;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.dto.response;
 
-public record ActivityBucketListProfileResponse : IdResponse, IProjectionResponse<ActivityBucketListProfileResponse, ActivityBucketListProfile>
+/// <inheritdoc cref="ActivityBacklogProfileResponse"/>
+public record ActivityBucketListProfileResponse : WithActivityResponse, IProjectionResponse<ActivityBucketListProfileResponse, ActivityBucketListProfile>
 {
     public required long ActivityId { get; init; }
+
     public required long ExperienceTypeId { get; init; }
+
+    /// <inheritdoc cref="ActivityBacklogProfileResponse.LocationType"/>
+    public required SelectOptionResponse ExperienceType { get; init; }
+
     public required int ComfortZoneStep { get; init; }
     public required bool RequiresTravel { get; init; }
     public decimal? FinancialGoal { get; init; }
@@ -39,7 +47,28 @@ public record ActivityBucketListProfileResponse : IdResponse, IProjectionRespons
         {
             Id = e.Id,
             ActivityId = e.ActivityId,
+            Activity = new ActivityResponse
+            {
+                Id = e.Activity.Id,
+                Name = e.Activity.Name,
+                Text = e.Activity.Text,
+                IsUnavoidable = e.Activity.IsUnavoidable,
+                IsArchived = e.Activity.IsArchived,
+                Role = new ActivityRoleResponse
+                {
+                    Id = e.Activity.Role.Id, Name = e.Activity.Role.Name, Text = e.Activity.Role.Text,
+                    Color = e.Activity.Role.Color, Icon = e.Activity.Role.Icon
+                },
+                Category = e.Activity.Category == null
+                    ? null
+                    : new ActivityCategoryResponse
+                    {
+                        Id = e.Activity.Category.Id, Name = e.Activity.Category.Name, Text = e.Activity.Category.Text,
+                        Color = e.Activity.Category.Color, Icon = e.Activity.Category.Icon
+                    }
+            },
             ExperienceTypeId = e.ExperienceTypeId,
+            ExperienceType = new SelectOptionResponse { Id = e.ExperienceType.Id, Text = e.ExperienceType.Text },
             ComfortZoneStep = e.ComfortZoneStep,
             RequiresTravel = e.RequiresTravel,
             FinancialGoal = e.FinancialGoal,
@@ -60,7 +89,28 @@ public record ActivityBucketListProfileResponse : IdResponse, IProjectionRespons
         {
             Id = e.Id,
             ActivityId = e.ActivityId,
+            Activity = new ActivityResponse
+            {
+                Id = e.Activity.Id,
+                Name = e.Activity.Name,
+                Text = e.Activity.Text,
+                IsUnavoidable = e.Activity.IsUnavoidable,
+                IsArchived = e.Activity.IsArchived,
+                Role = new ActivityRoleResponse
+                {
+                    Id = e.Activity.Role.Id, Name = e.Activity.Role.Name, Text = e.Activity.Role.Text,
+                    Color = e.Activity.Role.Color, Icon = e.Activity.Role.Icon
+                },
+                Category = e.Activity.Category == null
+                    ? null
+                    : new ActivityCategoryResponse
+                    {
+                        Id = e.Activity.Category.Id, Name = e.Activity.Category.Name, Text = e.Activity.Category.Text,
+                        Color = e.Activity.Category.Color, Icon = e.Activity.Category.Icon
+                    }
+            },
             ExperienceTypeId = e.ExperienceTypeId,
+            ExperienceType = new SelectOptionResponse { Id = e.ExperienceType.Id, Text = e.ExperienceType.Text },
             ComfortZoneStep = e.ComfortZoneStep,
             RequiresTravel = e.RequiresTravel,
             FinancialGoal = e.FinancialGoal,

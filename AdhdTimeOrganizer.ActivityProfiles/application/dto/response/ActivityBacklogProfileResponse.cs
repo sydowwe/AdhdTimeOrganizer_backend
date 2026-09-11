@@ -1,34 +1,74 @@
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
+using AdhdTimeOrganizer.Core.application.dto.response.activity;
+using AdhdTimeOrganizer.Core.application.dto.response.extendable;
 using Sydowwe.Framework.application.dto.response;
-using Sydowwe.Framework.application.dto.response.@base;
+using Sydowwe.Framework.application.dto.response.generic;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.dto.response;
 
-public record ActivityBacklogProfileResponse : IdResponse, IProjectionResponse<ActivityBacklogProfileResponse, ActivityBacklogProfile>
+/// <summary>
+/// A backlog row as the grid renders it.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Why the activity is nested rather than flattened.</b> This carried a flat <c>ActivityName</c>, which
+/// meant the grid's <c>activity.name</c> sort key resolved to nothing and had to be remapped, and the row
+/// could render a name but neither the category subtitle nor the avatar. Deriving from
+/// <see cref="WithActivityResponse"/> puts the whole <see cref="ActivityResponse"/> on the row — the same
+/// shape history rows, to-do items, planner tasks and timer presets already carry — so
+/// <c>activity.name</c>, <c>activity.role.name</c> and <c>activity.category.name</c> all resolve natively.
+/// </para>
+/// <para>
+/// The nested initializer is written out rather than shared because an EF projection cannot call into a
+/// stored expression without an expression-expanding query provider, which this solution does not use.
+/// Every other nested-activity response in the portal repeats it for the same reason.
+/// </para>
+/// <para>
+/// <see cref="ActivityId"/> stays alongside it. It duplicates <c>Activity.Id</c>, but it is what the
+/// create/update forms and the temptation-bundling pairing UI post back, and reading it off a nested
+/// object is a change to every caller for nothing.
+/// </para>
+/// </remarks>
+public record ActivityBacklogProfileResponse : WithActivityResponse, IProjectionResponse<ActivityBacklogProfileResponse, ActivityBacklogProfile>
 {
     public required long ActivityId { get; init; }
 
-    /// <summary>
-    /// Denormalized from the Activity so one read serves both the backlog list and the temptation-bundling
-    /// pairing UI: the to-do item stores a bare activity id, and without the name here resolving it to
-    /// something displayable meant a second call to /activity/all-options.
-    /// </summary>
-    public required string ActivityName { get; init; }
-
     public required long LocationTypeId { get; init; }
+
+    /// <summary>
+    /// The lookup itself, so the grid can render a label instead of an id and sort on
+    /// <c>locationType.text</c>. The <c>…Id</c> above is kept for the forms that post it back.
+    /// </summary>
+    public required SelectOptionResponse LocationType { get; init; }
+
     public required long WeatherDependencyId { get; init; }
+
+    /// <inheritdoc cref="LocationType"/>
+    public required SelectOptionResponse WeatherDependency { get; init; }
+
     public required EnergyLevel EnergyLevel { get; init; }
     public EffortType? EffortType { get; init; }
     public required int MinParticipants { get; init; }
     public int? MaxParticipants { get; init; }
+
     public required long ExpectedCostTierId { get; init; }
+
+    /// <inheritdoc cref="LocationType"/>
+    public required SelectOptionResponse ExpectedCostTier { get; init; }
+
     public required int DurationMinutes { get; init; }
+
+    /// <summary>
+    /// The activity can be done again. One name, one direction, everywhere — entity, column, request,
+    /// response and filter all say <c>IsRepeatable</c>, and nothing in the solution exposes the inverse
+    /// under a second name. A client that wants "is one-time" negates it at the point of use.
+    /// </summary>
     public required bool IsRepeatable { get; init; }
 
     /// <summary>
     /// True when the user has recorded a <see cref="MemoryAnchor"/> against this profile's Activity AND the
-    /// entry is one-time (<c>!IsRepeatable</c>) — anchoring marks an experience as had, which only closes a
+    /// entry is not repeatable — anchoring marks an experience as had, which only closes a
     /// backlog entry that was meant to happen once. A repeatable entry is never "done", so this stays false
     /// for it however many anchors its activity carries. Derived on read, never stored.
     /// </summary>
@@ -52,14 +92,36 @@ public record ActivityBacklogProfileResponse : IdResponse, IProjectionResponse<A
         {
             Id = e.Id,
             ActivityId = e.ActivityId,
-            ActivityName = e.Activity.Name,
+            Activity = new ActivityResponse
+            {
+                Id = e.Activity.Id,
+                Name = e.Activity.Name,
+                Text = e.Activity.Text,
+                IsUnavoidable = e.Activity.IsUnavoidable,
+                IsArchived = e.Activity.IsArchived,
+                Role = new ActivityRoleResponse
+                {
+                    Id = e.Activity.Role.Id, Name = e.Activity.Role.Name, Text = e.Activity.Role.Text,
+                    Color = e.Activity.Role.Color, Icon = e.Activity.Role.Icon
+                },
+                Category = e.Activity.Category == null
+                    ? null
+                    : new ActivityCategoryResponse
+                    {
+                        Id = e.Activity.Category.Id, Name = e.Activity.Category.Name, Text = e.Activity.Category.Text,
+                        Color = e.Activity.Category.Color, Icon = e.Activity.Category.Icon
+                    }
+            },
             LocationTypeId = e.LocationTypeId,
+            LocationType = new SelectOptionResponse { Id = e.LocationType.Id, Text = e.LocationType.Text },
             WeatherDependencyId = e.WeatherDependencyId,
+            WeatherDependency = new SelectOptionResponse { Id = e.WeatherDependency.Id, Text = e.WeatherDependency.Text },
             EnergyLevel = e.EnergyLevel,
             EffortType = e.EffortType,
             MinParticipants = e.MinParticipants,
             MaxParticipants = e.MaxParticipants,
             ExpectedCostTierId = e.ExpectedCostTierId,
+            ExpectedCostTier = new SelectOptionResponse { Id = e.ExpectedCostTier.Id, Text = e.ExpectedCostTier.Text },
             DurationMinutes = e.DurationMinutes,
             IsRepeatable = e.IsRepeatable
         });
@@ -78,14 +140,36 @@ public record ActivityBacklogProfileResponse : IdResponse, IProjectionResponse<A
         {
             Id = e.Id,
             ActivityId = e.ActivityId,
-            ActivityName = e.Activity.Name,
+            Activity = new ActivityResponse
+            {
+                Id = e.Activity.Id,
+                Name = e.Activity.Name,
+                Text = e.Activity.Text,
+                IsUnavoidable = e.Activity.IsUnavoidable,
+                IsArchived = e.Activity.IsArchived,
+                Role = new ActivityRoleResponse
+                {
+                    Id = e.Activity.Role.Id, Name = e.Activity.Role.Name, Text = e.Activity.Role.Text,
+                    Color = e.Activity.Role.Color, Icon = e.Activity.Role.Icon
+                },
+                Category = e.Activity.Category == null
+                    ? null
+                    : new ActivityCategoryResponse
+                    {
+                        Id = e.Activity.Category.Id, Name = e.Activity.Category.Name, Text = e.Activity.Category.Text,
+                        Color = e.Activity.Category.Color, Icon = e.Activity.Category.Icon
+                    }
+            },
             LocationTypeId = e.LocationTypeId,
+            LocationType = new SelectOptionResponse { Id = e.LocationType.Id, Text = e.LocationType.Text },
             WeatherDependencyId = e.WeatherDependencyId,
+            WeatherDependency = new SelectOptionResponse { Id = e.WeatherDependency.Id, Text = e.WeatherDependency.Text },
             EnergyLevel = e.EnergyLevel,
             EffortType = e.EffortType,
             MinParticipants = e.MinParticipants,
             MaxParticipants = e.MaxParticipants,
             ExpectedCostTierId = e.ExpectedCostTierId,
+            ExpectedCostTier = new SelectOptionResponse { Id = e.ExpectedCostTier.Id, Text = e.ExpectedCostTier.Text },
             DurationMinutes = e.DurationMinutes,
             IsRepeatable = e.IsRepeatable,
             IsAnchored = !e.IsRepeatable && anchors.Any(m => m.ActivityId == e.ActivityId),

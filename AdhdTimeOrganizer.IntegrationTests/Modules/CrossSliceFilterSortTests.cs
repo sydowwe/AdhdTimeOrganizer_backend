@@ -26,12 +26,13 @@ namespace AdhdTimeOrganizer.IntegrationTests.Modules;
 /// shape rather than by the model — and the two answers differ.
 /// </para>
 /// <para>
-/// <b>The two shapes, both in use.</b> A response may flatten the foreign column onto itself
-/// (<c>ActivityBacklogProfileResponse.ActivityName</c>) or nest it in an object
-/// (<c>ActivityResponse.Role</c>). Flattened has always worked. Nested needs a dotted sort key, which
-/// <c>QueryableEntityExtensions.SortByMany</c> resolves segment by segment — before that it threw
-/// <c>ArgumentException</c> out of <c>Expression.PropertyOrField</c>, i.e. a 500 on a key the grid
-/// looked like it should accept.
+/// <b>Nested is the shape the portal settled on.</b> A response could flatten the foreign column onto
+/// itself (<c>activityName</c>) or nest it in an object (<c>ActivityResponse.Role</c>). The profile grids
+/// flattened it and have been converted, so every grid that shows an activity now nests the whole
+/// <c>ActivityResponse</c> — which is what makes the activity's own role and category sortable rather than
+/// just its name. Nested needs a dotted sort key, which <c>QueryableEntityExtensions.SortByMany</c>
+/// resolves segment by segment — before that it threw <c>ArgumentException</c> out of
+/// <c>Expression.PropertyOrField</c>, i.e. a 500 on a key the grid looked like it should accept.
 /// </para>
 /// <para>
 /// Asserted on returned row <b>order</b> rather than on a 200, because the failure that matters is
@@ -65,21 +66,20 @@ public class CrossSliceFilterSortTests(AppDbContextFixture fixture) : PostgresTe
         return (await response.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, CancellationToken))!;
     }
 
-    private static string[] StringsOf(GridResponse page, IReadOnlyCollection<long> keepIds, string idField, string valueField) =>
-        page.Items
-            .Where(item => keepIds.Contains(item.GetProperty(idField).GetInt64()))
-            .Select(item => item.GetProperty(valueField).GetString()!)
-            .ToArray();
-
-    // ---- A: the flattened shape — ActivityProfiles sorting on a Core column ----------------------
+    // ---- A: a slice ordering by a column Core owns -----------------------------------------------
 
     /// <summary>
-    /// The ActivityProfiles grid orders by <c>activityName</c>, which is <c>Activity.Name</c> denormalized
-    /// into the response by the projection. This is the established pattern in this solution for showing
-    /// and ordering by another project's column, and the reason it is a projection field rather than a
-    /// <c>PostProcessItems</c> overlay: the base sorts after projecting, so a value filled in afterwards
-    /// sorts on its default.
+    /// The ActivityProfiles grid orders by <c>activity.name</c> — a column Core owns, reached through the
+    /// <c>ActivityResponse</c> the slice's projection nests. The reason it is in the projection at all
+    /// rather than a <c>PostProcessItems</c> overlay: the base sorts after projecting, so a value filled in
+    /// afterwards sorts on its default.
     /// </summary>
+    /// <remarks>
+    /// Kept distinct from <see cref="ActivityGrid_SortsByANestedMemberOfTheProjectedResponse"/> below even
+    /// though both now send a dotted key: that one is Core ordering by its own nested object, this one is a
+    /// slice ordering by an entity it does not own, and the project reference that makes it work is the
+    /// thing being frozen.
+    /// </remarks>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -94,17 +94,20 @@ public class CrossSliceFilterSortTests(AppDbContextFixture fixture) : PostgresTe
 
         var seeded = new[] { zebraId, mangoId, appleId };
 
-        var page = await PostGridAsync(BacklogGridRoute, GridBody([new { key = "activityName", isDesc }]));
+        var page = await PostGridAsync(BacklogGridRoute, GridBody([new { key = "activity.name", isDesc }]));
 
-        var names = StringsOf(page, seeded, "id", "activityName");
+        var names = page.Items
+            .Where(item => seeded.Contains(item.GetProperty("id").GetInt64()))
+            .Select(item => item.GetProperty("activity").GetProperty("name").GetString()!)
+            .ToArray();
 
         var expected = new[] { $"{prefix} Apple", $"{prefix} Mango", $"{prefix} Zebra" };
         if (isDesc)
             expected = expected.Reverse().ToArray();
 
         names.Should().Equal(expected,
-            "the grid sorts the projected response, and activityName is Activity.Name flattened onto it by "
-            + "ActivityBacklogProfileResponse — a slice ordering by a column Core owns");
+            "the grid sorts the projected response, and Activity.Name reaches it through the nested "
+            + "ActivityResponse ActivityBacklogProfileResponse projects — a slice ordering by a column Core owns");
     }
 
     // ---- B: the nested shape — a dotted sort key through the response object ---------------------
@@ -196,6 +199,67 @@ public class CrossSliceFilterSortTests(AppDbContextFixture fixture) : PostgresTe
         response.StatusCode.Should().NotBe(HttpStatusCode.OK,
             "an ignored sort key is worse than a failed request: the caller gets a plausible page in an "
             + "order nothing chose, and never learns which rows it did not see");
+    }
+
+    /// <summary>
+    /// The same dotted key, but through a member the projection builds <b>conditionally</b> —
+    /// <c>ActivityResponse.Category</c> is <c>e.Category == null ? null : new ActivityCategoryResponse{…}</c>,
+    /// because the FK is optional. <c>SortByMany</c>'s own remarks flag this as the case the provider may
+    /// refuse, so it is pinned rather than assumed: every nested-activity response in the solution
+    /// (history rows, to-do items, planner tasks, timer presets, the profile grids) carries a category in
+    /// exactly this shape, and whether it is sortable decides whether they need a flattened proxy member.
+    /// </summary>
+    /// <remarks>
+    /// Null ordering is <b>not</b> asserted. The uncategorised row is excluded from the comparison because
+    /// where it lands is Postgres's default (last ascending, first descending), not something this layer
+    /// chooses — see <c>SortByMany</c>. Pin that separately if the app ever fixes a placement.
+    /// </remarks>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ActivityGrid_SortsByANestedMemberOfAConditionallyProjectedObject(bool isDesc)
+    {
+        await using var db = CreateDbContext();
+
+        var prefix = $"xs-{Guid.NewGuid():N}"[..12];
+        var thirdId = await SeedActivityWithCategoryAsync(db, $"{prefix} third", $"{prefix} Charlie");
+        var firstId = await SeedActivityWithCategoryAsync(db, $"{prefix} first", $"{prefix} Alpha");
+        var secondId = await SeedActivityWithCategoryAsync(db, $"{prefix} second", $"{prefix} Bravo");
+
+        // Uncategorised, so the ORDER BY has to survive a NULL on the conditional branch.
+        await SeedActivityWithRoleAsync(db, $"{prefix} none", $"{prefix} Role");
+
+        var seeded = new[] { thirdId, firstId, secondId };
+
+        var page = await PostGridAsync(ActivityGridRoute, GridBody([new { key = "category.name", isDesc }]));
+
+        var ordered = page.Items
+            .Where(item => seeded.Contains(item.GetProperty("id").GetInt64()))
+            .Select(item => item.GetProperty("id").GetInt64())
+            .ToArray();
+
+        var expected = new[] { firstId, secondId, thirdId };
+        if (isDesc)
+            expected = expected.Reverse().ToArray();
+
+        ordered.Should().Equal(expected,
+            "a conditionally projected nested object must still be orderable through — otherwise every "
+            + "response carrying an optional Category needs a flattened proxy member to sort on");
+    }
+
+    private async Task<long> SeedActivityWithCategoryAsync(DbContext db, string activityName, string categoryName)
+    {
+        var role = new ActivityRole { UserId = UserId, Name = $"{categoryName} role", Color = "#112233" };
+        db.Set<ActivityRole>().Add(role);
+
+        var category = new ActivityCategory { UserId = UserId, Name = categoryName, Color = "#445566" };
+        db.Set<ActivityCategory>().Add(category);
+        await db.SaveChangesAsync(CancellationToken);
+
+        var activity = new Activity { UserId = UserId, Name = activityName, RoleId = role.Id, CategoryId = category.Id };
+        db.Set<Activity>().Add(activity);
+        await db.SaveChangesAsync(CancellationToken);
+        return activity.Id;
     }
 
     private async Task<long> SeedActivityWithRoleAsync(DbContext db, string activityName, string roleName)

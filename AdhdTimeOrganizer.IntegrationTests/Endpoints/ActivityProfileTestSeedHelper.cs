@@ -55,10 +55,27 @@ public static class ActivityProfileTestSeedHelper
         return role.Id;
     }
 
-    public static async Task<long> SeedActivityAsync(DbContext db, long userId, string name)
+    public static async Task<long> SeedCategoryAsync(DbContext db, long userId, string name)
     {
-        var roleId = await SeedRoleAsync(db, userId, $"{name} Role");
-        var activity = new Activity { UserId = userId, Name = name, RoleId = roleId };
+        var category = new ActivityCategory { UserId = userId, Name = name, Color = "#445566" };
+        db.Set<ActivityCategory>().Add(category);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return category.Id;
+    }
+
+    /// <summary>
+    /// <paramref name="roleName"/> and <paramref name="categoryName"/> default to null, which means "derive
+    /// a role from the activity name and file it under no category" — the shape most suites want. Pass them
+    /// when the test orders by <c>activity.role.name</c> or <c>activity.category.name</c>, where the
+    /// classification has to vary independently of the activity name for the assertion to mean anything.
+    /// </summary>
+    public static async Task<long> SeedActivityAsync(DbContext db, long userId, string name,
+        string? roleName = null, string? categoryName = null)
+    {
+        var roleId = await SeedRoleAsync(db, userId, roleName ?? $"{name} Role");
+        var categoryId = categoryName is null ? (long?)null : await SeedCategoryAsync(db, userId, categoryName);
+
+        var activity = new Activity { UserId = userId, Name = name, RoleId = roleId, CategoryId = categoryId };
         db.Set<Activity>().Add(activity);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return activity.Id;
@@ -74,9 +91,9 @@ public static class ActivityProfileTestSeedHelper
     }
 
     public static async Task<(long activityId, long profileId)> SeedBacklogProfileAsync(DbContext db, long userId,
-        string name = "Backlog Activity", bool isRepeatable = false)
+        string name = "Backlog Activity", bool isRepeatable = false, string? roleName = null, string? categoryName = null)
     {
-        var activityId = await SeedActivityAsync(db, userId, name);
+        var activityId = await SeedActivityAsync(db, userId, name, roleName, categoryName);
         var locationTypeId = await SeedLookupAsync<ActivityLocationType>(db, userId, $"{name} Home");
         var weatherId = await SeedLookupAsync<ActivityWeatherDependency>(db, userId, $"{name} Indoor");
         var costTierId = await SeedLookupAsync<ActivityExpectedCostTier>(db, userId, $"{name} Free");
