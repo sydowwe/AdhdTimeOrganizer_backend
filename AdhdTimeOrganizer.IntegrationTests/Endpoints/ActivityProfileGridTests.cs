@@ -672,7 +672,7 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
     }
 
     [Fact]
-    public async Task Backlog_Grid_IsOneTimeAndIsAnchoredFiltersCompose()
+    public async Task Backlog_Grid_IsRepeatableAndIsAnchoredFiltersCompose()
     {
         await using var db = CreateDbContext();
         var (doneActivityId, doneProfileId) = await SeedBacklogProfileAsync(db, FakeLoggedUserService.TestUserId, "See a solar eclipse");
@@ -686,14 +686,14 @@ public class ActivityProfileGridTests(AppDbContextFixture fixture) : PostgresTes
         // The two requests behind "1 of 2 experienced": the repeatable entry is not part of either total.
         var denominator = await client.PostAsJsonAsync(
             "api/activity-backlog-profile/grid",
-            FilteredGridBody(new { isOneTime = true }, itemsPerPage: 1),
+            FilteredGridBody(new { isRepeatable = false }, itemsPerPage: 1),
             JsonOpts, TestContext.Current.CancellationToken);
         denominator.StatusCode.Should().Be(HttpStatusCode.OK);
         (await denominator.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!.ItemsCount.Should().Be(2);
 
         var numerator = await client.PostAsJsonAsync(
             "api/activity-backlog-profile/grid",
-            FilteredGridBody(new { isOneTime = true, isAnchored = true }, itemsPerPage: 1),
+            FilteredGridBody(new { isRepeatable = false, isAnchored = true }, itemsPerPage: 1),
             JsonOpts, TestContext.Current.CancellationToken);
         numerator.StatusCode.Should().Be(HttpStatusCode.OK);
         var numeratorBody = (await numerator.Content.ReadFromJsonAsync<GridResponse>(JsonOpts, TestContext.Current.CancellationToken))!;

@@ -50,9 +50,6 @@ public class GridActivityBacklogProfileEndpoint(DbContext dbContext)
         if (filter.IsRepeatable.HasValue)
             query = query.Where(p => p.IsRepeatable == filter.IsRepeatable.Value);
 
-        if (filter.IsOneTime.HasValue)
-            query = query.Where(p => p.IsRepeatable != filter.IsOneTime.Value);
-
         if (filter.IsAnchored.HasValue)
         {
             var anchors = ScopedAnchors();

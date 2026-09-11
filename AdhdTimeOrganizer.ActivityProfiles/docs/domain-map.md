@@ -125,9 +125,11 @@ expressed as a POST body, and `seen` is an upsert keyed on a composite the bases
 ⚠ `ActivityBucketListProfileResponse` and `ActivityBacklogProfileResponse` each carry a **second**
 projection, `ProjectionWithAnchors(query, anchors)`, which is the only one that fills `IsAnchored` /
 `MemoryAnchorId`. The two grids use it through `BaseGridEndpoint.Projection`; the plain `Projection`
-answers "not done" for both fields. The matching `IsAnchored` filter field is tri-state, and the backlog
-filter also accepts `IsOneTime` — the inverse of `IsRepeatable`, under the name the clients use. See
-`summary.md` for why the fields cannot be overlaid after the query.
+answers "not done" for both fields. The matching `IsAnchored` filter field is tri-state. The backlog
+filter offers `IsRepeatable` and **no `IsOneTime` alias** — the inverse briefly had its own filter field,
+which put one question on the request under two spellings that a caller could contradict; a client wanting
+"one-time" sends `isRepeatable: false`. See `summary.md` for why the fields cannot be overlaid after the
+query.
 The lookups reuse Framework's generic `LookupResponse<T>` / `LookupFilter` and need no DTOs of their
 own.
 
