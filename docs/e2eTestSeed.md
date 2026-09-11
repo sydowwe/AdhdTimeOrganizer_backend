@@ -127,7 +127,7 @@ POST /api/test/seed          → 200 once the database is in the fixture state
 - **Synchronous.** It returns when the reset is complete. There is no 202-and-poll shape.
 - **Any non-2xx fails the whole test run**, with the status and body surfaced. There is no
   try/catch — a partial fixture is worse than no fixture.
-- **Cost:** ~1.5–2.0 s against a local Postgres.
+- **Cost:** ~2.5 s against a local Postgres — about 2 s of that is the ~1 700 tracking rows `e2e-v2` added.
 
 ### When the gate is closed
 
@@ -154,7 +154,8 @@ body, so a spec may hardcode them or read them.
 | secondary account `test2@example.com` | `10002` |
 | activity roles (primary) | `11001` Work, `11002` Health & Fitness, `11003` Hobbies & Leisure |
 | activity categories (primary) | `11501` Deep Work, `11502` Quick Tasks, `11503` Errands |
-| activities | `12001`–`12022` |
+| activities | `12001`–`12023` |
+| — the one desktop tracking attributes to | `12023` Desk Research |
 | — archived | `12010` Retired Hobby |
 | — referenced, so `canDelete: false` | `12011` Write Blog Post |
 | — unreferenced, so `canDelete: true` | `12012` Unused Idea |
@@ -169,7 +170,12 @@ body, so a spec may hardcode them or read them.
 | backlog / bucket-list / project profiles | `17001` / `17101` / `17201` |
 | memory anchor | `18001` |
 | routines (daily / weekly / monthly) | `19001` / `19002` / `19003` |
-| secondary account's own data | `11101`, `11601`, `12101`–`12102`, `13101`, `14101`–`14102`, `15501` |
+| day-planner templates | `20001` Home Office, `20002` Office Day, `20003` Relaxed Weekend (**pinned**) |
+| template tasks | `20101`–`20112` |
+| desktop mappings | `21001` → activity, `21002` ignore rule |
+| android mappings | `21101` → activity, `21102` ignore rule |
+| notifications | `22001`–`22006` (three unread, then three read) |
+| secondary account's own data | `11101`, `11601`, `12101`–`12102`, `13101`, `14101`–`14102`, `15501`, `22101`–`22102` |
 
 **Ids the fixture does not choose** — task priorities and routine time periods are created by the real
 sign-up path (`IUserDefaultsService`), so they are **resolved and returned** in the response
@@ -210,6 +216,50 @@ never rendered, because no data exercised them:
 
 Plus three routines (daily / weekly / monthly) with streaks in three different states.
 
+### The four surfaces `e2e-v2` added
+
+Same rule as the eight above — each was fully built and rendered nothing, because no row existed.
+
+9. **Three day-planner templates**, each with tasks across the day, one of them pinned. Two is the floor:
+   `/day-planner/templates/split` puts one template beside another, so a single template leaves that view as
+   unreachable as an empty list does. This is the one surface of the four a spec *could* create for itself
+   (`POST /api/task-planner-day-template` is an ordinary authenticated create) — it is seeded anyway because
+   the three views are documented by opening them, and a row that exists only because some spec ran leaves
+   them empty for anyone who opens them by hand.
+10. **Seven days of all three tracking ledgers** — 1 050 browser windows, 630 desktop windows, 35 Android
+    sessions. Seven because the widest default range a dashboard offers is a week, and a range that outruns
+    the data is still the empty state for most of it.
+11. **Distinct entries to map, and mappings beside them.** The two `settings/distinctEntries` grids are a
+    `GROUP BY` over the ledgers at read time, not a table of their own — so what has to be non-trivial is the
+    number of *groups*. Each desktop process carries two window titles for that reason. Each platform gets
+    both mapping outcomes: one rule resolving to an activity, one ignore rule.
+12. **Six notifications for the primary account** (three unread, three read) across six kinds, plus two for
+    the secondary one, so `All` / `Unread` and the type filter both discriminate and the bell is per-account.
+
+⚠ **The bell's text is Slovak regardless of the account's locale.** `NotificationTextRenderer` is documented
+as "v1 with sk-SK defaults" and takes no culture, so these rows render in Slovak for the `EN` fixture account.
+That is the app's behaviour, not the fixture's — a spec must not locate a notification by its English text.
+
+### ⚠ The tracking rows are written as rows, not posted through the heartbeats
+
+`B3` asked for the ingest path. It is not reachable from here, and what it would have added is reproduced
+instead:
+
+- The three ingest routes sit behind `PortalAuthorizationPolicies.ActivityTracking`, which does
+  `RequireRole(ExtensionRole)` — a role granted only to tokens minted for a browser extension. The seeder has
+  no principal at all, so there is no token it could present.
+- Their logic lives **inside the endpoint handlers**, not in a service anything else can call.
+- Nothing downstream is derived: both distinct grids group over these same tables at read time, so there is
+  no second table only the pipeline could fill.
+
+What is reproduced: minute-aligned `WindowStart` (the timeline stitches on `WindowStart == previous end`, so
+an unaligned value silently gaps it), one row per unique-index key, an Android `DurationSeconds` that agrees
+with its own two instants to the second, **the attribution** — the mapped desktop block runs at a full 60
+active seconds per window and goes through `IActivityTimeAttributionSink`, the same seam
+`DesktopActivityHeartbeatEndpoint` calls, so it collapses to one `ActivityHistory` row per block — and the
+ignore rule's process appearing **nowhere in the ledger**, because the heartbeat drops a matched entry before
+it writes a row.
+
 ### Determinism
 
 - **Dates are clock-relative**, computed from **one** UTC date read at the start of the reset, so two
@@ -239,7 +289,7 @@ number instead of assuming.
 
 ```jsonc
 {
-  "fixture": "e2e-v1",
+  "fixture": "e2e-v2",
   "seedDateUtc": "2026-09-10",
   "primaryUser":   { "id": 10001, "email": "test@example.com",  "password": "testpass123", "locale": "EN" },
   "secondaryUser": { "id": 10002, "email": "test2@example.com", "password": "testpass123", "locale": "EN" },
@@ -250,12 +300,20 @@ number instead of assuming.
                      "temptationBundled": 14015, "mostOverdue": 14007, "leastOverdue": 14012 },
   "profiles":      { "backlog": 17001, "bucketList": 17101, "project": 17201, "memoryAnchor": 18001 },
   "routines":      { "daily": 19001, "weekly": 19002, "monthly": 19003 },
+  "dayPlannerTemplates": { "homeOffice": 20001, "officeDay": 20002, "pinned": 20003 },
+  "trackingMappings":    { "desktopToActivity": 21001, "desktopIgnored": 21002,
+                           "androidToActivity": 21101, "androidIgnored": 21102 },
+  "notifications":       { "newestUnread": 22001, "oldestRead": 22006, "secondaryNewest": 22101 },
   "taskPriorities":     { "Today": 9, "This week": 10, "This month": 11, "This year": 12 },
   "routineTimePeriods": { "Daily": 5, "Weekly": 6, "Monthly": 7, "Yearly": 8 },
   "counts": {
-    "activities": 22, "todoListItems": 15, "overdueTodoListItems": 6,
-    "calibrationTodoListItems": 6, "activityHistoryEntries": 19,
-    "plannerTasks": 7, "calendars": 730
+    "activities": 23, "todoListItems": 15, "overdueTodoListItems": 6,
+    "calibrationTodoListItems": 6, "activityHistoryEntries": 26,
+    "plannerTasks": 7, "calendars": 730,
+    "dayPlannerTemplates": 3, "templatePlannerTasks": 12,
+    "webExtensionEntries": 1050, "desktopEntries": 630, "distinctDesktopEntries": 6,
+    "androidSessions": 35, "distinctAndroidEntries": 5,
+    "notifications": 6, "unreadNotifications": 3
   }
 }
 ```
@@ -282,8 +340,12 @@ reason to touch `E2eFixtureSeeder.cs`.
    does not grow. A new list, an item, an activity, a profile all fall here.
 3. **Is X a state the app has no way to produce?** *Then* it belongs in the fixture. A due date in the
    past. Three `ActivityHistory` rows dated −1 / −3 / −7. A streak mid-run. A row behind the archival
-   query filter. A second account. These are exactly the eight surfaces the fixture holds today, and
-   the list is short on purpose.
+   query filter. A second account. Browsing and desktop rows, which only an extension-role token may post.
+   A notification, which nothing client-side can raise at all. These are exactly the twelve surfaces the
+   fixture holds today, and the list is short on purpose.
+
+   Day-planner templates are the one entry that fails question 2 and is seeded anyway — see surface 9 above
+   for why. Treat that as the exception it is, not the precedent.
 
 **Do not make the endpoint take a shape parameter.** "Give me three overdue items and a weekly
 streak" turns this into a second write API, parallel to the real one and untested by anything that

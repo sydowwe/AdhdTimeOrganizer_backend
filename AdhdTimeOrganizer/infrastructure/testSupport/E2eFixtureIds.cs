@@ -22,7 +22,11 @@ namespace AdhdTimeOrganizer.infrastructure.testSupport;
 public static class E2eFixtureIds
 {
     /// <summary>Bumped whenever the fixture's shape changes in a way a spec could notice.</summary>
-    public const string FixtureVersion = "e2e-v1";
+    /// <remarks>
+    /// <c>e2e-v2</c> added the four surfaces that had no rows at all: day-planner templates, the three
+    /// tracking ledgers with their pattern mappings, and the notification bell.
+    /// </remarks>
+    public const string FixtureVersion = "e2e-v2";
 
     // --- accounts -------------------------------------------------------------------------------
     // Credentials mirror the SPA's e2e/.env.test. The password is stored as a hash written directly by
@@ -89,6 +93,14 @@ public static class E2eFixtureIds
     public const long ActivityTakeMedication = 12_020;
     public const long ActivityWeeklyReview = 12_021;
     public const long ActivityPayRent = 12_022;
+
+    /// <summary>
+    /// The one activity desktop tracking attributes time to. Deliberately its own activity rather than one
+    /// of the calibration set: the attribution rows are written by the real seam
+    /// (<c>IActivityTimeAttributionSink</c>), and folding machine-recorded time into the six activities the
+    /// estimate-vs-actual surfaces average over would move numbers a spec asserts on for an unrelated reason.
+    /// </summary>
+    public const long ActivityDeskResearch = 12_023;
 
     public const long SecondaryActivityDraftProposal = 12_101;
     public const long SecondaryActivityPostParcel = 12_102;
@@ -157,4 +169,42 @@ public static class E2eFixtureIds
     public const long RoutineTakeMedication = 19_001;
     public const long RoutineWeeklyReview = 19_002;
     public const long RoutinePayRent = 19_003;
+
+    // --- day-planner templates ------------------------------------------------------------------
+    // Three, not one: /day-planner/templates/split puts two templates side by side, so a fixture with a
+    // single template leaves half that view unreachable in exactly the way an empty list does.
+    public const long TemplateHomeOffice = 20_001;
+    public const long TemplateOfficeDay = 20_002;
+
+    /// <summary>Pinned, so the template list's pinned section is not empty either.</summary>
+    public const long TemplateRelaxedWeekend = 20_003;
+
+    /// <summary>Template tasks run 20_101–20_112, in the order the three templates are declared.</summary>
+    public const long TemplateTaskFirst = 20_101;
+
+    // --- tracking pattern mappings --------------------------------------------------------------
+    /// <summary>
+    /// Matches the one desktop process the ledger records at a full 60 active seconds per window, so the
+    /// attribution the real ingest path performs is part of the fixture rather than a rule nothing exercises.
+    /// </summary>
+    public const long DesktopMappingRider = 21_001;
+
+    /// <summary>
+    /// An ignore rule. Its process appears nowhere in the ledger, which is not an oversight — the ingest
+    /// path drops an entry an ignore rule matches, so a fixture holding both the rule and its rows would
+    /// describe a state the pipeline cannot produce.
+    /// </summary>
+    public const long DesktopMappingIgnoredLauncher = 21_002;
+
+    public const long AndroidMappingSpotify = 21_101;
+    public const long AndroidMappingIgnoredSettings = 21_102;
+
+    // --- notifications --------------------------------------------------------------------------
+    /// <summary>
+    /// The bell list: 22_001–22_006 for the primary account (three unread, then three read), 22_101–22_102
+    /// for the secondary one. Six kinds rather than six copies of one, so the type filter discriminates.
+    /// </summary>
+    public const long NotificationFirst = 22_001;
+
+    public const long SecondaryNotificationFirst = 22_101;
 }

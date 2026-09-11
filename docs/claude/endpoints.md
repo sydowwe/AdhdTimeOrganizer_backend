@@ -166,7 +166,14 @@ to the fixture the SPA's Playwright suite expects. It is the one endpoint in thi
   reuse `IAppWideDefaultSeederManager` (roles + root admin) and `IUserDefaultsService` (each account's
   per-user defaults), so a fixture account is shaped exactly like one the app created.
 - **The ids it guarantees live in `E2eFixtureIds`** and are echoed in the response body. They are a
-  contract with the SPA repo — add an id rather than renumbering one.
+  contract with the SPA repo — add an id rather than renumbering one. `FixtureVersion` lives there too and
+  the SPA fails global setup on a mismatch, so a shape change a spec could notice has to bump it.
+- **A row the fixture writes must be one the app's own write path could have produced.** The three tracking
+  ledgers are the case that bites: their ingest endpoints require the extension role, so the seeder writes
+  the rows directly — and therefore has to carry the pipeline's rules itself (minute-aligned windows,
+  attribution through `IActivityTimeAttributionSink`, nothing stored for a process an ignore rule matches).
+  Adding to them without those rules seeds a state the app cannot reach, which is worse than an empty grid
+  because it looks real.
 - The reset is `TRUNCATE … RESTART IDENTITY CASCADE` over every table **in the model**, derived from
   `dbContext.Model` so it cannot drift from the mapping, minus the `scheduler` schema (operational
   state; its registrars only run at boot). `__EFMigrationsHistory` is not an entity and so can never

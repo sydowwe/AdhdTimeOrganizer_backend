@@ -191,3 +191,12 @@ worth copying the shape of:
   plus its memory anchor. Every one of those surfaces is fully built and simply never rendered before,
   which is precisely why a 200 from the endpoint proves nothing. Idempotency is asserted by snapshotting
   every id and value out of the database, seeding again, and comparing — not by counting rows.
+  The `e2e-v2` additions are pinned the same way, and two of them carry a claim a row count cannot make.
+  The tracking ledgers are asserted through the *rules of the ingest path they bypass*: minute-aligned
+  window starts, an Android duration that agrees with its own two instants (the sync endpoint drops one
+  that does not), one `ActivityHistory` row per contiguous mapped block rather than one per window, and
+  **nothing at all** stored for the process the ignore rule matches — a fixture describing a state the
+  pipeline could not produce is not a fixture. The notifications get a renderer assertion beside the row
+  one, for the same reason the estimate needed a projection assertion: `NotificationTextRenderer` falls
+  back to a generic body for a payload it cannot bind, so a drifted payload seeds rows that render as
+  "Máte novú notifikáciu" and look like a renderer bug while every row assertion passes.

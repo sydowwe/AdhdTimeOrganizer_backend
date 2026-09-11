@@ -23,6 +23,9 @@ public sealed record TestSeedResponse(
     IReadOnlyDictionary<string, long> TodoListItems,
     IReadOnlyDictionary<string, long> Profiles,
     IReadOnlyDictionary<string, long> Routines,
+    IReadOnlyDictionary<string, long> DayPlannerTemplates,
+    IReadOnlyDictionary<string, long> TrackingMappings,
+    IReadOnlyDictionary<string, long> Notifications,
     IReadOnlyDictionary<string, long> TaskPriorities,
     IReadOnlyDictionary<string, long> RoutineTimePeriods,
     TestSeedCounts Counts);
@@ -43,6 +46,15 @@ public sealed record TestSeedAccount(long Id, string Email, string Password, str
 /// Items carrying a non-zero <c>suggestedTime</c> whose activity also has history rows — the input to
 /// the estimate-vs-actual chip and the header ratio line.
 /// </param>
+/// <param name="DistinctDesktopEntries">
+/// How many <c>(productName, processName, windowTitle)</c> groups the desktop ledger holds — the row count
+/// <c>/activity-tracking/desktop/settings/distinctEntries</c> shows, which is not the entry count and is the
+/// number a spec paginating that grid actually needs.
+/// </param>
+/// <param name="UnreadNotifications">
+/// Strictly smaller than <paramref name="Notifications"/>, which is what makes the bell's <c>All</c> /
+/// <c>Unread</c> filter distinguishable at all.
+/// </param>
 public sealed record TestSeedCounts(
     int Activities,
     int TodoListItems,
@@ -50,4 +62,13 @@ public sealed record TestSeedCounts(
     int CalibrationTodoListItems,
     int ActivityHistoryEntries,
     int PlannerTasks,
-    int Calendars);
+    int Calendars,
+    int DayPlannerTemplates,
+    int TemplatePlannerTasks,
+    int WebExtensionEntries,
+    int DesktopEntries,
+    int DistinctDesktopEntries,
+    int AndroidSessions,
+    int DistinctAndroidEntries,
+    int Notifications,
+    int UnreadNotifications);

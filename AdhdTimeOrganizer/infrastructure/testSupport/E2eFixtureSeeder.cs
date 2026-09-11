@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.application.dto.testSupport;
+using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.infrastructure.security;
@@ -11,13 +12,22 @@ using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
+using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.domain.serviceContract;
 using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
+using Sydowwe.Notifications.domain.entity;
+using DayTypeEnum = AdhdTimeOrganizer.Core.domain.model.@enum.DayType;
+using LocationEnum = AdhdTimeOrganizer.Core.domain.model.@enum.Location;
 using static AdhdTimeOrganizer.infrastructure.testSupport.E2eFixtureIds;
 
 namespace AdhdTimeOrganizer.infrastructure.testSupport;
@@ -54,6 +64,7 @@ public class E2eFixtureSeeder(
     IAppWideDefaultSeederManager appWideDefaults,
     IUserDefaultsService userDefaults,
     IPasswordHasher<User> passwordHasher,
+    IActivityTimeAttributionSink attributionSink,
     ILogger<E2eFixtureSeeder> logger) : IScopedService, IE2eFixtureSeeder
 {
     /// <summary>
@@ -95,15 +106,81 @@ public class E2eFixtureSeeder(
     ];
 
     /// <summary>
+    /// How many days of tracking the three ledgers carry, counting back from the seed date inclusive. Seven,
+    /// because the dashboards' widest default range is a week and a range that outruns the data renders as
+    /// the empty state this fixture exists to remove.
+    /// </summary>
+    private const int TrackingDays = 7;
+
+    /// <summary>
+    /// The browsing ledger, as contiguous one-minute windows. Each block writes one row per minute for its
+    /// primary domain and one for the background domain, which is the shape
+    /// <c>WebExtensionDataHeartbeatEndpoint</c> stores and <c>WebExtensionTimelineEndpoint</c> stitches back
+    /// into sessions — it derives each window's end as <c>WindowStart.AddMinutes(1)</c> and joins adjacent
+    /// windows, so a gap in the minutes is a gap in the timeline.
+    /// </summary>
+    private static readonly WebBlock[] WebBlocks =
+    [
+        new(StartHour: 9, Minutes: 30, "github.com", "https://github.com/sydowwe/adhd-time-organizer/pulls", "docs.microsoft.com"),
+        new(StartHour: 13, Minutes: 25, "chatgpt.com", "https://chatgpt.com/", "github.com"),
+        new(StartHour: 19, Minutes: 20, "youtube.com", "https://youtube.com/watch", "reddit.com")
+    ];
+
+    /// <summary>
+    /// The desktop ledger. <c>rider64.exe</c> is the one block recorded at a full 60 active seconds per
+    /// window — that is what makes the windows contiguous in the ledger's own terms, so the attribution the
+    /// heartbeat performs collapses into one <c>ActivityHistory</c> row per block instead of one per minute
+    /// (<c>ActivityHistoryTimeAttributionSink</c> extends a record whose end equals the next window's start).
+    /// <para>
+    /// The two window titles per process are what the distinct-entries grid groups on, together with the
+    /// process and product names — one title would make that grid one row per process.
+    /// </para>
+    /// </summary>
+    private static readonly DesktopBlock[] DesktopBlocks =
+    [
+        new(StartHour: 9, Minutes: 30, "rider64.exe", "JetBrains Rider", @"C:\Program Files\JetBrains\Rider\bin\rider64.exe",
+            ["AdhdTimeOrganizer – E2eFixtureSeeder.cs", "AdhdTimeOrganizer – TestSeedGate.cs"], ActiveSeconds: 60, IsMapped: true),
+        new(StartHour: 11, Minutes: 25, "chrome.exe", "Google Chrome", @"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            ["GitHub – Pull requests", "Stack Overflow – EF Core partitioning"], ActiveSeconds: 45, IsMapped: false),
+        new(StartHour: 15, Minutes: 20, "Code.exe", "Visual Studio Code", @"C:\Program Files\Microsoft VS Code\Code.exe",
+            ["adhd-time-organizer – global-setup.ts"], ActiveSeconds: 50, IsMapped: false),
+        new(StartHour: 20, Minutes: 15, "vlc.exe", "VLC media player", @"C:\Program Files\VideoLAN\VLC\vlc.exe",
+            ["Documentary.mkv"], ActiveSeconds: 55, IsMapped: false)
+    ];
+
+    /// <summary>
+    /// The Android ledger — whole sessions rather than minute windows, which is what the phone uploads.
+    /// Five apps, so the distinct-entries grid and the app pie chart both have something to separate.
+    /// </summary>
+    private static readonly AndroidApp[] AndroidApps =
+    [
+        new("com.spotify.music", "Spotify", StartHour: 8, Minutes: 35),
+        new("com.google.android.gm", "Gmail", StartHour: 10, Minutes: 12),
+        new("com.android.chrome", "Chrome", StartHour: 12, Minutes: 28),
+        new("com.whatsapp", "WhatsApp", StartHour: 17, Minutes: 18),
+        new("com.duolingo", "Duolingo", StartHour: 21, Minutes: 15)
+    ];
+
+    /// <summary>The device every seeded Android session was uploaded from.</summary>
+    private const string AndroidDeviceId = "e2e-pixel-7";
+
+    /// <summary>
     /// Every table this seeder writes an explicit id into. Their sequences are advanced past the fixture
     /// band afterwards — see <see cref="AdvanceSequencesAsync"/>.
     /// </summary>
+    /// <remarks>
+    /// The three tracking ledgers are deliberately absent: they hold thousands of rows no spec addresses by
+    /// id, so they keep their generated ids and their sequences need no nudge.
+    /// </remarks>
     private static readonly Type[] ExplicitIdEntities =
     [
         typeof(User), typeof(ActivityRole), typeof(ActivityCategory), typeof(Activity),
         typeof(TodoList), typeof(TodoListItem), typeof(ActivityHistory), typeof(PlannerTask),
         typeof(ActivityBacklogProfile), typeof(ActivityBucketListProfile), typeof(ActivityProjectProfile),
-        typeof(MemoryAnchor), typeof(RoutineTodoList)
+        typeof(MemoryAnchor), typeof(RoutineTodoList),
+        typeof(TaskPlannerDayTemplate), typeof(TemplatePlannerTask),
+        typeof(TrackerDesktopMappingByPattern), typeof(TrackerAndroidMappingByPattern),
+        typeof(Notification)
     ];
 
     public async Task<TestSeedResponse> ResetAsync(CancellationToken ct)
@@ -329,6 +406,10 @@ public class E2eFixtureSeeder(
             AddActivity(entry.ActivityId, userId, entry.Name, entry.RoleId, PrimaryCategoryErrands);
 
         AddActivity(ActivityDeepCleanKitchen, userId, "Deep Clean Kitchen", PrimaryRoleHealth, PrimaryCategoryErrands);
+
+        // Desktop tracking attributes to this one and nothing else does — see the id's own remarks.
+        AddActivity(ActivityDeskResearch, userId, "Desk Research", PrimaryRoleWork, PrimaryCategoryDeepWork);
+
         AddActivity(ActivityTakeMedication, userId, "Take Medication", PrimaryRoleHealth, null);
         AddActivity(ActivityWeeklyReview, userId, "Weekly Review", PrimaryRoleWork, PrimaryCategoryQuickTasks);
         AddActivity(ActivityPayRent, userId, "Pay Rent", PrimaryRoleHealth, PrimaryCategoryErrands);
@@ -360,14 +441,22 @@ public class E2eFixtureSeeder(
             Length = FromMinutes(50)
         });
 
-        AddRoutines(userId, today, await RoutineTimePeriodIdsAsync(userId, ct));
+        var periods = await RoutineTimePeriodIdsAsync(userId, ct);
+
+        AddRoutines(userId, today, periods);
         AddLeisureProfiles(userId, today, await LookupIdsAsync(userId, ct));
+        AddDayPlannerTemplates(userId, await ImportanceIdsAsync(userId, ct));
+        AddTrackingMappings(userId);
 
         await dbContext.SaveChangesAsync(ct);
 
         // Planner tasks need the calendar rows CreateDefaultsAsync produced, so they come last.
         await AddPlannerTasksAsync(userId, today, ct);
         await dbContext.SaveChangesAsync(ct);
+
+        // After the planner tasks: one notification deep-links to the first of them.
+        await AddTrackingLedgersAsync(userId, today, ct);
+        await AddNotificationsAsync(userId, today, periods, ct);
     }
 
     /// <summary>
@@ -697,6 +786,418 @@ public class E2eFixtureSeeder(
             });
     }
 
+    // --- day-planner templates --------------------------------------------------------------------
+
+    /// <summary>
+    /// Three templates with tasks across the day. Two is the floor — <c>/day-planner/templates/split</c>
+    /// compares one against another, so a single template leaves that view in the same unreachable state an
+    /// empty list does — and the third carries the pin, so the list's pinned section renders too.
+    /// </summary>
+    /// <remarks>
+    /// This is the one surface of the four an e2e spec could create for itself:
+    /// <c>POST /api/task-planner-day-template</c> is an ordinary authenticated create. It is seeded anyway
+    /// because the read-only views (<c>/templates</c>, <c>/templates/:id</c>, <c>/templates/split</c>) are
+    /// documented by opening them, and a row that exists only because some spec ran leaves them empty for
+    /// anyone who opens them by hand.
+    /// </remarks>
+    private void AddDayPlannerTemplates(long userId, IReadOnlyDictionary<int, long> importances)
+    {
+        dbContext.Set<TaskPlannerDayTemplate>().AddRange(
+            new TaskPlannerDayTemplate
+            {
+                Id = TemplateHomeOffice,
+                UserId = userId,
+                Name = "Home Office",
+                Description = "A full desk day without the commute",
+                Icon = "fas fa-house-laptop",
+                IsActive = true,
+                DefaultWakeUpTime = new TimeOnly(7, 0),
+                DefaultBedTime = new TimeOnly(23, 0),
+                SuggestedForDayType = DayTypeEnum.Workday,
+                ScheduledDays = [DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday],
+                SuggestedLocation = LocationEnum.Home,
+                Tags = ["focused", "deep work"],
+                UsageCount = 4
+            },
+            new TaskPlannerDayTemplate
+            {
+                Id = TemplateOfficeDay,
+                UserId = userId,
+                Name = "Office Day",
+                Description = "On site, with the commute either side",
+                Icon = "fas fa-building",
+                IsActive = true,
+                DefaultWakeUpTime = new TimeOnly(6, 30),
+                DefaultBedTime = new TimeOnly(22, 30),
+                SuggestedForDayType = DayTypeEnum.Workday,
+                ScheduledDays = [DayOfWeek.Tuesday, DayOfWeek.Thursday],
+                SuggestedLocation = LocationEnum.Office,
+                Tags = ["commute", "meetings"],
+                UsageCount = 2
+            },
+            new TaskPlannerDayTemplate
+            {
+                Id = TemplateRelaxedWeekend,
+                UserId = userId,
+                Name = "Relaxed Weekend",
+                Description = "Errands in the morning, nothing after lunch",
+                Icon = "fas fa-umbrella-beach",
+                IsActive = true,
+                DefaultWakeUpTime = new TimeOnly(9, 0),
+                DefaultBedTime = new TimeOnly(23, 30),
+                SuggestedForDayType = DayTypeEnum.Weekend,
+                ScheduledDays = [DayOfWeek.Saturday, DayOfWeek.Sunday],
+                SuggestedLocation = LocationEnum.Home,
+                Tags = ["relaxed"],
+                IsPinned = true,
+                UsageCount = 7
+            });
+
+        var critical = importances[TaskImportance.CriticalMarkerValue];
+        var optional = importances[TaskImportance.OptionalMarkerValue];
+
+        // (template, activity, start hour:minute, minutes, importance) — laid out so each template reads as
+        // a plausible day rather than three tasks in a row, since these are what the template detail view and
+        // the split comparison actually render.
+        var tasks = new (long TemplateId, long ActivityId, int Hour, int Minute, int Minutes, long? ImportanceId, string Location)[]
+        {
+            (TemplateHomeOffice, ActivityMorningExercise, 7, 30, 40, null, "Home"),
+            (TemplateHomeOffice, ActivityBugFixing, 9, 0, 90, critical, "Home"),
+            (TemplateHomeOffice, ActivityCodeReview, 11, 0, 30, null, "Home"),
+            (TemplateHomeOffice, ActivityMealPreparation, 12, 30, 45, null, "Home"),
+            (TemplateHomeOffice, ActivityFeatureDevelopment, 14, 0, 120, optional, "Home"),
+
+            (TemplateOfficeDay, ActivityMorningExercise, 6, 45, 30, null, "Gym"),
+            (TemplateOfficeDay, ActivityCodeReview, 9, 30, 45, critical, "Office"),
+            (TemplateOfficeDay, ActivityFeatureDevelopment, 10, 30, 150, null, "Office"),
+            (TemplateOfficeDay, ActivityDeskResearch, 15, 0, 60, optional, "Office"),
+
+            (TemplateRelaxedWeekend, ActivityGroceryShopping, 10, 0, 60, null, "Town"),
+            (TemplateRelaxedWeekend, ActivityDeepCleanKitchen, 11, 30, 90, optional, "Home"),
+            (TemplateRelaxedWeekend, ActivityReadANovel, 15, 0, 75, null, "Home")
+        };
+
+        var id = TemplateTaskFirst;
+
+        foreach (var task in tasks)
+        {
+            var start = new TimeOnly(task.Hour, task.Minute);
+
+            dbContext.Set<TemplatePlannerTask>().Add(new TemplatePlannerTask
+            {
+                Id = id++,
+                UserId = userId,
+                TemplateId = task.TemplateId,
+                ActivityId = task.ActivityId,
+                StartTime = start,
+                EndTime = start.AddMinutes(task.Minutes),
+                IsBackground = false,
+                ImportanceId = task.ImportanceId,
+                Location = task.Location
+            });
+        }
+    }
+
+    // --- activity tracking ------------------------------------------------------------------------
+
+    /// <summary>
+    /// The two pattern-mapping kinds per platform, so the <i>Mappings</i> tab beside each distinct-entries
+    /// grid is not empty and the "to activity" / "to ignored" workflow has both outcomes on screen.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ The two rules are not interchangeable, and which entries exist alongside them is part of the claim:
+    /// <list type="bullet">
+    /// <item>The <b>activity</b> rule matches <c>rider64.exe</c>, which the ledger does hold — and the
+    /// seconds it matches are attributed in <see cref="AddTrackingLedgersAsync"/> through the same seam the
+    /// heartbeat uses. A rule that resolves to an activity but leaves no attribution behind is a state the
+    /// ingest path cannot produce.</item>
+    /// <item>The <b>ignore</b> rule matches a process the ledger holds nothing for, for the mirror-image
+    /// reason: the heartbeat drops an entry an ignore rule matches before it ever writes a row.</item>
+    /// </list>
+    /// </remarks>
+    private void AddTrackingMappings(long userId)
+    {
+        dbContext.Set<TrackerDesktopMappingByPattern>().AddRange(
+            new TrackerDesktopMappingByPattern
+            {
+                Id = DesktopMappingRider,
+                UserId = userId,
+                ProcessName = "rider64.exe",
+                ProcessNameMatchType = PatternMatchType.Exact,
+                IsActive = true,
+                // Exactly one target group may be set (CK_TrackerDesktopMappingByPattern_TargetRequired):
+                // an activity here, so Role, Category and IsIgnored all stay null.
+                ActivityId = ActivityDeskResearch
+            },
+            new TrackerDesktopMappingByPattern
+            {
+                Id = DesktopMappingIgnoredLauncher,
+                UserId = userId,
+                ProcessName = "SteamLauncher.exe",
+                ProcessNameMatchType = PatternMatchType.Exact,
+                IsActive = true,
+                // Never false — CK_TrackerDesktopMappingByPattern_IsIgnoredOnlyTrue allows only NULL or TRUE.
+                IsIgnored = true
+            });
+
+        dbContext.Set<TrackerAndroidMappingByPattern>().AddRange(
+            new TrackerAndroidMappingByPattern
+            {
+                Id = AndroidMappingSpotify,
+                UserId = userId,
+                PackageName = "com.spotify.music",
+                PackageNameMatchType = PatternMatchType.Exact,
+                IsActive = true,
+                ActivityId = ActivityReadANovel
+            },
+            new TrackerAndroidMappingByPattern
+            {
+                Id = AndroidMappingIgnoredSettings,
+                UserId = userId,
+                PackageName = "com.android.settings",
+                PackageNameMatchType = PatternMatchType.Exact,
+                IsActive = true,
+                IsIgnored = true
+            });
+    }
+
+    /// <summary>
+    /// The three ingest ledgers, seven days deep: browser windows, desktop windows and Android sessions.
+    /// Without these every dashboard in <c>/activity-tracking</c> renders its whole control surface over
+    /// "No activity recorded for this period", and both <c>settings/distinctEntries</c> grids are empty.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Written as rows, not posted through the heartbeat endpoints.</b> The three ingest routes sit
+    /// behind <c>PortalAuthorizationPolicies.ActivityTracking</c>, which requires the extension role — the
+    /// seeder has no principal at all, so there is no token it could present — and their logic lives inside
+    /// the endpoint handlers rather than in a service anything else can call. What the ingest path would have
+    /// added is reproduced here instead: minute-aligned window starts (the timeline stitches on
+    /// <c>WindowStart == previous end</c>), one row per unique-index key, ignore rules honoured by omission,
+    /// and the attribution below.</para>
+    /// <para>Nothing is derived downstream — both distinct-entries grids are a <c>GROUP BY</c> over these
+    /// same tables at read time, so there is no second table that only the pipeline could have filled.</para>
+    /// </remarks>
+    private async Task AddTrackingLedgersAsync(long userId, DateOnly today, CancellationToken ct)
+    {
+        var webEntries = new List<WebExtensionActivityEntry>();
+        var desktopEntries = new List<DesktopActivityEntry>();
+        var androidSessions = new List<AndroidSessionData>();
+
+        // Oldest first, so the generated ids ascend with time the way a real ledger's do.
+        for (var daysAgo = TrackingDays - 1; daysAgo >= 0; daysAgo--)
+        {
+            var date = today.AddDays(-daysAgo);
+
+            foreach (var block in WebBlocks)
+                for (var minute = 0; minute < block.Minutes; minute++)
+                {
+                    var windowStart = Utc(date, block.StartHour).AddMinutes(minute);
+                    var isLast = minute == block.Minutes - 1;
+
+                    webEntries.Add(new WebExtensionActivityEntry
+                    {
+                        UserId = userId,
+                        WindowStart = windowStart,
+                        Domain = block.PrimaryDomain,
+                        Url = block.PrimaryUrl,
+                        // Varied rather than flat, and derived from the index rather than drawn at random:
+                        // a chart whose every bar is the same height proves nothing, and a random one is a
+                        // different fixture on every reset.
+                        ActiveSeconds = 40 + minute * 7 % 21,
+                        BackgroundSeconds = 0,
+                        IsFinal = isLast
+                    });
+
+                    webEntries.Add(new WebExtensionActivityEntry
+                    {
+                        UserId = userId,
+                        WindowStart = windowStart,
+                        Domain = block.BackgroundDomain,
+                        // Domain-only tracking: a legitimate entry the extension produces whenever no page
+                        // URL was captured, and the reason WebExtensionActivityEntry.Url is nullable.
+                        Url = null,
+                        ActiveSeconds = 0,
+                        BackgroundSeconds = 10 + minute * 11 % 21,
+                        IsFinal = isLast
+                    });
+                }
+
+            foreach (var block in DesktopBlocks)
+            {
+                for (var minute = 0; minute < block.Minutes; minute++)
+                    desktopEntries.Add(new DesktopActivityEntry
+                    {
+                        UserId = userId,
+                        WindowStart = Utc(date, block.StartHour).AddMinutes(minute),
+                        ProcessName = block.ProcessName,
+                        ProductName = block.ProductName,
+                        // Held for ten minutes at a time, so each title is a session rather than a flicker —
+                        // and so the distinct-entries grid has more rows than it has processes.
+                        WindowTitle = block.WindowTitles[minute / 10 % block.WindowTitles.Length],
+                        ExecutablePath = block.ExecutablePath,
+                        IsFullscreen = false,
+                        ActiveSeconds = block.ActiveSeconds,
+                        BackgroundSeconds = 60 - block.ActiveSeconds,
+                        IsPlayingSound = block.ProcessName == "vlc.exe",
+                        ActiveMonitor = 1
+                    });
+
+                if (!block.IsMapped)
+                    continue;
+
+                // The attribution the desktop heartbeat performs for a mapped entry, through Core's seam —
+                // the same call DesktopActivityHeartbeatEndpoint makes, and the reason the mapped block runs
+                // at a full 60 active seconds per window: the sink extends a record whose end meets the next
+                // window's start, so the block collapses to one ledger row exactly as it would in production.
+                // Passed as the whole block rather than minute by minute because the sink reads the stored
+                // rows to find what to extend, and nothing this method adds is saved yet.
+                await attributionSink.AttributeAsync(
+                    dbContext, userId, ActivityDeskResearch, Utc(date, block.StartHour), block.Minutes * 60, ct);
+            }
+
+            foreach (var app in AndroidApps)
+            {
+                var start = Utc(date, app.StartHour);
+
+                androidSessions.Add(new AndroidSessionData
+                {
+                    UserId = userId,
+                    DeviceId = AndroidDeviceId,
+                    PackageName = app.PackageName,
+                    AppLabel = app.AppLabel,
+                    SessionStartUtc = start,
+                    SessionEndUtc = start.AddMinutes(app.Minutes),
+                    // AndroidSyncEndpoint drops a session whose stated duration disagrees with its two
+                    // instants by more than two seconds, so the fixture keeps them in step exactly.
+                    DurationSeconds = app.Minutes * 60
+                });
+            }
+        }
+
+        dbContext.Set<WebExtensionActivityEntry>().AddRange(webEntries);
+        dbContext.Set<DesktopActivityEntry>().AddRange(desktopEntries);
+        dbContext.Set<AndroidSessionData>().AddRange(androidSessions);
+
+        await dbContext.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Seeded the tracking ledgers: {WebCount} browser windows, {DesktopCount} desktop windows, {AndroidCount} Android sessions.",
+            webEntries.Count, desktopEntries.Count, androidSessions.Count);
+    }
+
+    // --- notifications ----------------------------------------------------------------------------
+
+    /// <summary>
+    /// The bell. Six for the primary account — three unread, three read — across six kinds, so both the
+    /// <c>All</c> / <c>Unread</c> filter and the type filter have something to discriminate, plus two for the
+    /// secondary account so the bell is per-account rather than global.
+    /// </summary>
+    /// <remarks>
+    /// <para>Payloads are serialized from the typed records in <c>Sydowwe.Framework.Contracts</c> with the
+    /// same helper <c>NotificationTextRenderer</c> reads them back with, rather than hand-written JSON: the
+    /// renderer falls back to a name-less body for a document it cannot bind, so a drifted literal would seed
+    /// rows that render as "Máte novú notifikáciu" and look like a renderer bug.</para>
+    /// <para><c>CreatedTimestamp</c> is stamped to <c>UtcNow</c> on insert by the base save, and the bell
+    /// orders on it — so it is rewritten in a second pass, from the seed date rather than the clock. Without
+    /// that the six rows share one instant and their order is whatever Postgres returns; with the clock they
+    /// would differ between two seeds on the same day, which the fixture promises they do not.</para>
+    /// </remarks>
+    private async Task AddNotificationsAsync(
+        long userId, DateOnly today, IReadOnlyDictionary<string, long> periods, CancellationToken ct)
+    {
+        // Unread first: the stagger below makes each successive row older, and an unread bell that has to be
+        // scrolled to is not the state a spec asserting on the Unread filter wants to open.
+        var notifications = new List<Notification>
+        {
+            new()
+            {
+                Id = NotificationFirst,
+                UserId = userId,
+                Type = NotificationType.DeadlineApproaching,
+                PayloadJson = JsonHelper.Serialize(new DeadlineApproachingPayload("Feature Development")),
+                IsRead = false
+            },
+            new()
+            {
+                Id = NotificationFirst + 1,
+                UserId = userId,
+                Type = NotificationType.ReminderDigest,
+                PayloadJson = JsonHelper.Serialize(new ReminderDigestPayload(3)),
+                IsRead = false
+            },
+            new()
+            {
+                Id = NotificationFirst + 2,
+                UserId = userId,
+                Type = NotificationType.RoutinePeriodEndingSoon,
+                PayloadJson = JsonHelper.Serialize(new RoutinePeriodEndingSoonPayload(
+                    periods["Weekly"], "Weekly", Remaining: 2, Total: 5, DaysLeft: 1, Streak: 1)),
+                IsRead = false
+            },
+            new()
+            {
+                Id = NotificationFirst + 3,
+                UserId = userId,
+                Type = NotificationType.RoutinePeriodEnded,
+                PayloadJson = JsonHelper.Serialize(new RoutinePeriodEndedPayload(
+                    periods["Daily"], "Daily", CompletedCount: 4, TotalCount: 4, Streak: 12,
+                    Outcome: RoutineStreakOutcome.Extended)),
+                IsRead = true
+            },
+            new()
+            {
+                Id = NotificationFirst + 4,
+                UserId = userId,
+                Type = NotificationType.TimerBoundary,
+                PayloadJson = JsonHelper.Serialize(new TimerBoundaryPayload(
+                    TimerBoundaryPhase.Focus, "Bug Fixing", PhaseIndex: 2, PhaseTotal: 4, CycleIndex: 1, CycleTotal: 2)),
+                IsRead = true
+            },
+            new()
+            {
+                Id = NotificationFirst + 5,
+                UserId = userId,
+                Type = NotificationType.Test,
+                PayloadJson = JsonHelper.Serialize(new TestNotificationPayload("Fixture notification for the e2e suite.")),
+                IsRead = true
+            },
+
+            // The secondary account's own bell — the isolation check is "sign in as B and see B's rows".
+            new()
+            {
+                Id = SecondaryNotificationFirst,
+                UserId = SecondaryUserId,
+                Type = NotificationType.ReminderDigest,
+                PayloadJson = JsonHelper.Serialize(new ReminderDigestPayload(1)),
+                IsRead = false
+            },
+            new()
+            {
+                Id = SecondaryNotificationFirst + 1,
+                UserId = SecondaryUserId,
+                Type = NotificationType.Test,
+                PayloadJson = JsonHelper.Serialize(new TestNotificationPayload("Second account only.")),
+                IsRead = true
+            }
+        };
+
+        dbContext.Set<Notification>().AddRange(notifications);
+        await dbContext.SaveChangesAsync(ct);
+
+        // Second pass: on a Modified entity only ModifiedTimestamp is re-stamped, so these survive. Six hours
+        // apart from 08:00 on the seed date, which spreads them over the last day and a half.
+        var newest = Utc(today, 8);
+
+        for (var index = 0; index < notifications.Count; index++)
+        {
+            var notification = notifications[index];
+            notification.CreatedTimestamp = newest.AddHours(-6 * index);
+            notification.ReadAt = notification.IsRead ? notification.CreatedTimestamp.AddHours(1) : null;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
     // --- the secondary account ------------------------------------------------------------------
 
     /// <summary>
@@ -826,6 +1327,17 @@ public class E2eFixtureSeeder(
             .Where(period => period.UserId == userId)
             .ToDictionaryAsync(period => period.Text, period => period.Id, ct);
 
+    /// <summary>
+    /// Task importance ids keyed by their rank marker rather than their text: <c>Critical</c> and
+    /// <c>Optional</c> are the two the seeder needs, and the marker values are constants on the entity while
+    /// the text is a label a user can rename.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<int, long>> ImportanceIdsAsync(long userId, CancellationToken ct) =>
+        await dbContext.Set<TaskImportance>()
+            .IgnoreQueryFilters()
+            .Where(importance => importance.UserId == userId)
+            .ToDictionaryAsync(importance => importance.Importance, importance => importance.Id, ct);
+
     private async Task<LookupIds> LookupIdsAsync(long userId, CancellationToken ct)
     {
         var locationTypes = await dbContext.ActivityLocationTypes.IgnoreQueryFilters()
@@ -860,6 +1372,37 @@ public class E2eFixtureSeeder(
             .CountAsync(task => task.UserId == PrimaryUserId, ct);
         var calendarCount = await dbContext.Calendars.IgnoreQueryFilters()
             .CountAsync(calendar => calendar.UserId == PrimaryUserId, ct);
+
+        var templateCount = await dbContext.Set<TaskPlannerDayTemplate>().IgnoreQueryFilters()
+            .CountAsync(template => template.UserId == PrimaryUserId, ct);
+        var templateTaskCount = await dbContext.Set<TemplatePlannerTask>().IgnoreQueryFilters()
+            .CountAsync(task => task.UserId == PrimaryUserId, ct);
+
+        var webEntryCount = await dbContext.Set<WebExtensionActivityEntry>().IgnoreQueryFilters()
+            .CountAsync(entry => entry.UserId == PrimaryUserId, ct);
+        var desktopEntryCount = await dbContext.Set<DesktopActivityEntry>().IgnoreQueryFilters()
+            .CountAsync(entry => entry.UserId == PrimaryUserId, ct);
+
+        // The same GROUP BY FetchTableDistinctDesktopEntry does, so the count reported is the one that grid
+        // paginates — not the entry count, which is two orders of magnitude larger.
+        var distinctDesktopCount = await dbContext.Set<DesktopActivityEntry>().IgnoreQueryFilters()
+            .Where(entry => entry.UserId == PrimaryUserId)
+            .GroupBy(entry => new { entry.ProductName, entry.ProcessName, entry.WindowTitle })
+            .CountAsync(ct);
+
+        var androidSessionCount = await dbContext.Set<AndroidSessionData>().IgnoreQueryFilters()
+            .CountAsync(session => session.UserId == PrimaryUserId, ct);
+        var distinctAndroidCount = await dbContext.Set<AndroidSessionData>().IgnoreQueryFilters()
+            .Where(session => session.UserId == PrimaryUserId)
+            .GroupBy(session => new { session.PackageName, session.AppLabel })
+            .CountAsync(ct);
+
+        // Notification carries no IEntityWithUser navigation — its UserId is the recipient, so it has no
+        // global filter to ignore and the predicate below is the whole of the scoping.
+        var notificationCount = await dbContext.Set<Notification>()
+            .CountAsync(notification => notification.UserId == PrimaryUserId, ct);
+        var unreadNotificationCount = await dbContext.Set<Notification>()
+            .CountAsync(notification => notification.UserId == PrimaryUserId && !notification.IsRead, ct);
 
         return new TestSeedResponse(
             Fixture: FixtureVersion,
@@ -915,6 +1458,25 @@ public class E2eFixtureSeeder(
                 ["weekly"] = RoutineWeeklyReview,
                 ["monthly"] = RoutinePayRent
             },
+            DayPlannerTemplates: new Dictionary<string, long>
+            {
+                ["homeOffice"] = TemplateHomeOffice,
+                ["officeDay"] = TemplateOfficeDay,
+                ["pinned"] = TemplateRelaxedWeekend
+            },
+            TrackingMappings: new Dictionary<string, long>
+            {
+                ["desktopToActivity"] = DesktopMappingRider,
+                ["desktopIgnored"] = DesktopMappingIgnoredLauncher,
+                ["androidToActivity"] = AndroidMappingSpotify,
+                ["androidIgnored"] = AndroidMappingIgnoredSettings
+            },
+            Notifications: new Dictionary<string, long>
+            {
+                ["newestUnread"] = NotificationFirst,
+                ["oldestRead"] = NotificationFirst + 5,
+                ["secondaryNewest"] = SecondaryNotificationFirst
+            },
             TaskPriorities: await PriorityIdsAsync(PrimaryUserId, ct),
             RoutineTimePeriods: await RoutineTimePeriodIdsAsync(PrimaryUserId, ct),
             Counts: new TestSeedCounts(
@@ -924,7 +1486,16 @@ public class E2eFixtureSeeder(
                 CalibrationTodoListItems: CalibrationSet.Length,
                 ActivityHistoryEntries: historyCount,
                 PlannerTasks: plannerCount,
-                Calendars: calendarCount));
+                Calendars: calendarCount,
+                DayPlannerTemplates: templateCount,
+                TemplatePlannerTasks: templateTaskCount,
+                WebExtensionEntries: webEntryCount,
+                DesktopEntries: desktopEntryCount,
+                DistinctDesktopEntries: distinctDesktopCount,
+                AndroidSessions: androidSessionCount,
+                DistinctAndroidEntries: distinctAndroidCount,
+                Notifications: notificationCount,
+                UnreadNotifications: unreadNotificationCount));
     }
 
     // --- helpers --------------------------------------------------------------------------------
@@ -965,6 +1536,29 @@ public class E2eFixtureSeeder(
         int[] ActualMinutes);
 
     private sealed record OverdueEntry(long ActivityId, long ItemId, string Name, long RoleId, int DaysOverdue);
+
+    private sealed record WebBlock(
+        int StartHour,
+        int Minutes,
+        string PrimaryDomain,
+        string PrimaryUrl,
+        string BackgroundDomain);
+
+    /// <param name="IsMapped">
+    /// Whether a <see cref="TrackerDesktopMappingByPattern"/> resolves this process to an activity — which
+    /// makes its seconds attributable, and is why it is the one block recorded at 60 active seconds.
+    /// </param>
+    private sealed record DesktopBlock(
+        int StartHour,
+        int Minutes,
+        string ProcessName,
+        string ProductName,
+        string ExecutablePath,
+        string[] WindowTitles,
+        int ActiveSeconds,
+        bool IsMapped);
+
+    private sealed record AndroidApp(string PackageName, string AppLabel, int StartHour, int Minutes);
 
     private sealed record LookupIds(
         long LocationTypeIndoor,
