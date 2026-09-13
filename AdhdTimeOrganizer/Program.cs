@@ -35,12 +35,14 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Serilog;
 using Serilog.Events;
 using Sydowwe.Framework.application.middleware;
 using Sydowwe.Framework.config;
 using Sydowwe.Framework.domain.auth;
 using Sydowwe.Framework.domain.extServiceContract.user;
+using Sydowwe.Framework.domain.extServiceContract.user.auth;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.domain.serviceContract;
 using Sydowwe.Framework.infrastructure.extService;
@@ -234,6 +236,16 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     // Dependency injection
     services.AddDependencyInjection();
     services.AddModuleServices(configuration);
+
+    // reCAPTCHA verification, switched off in exactly the processes that may already truncate their own
+    // database. Must come after AddDependencyInjection(), which registers the real HttpClient-backed
+    // service -- this replaces that registration. See LocalAlwaysPassRecaptchaService for why a local
+    // secret cannot be made to pass instead, and why this rides on the seed gate rather than a new flag.
+    if (testSeedGate.IsOpen)
+    {
+        services.RemoveAll<IGoogleRecaptchaService>();
+        services.AddSingleton<IGoogleRecaptchaService, LocalAlwaysPassRecaptchaService>();
+    }
 
     // Email senders. Registered explicitly here because the framework assembly is excluded from the
     // Scrutor marker scan, so neither the base sender nor the generic user sender is picked up despite
