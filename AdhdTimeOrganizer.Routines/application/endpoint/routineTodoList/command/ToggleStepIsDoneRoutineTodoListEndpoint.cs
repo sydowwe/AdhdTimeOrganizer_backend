@@ -37,7 +37,7 @@ public class ToggleStepIsDoneRoutineTodoListEndpoint(DbContext dbContext)
             .PublishAsync(Mode.WaitForAll, ct);
     }
 
-    protected override void OnItemCompleted(RoutineTodoList item, DateTime now)
+    protected override void OnItemDoneChanged(RoutineTodoList item, DateTime now)
     {
         RoutineResetService.UpdateItemStreak(item, now);
     }

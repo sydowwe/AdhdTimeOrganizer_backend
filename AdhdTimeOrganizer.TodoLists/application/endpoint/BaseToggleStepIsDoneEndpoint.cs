@@ -79,6 +79,7 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(DbContext dbContext)
     /// </summary>
     protected void ApplyStepToggle(TEntity item, TodoListStep step, DateTime now, bool wasReset = false)
     {
+        var wasDone = item.IsDone;
         var wasFullyComplete = !wasReset && item.IsDone && (item.TotalCount is null || item.DoneCount >= item.TotalCount);
         step.IsDone = !step.IsDone;
 
@@ -87,12 +88,8 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(DbContext dbContext)
             item.IsDone = false;
             if (item.TotalCount.HasValue && item.DoneCount > 0)
                 item.DoneCount--;
-            return;
         }
-
-        var allDone = item.Steps.All(s => s.IsDone);
-
-        if (allDone)
+        else if (item.Steps.All(s => s.IsDone))
         {
             if (item.TotalCount.HasValue)
             {
@@ -106,29 +103,30 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(DbContext dbContext)
             {
                 item.IsDone = true;
             }
-
-            if (item.IsDone)
-                OnItemCompleted(item, now);
         }
         else
         {
             item.IsDone = false;
         }
+
+        if (item.IsDone != wasDone)
+            OnItemDoneChanged(item, now);
     }
 
     /// <summary>
-    /// Runs when this toggle is the one that completed the item — the step path's equivalent of
-    /// <c>BaseToggleIsDoneTodoListEndpoint.AfterItemToggled</c>, so finishing an item by ticking its last step
-    /// scores the same as finishing it through the bulk toggle.
+    /// Runs when this toggle is the one that completed the item <i>or</i> reopened it — the step path's
+    /// equivalent of <c>BaseToggleIsDoneTodoListEndpoint.AfterItemToggled</c>, so finishing an item by ticking
+    /// its last step scores the same as finishing it through the bulk toggle, and un-ticking a step of a
+    /// finished item gives back the same as un-ticking the item.
     /// <para>
-    /// Overridden by <c>ToggleStepIsDoneRoutineTodoListEndpoint</c> to advance the routine item's streak, and
-    /// by nothing else — which is why it reads as dead on a search of this project alone. It is not:
+    /// Overridden by <c>ToggleStepIsDoneRoutineTodoListEndpoint</c> to move the routine item's streak, and by
+    /// nothing else — which is why it reads as dead on a search of this project alone. It is not:
     /// <c>RoutineToggleIsDoneTests.StepToggle_CompletingTheLastStep_UpdatesTheItemStreak</c> is what goes red
     /// if the call above is removed again. <see cref="TodoListItem"/> has no per-item streak, so the default
     /// no-op is correct for it.
     /// </para>
     /// </summary>
-    protected virtual void OnItemCompleted(TEntity item, DateTime now)
+    protected virtual void OnItemDoneChanged(TEntity item, DateTime now)
     {
     }
 }

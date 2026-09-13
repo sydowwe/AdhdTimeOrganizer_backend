@@ -2371,6 +2371,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("best_streak");
 
+                    b.Property<int?>("BestStreakBeforeScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("best_streak_before_score");
+
                     b.Property<DateTime>("CreatedTimestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")

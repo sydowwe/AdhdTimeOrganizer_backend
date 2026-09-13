@@ -39,15 +39,10 @@ public class PlannerTaskIsDoneChangedEventHandler(IServiceScopeFactory scopeFact
         if (item == null)
             return;
 
-        if (eventModel.NewIsDone)
-        {
-            item.SetDone(true);
-            RoutineResetService.UpdateItemStreak(item, DateTime.UtcNow);
-        }
-        else
-        {
-            item.SetDone(false);
-        }
+        // In both directions: un-ticking the planner task is an un-tick of the routine item, and the streak
+        // walk-back UpdateItemStreak does for the toggle endpoints has to happen here too.
+        item.SetDone(eventModel.NewIsDone);
+        RoutineResetService.UpdateItemStreak(item, DateTime.UtcNow);
     }
 
     private static async Task SyncTodoListItem(AppDbContext dbContext, PlannerTaskIsDoneChangedEvent eventModel, CancellationToken ct)

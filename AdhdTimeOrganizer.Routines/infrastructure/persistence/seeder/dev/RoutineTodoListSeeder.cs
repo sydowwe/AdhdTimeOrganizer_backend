@@ -102,6 +102,9 @@ public class RoutineTodoListSeeder(
                 Streak = 12,
                 BestStreak = 21,
                 LastCompletedAt = now,
+                // Done items have scored the open cycle, so they carry the mark a tick sets — without it the
+                // next completing toggle would count a second time. None of these ticks set a record.
+                BestStreakBeforeScore = 21,
                 Steps =
                 [
                     new TodoListStep { Name = "10 min warm-up", Order = 1, IsDone = true },
@@ -163,6 +166,7 @@ public class RoutineTodoListSeeder(
                 Streak = 8,
                 BestStreak = 15,
                 LastCompletedAt = now,
+                BestStreakBeforeScore = 15,
                 Steps =
                 [
                     new TodoListStep { Name = "Breakfast", Order = 1, IsDone = true },
@@ -233,7 +237,8 @@ public class RoutineTodoListSeeder(
                 LastResetDate = today.AddDays(-(int)today.DayOfWeek),
                 Streak = 7,
                 BestStreak = 18,
-                LastCompletedAt = now
+                LastCompletedAt = now,
+                BestStreakBeforeScore = 18
             });
             nextOrderWeekly -= settings.Value.DisplayOrderGap;
         }

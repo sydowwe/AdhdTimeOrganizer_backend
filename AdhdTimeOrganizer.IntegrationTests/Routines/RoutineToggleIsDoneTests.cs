@@ -41,10 +41,10 @@ namespace AdhdTimeOrganizer.IntegrationTests.Routines;
 /// (<c>UpdateItemStreak_CalledTwiceInTheSameCycle_IncrementsOnlyOnce</c> and
 /// <c>UpdateItemStreak_AfterANewCycle_IncrementsAgain</c>). The §1 tests below are therefore written as
 /// green endpoint-level pins over that fix, not as expected-failing ones.</item>
-/// <item><b>The step toggle did not reach <c>UpdateItemStreak</c>.</b> Routines overrides
-/// <c>OnItemCompleted</c> (<c>ToggleStepIsDoneRoutineTodoListEndpoint:40-43</c>), but the only call to it was
-/// commented out in <c>BaseToggleStepIsDoneEndpoint.ApplyStepToggle</c>, so completing an item by its last
-/// step scored no streak at all. Found by
+/// <item><b>The step toggle did not reach <c>UpdateItemStreak</c>.</b> Routines overrides the item-done hook
+/// (<c>ToggleStepIsDoneRoutineTodoListEndpoint.OnItemDoneChanged</c>, then named <c>OnItemCompleted</c>), but
+/// the only call to it was commented out in <c>BaseToggleStepIsDoneEndpoint.ApplyStepToggle</c>, so completing
+/// an item by its last step scored no streak at all. Found by
 /// <see cref="StepToggle_CompletingTheLastStep_UpdatesTheItemStreak"/> and fixed by restoring that call; the
 /// test now stands as its regression pin.</item>
 /// </list>
@@ -243,6 +243,99 @@ public class RoutineToggleIsDoneTests(AppDbContextFixture fixture) : PostgresTes
         stored.LastCompletedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.UtcNow);
     }
 
+    // ---- §1b the un-tick walk-back (ask B9) ------------------------------------------------------------
+
+    /// <summary>
+    /// The decision behind ask B9: an accidental tick undone inside the same cycle costs nothing. Before this
+    /// the first tick in a cycle was <c>+1</c> permanently — the un-tick path returned before touching the
+    /// counters — and the e2e fixture's "Meditation" item drifted from 5 to 6 on a single stray click. Seeded
+    /// at <c>Streak == BestStreak</c> so the tick sets a record and the un-tick has both to give back.
+    /// </summary>
+    [Fact]
+    public async Task Toggle_UntickInsideTheSameCycle_GivesTheStreakBack()
+    {
+        long itemId;
+        await using (var db = CreateDbContext())
+        {
+            var period = await SeedPeriodAsync(db, lastResetAt: DateTime.UtcNow);
+            itemId = (await SeedItemAsync(db, period, "untick-walkback", streak: 4, lastResetDate: Today)).Id;
+        }
+
+        (await ToggleAsync(itemId)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await LoadItemAsync(itemId)).Streak.Should().Be(5, "the tick scored");
+
+        (await ToggleAsync(itemId)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var stored = await LoadItemAsync(itemId);
+        stored.IsDone.Should().BeFalse();
+        stored.Streak.Should().Be(4, "the un-tick inside the cycle the score belongs to gives the point back");
+        stored.BestStreak.Should().Be(4, "and the record the tick set goes with it");
+        stored.BestStreakBeforeScore.Should().BeNull("the item is open to score again");
+    }
+
+    /// <summary>
+    /// The mirror of <see cref="Toggle_UntickInsideTheSameCycle_GivesTheStreakBack"/>: a score from a cycle that
+    /// has since closed is beyond reach. The reset clears the mark, so once the item re-scores in the fresh
+    /// cycle an un-tick returns exactly that one point — never the closed cycle's — and the walk-back bottoms
+    /// out where the closed cycle left it.
+    /// </summary>
+    [Fact]
+    public async Task Toggle_UntickAfterTheCycleClosed_LeavesTheEarlierScoreAlone()
+    {
+        long itemId;
+        await using (var db = CreateDbContext())
+        {
+            var period = await SeedPeriodAsync(db, lastResetAt: DateTime.UtcNow.AddDays(-8), streak: 3);
+            var item = await SeedItemAsync(db, period, "untick-old-cycle", isDone: true, streak: 4, lastResetDate: Today.AddDays(-8));
+            // Ticked and scored — a record, 3 → 4 — in the cycle that is about to close.
+            item.BestStreakBeforeScore = 3;
+            await db.SaveChangesAsync(CancellationToken);
+            itemId = item.Id;
+        }
+
+        // The reset runs first (the item was done, so it keeps its 4), then this tick scores the fresh cycle.
+        (await ToggleAsync(itemId, forceValue: true)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await LoadItemAsync(itemId)).Streak.Should().Be(5);
+
+        (await ToggleAsync(itemId, forceValue: false)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var stored = await LoadItemAsync(itemId);
+        stored.Streak.Should().Be(4, "only the open cycle's point is returned; the closed cycle's stands");
+        stored.BestStreak.Should().Be(4, "the record the undone tick set goes with it, down to the one the closed cycle set");
+
+        // And a second un-tick has nothing left to give.
+        (await ToggleAsync(itemId, forceValue: false)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await LoadItemAsync(itemId)).Streak.Should().Be(4, "the closed cycle's score is not the open cycle's to return");
+    }
+
+    /// <summary>
+    /// The other half of the same decision: a cycle that closes with the item undone breaks the item's streak,
+    /// as it always did the period's. Before this nothing ever zeroed <c>RoutineTodoList.Streak</c>, so an
+    /// item's "streak" was a lifetime count and its <c>BestStreak</c> could never exceed it.
+    /// </summary>
+    [Fact]
+    public async Task Toggle_OnAnElapsedPeriod_BreaksTheStreakOfAnItemLeftUndone()
+    {
+        long undoneItemId, doneItemId;
+        await using (var db = CreateDbContext())
+        {
+            var period = await SeedPeriodAsync(db, lastResetAt: DateTime.UtcNow.AddDays(-8));
+            undoneItemId = (await SeedItemAsync(db, period, "elapsed-undone", streak: 6, lastResetDate: Today.AddDays(-8))).Id;
+            doneItemId = (await SeedItemAsync(db, period, "elapsed-done-kept", isDone: true, streak: 6, lastResetDate: Today.AddDays(-8))).Id;
+        }
+
+        // Toggling either item resets the whole period first; the done one is the toggled one so the undone
+        // one is touched by nothing but the reset.
+        (await ToggleAsync(doneItemId, forceValue: true)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var undone = await LoadItemAsync(undoneItemId);
+        undone.Streak.Should().Be(0, "undone at the boundary is a miss, and a miss breaks the item's streak");
+        undone.BestStreak.Should().Be(6, "the record survives the break");
+
+        var done = await LoadItemAsync(doneItemId);
+        done.Streak.Should().Be(7, "done at the boundary kept its 6, and the tick after the reset scored the new cycle");
+    }
+
     // ---- §2 the reset side-effect --------------------------------------------------------------------
 
     /// <summary>
@@ -405,8 +498,8 @@ public class RoutineToggleIsDoneTests(AppDbContextFixture fixture) : PostgresTes
     /// does, and — since it shares <c>UpdateItemStreak</c> — must not score twice when the step is un-ticked
     /// and re-ticked inside the same cycle.
     /// <para>
-    /// This is the regression pin for the bug it was written to find: Routines overrides
-    /// <c>OnItemCompleted</c> (<c>ToggleStepIsDoneRoutineTodoListEndpoint:40-43</c>), but the only call site
+    /// This is the regression pin for the bug it was written to find: Routines overrides the item-done hook
+    /// (<c>ToggleStepIsDoneRoutineTodoListEndpoint.OnItemDoneChanged</c>), but the only call site
     /// was commented out in <c>BaseToggleStepIsDoneEndpoint.ApplyStepToggle</c>, so the hook never ran and a
     /// routine completed through its checklist scored nothing while the same item completed through the bulk
     /// toggle scored normally. Restoring that call is the whole fix. Note that
@@ -433,20 +526,29 @@ public class RoutineToggleIsDoneTests(AppDbContextFixture fixture) : PostgresTes
         var afterFirst = await LoadItemAsync(itemId);
         afterFirst.Streak.Should().Be(1, "completing an item by its last step is a completion like any other");
 
-        // Un-tick and re-tick: the repeat case, shared with the bulk toggle through UpdateItemStreak.
+        // Un-tick: reopening the item through its step is an un-tick like any other, so the point comes back
+        // (the hook fires on both transitions, not only on completion).
         (await ToggleStepAsync(itemId, stepId)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var afterUntick = await LoadItemAsync(itemId);
+        afterUntick.IsDone.Should().BeFalse();
+        afterUntick.Streak.Should().Be(0, "un-ticking the step that completed the item gives the point back");
+        afterUntick.BestStreak.Should().Be(0);
+
+        // Re-tick: the repeat case, shared with the bulk toggle through UpdateItemStreak.
         (await ToggleStepAsync(itemId, stepId)).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         var afterRetick = await LoadItemAsync(itemId);
         afterRetick.IsDone.Should().BeTrue();
-        afterRetick.Streak.Should().Be(1, "the increment is once per cycle here too");
+        afterRetick.Streak.Should().Be(1, "net zero across an un-tick/re-tick, not a climb");
         afterRetick.BestStreak.Should().Be(1);
     }
 
     /// <summary>
     /// <c>BeforeToggle</c> (<c>:28-32</c>) calls the <b>single-item</b> <c>TryReset</c>, which deliberately does
-    /// not advance <c>LastResetAt</c>, write a completion row, or evaluate either streak — only the list
-    /// overload closes a cycle. This is the endpoint-level guard <c>docs/testing.md</c>'s known-gaps list asks
+    /// not advance <c>LastResetAt</c>, write a completion row, or evaluate the period streak — only the list
+    /// overload closes a cycle. (The item's own streak it does settle: done at the boundary is a hit, so the
+    /// item here keeps its 4.) This is the endpoint-level guard <c>docs/testing.md</c>'s known-gaps list asks
     /// for (it currently names the unit tests as the whole guard), and it is what stops a "unify the two
     /// overloads" refactor from silently consuming a reset cycle without scoring it.
     /// </summary>
@@ -474,7 +576,7 @@ public class RoutineToggleIsDoneTests(AppDbContextFixture fixture) : PostgresTes
         storedItem.IsDone.Should().BeFalse("after the reset only one of two steps is ticked");
         storedItem.Steps.OrderBy(s => s.Order).Select(s => s.IsDone)
             .Should().Equal(new[] { true, false }, "the reset wiped both steps, then this request ticked the first");
-        storedItem.Streak.Should().Be(4, "the single-item overload does not evaluate the streak");
+        storedItem.Streak.Should().Be(4, "the item was done when the cycle closed, so its own streak survives the reset");
 
         var storedPeriod = await LoadPeriodAsync(periodId);
         storedPeriod.LastResetAt.Should().BeCloseTo(lastResetAt, TimeSpan.FromMilliseconds(1),

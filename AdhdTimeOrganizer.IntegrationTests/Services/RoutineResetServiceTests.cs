@@ -692,17 +692,108 @@ public class RoutineResetServiceTests
 
     // ─── UpdateItemStreak ────────────────────────────────────────────────────
 
+    /// <summary>An un-tick of an item that has not scored the open cycle has nothing to give back.</summary>
     [Fact]
-    public void UpdateItemStreak_ItemNotDone_NoChange()
+    public void UpdateItemStreak_ItemNotDoneAndNotScoredThisCycle_NoChange()
     {
         var item = MakeItem(false);
         item.Streak = 3;
+        item.BestStreak = 7;
         var before = item.LastCompletedAt;
 
         RoutineResetService.UpdateItemStreak(item, DateTime.UtcNow);
 
         item.Streak.Should().Be(3);
+        item.BestStreak.Should().Be(7);
         item.LastCompletedAt.Should().Be(before);
+    }
+
+    /// <summary>
+    /// Ask B9: the first tick in a cycle used to be <c>+1</c> permanently, with no decrement path anywhere. Now an
+    /// un-tick inside the cycle the score belongs to is a full undo — the point, and the record if the tick
+    /// set one.
+    /// </summary>
+    [Fact]
+    public void UpdateItemStreak_UntickInsideTheSameCycle_GivesThePointAndTheRecordBack()
+    {
+        var now = DateTime.UtcNow;
+        var item = MakeItem(true);
+        item.Streak = 5;
+        item.BestStreak = 5;
+
+        RoutineResetService.UpdateItemStreak(item, now);
+        item.Streak.Should().Be(6);
+        item.BestStreak.Should().Be(6, "the tick set a record");
+
+        item.SetDone(false);
+        RoutineResetService.UpdateItemStreak(item, now.AddMinutes(1));
+
+        item.Streak.Should().Be(5);
+        item.BestStreak.Should().Be(5, "the record the tick set is undone with it");
+        item.BestStreakBeforeScore.Should().BeNull("the item is open to score again");
+        item.LastCompletedAt.Should().Be(now, "last completed is a fact about the tick, not the score");
+    }
+
+    /// <summary>
+    /// The half the escalation called awkward: <c>BestStreak == Streak</c> after a tick reads the same whether
+    /// the tick <i>set</i> the record or merely <i>reached</i> it, so the walk-back cannot be derived from the
+    /// counters. The mark carries the pre-tick record precisely so this case restores it rather than lowering it.
+    /// </summary>
+    [Fact]
+    public void UpdateItemStreak_UntickAfterReachingButNotBeatingTheRecord_LeavesTheRecordAlone()
+    {
+        var now = DateTime.UtcNow;
+        var item = MakeItem(true);
+        item.Streak = 5;
+        item.BestStreak = 6;
+
+        RoutineResetService.UpdateItemStreak(item, now);
+        item.Streak.Should().Be(6);
+        item.BestStreak.Should().Be(6, "reached, not beaten");
+
+        item.SetDone(false);
+        RoutineResetService.UpdateItemStreak(item, now.AddMinutes(1));
+
+        item.Streak.Should().Be(5);
+        item.BestStreak.Should().Be(6, "the record predates the tick, so the un-tick must not touch it");
+    }
+
+    /// <summary>
+    /// A mark on a zero streak cannot come out of the code paths, only out of a hand-edited row or a bad
+    /// backfill — and <c>streak</c> carries a <c>&gt;= 0</c> CHECK, so a bare decrement would make the un-tick
+    /// a 500 on the app's most-used control. The walk-back clamps instead and keeps <c>BestStreak &gt;= Streak</c>.
+    /// </summary>
+    [Fact]
+    public void UpdateItemStreak_UntickWithAMarkOnAZeroStreak_ClampsRatherThanGoingNegative()
+    {
+        var item = MakeItem(false);
+        item.Streak = 0;
+        item.BestStreak = 3;
+        item.BestStreakBeforeScore = 3;
+
+        RoutineResetService.UpdateItemStreak(item, DateTime.UtcNow);
+
+        item.Streak.Should().Be(0);
+        item.BestStreak.Should().Be(3);
+        item.BestStreakBeforeScore.Should().BeNull();
+    }
+
+    /// <summary>Walk-back is once per score, like the score itself: a second un-tick has nothing left.</summary>
+    [Fact]
+    public void UpdateItemStreak_UntickTwice_GivesBackOnlyOnce()
+    {
+        var now = DateTime.UtcNow;
+        var item = MakeItem(true);
+        item.Streak = 2;
+        item.BestStreak = 2;
+
+        RoutineResetService.UpdateItemStreak(item, now);
+        item.SetDone(false);
+        RoutineResetService.UpdateItemStreak(item, now);
+        RoutineResetService.UpdateItemStreak(item, now);
+
+        item.Streak.Should().Be(2);
+        item.BestStreak.Should().Be(2);
     }
 
     [Fact]
@@ -761,24 +852,97 @@ public class RoutineResetServiceTests
         item.LastCompletedAt.Should().Be(now.AddMinutes(5), "LastCompletedAt means last completed, not last scored");
     }
 
-    /// <summary>The control for the guard above: a reset must open the item up to being counted again.</summary>
+    /// <summary>
+    /// The control for the guard above: a reset must open the item up to being counted again. Goes through the
+    /// real single-item <c>TryReset</c> rather than hand-rolling what a reset does, because clearing the scored
+    /// mark is now part of it and a hand-rolled reset would silently skip that.
+    /// </summary>
     [Fact]
     public void UpdateItemStreak_AfterANewCycle_IncrementsAgain()
     {
         var now = DateTime.UtcNow;
+        var period = MakePeriod(7, lastResetAt: now.AddDays(-8));
         var item = MakeItem(true);
-        item.LastResetDate = DateOnly.FromDateTime(now);
+        item.LastResetDate = DateOnly.FromDateTime(now.AddDays(-8));
 
-        RoutineResetService.UpdateItemStreak(item, now);
+        RoutineResetService.UpdateItemStreak(item, now.AddDays(-1));
 
-        // What a reset does to the item.
-        item.SetDone(false);
-        item.LastResetDate = DateOnly.FromDateTime(now).AddDays(1);
+        RoutineResetService.TryReset(period, item, now).Should().BeTrue();
         item.SetDone(true);
-
-        RoutineResetService.UpdateItemStreak(item, now.AddDays(1));
+        RoutineResetService.UpdateItemStreak(item, now);
 
         item.Streak.Should().Be(2);
         item.BestStreak.Should().Be(2);
+    }
+
+    // ─── Item streak across a reset ──────────────────────────────────────────
+    // The item's own streak has no threshold and no grace: undone at the boundary is a miss and breaks it, done
+    // keeps what the tick earned. Before this nothing anywhere zeroed RoutineTodoList.Streak, so it was a
+    // lifetime count and the seeders' BestStreak > Streak could never happen in practice.
+
+    [Fact]
+    public void TryReset_Batch_ItemLeftUndone_BreaksItsStreakAndKeepsItsRecord()
+    {
+        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-8));
+        var item = MakeItem(false);
+        item.Streak = 6;
+        item.BestStreak = 9;
+
+        RoutineResetService.TryReset(period, [item], DateTime.UtcNow);
+
+        item.Streak.Should().Be(0);
+        item.BestStreak.Should().Be(9);
+    }
+
+    [Fact]
+    public void TryReset_Batch_ItemDone_KeepsItsStreakAndClearsTheScoredMark()
+    {
+        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-8));
+        var item = MakeItem(true);
+        item.Streak = 6;
+        item.BestStreak = 6;
+        item.BestStreakBeforeScore = 5;
+
+        RoutineResetService.TryReset(period, [item], DateTime.UtcNow);
+
+        item.IsDone.Should().BeFalse();
+        item.Streak.Should().Be(6);
+        item.BestStreak.Should().Be(6);
+        item.BestStreakBeforeScore.Should().BeNull("the cycle the score belonged to is closed, so it is no longer undoable");
+    }
+
+    /// <summary>
+    /// The single-item overload settles the item's own verdict too — it is the item's alone to settle, and
+    /// leaving it to the list overload would let a tick in between score a cycle the item had missed.
+    /// </summary>
+    [Fact]
+    public void TryReset_Single_ItemLeftUndone_BreaksItsStreak()
+    {
+        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-8));
+        var item = MakeItem(false);
+        item.Streak = 6;
+        item.BestStreak = 9;
+        item.BestStreakBeforeScore = 8;
+
+        RoutineResetService.TryReset(period, item, DateTime.UtcNow);
+
+        item.Streak.Should().Be(0);
+        item.BestStreak.Should().Be(9);
+        item.BestStreakBeforeScore.Should().BeNull();
+    }
+
+    /// <summary>Dormancy is a run of misses: the first closed cycle breaks the streak and the rest keep it at zero.</summary>
+    [Fact]
+    public void TryResetCatchUp_ItemDoneAtTheFirstBoundaryOnly_KeepsThenBreaks()
+    {
+        var period = MakePeriod(7, lastResetAt: DateTime.UtcNow.AddDays(-22));
+        var item = MakeItem(true);
+        item.Streak = 6;
+
+        var result = RoutineResetService.TryResetCatchUp(period, [item], DateTime.UtcNow);
+
+        result.Should().NotBeNull();
+        result!.Value.CyclesClosed.Should().Be(3);
+        item.Streak.Should().Be(0, "done at the first boundary, undone at the two after it");
     }
 }

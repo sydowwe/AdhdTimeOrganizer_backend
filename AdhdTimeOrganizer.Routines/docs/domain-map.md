@@ -31,7 +31,7 @@ Not shown, because it is **not in this project**: `PlannerTask` (Planning) has n
 | Type | Notes |
 |---|---|
 | `RoutineTimePeriod` | `BaseEntityWithUser` + `IEntityWithIsHidden` + `IBaseTextColorEntity`. `LengthInDays` / `ResetAnchorDay` drive `RoutineResetService.ComputeNextReset`. Two unique indexes: `(UserId, Text)` and `(UserId, LengthInDays)`. Carries `Streak` / `BestStreak` / `StreakThreshold` / `StreakGraceDays` / `StreakGraceUntil`, `HistoryDepth`, the freeze budget (`FreezeBudget` / `FreezesRemaining` / `FreezeBudgetResetsAt`), the opt-in `ReminderLeadDays`, and the two notification idempotency marks `EndingSoonNotifiedFor` / `GraceNotifiedFor`. |
-| `RoutineTodoList` | Derives from TodoLists' `BaseTodoListItem` — the one real outbound edge (see `summary.md`). Adds `TimePeriodId`, `LastResetDate`, its own `Streak` / `BestStreak` / `LastCompletedAt`, and the scheduling hints `SuggestedDays` / `SuggestedDayOfMonth`. |
+| `RoutineTodoList` | Derives from TodoLists' `BaseTodoListItem` — the one real outbound edge (see `summary.md`). Adds `TimePeriodId`, `LastResetDate`, its own `Streak` / `BestStreak` / `LastCompletedAt`, the scored-this-cycle mark `BestStreakBeforeScore` (null = not scored; otherwise the pre-score record an un-tick restores), and the scheduling hints `SuggestedDays` / `SuggestedDayOfMonth`. |
 | `RoutinePeriodCompletion` | Plain `BaseEntity` (no `UserId` — scoped transitively through `TimePeriodId`). One row per elapsed period: `PeriodStart` / `PeriodEnd` / `CompletedCount` / `TotalCount`, plus `IsFrozen` / `FrozenAt` (paired by a CHECK). Unique on `(TimePeriodId, PeriodStart)`. Append-only, and the only routines entity outside the `BaseTableEntity` convention — it keeps its own `CreatedAt` and its table is the plural `routine_period_completions`; see the Persistence row below. |
 | `UserRoutineSettings` | `BaseEntityWithUser`, at most one row per user (`IsOneWithOneUser`, unique on `UserId`). Holds `RoutineReviewDismissedForWeekStart` — the week-start the user last dismissed the weekly "fresh start" review card for. **Stored, never interpreted:** which week that *is* depends on the caller's `FirstDayOfWeek` and device time zone, so no job and no query here compares it against "now". The row exists so the dismissal follows the user to a second device. |
 
@@ -50,6 +50,20 @@ Met → `Extended`, streak increments. Missed with `StreakGraceDays > 0` → `On
 `StreakGraceUntil` opened. Missed with no grace → `Broken`, streak zeroed. **No items at all →
 `NotEvaluated`**, streak untouched: completion says nothing about a routine with nothing in it. Either
 way a `RoutinePeriodCompletion` row is written and the items un-tick.
+
+**The item's own streak is simpler, and settled per item.** No threshold, no grace, no freeze (there is
+no item-level history to re-derive from): an item that reaches the boundary undone missed the cycle and
+its `Streak` zeroes (`BestStreak` stands); one that reaches it done keeps what its tick earned. Both
+`TryReset` overloads do this through one `OpenNewCycle` helper — the single-item overload included, because
+the verdict needs nothing but the item and deferring it would let a tick landing before the list overload
+runs score a cycle the item had in fact missed. The mark `BestStreakBeforeScore` clears there too.
+
+**A tick scores once per cycle, and an un-tick inside that cycle is a full undo (ask B9).** The scoring
+toggle sets `BestStreakBeforeScore` to the record as it stood, then increments; a later un-tick with the
+mark still set decrements, restores that record, and clears the mark. So un-tick/re-tick is net zero
+and an accidental click costs nothing once undone — but a score whose cycle has closed is beyond reach,
+because the reset cleared its mark. `LastCompletedAt` moves on every completing toggle and is never
+walked back: it records the tick, not the score.
 
 `ComputeNextReset` is derived from `LastResetAt` alone — its `now` argument does not move the answer,
 and **the instant it returns is allowed to be in the past**: being in the past is exactly what makes a
@@ -170,11 +184,11 @@ transaction that read the period.
 |---|---|---|---|
 | `RoutineResetService.ComputeNextReset` | Static fn | The boundary closing the cycle `LastResetAt` opened, from length + anchor. Derived from `LastResetAt`, **not** from `now` — the instant may be in the past, and that is what "due" means. Also feeds `RoutineTimePeriodResponse.NextResetAt` | `RoutineResetService.cs` |
 | `RoutineResetService.CheckGrace` | Static fn | Breaks a lapsed streak grace window. Call before `TryReset` **and before `Apply`**, on **every** read/write site | `RoutineResetService.cs` |
-| `RoutineResetService.TryReset(period, item, now)` | Static fn | Single-item overload — step toggle only. Does **not** advance `LastResetAt`, write a completion, or score the streak | `RoutineResetService.cs` |
-| `RoutineResetService.TryReset(period, items, now)` | Static fn | List overload. Closes **one** cycle: advances the streak, returns the `RoutinePeriodCompletion` + `StreakOutcome`, clears `EndingSoonNotifiedFor`. Call it directly only when one cycle is what you mean | `RoutineResetService.cs` |
+| `RoutineResetService.TryReset(period, item, now)` | Static fn | Single-item overload — step toggle only. Does **not** advance `LastResetAt`, write a completion, or score the *period* streak; it does settle the item's own (undone at the boundary → `Streak = 0`) and clear its scored mark | `RoutineResetService.cs` |
+| `RoutineResetService.TryReset(period, items, now)` | Static fn | List overload. Closes **one** cycle: advances the period streak, settles each item's own, returns the `RoutinePeriodCompletion` + `StreakOutcome`, clears `EndingSoonNotifiedFor`. Call it directly only when one cycle is what you mean | `RoutineResetService.cs` |
 | `RoutineResetService.TryResetCatchUp(period, items, now)` | Static fn | What the reset job, the grouped read and the bulk toggle actually call. Loops the list overload until the period is current (capped at 1200 cycles), returns the newest `HistoryDepth` completions plus one `Latest` result to notify on. A grace window opened by one closed cycle is checked against the *next* boundary, not against `now` | `RoutineResetService.cs` |
 | `RoutineResetService.EvaluateEndingSoon` / `ShouldWarnGraceExpiring` | Static fn | The two nudge conditions — nudge job only | `RoutineResetService.cs` |
-| `RoutineResetService.UpdateItemStreak` | Static fn | Item-level streak after a completing toggle. Increments **once per cycle, not once per toggle** — an un-tick/re-tick, or a repeated `ForceValue = true` at an already-complete counted item, moves `LastCompletedAt` and nothing else. The guard reads the item alone (`LastCompletedAt` vs `LastResetDate`), so the two host event handlers that complete an item without loading its period are covered too | `RoutineResetService.cs` |
+| `RoutineResetService.UpdateItemStreak` | Static fn | Item-level streak after a toggle in either direction; call once `IsDone` is settled. Increments **once per cycle, not once per toggle** — a re-tick, or a repeated `ForceValue = true` at an already-complete counted item, moves `LastCompletedAt` and nothing else — and an un-tick inside the cycle the score belongs to gives the point and any record it set back. The guard is the item's own `BestStreakBeforeScore` mark, so the two host event handlers that toggle an item without loading its period are covered too | `RoutineResetService.cs` |
 | `RoutineStreakFreezeService.RefreshFreezeBudget` | Static fn | Lazy monthly refill. **Nothing else refills the budget** — there is no job | `RoutineStreakFreezeService.cs` |
 | `RoutineStreakFreezeService.Apply` | Static fn | Spend a freeze; returns `StreakFreezeRejection` — anything but `None` means nothing was written. Refuses a `TotalCount == 0` entry as `NotAMiss`: `RecomputeStreak` skips item-less periods outright, so the run already carries across one for free. Caller must have run `CheckGrace` first | `RoutineStreakFreezeService.cs` |
 | `RoutineStreakFreezeService.RecomputeStreak` | Static fn | Walks the **complete** history oldest-first — a trimmed list under-counts the run | `RoutineStreakFreezeService.cs` |

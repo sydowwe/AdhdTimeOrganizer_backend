@@ -158,10 +158,15 @@ public static class RoutineResetService
     /// <summary>
     /// Resets a single item's own checklist state if the period has elapsed, so a stale item looks fresh the
     /// moment it's touched. Deliberately does <b>not</b> advance <see cref="RoutineTimePeriod.LastResetAt"/> or
-    /// evaluate the streak — <see cref="ComputeNextReset"/> will keep reporting the same due reset until the
-    /// list-based overload runs (background job or the grouped read), which is the only place the streak
-    /// transition and <see cref="RoutinePeriodCompletion"/> row are produced. Advancing it here would let this
-    /// single-item path silently consume the reset cycle with no streak evaluation.
+    /// evaluate the <i>period</i> streak — <see cref="ComputeNextReset"/> will keep reporting the same due reset
+    /// until the list-based overload runs (background job or the grouped read), which is the only place the
+    /// period's streak transition and <see cref="RoutinePeriodCompletion"/> row are produced. Advancing it here
+    /// would let this single-item path silently consume the reset cycle with no streak evaluation.
+    /// <para>
+    /// The item's <i>own</i> streak is settled here, though: its verdict needs nothing but the item (see
+    /// <see cref="OpenNewCycle"/>), and leaving it to the list overload would let a tick landing in between
+    /// score a cycle the item had in fact missed.
+    /// </para>
     /// Use when only one item is in context (e.g. step toggle). Returns true if a reset occurred.
     /// </summary>
     public static bool TryReset(RoutineTimePeriod period, RoutineTodoList item, DateTime now)
@@ -170,11 +175,29 @@ public static class RoutineResetService
         if (now < nextReset)
             return false;
 
-        var today = DateOnly.FromDateTime(now);
-        item.SetDone(false);
-        item.LastResetDate = today;
+        OpenNewCycle(item, DateOnly.FromDateTime(now));
 
         return true;
+    }
+
+    /// <summary>
+    /// What closing a cycle does to one item, shared by both <c>TryReset</c> overloads so neither can drift.
+    /// <para>
+    /// An item that reaches the boundary undone missed the cycle, and a miss breaks <i>its</i> streak — there is
+    /// no threshold or grace at item level (both are period concepts, evaluated by the list overload against
+    /// all items), and no item-level history a freeze could re-derive from. An item that reaches it done keeps
+    /// the streak it earned when it was ticked.
+    /// </para>
+    /// </summary>
+    private static void OpenNewCycle(RoutineTodoList item, DateOnly today)
+    {
+        if (!item.IsDone)
+            item.Streak = 0;
+
+        item.SetDone(false);
+        item.LastResetDate = today;
+        // The cycle the score belonged to is closed, so there is nothing left to give back.
+        item.BestStreakBeforeScore = null;
     }
 
     /// <summary>
@@ -229,10 +252,7 @@ public static class RoutineResetService
 
         var today = DateOnly.FromDateTime(now);
         foreach (var item in items)
-        {
-            item.SetDone(false);
-            item.LastResetDate = today;
-        }
+            OpenNewCycle(item, today);
 
         var periodEnd = DateOnly.FromDateTime(nextReset);
         period.LastResetAt = nextReset;
@@ -326,43 +346,48 @@ public static class RoutineResetService
     }
 
     /// <summary>
-    /// Whether this item has already been counted towards its streak in the cycle it is currently in.
+    /// Whether this item has already been counted towards its streak in the cycle it is currently in — the mark
+    /// <see cref="RoutineTodoList.BestStreakBeforeScore"/> carries, set by the scoring toggle and cleared by
+    /// every reset path through <see cref="OpenNewCycle"/>.
     /// <para>
-    /// The cycle opened at <see cref="RoutineTodoList.LastResetDate"/> — every reset path stamps it — so a
-    /// completion at or after that day belongs to the cycle in progress. A null <c>LastResetDate</c> means the
-    /// item has never been reset, so its first cycle runs from creation and any completion at all counts.
-    /// </para>
-    /// <para>
-    /// Deliberately compared on the item alone rather than against <see cref="RoutineTimePeriod.LastResetAt"/>:
+    /// Deliberately read off the item alone rather than derived against <see cref="RoutineTimePeriod.LastResetAt"/>:
     /// the two event handlers in the host that complete a routine item load it without its period, and a guard
-    /// they cannot call is a guard with two holes in it. The cost is day granularity — a cycle that is both reset
-    /// and completed twice within one calendar day scores the second completion as already-counted — which needs
-    /// the single-item <see cref="TryReset(RoutineTimePeriod, RoutineTodoList, DateTime)"/> and a list reset to
-    /// land on the same day to reach at all.
+    /// they cannot call is a guard with two holes in it.
     /// </para>
     /// </summary>
-    private static bool AlreadyCountedThisCycle(RoutineTodoList item)
-    {
-        if (item.LastCompletedAt == default)
-            return false;
-
-        return item.LastResetDate is not { } lastReset || DateOnly.FromDateTime(item.LastCompletedAt) >= lastReset;
-    }
+    private static bool AlreadyCountedThisCycle(RoutineTodoList item) => item.BestStreakBeforeScore is not null;
 
     /// <summary>
-    /// Updates the item's streak after a toggle. Call after IsDoneLogic has been applied.
+    /// Updates the item's streak after a toggle, in either direction. Call after the item's <c>IsDone</c> has
+    /// been settled.
     /// <para>
-    /// The increment is <b>once per cycle</b>, not once per toggle: un-ticking and re-ticking an item, or
-    /// re-sending <c>ForceValue = true</c> at an already-complete counted item (which leaves it done and still
-    /// runs the after-toggle hook), must not walk <c>Streak</c> and <c>BestStreak</c> up. Only a reset opens the
-    /// item up to being counted again. <see cref="RoutineTodoList.LastCompletedAt"/> still moves on every
-    /// completing toggle — it means "last completed", not "last scored".
+    /// The increment is <b>once per cycle</b>, not once per toggle: re-ticking a counted item, or re-sending
+    /// <c>ForceValue = true</c> at an already-complete counted item (which leaves it done and still runs the
+    /// after-toggle hook), must not walk <c>Streak</c> and <c>BestStreak</c> up. Only a reset opens the item up
+    /// to being counted again. <see cref="RoutineTodoList.LastCompletedAt"/> still moves on every completing
+    /// toggle — it means "last completed", not "last scored".
+    /// </para>
+    /// <para>
+    /// The mirror holds on the way down: un-ticking an item that scored in the cycle still open gives the point
+    /// back and restores the <c>BestStreak</c> the score raised, so an accidental click — the app's most-used
+    /// control, built for users who mis-click — costs nothing once undone. Un-ticking an item that has not
+    /// scored this cycle (its tick was in a cycle since closed) has nothing to give back and changes nothing.
     /// </para>
     /// </summary>
     public static void UpdateItemStreak(RoutineTodoList item, DateTime now)
     {
         if (!item.IsDone)
+        {
+            if (item.BestStreakBeforeScore is not { } bestBefore)
+                return;
+
+            // A mark implies the score happened, so Streak is at least 1 — but the column has a >= 0 CHECK
+            // and a hand-edited or badly backfilled row would otherwise turn an un-tick into a 500.
+            item.Streak = Math.Max(0, item.Streak - 1);
+            item.BestStreak = Math.Max(bestBefore, item.Streak);
+            item.BestStreakBeforeScore = null;
             return;
+        }
 
         var alreadyCounted = AlreadyCountedThisCycle(item);
         item.LastCompletedAt = now;
@@ -370,6 +395,7 @@ public static class RoutineResetService
         if (alreadyCounted)
             return;
 
+        item.BestStreakBeforeScore = item.BestStreak;
         item.Streak++;
         if (item.Streak > item.BestStreak)
             item.BestStreak = item.Streak;
