@@ -42,8 +42,9 @@ public class SeedTestDataEndpoint(
             s.Summary = "Resets the database to the known e2e fixture";
             s.Description =
                 "Development-only, and only against a database on this machine. Truncates every table in " +
-                "the model except the scheduler's, then rebuilds the roles, the root admin and the two " +
-                "e2e accounts with their fixture data. Returns the stable ids the specs reference.";
+                "the model except the scheduler's, then rebuilds the roles, the root admin and the three " +
+                "e2e accounts (two plain users and an admin) with their fixture data. Returns the stable " +
+                "ids the specs reference.";
             s.Response<TestSeedResponse>(200, "The database is in the fixture state");
         });
     }

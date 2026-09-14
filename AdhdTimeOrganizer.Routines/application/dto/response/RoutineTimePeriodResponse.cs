@@ -38,22 +38,46 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
     public List<PeriodCompletionRecord> CompletionHistory { get; init; } = [];
 
     /// <summary>
-    /// The full period shape the client renders — the projected columns plus the two derived members
-    /// (<see cref="NextResetAt"/>, <see cref="CompletionHistory"/>) that <see cref="Projection"/> cannot compute
-    /// in the database. Every endpoint returning a whole period goes through here so the grouped read and the
-    /// freeze endpoint cannot drift apart; the client re-reads both with the same parser.
+    /// Closed cycles in <see cref="CompletionHistory"/> — the denominator of the consistency figure, and the
+    /// client's gate for every surface that needs a period to have elapsed at least once (the review card,
+    /// the personal-bests panel). Counted over the same <see cref="RoutineTimePeriod.HistoryDepth"/> window
+    /// the heatmap shows, so the figure beside the heatmap describes the cells in it. Not a column: the ledger
+    /// is the source, and a counter beside it is one more thing to keep in step.
+    /// </summary>
+    public int TotalPeriodsElapsed { get; init; }
+
+    /// <summary>
+    /// Of <see cref="TotalPeriodsElapsed"/>, the cycles that met <see cref="StreakThreshold"/>. A frozen cycle
+    /// is not one of them — a freeze carries the streak, it does not make the period count as done — and a
+    /// cycle with no items is neither, matching <c>RoutineStreakFreezeService.IsSuccess</c>.
+    /// </summary>
+    public int TotalPeriodsCompleted { get; init; }
+
+    /// <summary>
+    /// The full period shape the client renders — the projected columns plus the derived members
+    /// (<see cref="NextResetAt"/>, <see cref="CompletionHistory"/> and the two totals over it) that
+    /// <see cref="Projection"/> cannot compute in the database. Every endpoint returning a whole period goes
+    /// through here so the grouped read and the freeze endpoint cannot drift apart; the client re-reads both
+    /// with the same parser.
     /// <para><paramref name="historyAsc"/> is oldest-first and already trimmed to
     /// <see cref="RoutineTimePeriod.HistoryDepth"/> by the caller.</para>
     /// </summary>
     public static RoutineTimePeriodResponse From(
         RoutineTimePeriod period,
         IEnumerable<RoutinePeriodCompletion> historyAsc,
-        DateTime now) =>
-        Map(period) with
+        DateTime now)
+    {
+        var history = historyAsc.ToList();
+
+        return Map(period) with
         {
             NextResetAt = RoutineResetService.ComputeNextReset(period, now),
-            CompletionHistory = historyAsc.Select(PeriodCompletionRecord.From).ToList()
+            CompletionHistory = history.Select(PeriodCompletionRecord.From).ToList(),
+            TotalPeriodsElapsed = history.Count,
+            TotalPeriodsCompleted = history.Count(completion =>
+                RoutineStreakFreezeService.IsSuccess(completion, period.StreakThreshold))
         };
+    }
 
     public static IQueryable<RoutineTimePeriodResponse> Projection(IQueryable<RoutineTimePeriod> query)
     {

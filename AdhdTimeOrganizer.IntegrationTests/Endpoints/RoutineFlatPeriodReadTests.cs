@@ -78,6 +78,13 @@ public class RoutineFlatPeriodReadTests(AppDbContextFixture fixture) : PostgresT
         served.CompletionHistory.Should().HaveCount(2, "HistoryDepth is 2 and three rows exist");
         served.CompletionHistory.Select(c => c.PeriodStart).Should().Equal(
             FirstStart.AddDays(7), FirstStart.AddDays(14));
+
+        // The two totals are over the same trimmed window, not the three rows — the consistency figure the
+        // client derives from them has to describe the heatmap it sits beside. The SPA gates the review card
+        // and the personal-bests panel on TotalPeriodsElapsed > 0, and defaulted both to 0 for as long as this
+        // response carried neither.
+        served.TotalPeriodsElapsed.Should().Be(2);
+        served.TotalPeriodsCompleted.Should().Be(2, "every seeded row is 3 of 3");
     }
 
     [Fact]

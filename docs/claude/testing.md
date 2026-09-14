@@ -200,3 +200,44 @@ worth copying the shape of:
   one, for the same reason the estimate needed a projection assertion: `NotificationTextRenderer` falls
   back to a generic body for a payload it cannot bind, so a drifted payload seeds rows that render as
   "Máte novú notifikáciu" and look like a renderer bug while every row assertion passes.
+  The `e2e-v3` additions — the admin account and the reminders register — add a third shape of claim.
+  `Seed_GivesTheAdminAccountTheAdminRole_AndNoOtherAccount` asserts the grant **and its absence**: the
+  five `reminder-definition`/`reminder-dashboard` routes are gated on `GetAdminRole()`, no account carried
+  `Admin` before, and `GET /api/user/data` returns no roles field at all — so a missing grant surfaces only
+  as a 403 from a view the SPA has already rendered the chrome for. The absence half matters as much: if
+  `primaryUser` ever picked up `Admin`, no spec could distinguish an admin gate that still works from one
+  silently removed. The reminder rows are pinned per *dashboard number* rather than per table, because
+  every number those views render is a count over a subset — upcoming strictly smaller than the total,
+  a next-7-days count different from the upcoming one, and **`FailedNeedingAttention` smaller than the
+  failed-row count**, which the fixture's reversed-failure pair is the only thing that can establish. And
+  `Seed_KeysEveryDefinitionToARealPortalReminder` holds the seam the fixture writes by hand: the module's
+  key is four strings with no FK behind them, so a definition naming a portal row that does not exist is
+  the orphan `ReminderRegistrationService` logs about, and it renders in the register perfectly.
+  The `e2e-v4` addition — routine period history — is pinned by a fourth shape:
+  `Seed_LeavesEveryRoutinePeriodCurrent_SoTheGroupedReadDoesNotRewriteIt` runs the three lazy mutations
+  the grouped read performs (`CheckGrace`, `RefreshFreezeBudget`, `TryResetCatchUp`) over the seeded periods
+  and asserts each is a no-op. Without it a period whose `LastResetAt` merely *looks* plausible is rewritten
+  by the first request — a completion row appended, the streak re-scored, every item un-ticked, on a 200 —
+  while every row assertion passes against the state before that request. The ledger itself is asserted as
+  the rules the reset job obeys (contiguous cycles, the newest closing on `LastResetAt`, the period streak
+  equal to what `RecomputeStreak` walks to over the rows, `FrozenAt` present exactly on the frozen row), and
+  the read-path guard drives `RoutineTimePeriodReadRefresher` from a host with **no ambient user** — every
+  stock test host resolves a user id for the `IEntityWithUser` filter, so from any of them the fixture
+  accounts' periods are invisible and the refresher renders nothing, which is a fact about the test host and
+  not about the fixture.
+- `ProfileGridSortKeyTests` + `SortKeyRejectionTests` — the sort keys the client actually sends, and what
+  happens to one that resolves to nothing. The first pins the keys per grid (`activity.name` on all four
+  profile grids, the anchor grid's composite `periodKey` expanding into year-then-month with one shared
+  direction) and asserts on row **order**, never on a 200: a key that lands on the wrong member returns a
+  valid page in the wrong order, which on a paginated grid hides rows. The second pins the general rule —
+  an unresolvable key is a **400 naming the key**, never a 500 and never a silently unsorted page — across
+  the three kinds of caller that do not share a base, because the rejection lives in `InvalidSortKeyMiddleware`
+  and nothing else proves it is reached: a `BaseGridEndpoint` derivative, the non-grid
+  `reminder-dashboard/my-upcoming`, and a tracking distinct-entry table whose blanket `catch (Exception)`
+  turned the rejection back into a 500 until it learned to rethrow this one type. Each route is also given
+  a **valid** key, since over-eager rejection is the same outage in the other direction — and the mapping
+  grid's `activity.text` is in there because it reaches through a **conditionally** projected nested object
+  (`Activity == null ? null : new …`), the shape `SortByMany` warns a provider may refuse to translate. The
+  reminder cases pin the `nextOccurrence` → `nextOccurrenceAt` alias on all three reads over a definition,
+  asserted on order rather than on a 200: an alias that resolved to the wrong member, or a normalizer that
+  dropped the entry instead of renaming it, returns a page that looks exactly as healthy.

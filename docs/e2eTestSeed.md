@@ -152,10 +152,12 @@ body, so a spec may hardcode them or read them.
 |---|---|
 | primary account `test@example.com` | `10001` |
 | secondary account `test2@example.com` | `10002` |
+| **admin** account `admin@example.com` | `10003` — carries `Admin` **and** `User`; the only account that does |
 | activity roles (primary) | `11001` Work, `11002` Health & Fitness, `11003` Hobbies & Leisure |
 | activity categories (primary) | `11501` Deep Work, `11502` Quick Tasks, `11503` Errands |
-| activities | `12001`–`12023` |
+| activities | `12001`–`12027` |
 | — the one desktop tracking attributes to | `12023` Desk Research |
+| — the four milestone routines' | `12024`–`12027` Drink Water, Journal, Make the Bed, Brush Teeth |
 | — archived | `12010` Retired Hobby |
 | — referenced, so `canDelete: false` | `12011` Write Blog Post |
 | — unreferenced, so `canDelete: true` | `12012` Unused Idea |
@@ -168,14 +170,19 @@ body, so a spec may hardcode them or read them.
 | activity history | `15001`–`15018` (calibration), `15101` |
 | planner tasks | `16001`–`16007` |
 | backlog / bucket-list / project profiles | `17001` / `17101` / `17201` |
-| memory anchor | `18001` |
+| memory anchors | `18001` (on the bucket-list activity), `18002` (on the **archived** activity) |
 | routines (daily / weekly / monthly) | `19001` / `19002` / `19003` |
+| — milestone items, all daily: streak ≥30 / ≥90 / ≥180 / ≥365 | `19004` / `19005` / `19006` / `19007` |
+| routine period completions | **no fixture id** — 16 per period on Daily and Weekly, identity-generated; the freeze action keys on `periodStart` |
 | day-planner templates | `20001` Home Office, `20002` Office Day, `20003` Relaxed Weekend (**pinned**) |
 | template tasks | `20101`–`20112` |
 | desktop mappings | `21001` → activity, `21002` ignore rule |
 | android mappings | `21101` → activity, `21102` ignore rule |
 | notifications | `22001`–`22006` (three unread, then three read) |
-| secondary account's own data | `11101`, `11601`, `12101`–`12102`, `13101`, `14101`–`14102`, `15501`, `22101`–`22102` |
+| reminders (portal rows) | `23001`–`23005`; the module's definition for each is **its id + 200** |
+| — paused / cancelled | `23004` (task-linked) / `23005` |
+| reminder dispatch ledger | `23501`–`23507` (3 sent, 1 skipped, 2 failed, 1 of those reversed) |
+| secondary account's own data | `11101`, `11601`, `12101`–`12102`, `13101`, `14101`–`14102`, `15501`, `22101`–`22102`, `23101` |
 
 **Ids the fixture does not choose** — task priorities and routine time periods are created by the real
 sign-up path (`IUserDefaultsService`), so they are **resolved and returned** in the response
@@ -213,8 +220,15 @@ never rendered, because no data exercised them:
 8. **One leisure profile of each kind** on distinct activities, plus a **memory anchor** on the
    bucket-list one. A bucket-list entry carries no `IsRepeatable` — that is the backlog profile's
    field — so it is inherently the one-time kind, which is what makes it the right one to anchor.
+   A **second anchor sits on the archived activity** (`18002` → `12010`). That pairing is the anchor
+   grid's normal case, not an edge one — you anchor something you have done and retire the activity
+   afterwards — and it is the only fixture row that exercises the grid's
+   `AppQueryFilters.ActivityArchived` lift. The three *profile* grids do the opposite and hide their
+   archived rows, which is why the archived activity carries no profile: on those surfaces an activity
+   and its profiles disappear together.
 
-Plus three routines (daily / weekly / monthly) with streaks in three different states.
+Plus seven routines: three across the periods with item streaks in three different states, and four more
+daily ones for the milestone tiers — see surface 14 below.
 
 ### The four surfaces `e2e-v2` added
 
@@ -235,10 +249,110 @@ Same rule as the eight above — each was fully built and rendered nothing, beca
     both mapping outcomes: one rule resolving to an activity, one ignore rule.
 12. **Six notifications for the primary account** (three unread, three read) across six kinds, plus two for
     the secondary one, so `All` / `Unread` and the type filter both discriminate and the bell is per-account.
+13. **An admin account, and six reminders for its views to show.** See the section below — this one is two
+    fixture gaps, not one, and either alone leaves all five reminder views unrenderable.
 
 ⚠ **The bell's text is Slovak regardless of the account's locale.** `NotificationTextRenderer` is documented
 as "v1 with sk-SK defaults" and takes no culture, so these rows render in Slovak for the `EN` fixture account.
 That is the app's behaviour, not the fixture's — a spec must not locate a notification by its English text.
+
+### The admin account, and why it is a third account
+
+The five `reminder-definition` / `reminder-dashboard` routes behind `/pripomienky/*` are gated on
+`GetAdminRole()`, and correctly so: they roll up **every** user's reminders with no user scoping at all, so
+the role gate is the only boundary in front of them. (The self-service sibling,
+`reminder-dashboard/my-upcoming`, is `GetUserRole()` and scopes by caller — that asymmetry is the design, not
+a drift.) Until `e2e-v3` no fixture account carried `Admin`, so all five answered **403** with an empty body,
+and the SPA could not stop it first: this app has no role model — `authAdapter.ts` returns constant `true` for
+`isAdminRole` — so the view mounts and the server's answer is the first real authorization check.
+
+`admin@example.com` (`10003`) carries `Admin` and `User`. It is deliberately **not** the primary account
+promoted:
+
+- Nearly every spec signs in as `primaryUser`. If that account were an admin, every admin-gated route in the
+  app would be reachable from those specs, and no test could tell a gate that still works from one that was
+  quietly removed. Keeping the primary a plain `User` is what keeps "an ordinary user gets 403 here"
+  assertable.
+- It is the state a real deployment has — an operator account beside ordinary ones — rather than one the app
+  could not produce.
+
+Nothing else is seeded against it: it has the per-user defaults every account gets and no fixture data of its
+own. It exists to satisfy a role gate.
+
+### The reminders, in both halves
+
+A reminder is two rows in two projects, and the admin views read the second one:
+
+- The portal's **`Reminder`** (`planning` schema) is the user's intent — title, instant, lead offsets, and an
+  optional planner-task link.
+- The module's **`ReminderDefinition`** (`reminders` schema) is scheduler state — status, next occurrence,
+  recipients — keyed to the portal row by the string tuple
+  `(Portal, Reminder, <portal id>, PersonalReminder)`. `ReminderDispatch` is the append-only outcome ledger
+  beneath it.
+
+The fixture writes both halves by hand rather than through `ReminderRegistrationService`. The seam is the
+right path for the *app* and is covered by `ReminderRegistrationTests`; going through it here would let the
+registry's upsert choose the definition ids, and `/pripomienky/register/:id` needs an id a spec can name. The
+key format, template key and payload are read off that service's constants, so only the ids are the fixture's.
+
+Six reminders, chosen so no dashboard number is zero and no two are the same number:
+
+| | |
+|---|---|
+| four with a pending occurrence | three inside the overview's 7-day window, one (the recurring one) outside it |
+| one paused, one cancelled | both with `nextOccurrenceAt` null, as the registry leaves them |
+| both schedule shapes | four one-shot with lead offsets, one recurring-monthly |
+| spanning two accounts | five for the primary, one for the secondary — these views are cross-user |
+| seven dispatches over the last 7 days | 3 sent, 1 skipped (quiet hours), 2 failed — **one of the failures is reversed** |
+
+That last row is the one to preserve. "Needs attention" on the overview is *failed rows no reversal
+supersedes*, so a fixture with a single plain failure cannot distinguish a correct implementation from one
+that simply counts failures. `counts.reminderFailuresNeedingAttention` is 1 while two failed rows exist.
+
+### The routine period history `e2e-v4` added
+
+14. **Sixteen closed cycles on the Daily and Weekly periods, and the period-level streaks they imply.** The
+    per-user default seeder creates the four periods bare — threshold, grace and anchor only — and nothing in the
+    fixture had ever closed a cycle, so `routine_period_completions` was empty and every period's `streak` /
+    `bestStreak` was 0 for every account. Four surfaces read those and had never rendered: the group heatmaps and
+    the history dialog, the trend arrow, the personal-bests panel, and the weekly review card. Sixteen because
+    that is `HistoryDepth`'s default, so the heatmap is full rather than left-padded.
+
+    The Weekly history is the interesting one: `xf.xxxx.xx.xx.xx` newest-first (met / **frozen** / missed), which
+    walks to streak 1, best 4 — the same numbers the Weekly Review item already carried — with **one streak
+    freeze spent** on the most recent miss and the miss behind it left unfrozen so a spec still has one to spend
+    a freeze on. The frozen cell is the heatmap's third state, and the SPA's client-side `mockHistory` never
+    invents one: it is reachable only from a real row, which is the main reason this is seeded rather than
+    left to the counter-driven mock. The Daily history is 5 of 5 on every cycle but the one eleven cycles back
+    (4 of 5, which broke the run at a threshold of 100), so the Daily period sits on streak 11 / best 30.
+
+    **Four more daily routines, one per milestone tier.** `RoutineTodoListItem.vue` picks its streak icon from the
+    item's *current* streak at 7 / 30 / 90 / 180 / 365. The highest seeded item streak was 12, so only the
+    lowest tier had ever rendered — and `bestStreak: 30` on Take Medication never reached it. Drink Water (45),
+    Journal (120), Make the Bed (200) and Brush Teeth (400) cover the other four; the response names each by the
+    tier it clears (`routines.milestone30` … `milestone365`). Drink Water is the one daily item not yet ticked
+    today, so the group is not all-done.
+
+    ⚠ **The history is written to the state the reset job would have left, and the guard for that is the one to
+    keep.** `GET /routine-todo-list/grouped-by-time-period` runs `RoutineResetService.TryResetCatchUp` on every
+    period before rendering it. A period whose `lastResetAt` makes it look due is rewritten by the first request:
+    a completion row appended, the streak re-scored, every item un-ticked — on a 200, with every row assertion
+    still passing against the pre-request state. So `lastResetAt` lands exactly on the boundary that opened the
+    current cycle (midnight today for Daily; the most recent Monday for Weekly, which may be today), the newest
+    completion row ends on that same boundary, every item's `lastResetDate` matches it, and the freeze window is
+    stamped so `RefreshFreezeBudget` has nothing to refill. The period streaks are what
+    `RoutineStreakFreezeService.RecomputeStreak` derives from the rows — a seeded value below the walk is
+    "corrected" the first time a freeze is spent, and a spec would see the number change under it.
+    `Seed_LeavesEveryRoutinePeriodCurrent_SoTheGroupedReadDoesNotRewriteIt` runs the read's three lazy
+    mutations over the fixture and asserts each is a no-op.
+
+    ⚠ **`totalPeriodsElapsed` / `totalPeriodsCompleted` were not fields this API had until the same change.**
+    The SPA's `RoutineTimePeriodEntity` had declared both, defaulted them to 0, and gated the weekly review
+    card, the consistency figure and the personal-bests panel on `totalPeriodsElapsed > 0` — while nothing
+    server-side populated them, not the entity and not `RoutineTimePeriodResponse`. So those three surfaces
+    were unreachable for every account regardless of what any fixture seeded, and a row assertion could not
+    have caught it. `RoutineTimePeriodResponse.From` now derives both over the `HistoryDepth` window it
+    already renders (see the Routines domain map); the fixture rows are what give them a value other than 0.
 
 ### ⚠ The tracking rows are written as rows, not posted through the heartbeats
 
@@ -289,31 +403,42 @@ number instead of assuming.
 
 ```jsonc
 {
-  "fixture": "e2e-v2",
+  "fixture": "e2e-v4",
   "seedDateUtc": "2026-09-10",
   "primaryUser":   { "id": 10001, "email": "test@example.com",  "password": "testpass123", "locale": "EN" },
   "secondaryUser": { "id": 10002, "email": "test2@example.com", "password": "testpass123", "locale": "EN" },
+  "adminUser":     { "id": 10003, "email": "admin@example.com", "password": "testpass123", "locale": "EN" },
   "activities":    { "bugFixing": 12001, "archived": 12010, "notDeletable": 12011, "deletable": 12012, /* … */ },
   "todoLists":     { "focus": 13001, "errands": 13002, "empty": 13003, "secondaryWork": 13101 },
   "todoListItems": { "withEstimate": 14002, "withEstimateAndSteps": 14001,
                      "multiCountPartial": 14013, "completedToday": 14014,
                      "temptationBundled": 14015, "mostOverdue": 14007, "leastOverdue": 14012 },
-  "profiles":      { "backlog": 17001, "bucketList": 17101, "project": 17201, "memoryAnchor": 18001 },
-  "routines":      { "daily": 19001, "weekly": 19002, "monthly": 19003 },
+  "profiles":      { "backlog": 17001, "bucketList": 17101, "project": 17201,
+                     "memoryAnchor": 18001, "memoryAnchorOnArchived": 18002 },
+  "routines":      { "daily": 19001, "weekly": 19002, "monthly": 19003,
+                     "milestone30": 19004, "milestone90": 19005, "milestone180": 19006, "milestone365": 19007 },
   "dayPlannerTemplates": { "homeOffice": 20001, "officeDay": 20002, "pinned": 20003 },
   "trackingMappings":    { "desktopToActivity": 21001, "desktopIgnored": 21002,
                            "androidToActivity": 21101, "androidIgnored": 21102 },
   "notifications":       { "newestUnread": 22001, "oldestRead": 22006, "secondaryNewest": 22101 },
+  // Portal rows. The admin register and its detail route take the definition ids below, not these.
+  "reminders":           { "callTheDentist": 23001, "fileTaxReturn": 23002, "payRentRecurring": 23003,
+                           "paused": 23004, "cancelled": 23005, "secondaryPostParcel": 23101 },
+  "reminderDefinitions": { "callTheDentist": 23201, "fileTaxReturn": 23202, "payRentRecurring": 23203,
+                           "paused": 23204, "cancelled": 23205, "secondaryPostParcel": 23301 },
   "taskPriorities":     { "Today": 9, "This week": 10, "This month": 11, "This year": 12 },
   "routineTimePeriods": { "Daily": 5, "Weekly": 6, "Monthly": 7, "Yearly": 8 },
   "counts": {
-    "activities": 23, "todoListItems": 15, "overdueTodoListItems": 6,
+    "activities": 27, "todoListItems": 15, "overdueTodoListItems": 6,
     "calibrationTodoListItems": 6, "activityHistoryEntries": 26,
     "plannerTasks": 7, "calendars": 730,
     "dayPlannerTemplates": 3, "templatePlannerTasks": 12,
     "webExtensionEntries": 1050, "desktopEntries": 630, "distinctDesktopEntries": 6,
     "androidSessions": 35, "distinctAndroidEntries": 5,
-    "notifications": 6, "unreadNotifications": 3
+    "notifications": 6, "unreadNotifications": 3,
+    "reminderDefinitions": 6, "upcomingReminders": 4,
+    "reminderDispatches": 7, "reminderFailuresNeedingAttention": 1,
+    "routinePeriodCompletions": 32, "frozenRoutinePeriodCompletions": 1
   }
 }
 ```
@@ -371,8 +496,11 @@ changes the world for every spec after it.
   [claude/endpoints.md](claude/endpoints.md#the-e2e-fixture-endpoint) for why.
 - Watch the constraints that will reject a careless addition: `todo_list_item` is unique on
   `(user_id, activity_id, todo_list_id)`, `activity_history` on `(user_id, activity_id, start_timestamp)`,
-  `total_count` is constrained to 2–99 with `done_count <= total_count`, and every `DateTime` must be
-  `DateTimeKind.Utc`.
+  `total_count` is constrained to 2–99 with `done_count <= total_count`, every `DateTime` must be
+  `DateTimeKind.Utc`, `routine_period_completions` is unique on `(time_period_id, period_start)` and its
+  `frozen_at` must be set exactly when `is_frozen` is. And the one no constraint catches: a routine period
+  seeded so that `RoutineResetService.ComputeNextReset` lands in the past is rewritten by the first grouped
+  read (surface 14).
 - Add a row assertion to `TestSeedEndpointTests` for anything a spec will depend on. A 200 proves
   nothing about the data, which is the whole reason these gaps existed.
 - ⚠ **And a projection assertion, if the point of the row is that a spec can see it.** Those are not

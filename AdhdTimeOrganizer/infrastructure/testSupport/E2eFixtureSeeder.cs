@@ -7,10 +7,13 @@ using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Planning.application.service.reminder;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.model.entity.reminder;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.android;
@@ -20,12 +23,15 @@ using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.notification.payload;
+using Sydowwe.Framework.Contracts.reminders;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.domain.serviceContract;
 using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
 using Sydowwe.Notifications.domain.entity;
+using Sydowwe.Reminders.domain.entity;
+using Sydowwe.Reminders.domain.@enum;
 using DayTypeEnum = AdhdTimeOrganizer.Core.domain.model.@enum.DayType;
 using LocationEnum = AdhdTimeOrganizer.Core.domain.model.@enum.Location;
 using static AdhdTimeOrganizer.infrastructure.testSupport.E2eFixtureIds;
@@ -169,8 +175,9 @@ public class E2eFixtureSeeder(
     /// band afterwards — see <see cref="AdvanceSequencesAsync"/>.
     /// </summary>
     /// <remarks>
-    /// The three tracking ledgers are deliberately absent: they hold thousands of rows no spec addresses by
-    /// id, so they keep their generated ids and their sequences need no nudge.
+    /// The three tracking ledgers and the routine completion ledger are deliberately absent: nothing addresses
+    /// a row of theirs by id (the freeze action keys on <c>periodStart</c>), so they keep their generated ids
+    /// and their sequences need no nudge.
     /// </remarks>
     private static readonly Type[] ExplicitIdEntities =
     [
@@ -180,7 +187,8 @@ public class E2eFixtureSeeder(
         typeof(MemoryAnchor), typeof(RoutineTodoList),
         typeof(TaskPlannerDayTemplate), typeof(TemplatePlannerTask),
         typeof(TrackerDesktopMappingByPattern), typeof(TrackerAndroidMappingByPattern),
-        typeof(Notification)
+        typeof(Notification),
+        typeof(Reminder), typeof(ReminderDefinition), typeof(ReminderDispatch)
     ];
 
     public async Task<TestSeedResponse> ResetAsync(CancellationToken ct)
@@ -198,11 +206,18 @@ public class E2eFixtureSeeder(
         // would 403 rather than 401, which reads as an endpoint bug.
         await appWideDefaults.SeedAllAsync();
 
-        await CreateAccountAsync(PrimaryUserId, PrimaryUserEmail, PrimaryUserPassword, ct);
-        await CreateAccountAsync(SecondaryUserId, SecondaryUserEmail, SecondaryUserPassword, ct);
+        await CreateAccountAsync(PrimaryUserId, PrimaryUserEmail, PrimaryUserPassword,
+            [PortalRoleCatalog.User], ct);
+        await CreateAccountAsync(SecondaryUserId, SecondaryUserEmail, SecondaryUserPassword,
+            [PortalRoleCatalog.User], ct);
+        await CreateAccountAsync(AdminUserId, AdminUserEmail, AdminUserPassword,
+            [PortalRoleCatalog.User, PortalRoleCatalog.Admin], ct);
 
         await SeedPrimaryAccountAsync(today, ct);
         await SeedSecondaryAccountAsync(today, ct);
+
+        // After both accounts: the reminders span them, and the task-linked one needs its planner task.
+        await AddRemindersAsync(today, ct);
 
         await AdvanceSequencesAsync(ct);
 
@@ -320,7 +335,14 @@ public class E2eFixtureSeeder(
     /// suite. The seeded root admin stays <c>Sk</c> — it is not a test account.
     /// </para>
     /// </remarks>
-    private async Task CreateAccountAsync(long id, string email, string password, CancellationToken ct)
+    /// <param name="roles">
+    /// The role names to grant, from <see cref="PortalRoleCatalog"/>. Every account gets <c>User</c>; the
+    /// admin account gets <c>Admin</c> on top of it — see <see cref="E2eFixtureIds.AdminUserId"/> for why
+    /// that is a third account rather than a promotion of the primary one. A name with no <c>AspNetRoles</c>
+    /// row throws rather than silently granting nothing, because the symptom of the silent version is a 403
+    /// on a route nobody expects to be gated.
+    /// </param>
+    private async Task CreateAccountAsync(long id, string email, string password, string[] roles, CancellationToken ct)
     {
         var normalized = email.ToUpperInvariant();
 
@@ -350,12 +372,20 @@ public class E2eFixtureSeeder(
         // Every endpoint without explicit roles gets Roles("User","Admin","Root") from the global
         // configurator in Program.cs, so an account with no role row authenticates and then 403s on
         // everything it touches.
-        var userRoleId = await dbContext.Roles
-            .Where(role => role.NormalizedName == PortalRoleCatalog.User.ToUpperInvariant())
-            .Select(role => role.Id)
-            .FirstAsync(ct);
+        var normalizedRoles = roles.Select(role => role.ToUpperInvariant()).ToList();
 
-        dbContext.UserRoles.Add(new IdentityUserRole<long> { UserId = id, RoleId = userRoleId });
+        var roleIds = await dbContext.Roles
+            .Where(role => normalizedRoles.Contains(role.NormalizedName!))
+            .Select(role => role.Id)
+            .ToListAsync(ct);
+
+        if (roleIds.Count != roles.Length)
+            throw new InvalidOperationException(
+                $"Fixture account {id} asked for {roles.Length} role(s) but only {roleIds.Count} exist. " +
+                "The app-wide role seeder and PortalRoleCatalog have diverged; the fixture is incomplete.");
+
+        foreach (var roleId in roleIds)
+            dbContext.UserRoles.Add(new IdentityUserRole<long> { UserId = id, RoleId = roleId });
 
         await dbContext.SaveChangesAsync(ct);
 
@@ -414,6 +444,12 @@ public class E2eFixtureSeeder(
         AddActivity(ActivityWeeklyReview, userId, "Weekly Review", PrimaryRoleWork, PrimaryCategoryQuickTasks);
         AddActivity(ActivityPayRent, userId, "Pay Rent", PrimaryRoleHealth, PrimaryCategoryErrands);
 
+        // The four milestone routines' activities.
+        AddActivity(ActivityDrinkWater, userId, "Drink Water", PrimaryRoleHealth, null);
+        AddActivity(ActivityJournal, userId, "Journal", PrimaryRoleLeisure, null);
+        AddActivity(ActivityMakeTheBed, userId, "Make the Bed", PrimaryRoleHealth, PrimaryCategoryQuickTasks);
+        AddActivity(ActivityBrushTeeth, userId, "Brush Teeth", PrimaryRoleHealth, null);
+
         dbContext.TodoLists.AddRange(
             new TodoList { Id = PrimaryListFocus, UserId = userId, Name = "Focus", Text = "What I am working on now", Icon = "fas fa-bullseye" },
             new TodoList { Id = PrimaryListErrands, UserId = userId, Name = "Errands", Text = "Off-desk things that keep slipping", Icon = "fas fa-bag-shopping" },
@@ -441,9 +477,12 @@ public class E2eFixtureSeeder(
             Length = FromMinutes(50)
         });
 
-        var periods = await RoutineTimePeriodIdsAsync(userId, ct);
+        // The entities, not just their ids: the Daily and Weekly periods are mutated below (streak state,
+        // reset instant, freeze window) and are tracked, so the same SaveChanges writes them back.
+        var periods = await RoutineTimePeriodsAsync(userId, ct);
 
         AddRoutines(userId, today, periods);
+        AddRoutinePeriodHistory(today, periods);
         AddLeisureProfiles(userId, today, await LookupIdsAsync(userId, ct));
         AddDayPlannerTemplates(userId, await ImportanceIdsAsync(userId, ct));
         AddTrackingMappings(userId);
@@ -732,15 +771,54 @@ public class E2eFixtureSeeder(
             HighlightNote = "Topped a V3 on the overhang for the first time.",
             Rating = 9
         });
+
+        // An anchor on the ARCHIVED activity. The anchor grid is the one profile surface that must keep
+        // showing a row whose activity is archived — anchoring is for things already done, and retiring the
+        // activity afterwards is the normal path, not an edge case. The grid lifts
+        // AppQueryFilters.ActivityArchived for exactly this row; without a row of this shape in the fixture
+        // nothing exercised the lift, and the bug it fixes was invisible on screen (an empty grid reporting
+        // itemsCount: 1) rather than an error.
+        dbContext.Set<MemoryAnchor>().Add(new MemoryAnchor
+        {
+            Id = MemoryAnchorRetiredHobby,
+            UserId = userId,
+            ActivityId = ActivityRetiredHobby,
+            AnchorMonth = anchoredMonth.AddMonths(-1).Month,
+            AnchorYear = anchoredMonth.AddMonths(-1).Year,
+            HighlightNote = "The last session before hanging it up for good.",
+            Rating = 7
+        });
     }
 
     /// <summary>
-    /// Three routines, one per period, with streaks in three different states — running, just started,
-    /// and never completed.
+    /// The routines. Three across the periods with item streaks in three different states — running, just
+    /// started, and never completed — plus four more daily ones whose streaks sit in the four milestone tiers
+    /// above the first (<c>RoutineTodoListItem.vue</c> switches its icon at 7 / 30 / 90 / 180 / 365 on the
+    /// item's <i>current</i> streak, so <c>BestStreak = 30</c> on the first item never reached it).
     /// </summary>
-    private void AddRoutines(long userId, DateOnly today, IReadOnlyDictionary<string, long> periods)
+    /// <remarks>
+    /// Every item's reset and completion instants are placed relative to the cycle its period is actually
+    /// in — <c>LastResetDate</c> on the boundary <see cref="AddRoutinePeriodHistory"/> stamps as
+    /// <c>LastResetAt</c>, <c>LastCompletedAt</c> inside the right cycle — and every item done in the open cycle
+    /// carries <c>BestStreakBeforeScore</c>, the mark <c>RoutineResetService</c> reads as "already counted this
+    /// cycle". An item done without the mark double-scores the next tick; one carrying it while undone refuses
+    /// to score at all and gives a point back on the next un-tick.
+    /// </remarks>
+    private void AddRoutines(long userId, DateOnly today, IReadOnlyDictionary<string, RoutineTimePeriod> periods)
     {
         var never = Utc(today.AddYears(-1), 0);
+        var everyDay = new List<DayOfWeek>
+        {
+            DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday,
+            DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+        };
+
+        // The daily cycle opened at midnight today; the weekly one on the most recent Monday (the period's
+        // ResetAnchorDay), which may be today.
+        var dailyCycleStart = today;
+        var weeklyCycleStart = LastWeeklyBoundary(today, periods["Weekly"]);
+
+        var daily = periods["Daily"].Id;
 
         dbContext.RoutineTodoLists.AddRange(
             new RoutineTodoList
@@ -748,27 +826,32 @@ public class E2eFixtureSeeder(
                 Id = RoutineTakeMedication,
                 UserId = userId,
                 ActivityId = ActivityTakeMedication,
-                TimePeriodId = periods["Daily"],
+                TimePeriodId = daily,
                 IsDone = true,
                 DisplayOrder = DisplayOrderStart,
+                // Twelve including today's tick, so eleven closed cycles — the Daily period's own streak.
                 Streak = 12,
                 BestStreak = 30,
-                LastResetDate = today,
+                LastResetDate = dailyCycleStart,
                 LastCompletedAt = Utc(today, 8),
-                SuggestedDays = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday]
+                // Scored today, well short of the record: an un-tick gives back 12 → 11 and leaves 30 alone.
+                BestStreakBeforeScore = 30,
+                SuggestedDays = [.. everyDay]
             },
             new RoutineTodoList
             {
                 Id = RoutineWeeklyReview,
                 UserId = userId,
                 ActivityId = ActivityWeeklyReview,
-                TimePeriodId = periods["Weekly"],
+                TimePeriodId = periods["Weekly"].Id,
                 IsDone = false,
                 DisplayOrder = DisplayOrderStart,
                 Streak = 1,
                 BestStreak = 4,
-                LastResetDate = today.AddDays(-2),
-                LastCompletedAt = Utc(today.AddDays(-9), 18),
+                LastResetDate = weeklyCycleStart,
+                // The Sunday before the cycle opened: inside the cycle that closed last, which is the one
+                // the streak of 1 is for, and never inside the open one whichever weekday today is.
+                LastCompletedAt = Utc(weeklyCycleStart.AddDays(-1), 18),
                 SuggestedDays = [DayOfWeek.Sunday]
             },
             new RoutineTodoList
@@ -776,7 +859,7 @@ public class E2eFixtureSeeder(
                 Id = RoutinePayRent,
                 UserId = userId,
                 ActivityId = ActivityPayRent,
-                TimePeriodId = periods["Monthly"],
+                TimePeriodId = periods["Monthly"].Id,
                 IsDone = false,
                 DisplayOrder = DisplayOrderStart,
                 Streak = 0,
@@ -784,6 +867,188 @@ public class E2eFixtureSeeder(
                 LastCompletedAt = never,
                 SuggestedDayOfMonth = 1
             });
+
+        // The milestone tiers, one item each. Streaks sit well past their tier, so a spec that un-ticks and
+        // re-ticks one (net zero on the streak) cannot drop it across a boundary. A cycle that lapses undone
+        // is different: it zeroes the item's streak outright, so a spec straddling midnight UTC with one of
+        // these left un-ticked starts its next assertion from the lowest tier, not the seeded one.
+        var milestones = new (long Id, long ActivityId, int Streak, bool DoneToday)[]
+        {
+            (RoutineDrinkWater, ActivityDrinkWater, 45, false),
+            (RoutineJournal, ActivityJournal, 120, true),
+            (RoutineMakeTheBed, ActivityMakeTheBed, 200, true),
+            (RoutineBrushTeeth, ActivityBrushTeeth, 400, true)
+        };
+
+        var order = DisplayOrderStart;
+
+        foreach (var milestone in milestones)
+        {
+            order -= DisplayOrderGap;
+
+            dbContext.RoutineTodoLists.Add(new RoutineTodoList
+            {
+                Id = milestone.Id,
+                UserId = userId,
+                ActivityId = milestone.ActivityId,
+                TimePeriodId = daily,
+                IsDone = milestone.DoneToday,
+                DisplayOrder = order,
+                Streak = milestone.Streak,
+                BestStreak = milestone.Streak,
+                LastResetDate = dailyCycleStart,
+                // Done today has scored this cycle. Not yet done was last ticked yesterday evening and is
+                // one tick away from extending — the state a spec toggling it wants to start from.
+                LastCompletedAt = milestone.DoneToday ? Utc(today, 7) : Utc(today.AddDays(-1), 20),
+                // Streak == BestStreak, so today's tick is the one that set the record: un-ticking gives back
+                // both, to Streak - 1 / Streak - 1.
+                BestStreakBeforeScore = milestone.DoneToday ? milestone.Streak - 1 : null,
+                SuggestedDays = [.. everyDay]
+            });
+        }
+    }
+
+    /// <summary>
+    /// The pattern of the Weekly period's last <see cref="E2eFixtureIds.RoutineHistoryCycles"/> closed cycles,
+    /// newest first: <c>'x'</c> met the threshold, <c>'.'</c> missed it, <c>'f'</c> missed it and had a streak
+    /// freeze spent on it.
+    /// <para>
+    /// Written to agree with the Weekly Review item's own counters (streak 1, best 4): the newest cycle is a
+    /// hit and the one before it is not, and the longest unbroken run is four. The freeze sits on that
+    /// most recent miss so the heatmap's third cell state is in view rather than scrolled off, and the miss
+    /// behind it is left unfrozen so a spec still has one to spend a freeze on.
+    /// </para>
+    /// </summary>
+    private const string WeeklyHistoryPattern = "xf.xxxx.xx.xx.xx";
+
+    /// <summary>
+    /// The closed cycle in the Daily period's history that the first item missed. Eleven, because the item's
+    /// streak of 12 includes today's still-open cycle — so the period, which only scores closed ones, is on 11.
+    /// </summary>
+    private const int DailyMissedCyclesAgo = 11;
+
+    /// <summary>
+    /// The routine <i>period</i> history: the completion ledger for the Daily and Weekly periods, and the
+    /// period-level streak state that ledger would have left behind. Everything the heatmaps, the trend arrow,
+    /// the consistency figure and the personal-bests panel read; none of it existed before <c>e2e-v4</c>,
+    /// because the per-user default seeder creates the four periods bare and nothing had ever closed a cycle.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Written to the state the reset job would have left, not merely to plausible values.</b> The
+    /// grouped read (<c>GetAllGroupedRoutineTodoListEndpoint</c>) runs <c>RoutineResetService.TryResetCatchUp</c>
+    /// on every period before rendering it. Seed a period whose <c>LastResetAt</c> makes it look due and the
+    /// first request closes the cycle: it appends its own completion row, re-scores the streak, and un-ticks
+    /// every item — silently, on a 200. So <c>LastResetAt</c> lands exactly on the boundary that opened the
+    /// current cycle, the newest completion row ends on that same boundary, and the freeze window is stamped
+    /// so <c>RefreshFreezeBudget</c> has nothing to refill. <c>TestSeedEndpointTests</c> asserts the catch-up
+    /// is a no-op over the seeded rows.</para>
+    /// <para>The period streaks are the ones <c>RoutineStreakFreezeService.RecomputeStreak</c> derives from
+    /// the rows (it only ever raises, so a seeded value below the walk would be corrected on the first freeze
+    /// and a spec would see the number change under it). <c>BestStreak</c> on the Daily period is 30 rather
+    /// than the walk's 11 because its history is sixteen rows deep and the best run predates them — the same
+    /// reason that method never lowers.</para>
+    /// <para>Counts are honest: a frozen row keeps its 0 of 1, because a freeze changes how a period is
+    /// scored, not what happened in it — the consistency figure is computed over the counts, the streak over
+    /// the flags.</para>
+    /// </remarks>
+    private void AddRoutinePeriodHistory(DateOnly today, IReadOnlyDictionary<string, RoutineTimePeriod> periods)
+    {
+        var daily = periods["Daily"];
+        var weekly = periods["Weekly"];
+
+        // The freeze window: what RefreshFreezeBudget would open on first read. Stamped on all four periods so
+        // no read of the fixture writes, and so the freeze count a spec sees is the one seeded here.
+        var freezeWindowResetsAt = RoutineStreakFreezeService.NextBudgetReset(Utc(today, 0));
+        foreach (var period in periods.Values)
+        {
+            period.FreezesRemaining = period.FreezeBudget;
+            period.FreezeBudgetResetsAt = freezeWindowResetsAt;
+        }
+
+        // --- Daily: five items, one miss eleven cycles back ---------------------------------------------
+        // Item counts are the five daily routines. All five are done on every closed cycle but one, where the
+        // first item was missed — 4 of 5 is 80% against a threshold of 100, so that cycle broke the run.
+        const int dailyItems = 5;
+
+        daily.LastResetAt = Utc(today, 0);
+        daily.Streak = DailyMissedCyclesAgo;
+        daily.BestStreak = 30;
+
+        for (var cyclesAgo = 0; cyclesAgo < RoutineHistoryCycles; cyclesAgo++)
+        {
+            var periodEnd = today.AddDays(-cyclesAgo);
+            dbContext.Set<RoutinePeriodCompletion>().Add(new RoutinePeriodCompletion
+            {
+                TimePeriodId = daily.Id,
+                PeriodStart = periodEnd.AddDays(-daily.LengthInDays),
+                PeriodEnd = periodEnd,
+                CompletedCount = cyclesAgo == DailyMissedCyclesAgo ? dailyItems - 1 : dailyItems,
+                TotalCount = dailyItems,
+                // The sweep's instant: the boundary itself, since the job runs at midnight UTC.
+                CreatedAt = Utc(periodEnd, 0)
+            });
+        }
+
+        // --- Weekly: one item, a mixed run, one freeze ---------------------------------------------------
+        // The pattern is the Weekly depth; the constant is what the ids file and the docs promise. Two sources
+        // that can drift apart get checked against each other rather than trusted.
+        if (WeeklyHistoryPattern.Length != RoutineHistoryCycles)
+            throw new InvalidOperationException(
+                $"WeeklyHistoryPattern has {WeeklyHistoryPattern.Length} cycles but RoutineHistoryCycles is {RoutineHistoryCycles}.");
+
+        var weeklyCycleStart = LastWeeklyBoundary(today, weekly);
+        weekly.LastResetAt = Utc(weeklyCycleStart, 0);
+
+        var frozenThisWindow = false;
+        var rowsByPeriodStartAsc = new List<RoutinePeriodCompletion>();
+
+        for (var cyclesAgo = 0; cyclesAgo < WeeklyHistoryPattern.Length; cyclesAgo++)
+        {
+            var periodEnd = weeklyCycleStart.AddDays(-weekly.LengthInDays * cyclesAgo);
+            var mark = WeeklyHistoryPattern[cyclesAgo];
+            var isFrozen = mark == 'f';
+
+            // Spent the morning after the miss showed up, which is when the client offers the action.
+            var frozenAt = isFrozen ? Utc(periodEnd, 9) : (DateTime?)null;
+            frozenThisWindow |= frozenAt >= new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            rowsByPeriodStartAsc.Insert(0, new RoutinePeriodCompletion
+            {
+                TimePeriodId = weekly.Id,
+                PeriodStart = periodEnd.AddDays(-weekly.LengthInDays),
+                PeriodEnd = periodEnd,
+                CompletedCount = mark == 'x' ? 1 : 0,
+                TotalCount = 1,
+                CreatedAt = Utc(periodEnd, 0),
+                IsFrozen = isFrozen,
+                FrozenAt = frozenAt
+            });
+        }
+
+        dbContext.Set<RoutinePeriodCompletion>().AddRange(rowsByPeriodStartAsc);
+
+        // A freeze spent inside the current calendar month is one the window has not yet given back.
+        if (frozenThisWindow)
+            weekly.FreezesRemaining--;
+
+        // Derived by the same walk the freeze endpoint runs, from the rows just written — not typed in beside
+        // them, so the pattern above is the single place the Weekly numbers come from.
+        weekly.Streak = 0;
+        weekly.BestStreak = 0;
+        RoutineStreakFreezeService.RecomputeStreak(weekly, rowsByPeriodStartAsc);
+    }
+
+    /// <summary>
+    /// The most recent instant a weekly-anchored period reset on or before <paramref name="today"/> — midnight on
+    /// the last <c>ResetAnchorDay</c> weekday, which is today if today is that weekday. The instant
+    /// <c>RoutineResetService.ComputeNextReset</c> would advance from to land strictly after now.
+    /// </summary>
+    private static DateOnly LastWeeklyBoundary(DateOnly today, RoutineTimePeriod period)
+    {
+        // The service's own convention: 1 = Monday … 7 = Sunday.
+        var anchor = period.ResetAnchorDay == 7 ? DayOfWeek.Sunday : (DayOfWeek)period.ResetAnchorDay;
+        var daysSince = ((int)today.DayOfWeek - (int)anchor + 7) % 7;
+        return today.AddDays(-daysSince);
     }
 
     // --- day-planner templates --------------------------------------------------------------------
@@ -1103,7 +1368,7 @@ public class E2eFixtureSeeder(
     /// would differ between two seeds on the same day, which the fixture promises they do not.</para>
     /// </remarks>
     private async Task AddNotificationsAsync(
-        long userId, DateOnly today, IReadOnlyDictionary<string, long> periods, CancellationToken ct)
+        long userId, DateOnly today, IReadOnlyDictionary<string, RoutineTimePeriod> periods, CancellationToken ct)
     {
         // Unread first: the stagger below makes each successive row older, and an unread bell that has to be
         // scrolled to is not the state a spec asserting on the Unread filter wants to open.
@@ -1130,17 +1395,21 @@ public class E2eFixtureSeeder(
                 Id = NotificationFirst + 2,
                 UserId = userId,
                 Type = NotificationType.RoutinePeriodEndingSoon,
+                // Weekly holds one item, not yet done this cycle — 1 of 1 remaining, not the 2 of 5 that used
+                // to be here and described a group the fixture never had.
                 PayloadJson = JsonHelper.Serialize(new RoutinePeriodEndingSoonPayload(
-                    periods["Weekly"], "Weekly", Remaining: 2, Total: 5, DaysLeft: 1, Streak: 1)),
+                    periods["Weekly"].Id, "Weekly", Remaining: 1, Total: 1, DaysLeft: 1, Streak: periods["Weekly"].Streak)),
                 IsRead = false
             },
             new()
             {
+                // The summary the last Daily reset would have sent: read off the period rather than retyped,
+                // so it agrees with the newest completion row and the streak AddRoutinePeriodHistory left.
                 Id = NotificationFirst + 3,
                 UserId = userId,
                 Type = NotificationType.RoutinePeriodEnded,
                 PayloadJson = JsonHelper.Serialize(new RoutinePeriodEndedPayload(
-                    periods["Daily"], "Daily", CompletedCount: 4, TotalCount: 4, Streak: 12,
+                    periods["Daily"].Id, "Daily", CompletedCount: 5, TotalCount: 5, Streak: periods["Daily"].Streak,
                     Outcome: RoutineStreakOutcome.Extended)),
                 IsRead = true
             },
@@ -1267,6 +1536,218 @@ public class E2eFixtureSeeder(
         await dbContext.SaveChangesAsync(ct);
     }
 
+    // --- reminders ------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The reminders surface, in both of the projects that own half of it: the portal's own
+    /// <see cref="Reminder"/> rows (what the user asked for) and the module's
+    /// <see cref="ReminderDefinition"/> / <see cref="ReminderDispatch"/> rows (scheduler state and the
+    /// append-only outcome ledger). Spans both fixture accounts on purpose — the register and its
+    /// dashboards roll up <i>every</i> user's reminders, which is what makes them Admin-only and what
+    /// distinguishes them from the self-service <c>my-upcoming</c> view.
+    ///
+    /// <para><b>Why the two sides are written by hand rather than through
+    /// <see cref="ReminderRegistrationService"/>.</b> The seam is the right way for the <i>app</i> to
+    /// create a reminder, and it is covered by <c>ReminderRegistrationTests</c>. Here it would take the
+    /// definition ids away from the fixture — the registry upserts and lets the sequence choose — and a
+    /// spec opening <c>/pripomienky/register/:id</c> needs an id it can name. The key format, template key
+    /// and payload below are therefore read off that service's constants rather than retyped, so the two
+    /// cannot drift apart silently; only the ids are ours.</para>
+    ///
+    /// <para>The statuses are chosen so no dashboard number is zero and no two are equal: four definitions
+    /// with a pending occurrence (three of them inside the overview's 7-day window, one outside it), one
+    /// paused, one cancelled. <see cref="AddReminderDispatchesAsync"/> does the same for the outcome
+    /// tallies.</para>
+    /// </summary>
+    private async Task AddRemindersAsync(DateOnly today, CancellationToken ct)
+    {
+        // The instants the dispatch ledger below is written at. Named here because the definitions have to
+        // agree with them: a recurring reminder's LastOccurrenceAt is its newest Sent row, and a definition
+        // claiming it last fired at an instant with no ledger row is a state the scanner cannot produce.
+        var rentLastSent = Offset(today.AddDays(-1), 8);
+        var rentSkipped = Offset(today.AddDays(-3), 8);
+        var standupSent = Offset(today.AddDays(-2), 9);
+        var standupFailed = Offset(today.AddDays(-4), 9);
+        var gymSent = Offset(today.AddDays(-6), 18);
+        var gymFailedThenReversed = Offset(today.AddDays(-5), 18);
+
+        var lastOccurrences = new Dictionary<long, DateTimeOffset>
+        {
+            [ReminderPayRent] = rentLastSent,
+            [ReminderStandup] = standupSent,
+            [ReminderOldGymClass] = gymSent
+        };
+
+        var reminders = new FixtureReminder[]
+        {
+            new(ReminderCallTheDentist, PrimaryUserId, "Call the dentist", Utc(today.AddDays(2), 15),
+                [-30, 0], null, null, ReminderStatus.Active),
+            new(ReminderFileTaxReturn, PrimaryUserId, "File the tax return", Utc(today.AddDays(5), 9),
+                [0], null, null, ReminderStatus.Active),
+            new(ReminderPayRent, PrimaryUserId, "Pay the rent", Utc(today.AddDays(12), 8),
+                [0], ReminderRecurrence.Monthly, null, ReminderStatus.Active),
+
+            // Task-linked: RemindAt mirrors the tomorrow-09:00 planner task's instant, exactly as
+            // ReminderRegistrationService would have derived it. Not one of today's tasks — a completed or
+            // cancelled task retires its reminder, so a reminder on one would be a state the app deletes.
+            new(ReminderStandup, PrimaryUserId, "Before the feature block", Utc(today.AddDays(1), 9),
+                [-15], null, PlannerTaskFirst + 3, ReminderStatus.Paused),
+
+            new(ReminderOldGymClass, PrimaryUserId, "Gym class", Utc(today.AddDays(-6), 18),
+                [0], null, null, ReminderStatus.Cancelled),
+            new(SecondaryReminderPostParcel, SecondaryUserId, "Post the parcel", Utc(today.AddDays(1), 11),
+                [-60], null, null, ReminderStatus.Active)
+        };
+
+        foreach (var reminder in reminders)
+        {
+            dbContext.Set<Reminder>().Add(new Reminder
+            {
+                Id = reminder.Id,
+                UserId = reminder.UserId,
+                Title = reminder.Title,
+                RemindAt = reminder.RemindAt,
+                LeadOffsetsMinutes = [.. reminder.LeadOffsetsMinutes],
+                Recurrence = reminder.Recurrence,
+                PlannerTaskId = reminder.PlannerTaskId
+            });
+
+            var isRecurring = reminder.Recurrence is not null;
+
+            // The soonest occurrence is the deadline shifted by the earliest (most negative) offset —
+            // NormalizeOffsets orders them, and the fixture's arrays are written already ordered.
+            var dueAt = new DateTimeOffset(reminder.RemindAt);
+            var firstOccurrence = dueAt.AddMinutes(reminder.LeadOffsetsMinutes[0]);
+
+            dbContext.Set<ReminderDefinition>().Add(new ReminderDefinition
+            {
+                Id = reminder.Id + ReminderDefinitionOffset,
+
+                // The idempotency key, from the one class that owns its format.
+                OwnerModule = ReminderRegistrationService.OwnerModule,
+                SubjectType = ReminderRegistrationService.SubjectType,
+                SubjectId = reminder.Id.ToString(),
+                Kind = ReminderRegistrationService.Kind,
+
+                TemplateKey = ReminderRegistrationService.TemplateKey,
+                NotificationType = NotificationType.PersonalReminder,
+                PayloadJson = JsonHelper.Serialize(
+                    new PersonalReminderPayload(reminder.Id, reminder.Title, reminder.PlannerTaskId)),
+
+                ScheduleType = isRecurring ? ReminderScheduleType.RecurringInterval : ReminderScheduleType.OneShot,
+
+                // Per-type fields are meaningful only for the matching ScheduleType; the others stay null
+                // rather than being filled with a plausible-looking value nothing reads.
+                DueAt = isRecurring ? null : dueAt,
+                IntervalPreset = isRecurring ? ToPreset(reminder.Recurrence!.Value) : null,
+
+                // A recurring schedule has no lead-offset concept, so the single offset is folded into the
+                // anchor — the same fold BuildSchedule performs.
+                AnchorDate = isRecurring ? firstOccurrence : null,
+                LeadOffsets = isRecurring
+                    ? []
+                    : [.. reminder.LeadOffsetsMinutes.Select(offset => new ReminderLeadOffset { OffsetMinutes = offset })],
+
+                // Explicit users, never a resolver: the module's read paths exclude resolver-backed
+                // reminders, and a personal reminder has exactly one known recipient anyway.
+                RecipientMode = RecipientMode.ExplicitUsers,
+                Recipients = [new ReminderRecipient { UserId = reminder.UserId }],
+
+                Status = reminder.Status,
+
+                // Paused and Cancelled both mean "no pending occurrence" — the registry nulls this column on
+                // both transitions, and the upcoming reads treat a non-null value as the definition of active.
+                NextOccurrenceAt = reminder.Status == ReminderStatus.Active ? firstOccurrence : null,
+                LastOccurrenceAt = lastOccurrences.TryGetValue(reminder.Id, out var last) ? last : null
+            });
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+
+        await AddReminderDispatchesAsync(
+            rentLastSent, rentSkipped, standupSent, standupFailed, gymSent, gymFailedThenReversed, ct);
+    }
+
+    /// <summary>
+    /// The last seven days of the append-only dispatch ledger — what the history grid pages and what the
+    /// overview's recent-outcome card tallies. Every outcome appears, and the two <c>Failed</c> rows are not
+    /// interchangeable: one stands, the other is superseded by a <c>Reversed</c> row pointing at it. That is
+    /// what makes the overview's "needs attention" count 1 rather than 2, and a fixture without the pair
+    /// cannot tell a correct implementation from one that simply counts failures.
+    /// </summary>
+    /// <remarks>
+    /// Rows are inserted, never updated — a correction is a new reversal row. The <c>RecipientsSnapshot</c>
+    /// carries user ids only, as its PII contract requires.
+    /// </remarks>
+    private async Task AddReminderDispatchesAsync(
+        DateTimeOffset rentLastSent,
+        DateTimeOffset rentSkipped,
+        DateTimeOffset standupSent,
+        DateTimeOffset standupFailed,
+        DateTimeOffset gymSent,
+        DateTimeOffset gymFailedThenReversed,
+        CancellationToken ct)
+    {
+        var id = ReminderDispatchFirst;
+
+        ReminderDispatch Dispatch(
+            long reminderId, DateTimeOffset occurrenceAt, DispatchOutcome outcome,
+            SkipReason? skipReason = null, string? failureDetail = null,
+            long? reversesDispatchId = null, TimeSpan? delay = null)
+        {
+            var rowId = id++;
+
+            return new ReminderDispatch
+            {
+                Id = rowId,
+                ReminderDefinitionId = reminderId + ReminderDefinitionOffset,
+                OccurrenceAt = occurrenceAt,
+                DispatchedAt = occurrenceAt + (delay ?? TimeSpan.Zero),
+                Outcome = outcome,
+                SkipReason = skipReason,
+                FailureDetail = failureDetail,
+                NotificationTypeSnapshot = NotificationType.PersonalReminder,
+                TemplateKeySnapshot = ReminderRegistrationService.TemplateKey,
+                RecipientsSnapshot = JsonHelper.Serialize(new[] { PrimaryUserId }),
+                // Derived from the row rather than Activity.Current, so two resets produce the same ledger.
+                CorrelationId = $"e2e-dispatch-{rowId}",
+                ReversesDispatchId = reversesDispatchId
+            };
+        }
+
+        var failedThenReversed = Dispatch(
+            ReminderOldGymClass, gymFailedThenReversed, DispatchOutcome.Failed,
+            // The failure *shape*, never an exception message — this ledger is retained and exported.
+            failureDetail: "NotificationChannelUnavailable");
+
+        dbContext.Set<ReminderDispatch>().AddRange(
+            Dispatch(ReminderPayRent, rentLastSent, DispatchOutcome.Sent),
+            Dispatch(ReminderStandup, standupSent, DispatchOutcome.Sent),
+            Dispatch(ReminderOldGymClass, gymSent, DispatchOutcome.Sent),
+            Dispatch(ReminderPayRent, rentSkipped, DispatchOutcome.Skipped, skipReason: SkipReason.QuietHours),
+            Dispatch(ReminderStandup, standupFailed, DispatchOutcome.Failed,
+                failureDetail: "MissingRecipientResolver"),
+            failedThenReversed,
+            Dispatch(ReminderOldGymClass, gymFailedThenReversed, DispatchOutcome.Reversed,
+                reversesDispatchId: failedThenReversed.Id, delay: TimeSpan.FromHours(1)));
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// The portal recurrence → module preset mapping, for the fixture's one recurring reminder.
+    /// <c>ReminderRegistrationService.ToPreset</c> is the authority; this covers only the values the fixture
+    /// uses and throws on anything else rather than guessing.
+    /// </summary>
+    private static ReminderIntervalPreset ToPreset(ReminderRecurrence recurrence) => recurrence switch
+    {
+        ReminderRecurrence.Daily => ReminderIntervalPreset.Daily,
+        ReminderRecurrence.Weekly => ReminderIntervalPreset.Weekly,
+        ReminderRecurrence.Monthly => ReminderIntervalPreset.Monthly,
+        _ => throw new ArgumentOutOfRangeException(nameof(recurrence), recurrence,
+            "The fixture has no module preset for this recurrence; add it here and in ReminderRegistrationService.")
+    };
+
     // --- shared builders ------------------------------------------------------------------------
 
     private void AddActivityRoles(long userId, (long Id, string Name, string Color, string Icon)[] roles)
@@ -1326,6 +1807,16 @@ public class E2eFixtureSeeder(
             .IgnoreQueryFilters()
             .Where(period => period.UserId == userId)
             .ToDictionaryAsync(period => period.Text, period => period.Id, ct);
+
+    /// <summary>
+    /// The four periods themselves, tracked — the routine history writes period-level state onto two of
+    /// them, and the other two get their freeze window stamped.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, RoutineTimePeriod>> RoutineTimePeriodsAsync(long userId, CancellationToken ct) =>
+        await dbContext.RoutineTimePeriods
+            .IgnoreQueryFilters()
+            .Where(period => period.UserId == userId)
+            .ToDictionaryAsync(period => period.Text, ct);
 
     /// <summary>
     /// Task importance ids keyed by their rank marker rather than their text: <c>Critical</c> and
@@ -1404,11 +1895,35 @@ public class E2eFixtureSeeder(
         var unreadNotificationCount = await dbContext.Set<Notification>()
             .CountAsync(notification => notification.UserId == PrimaryUserId && !notification.IsRead, ct);
 
+        // Reminder counts are deliberately NOT scoped to the primary account: the admin views these describe
+        // roll up every user's reminders, so a per-user count would not be the number any of them renders.
+        var definitionCount = await dbContext.Set<ReminderDefinition>().CountAsync(ct);
+        var upcomingReminderCount = await dbContext.Set<ReminderDefinition>()
+            .CountAsync(definition => definition.NextOccurrenceAt != null, ct);
+        var dispatchCount = await dbContext.Set<ReminderDispatch>().CountAsync(ct);
+
+        // The same predicate ReminderDashboardQueries.EffectiveFailuresOnly applies — a Failed row no
+        // reversal row points at.
+        var reversedDispatchIds = dbContext.Set<ReminderDispatch>()
+            .Where(dispatch => dispatch.ReversesDispatchId != null)
+            .Select(dispatch => dispatch.ReversesDispatchId!.Value);
+        var effectiveFailureCount = await dbContext.Set<ReminderDispatch>()
+            .CountAsync(dispatch => dispatch.Outcome == DispatchOutcome.Failed
+                                    && !reversedDispatchIds.Contains(dispatch.Id), ct);
+
+        // RoutinePeriodCompletion carries no UserId; the scoping runs through its period, and so does the
+        // query filter — lifted here like every other count, with the explicit predicate as the scoping.
+        var completions = dbContext.Set<RoutinePeriodCompletion>().IgnoreQueryFilters()
+            .Where(completion => completion.RoutineTimePeriod.UserId == PrimaryUserId);
+        var completionCount = await completions.CountAsync(ct);
+        var frozenCompletionCount = await completions.CountAsync(completion => completion.IsFrozen, ct);
+
         return new TestSeedResponse(
             Fixture: FixtureVersion,
             SeedDateUtc: today,
             PrimaryUser: new TestSeedAccount(PrimaryUserId, PrimaryUserEmail, PrimaryUserPassword, "EN"),
             SecondaryUser: new TestSeedAccount(SecondaryUserId, SecondaryUserEmail, SecondaryUserPassword, "EN"),
+            AdminUser: new TestSeedAccount(AdminUserId, AdminUserEmail, AdminUserPassword, "EN"),
             Activities: new Dictionary<string, long>
             {
                 ["bugFixing"] = ActivityBugFixing,
@@ -1450,13 +1965,19 @@ public class E2eFixtureSeeder(
                 ["backlog"] = BacklogProfileReadANovel,
                 ["bucketList"] = BucketListProfileLearnBouldering,
                 ["project"] = ProjectProfileBuildABookshelf,
-                ["memoryAnchor"] = MemoryAnchorLearnBouldering
+                ["memoryAnchor"] = MemoryAnchorLearnBouldering,
+                ["memoryAnchorOnArchived"] = MemoryAnchorRetiredHobby
             },
             Routines: new Dictionary<string, long>
             {
                 ["daily"] = RoutineTakeMedication,
                 ["weekly"] = RoutineWeeklyReview,
-                ["monthly"] = RoutinePayRent
+                ["monthly"] = RoutinePayRent,
+                // Keyed by the milestone tier the item's streak clears, which is the SPA's own threshold.
+                ["milestone30"] = RoutineDrinkWater,
+                ["milestone90"] = RoutineJournal,
+                ["milestone180"] = RoutineMakeTheBed,
+                ["milestone365"] = RoutineBrushTeeth
             },
             DayPlannerTemplates: new Dictionary<string, long>
             {
@@ -1477,6 +1998,9 @@ public class E2eFixtureSeeder(
                 ["oldestRead"] = NotificationFirst + 5,
                 ["secondaryNewest"] = SecondaryNotificationFirst
             },
+            Reminders: ReminderIds,
+            ReminderDefinitions: ReminderIds.ToDictionary(
+                entry => entry.Key, entry => entry.Value + ReminderDefinitionOffset),
             TaskPriorities: await PriorityIdsAsync(PrimaryUserId, ct),
             RoutineTimePeriods: await RoutineTimePeriodIdsAsync(PrimaryUserId, ct),
             Counts: new TestSeedCounts(
@@ -1495,8 +2019,28 @@ public class E2eFixtureSeeder(
                 AndroidSessions: androidSessionCount,
                 DistinctAndroidEntries: distinctAndroidCount,
                 Notifications: notificationCount,
-                UnreadNotifications: unreadNotificationCount));
+                UnreadNotifications: unreadNotificationCount,
+                ReminderDefinitions: definitionCount,
+                UpcomingReminders: upcomingReminderCount,
+                ReminderDispatches: dispatchCount,
+                ReminderFailuresNeedingAttention: effectiveFailureCount,
+                RoutinePeriodCompletions: completionCount,
+                FrozenRoutinePeriodCompletions: frozenCompletionCount));
     }
+
+    /// <summary>
+    /// The reminder ids by name, shared by both maps in the response — the module-side one is these plus
+    /// <see cref="E2eFixtureIds.ReminderDefinitionOffset"/>, so the two can never name different sets.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, long> ReminderIds = new Dictionary<string, long>
+    {
+        ["callTheDentist"] = ReminderCallTheDentist,
+        ["fileTaxReturn"] = ReminderFileTaxReturn,
+        ["payRentRecurring"] = ReminderPayRent,
+        ["paused"] = ReminderStandup,
+        ["cancelled"] = ReminderOldGymClass,
+        ["secondaryPostParcel"] = SecondaryReminderPostParcel
+    };
 
     // --- helpers --------------------------------------------------------------------------------
 
@@ -1524,6 +2068,13 @@ public class E2eFixtureSeeder(
     private static DateTime Utc(DateOnly date, int hour) =>
         new(date.Year, date.Month, date.Day, hour, 0, 0, DateTimeKind.Utc);
 
+    /// <summary>
+    /// The same instant as a <see cref="DateTimeOffset"/> at offset zero — which is where every persisted
+    /// <c>DateTimeOffset</c> in this solution has to land, and what building it from a UTC-kind
+    /// <see cref="DateTime"/> guarantees.
+    /// </summary>
+    private static DateTimeOffset Offset(DateOnly date, int hour) => new(Utc(date, hour));
+
     private static IntTime FromMinutes(int minutes) => new(minutes * 60);
 
     private sealed record CalibrationEntry(
@@ -1536,6 +2087,28 @@ public class E2eFixtureSeeder(
         int[] ActualMinutes);
 
     private sealed record OverdueEntry(long ActivityId, long ItemId, string Name, long RoleId, int DaysOverdue);
+
+    /// <summary>
+    /// One reminder as the fixture declares it — enough to build both the portal row and the module
+    /// definition from a single line, so the two cannot disagree about the title, the instant or the offsets.
+    /// </summary>
+    /// <param name="LeadOffsetsMinutes">
+    /// Written already ordered (most negative first), because the soonest occurrence is derived from the
+    /// first entry — the ordering <c>NormalizeOffsets</c> performs on the live path.
+    /// </param>
+    /// <param name="Status">
+    /// The module-side lifecycle. The portal row has no status column at all: scheduler state lives in the
+    /// module, and mirroring it onto <see cref="Reminder"/> is the drift the entity docs forbid.
+    /// </param>
+    private sealed record FixtureReminder(
+        long Id,
+        long UserId,
+        string Title,
+        DateTime RemindAt,
+        int[] LeadOffsetsMinutes,
+        ReminderRecurrence? Recurrence,
+        long? PlannerTaskId,
+        ReminderStatus Status);
 
     private sealed record WebBlock(
         int StartHour,

@@ -247,6 +247,15 @@ on the DTOs (`ICreateRequest` / `IUpdateRequest` / `IProjectionResponse`), not a
 `PeriodCompletionRecord` sits with them rather than in the host, because both its consumers
 (`GetCompletionHistoryRoutineTimePeriodEndpoint`, `RoutineTimePeriodResponse`) are here.
 
+`RoutineTimePeriodResponse` carries four members `Projection` cannot produce, all set in `From`:
+`NextResetAt`, `CompletionHistory`, and the two totals over that history — `TotalPeriodsElapsed` (the
+rows in the `HistoryDepth` window) and `TotalPeriodsCompleted` (of those, the ones `IsSuccess` passes; a
+frozen cycle is not one). They are counted over the **window**, not the whole ledger, so the consistency
+figure the client derives from them describes the heatmap it sits beside. The SPA had declared both names
+and defaulted them to 0 since before the ledger existed, gating its review card, consistency figure and
+personal-bests panel on `totalPeriodsElapsed > 0` — so until `From` set them, those three surfaces could
+not render for any account, and no row assertion noticed.
+
 Five validators. `RoutineTimePeriodValidator` mirrors the DB CHECKs so a bad range is a 400 rather
 than a 500. The two to-do list validators each carry a DB-backed cross-field rule, which means a
 query, which is why it is a `CustomAsync` rule and not a `RuleFor` chain. Both delegate it to

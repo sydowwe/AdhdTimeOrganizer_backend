@@ -1,12 +1,19 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.application.dto.testSupport;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.testSupport;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.Planning.application.service.reminder;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.model.entity.reminder;
+using AdhdTimeOrganizer.Routines.application.service.routine;
+using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
@@ -18,10 +25,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.domain.extServiceContract.user;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Notifications.application;
 using Sydowwe.Notifications.domain.entity;
+using Sydowwe.Reminders.application.dto.reminderDefinition;
+using Sydowwe.Reminders.domain.entity;
+using Sydowwe.Reminders.domain.@enum;
+using Sydowwe.Framework.Contracts.reminders;
 using Sydowwe.Scheduler.domain.@enum;
 using Sydowwe.Scheduler.domain.entity;
 using Xunit;
@@ -147,6 +159,38 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
             .Select(notification => new { notification.Id, notification.Type, notification.IsRead, notification.CreatedTimestamp })
             .ToListAsync(CancellationToken);
 
+        var routines = await db.RoutineTodoLists.IgnoreQueryFilters()
+            .Where(routine => routine.UserId == PrimaryUserId)
+            .OrderBy(routine => routine.Id)
+            .Select(routine => new
+            {
+                routine.Id, routine.ActivityId, routine.TimePeriodId, routine.IsDone, routine.Streak, routine.BestStreak,
+                routine.LastResetDate, routine.LastCompletedAt, routine.DisplayOrder
+            })
+            .ToListAsync(CancellationToken);
+
+        // The period-level state the history seeder writes onto the per-user default rows, and the ledger
+        // beneath it. The completion ids are identity-generated and excluded on purpose: nothing addresses one.
+        var periods = await db.RoutineTimePeriods.IgnoreQueryFilters()
+            .Where(period => period.UserId == PrimaryUserId)
+            .OrderBy(period => period.Id)
+            .Select(period => new
+            {
+                period.Id, period.Text, period.Streak, period.BestStreak, period.LastResetAt,
+                period.FreezesRemaining, period.FreezeBudgetResetsAt
+            })
+            .ToListAsync(CancellationToken);
+
+        var completions = await db.Set<RoutinePeriodCompletion>()
+            .Where(completion => completion.RoutineTimePeriod.UserId == PrimaryUserId)
+            .OrderBy(completion => completion.TimePeriodId).ThenBy(completion => completion.PeriodStart)
+            .Select(completion => new
+            {
+                completion.TimePeriodId, completion.PeriodStart, completion.PeriodEnd, completion.CompletedCount,
+                completion.TotalCount, completion.IsFrozen, completion.FrozenAt, completion.CreatedAt
+            })
+            .ToListAsync(CancellationToken);
+
         return new FixtureSnapshot(
             items.Select(item => item.ToString()!).ToList(),
             activities.Select(activity => activity.ToString()!).ToList(),
@@ -155,6 +199,9 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
             templates.Select(template => template.ToString()!).ToList(),
             templateTasks.Select(task => task.ToString()!).ToList(),
             notifications.Select(notification => notification.ToString()!).ToList(),
+            routines.Select(routine => routine.ToString()!).ToList(),
+            periods.Select(period => period.ToString()!).ToList(),
+            completions.Select(completion => completion.ToString()!).ToList(),
             await TrackingSnapshotAsync(db));
     }
 
@@ -212,27 +259,67 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
         List<string> Templates,
         List<string> TemplateTasks,
         List<string> Notifications,
+        List<string> Routines,
+        List<string> RoutinePeriods,
+        List<string> RoutineCompletions,
         string Tracking);
 
     // --- fixture item 1: the e2e account itself --------------------------------------------------
 
     [Fact]
-    public async Task Seed_CreatesBothAccounts_ConfirmedAndInEnglish()
+    public async Task Seed_CreatesAllThreeAccounts_ConfirmedAndInEnglish()
     {
         await SeedAsync();
 
         await using var db = Db();
         var accounts = await db.Users
-            .Where(user => user.Id == PrimaryUserId || user.Id == SecondaryUserId)
+            .Where(user => user.Id == PrimaryUserId || user.Id == SecondaryUserId || user.Id == AdminUserId)
             .OrderBy(user => user.Id)
             .ToListAsync(CancellationToken);
 
-        accounts.Should().HaveCount(2);
+        accounts.Should().HaveCount(3);
         accounts.Should().OnlyContain(user => user.EmailConfirmed);
         // The whole UI reads its locale off this column; a Slovak default breaks every label locator.
         accounts.Should().OnlyContain(user => user.Locale == AvailableLocales.En);
         accounts[0].Email.Should().Be(PrimaryUserEmail);
         accounts[1].Email.Should().Be(SecondaryUserEmail);
+        accounts[2].Email.Should().Be(AdminUserEmail);
+    }
+
+    /// <summary>
+    /// The role rows, asserted from both sides — because both sides are load-bearing and neither is visible
+    /// to the client. <c>GET /api/user/data</c> returns no roles or claims field at all, so the first place a
+    /// missing grant shows up is a 403 from a route the SPA has already rendered the chrome for; that is
+    /// precisely how the reminders register came to answer 403 for every fixture account.
+    ///
+    /// <para>The "only the admin" half matters as much as the grant: the primary account is what nearly every
+    /// spec signs in as, and if it ever picked up <c>Admin</c> then no spec could tell an admin-gated route
+    /// from an open one again.</para>
+    /// </summary>
+    [Fact]
+    public async Task Seed_GivesTheAdminAccountTheAdminRole_AndNoOtherAccount()
+    {
+        await SeedAsync();
+
+        using var scope = Fixture.UnauthenticatedFactory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<Core.domain.model.entity.user.User>>();
+
+        var admin = await users.FindByEmailAsync(AdminUserEmail);
+        admin.Should().NotBeNull();
+        (await users.CheckPasswordAsync(admin!, AdminUserPassword)).Should().BeTrue();
+
+        var adminRoles = await users.GetRolesAsync(admin!);
+        adminRoles.Should().Contain(PortalRoleCatalog.Admin,
+            "the five reminder-register and reminder-dashboard routes are gated on GetAdminRole()");
+        adminRoles.Should().Contain(PortalRoleCatalog.User,
+            "an administrator is also an ordinary user of the app, and needs their own surface to navigate");
+
+        foreach (var email in new[] { PrimaryUserEmail, SecondaryUserEmail })
+        {
+            var plain = await users.FindByEmailAsync(email);
+            (await users.GetRolesAsync(plain!)).Should().BeEquivalentTo([PortalRoleCatalog.User],
+                "a plain fixture account being denied admin surface is the contrast the admin account exists against");
+        }
     }
 
     /// <summary>
@@ -467,10 +554,23 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
         new[] { backlog.ActivityId, bucketList.ActivityId, project.ActivityId }
             .Should().OnlyHaveUniqueItems("the three kinds have to sit on distinct activities");
 
-        var anchor = await db.Set<MemoryAnchor>().IgnoreQueryFilters().SingleAsync(CancellationToken);
+        var anchor = await db.Set<MemoryAnchor>().IgnoreQueryFilters()
+            .SingleAsync(a => a.Id == MemoryAnchorLearnBouldering, CancellationToken);
         anchor.ActivityId.Should().Be(bucketList.ActivityId,
             "the anchor closes the loop on a one-time bucket-list entry");
         anchor.Rating.Should().BeInRange(1, 10);
+
+        // The second anchor is the other half of the fixture's anchor story: one on a live activity, one on
+        // the archived one. Anchoring something and retiring the activity afterwards is the normal path, so
+        // a fixture holding only the live case leaves the anchor grid's archived lift unexercised — which is
+        // how that grid shipped counting a row it could not project.
+        var onArchived = await db.Set<MemoryAnchor>().IgnoreQueryFilters()
+            .SingleAsync(a => a.Id == MemoryAnchorRetiredHobby, CancellationToken);
+        onArchived.ActivityId.Should().Be(ActivityRetiredHobby);
+        onArchived.Rating.Should().BeInRange(1, 10);
+
+        (anchor.AnchorYear, anchor.AnchorMonth).Should().NotBe((onArchived.AnchorYear, onArchived.AnchorMonth),
+            "two anchors in distinct periods are what makes the grid's periodKey sort assert on something");
     }
 
     // --- fixture item 9: day-planner templates ---------------------------------------------------
@@ -737,6 +837,408 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
         renderer.Render(digest.Type, digest.PayloadJson).Body.Should().Contain("3");
     }
 
+    // --- fixture item 12: the reminders register and its dashboards -------------------------------
+
+    /// <summary>
+    /// Unit 17's five views had nothing to show even once the role gate was satisfiable: the fixture created
+    /// no reminder at all, in either of the two projects that own half of one. So this asserts the module
+    /// side has rows <i>and</i> that they are not all the same row — every dashboard number the overview
+    /// renders is a count over a subset, and a fixture of six identical active definitions makes five of
+    /// those numbers indistinguishable from a stub that returns the total.
+    /// </summary>
+    [Fact]
+    public async Task Seed_LeavesReminderDefinitions_InEveryLifecycleStateTheDashboardsCount()
+    {
+        var body = await SeedAsync();
+        var now = DateTimeOffset.UtcNow;
+
+        await using var db = Db();
+
+        var definitions = await db.Set<ReminderDefinition>().ToListAsync(CancellationToken);
+
+        definitions.Should().HaveCountGreaterThanOrEqualTo(5);
+        body.Counts.ReminderDefinitions.Should().Be(definitions.Count);
+
+        // Upcoming is defined as "has a pending occurrence", and the paused/cancelled rows are what make it a
+        // strictly smaller set than the total — the registry nulls the column on both transitions.
+        var upcoming = definitions.Where(definition => definition.NextOccurrenceAt != null).ToList();
+        upcoming.Should().HaveCountGreaterThan(1);
+        upcoming.Count.Should().BeLessThan(definitions.Count);
+        body.Counts.UpcomingReminders.Should().Be(upcoming.Count);
+
+        definitions.Should().Contain(definition => definition.Status == ReminderStatus.Paused)
+            .And.Contain(definition => definition.Status == ReminderStatus.Cancelled);
+        definitions.Where(definition => definition.Status != ReminderStatus.Active)
+            .Should().OnlyContain(definition => definition.NextOccurrenceAt == null);
+
+        // The overview's headline card counts the next seven days, not the whole upcoming set. One reminder
+        // deliberately falls outside that window so the two numbers differ.
+        upcoming.Should().Contain(definition => definition.NextOccurrenceAt <= now.AddDays(7))
+            .And.Contain(definition => definition.NextOccurrenceAt > now.AddDays(7));
+
+        // Both schedule shapes, because the grid renders a schedule-type column and filters on it.
+        definitions.Should().Contain(definition => definition.ScheduleType == ReminderScheduleType.OneShot)
+            .And.Contain(definition => definition.ScheduleType == ReminderScheduleType.RecurringInterval);
+
+        // Across both accounts: these views roll up every user's reminders, which is the whole reason they
+        // are Admin-only and not the self-service my-upcoming view.
+        var recipients = await db.Set<ReminderRecipient>()
+            .Select(recipient => recipient.UserId)
+            .Distinct()
+            .ToListAsync(CancellationToken);
+        recipients.Should().Contain([PrimaryUserId, SecondaryUserId]);
+    }
+
+    /// <summary>
+    /// The two halves of a reminder live in two projects, and only the module half is keyed by strings. A
+    /// definition whose <c>SubjectId</c> names a portal row that does not exist is exactly the orphan
+    /// <c>ReminderRegistrationService</c> logs about — it renders in the register perfectly and is a state the
+    /// app cannot reach.
+    /// </summary>
+    [Fact]
+    public async Task Seed_KeysEveryDefinitionToARealPortalReminder()
+    {
+        var body = await SeedAsync();
+
+        await using var db = Db();
+
+        var reminderIds = await db.Set<Reminder>().IgnoreQueryFilters()
+            .Select(reminder => reminder.Id)
+            .ToListAsync(CancellationToken);
+
+        var definitions = await db.Set<ReminderDefinition>().ToListAsync(CancellationToken);
+
+        definitions.Should().OnlyContain(definition =>
+            definition.OwnerModule == ReminderRegistrationService.OwnerModule
+            && definition.SubjectType == ReminderRegistrationService.SubjectType
+            && definition.Kind == ReminderRegistrationService.Kind
+            && definition.TemplateKey == ReminderRegistrationService.TemplateKey);
+
+        definitions.Select(definition => long.Parse(definition.SubjectId))
+            .Should().BeSubsetOf(reminderIds)
+            .And.OnlyHaveUniqueItems("the key is unique on (owner, subject type, subject id, kind)");
+
+        // The response's two id maps name the same reminders from both sides, and differ — a spec handing the
+        // portal id to /reminder-definition/{id} must not accidentally hit a real row.
+        foreach (var (name, reminderId) in body.Reminders)
+        {
+            body.ReminderDefinitions[name].Should().NotBe(reminderId);
+            definitions.Should().ContainSingle(definition => definition.Id == body.ReminderDefinitions[name])
+                .Which.SubjectId.Should().Be(reminderId.ToString());
+        }
+    }
+
+    /// <summary>
+    /// The dispatch ledger behind the history grid and the overview's outcome card. The reversal pair is the
+    /// part worth seeding deliberately: "needs attention" is Failed rows <i>no reversal supersedes</i>, so a
+    /// fixture with one plain failure cannot distinguish that from a count of all failures.
+    /// </summary>
+    [Fact]
+    public async Task Seed_LeavesEveryDispatchOutcome_IncludingAFailureThatWasReversed()
+    {
+        var body = await SeedAsync();
+        var today = body.SeedDateUtc;
+
+        await using var db = Db();
+
+        var dispatches = await db.Set<ReminderDispatch>().ToListAsync(CancellationToken);
+
+        dispatches.Should().NotBeEmpty();
+        body.Counts.ReminderDispatches.Should().Be(dispatches.Count);
+
+        foreach (var outcome in Enum.GetValues<DispatchOutcome>())
+            dispatches.Should().Contain(dispatch => dispatch.Outcome == outcome,
+                $"the overview's recent-outcome card has a tile for {outcome}");
+
+        // Inside the overview's backward window, or the card tallies zeroes over a populated ledger.
+        dispatches.Should().OnlyContain(dispatch => dispatch.DispatchedAt >= new DateTimeOffset(
+            today.AddDays(-7).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
+
+        var reversedIds = dispatches.Where(dispatch => dispatch.ReversesDispatchId != null)
+            .Select(dispatch => dispatch.ReversesDispatchId!.Value)
+            .ToList();
+        reversedIds.Should().NotBeEmpty();
+
+        var failures = dispatches.Where(dispatch => dispatch.Outcome == DispatchOutcome.Failed).ToList();
+        var effective = failures.Where(dispatch => !reversedIds.Contains(dispatch.Id)).ToList();
+
+        effective.Should().NotBeEmpty();
+        effective.Count.Should().BeLessThan(failures.Count,
+            "a reversed failure is what makes the needs-attention count different from the failure count");
+        body.Counts.ReminderFailuresNeedingAttention.Should().Be(effective.Count);
+
+        // The failure detail is the fixed-shape summary the card renders, never an exception message — this
+        // ledger is retained and exported, and free-text PII cannot be scrubbed out of it afterwards.
+        failures.Should().OnlyContain(dispatch => dispatch.FailureDetail != null);
+        dispatches.Where(dispatch => dispatch.Outcome == DispatchOutcome.Skipped)
+            .Should().OnlyContain(dispatch => dispatch.SkipReason != null);
+
+        // Recipient snapshots carry ids only.
+        dispatches.Should().OnlyContain(dispatch => dispatch.RecipientsSnapshot.StartsWith("["));
+    }
+
+    /// <summary>
+    /// The rows above prove the register has content; this proves it renders as content. Same reasoning as the
+    /// estimate-vs-actual projection guard — it goes through <c>ReminderDefinitionDto.Projection</c>, the
+    /// expression the grid endpoint itself uses, because a row the projection cannot produce is invisible to
+    /// every spec while passing every row assertion in this class.
+    /// </summary>
+    [Fact]
+    public async Task Seed_LeavesTheRegisterRenderableThroughItsProjection()
+    {
+        var body = await SeedAsync();
+
+        await using var db = Db();
+
+        var projected = await ReminderDefinitionDto.Projection(db.Set<ReminderDefinition>())
+            .ToListAsync(CancellationToken);
+
+        projected.Should().HaveCount(body.Counts.ReminderDefinitions);
+
+        // Every column the register's grid shows: owner module, subject, kind, schedule type, status and the
+        // next occurrence. All six rendered a dash or a blank when the grid had no rows to show at all.
+        projected.Should().OnlyContain(definition =>
+            !string.IsNullOrWhiteSpace(definition.OwnerModule)
+            && !string.IsNullOrWhiteSpace(definition.SubjectType)
+            && !string.IsNullOrWhiteSpace(definition.SubjectId)
+            && !string.IsNullOrWhiteSpace(definition.Kind));
+
+        // Recipients come through the projection as their own collection; an empty one renders a reminder
+        // nobody receives.
+        projected.Should().OnlyContain(definition => definition.Recipients.Count > 0);
+
+        // And the one-shot rows carry the lead offsets the detail view lists.
+        projected.Where(definition => definition.ScheduleType == ReminderScheduleType.OneShot)
+            .Should().OnlyContain(definition => definition.DueAt != null && definition.LeadOffsets.Count > 0);
+
+        projected.Where(definition => definition.ScheduleType == ReminderScheduleType.RecurringInterval)
+            .Should().OnlyContain(definition => definition.IntervalPreset != null && definition.AnchorDate != null);
+    }
+
+    // --- fixture item 14: routine period history ---------------------------------------------------
+
+    /// <summary>
+    /// The completion ledger and the period-level streaks. Four routine surfaces (heatmaps, trend, personal
+    /// bests, the review card) read these and had never rendered, because the per-user default seeder creates
+    /// the four periods bare and nothing had ever closed a cycle. Asserted as the rules the reset job would
+    /// have obeyed, not just as a row count: the Weekly history is deep enough to fill its heatmap, mixed,
+    /// contiguous, and carries a frozen cell; and the streak on each period is what the freeze endpoint's own
+    /// walk derives from the rows — a period whose streak disagrees with its history gets silently "corrected"
+    /// the first time a freeze is spent.
+    /// </summary>
+    [Fact]
+    public async Task Seed_LeavesRoutinePeriodHistory_MixedFrozenAndConsistentWithTheStreaks()
+    {
+        var body = await SeedAsync();
+
+        await using var db = Db();
+
+        var weekly = await db.RoutineTimePeriods.IgnoreQueryFilters()
+            .SingleAsync(period => period.Id == body.RoutineTimePeriods["Weekly"], CancellationToken);
+        var daily = await db.RoutineTimePeriods.IgnoreQueryFilters()
+            .SingleAsync(period => period.Id == body.RoutineTimePeriods["Daily"], CancellationToken);
+
+        var all = await db.Set<RoutinePeriodCompletion>()
+            .Where(completion => completion.RoutineTimePeriod.UserId == PrimaryUserId)
+            .OrderBy(completion => completion.PeriodStart)
+            .ToListAsync(CancellationToken);
+
+        all.Should().NotBeEmpty();
+        body.Counts.RoutinePeriodCompletions.Should().Be(all.Count);
+        body.Counts.FrozenRoutinePeriodCompletions.Should().Be(all.Count(completion => completion.IsFrozen));
+
+        foreach (var period in new[] { weekly, daily })
+        {
+            var rows = all.Where(completion => completion.TimePeriodId == period.Id).ToList();
+
+            // Enough to fill the heatmap at the depth the server reports for it, or the strip is left-padded.
+            rows.Should().HaveCountGreaterThanOrEqualTo(period.HistoryDepth,
+                $"the {period.Text} heatmap renders HistoryDepth cells and a shorter history leaves blanks");
+
+            // Mixed: the consistency figure and the trend arrow need both outcomes to compute anything.
+            rows.Should().Contain(row => RoutineStreakFreezeService.IsSuccess(row, period.StreakThreshold))
+                .And.Contain(row => !RoutineStreakFreezeService.IsSuccess(row, period.StreakThreshold));
+
+            // Contiguous, oldest to newest, one row per cycle — a gap renders as a hole in the heatmap and the
+            // history dialog walks day by day between periodStart and periodEnd.
+            rows.Should().OnlyContain(row => row.PeriodEnd == row.PeriodStart.AddDays(period.LengthInDays));
+            rows.Zip(rows.Skip(1)).Should().OnlyContain(pair => pair.Second.PeriodStart == pair.First.PeriodEnd);
+
+            // The newest row closes exactly at the instant the period says it last reset. That is the pairing
+            // the reset job leaves behind, and it is what stops the grouped read closing the cycle again.
+            rows[^1].PeriodEnd.Should().Be(DateOnly.FromDateTime(period.LastResetAt!.Value));
+
+            // The streak the rows imply is the streak the period carries.
+            var walked = new RoutineTimePeriod
+            {
+                Text = period.Text, Color = period.Color, LengthInDays = period.LengthInDays,
+                ResetAnchorDay = period.ResetAnchorDay, StreakThreshold = period.StreakThreshold,
+                StreakGraceDays = period.StreakGraceDays
+            };
+            RoutineStreakFreezeService.RecomputeStreak(walked, rows);
+            period.Streak.Should().Be(walked.Streak,
+                $"the {period.Text} period's streak has to be the one its own history walks to");
+            period.BestStreak.Should().BeGreaterThanOrEqualTo(walked.BestStreak);
+        }
+
+        // The third cell state, reachable only from a real row — the SPA's mock history never invents one.
+        var frozen = all.Where(row => row.IsFrozen).ToList();
+        frozen.Should().ContainSingle().Which.TimePeriodId.Should().Be(weekly.Id);
+        frozen.Should().OnlyContain(row => row.FrozenAt != null);
+        all.Where(row => !row.IsFrozen).Should().OnlyContain(row => row.FrozenAt == null);
+
+        // A frozen row keeps the counts it was recorded with; only its scoring changes.
+        frozen.Should().OnlyContain(row => !RoutineStreakFreezeService.IsSuccess(row, weekly.StreakThreshold));
+
+        // And a miss that was *not* frozen stays in the Weekly history, or the freeze action has nothing to act on.
+        all.Should().Contain(row => row.TimePeriodId == weekly.Id && !row.IsFrozen
+                                    && !RoutineStreakFreezeService.IsSuccess(row, weekly.StreakThreshold));
+
+        // The freeze budget is consistent with the ledger: a freeze spent inside the current window is one
+        // fewer remaining, and the window itself is the one RefreshFreezeBudget would open.
+        var windowStart = new DateTime(body.SeedDateUtc.Year, body.SeedDateUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var spentThisWindow = frozen.Count(row => row.FrozenAt >= windowStart);
+        weekly.FreezesRemaining.Should().Be(weekly.FreezeBudget - spentThisWindow);
+        weekly.FreezeBudgetResetsAt.Should().Be(RoutineStreakFreezeService.NextBudgetReset(windowStart));
+    }
+
+    /// <summary>
+    /// The one that pins the silent failure. <c>GET /routine-todo-list/grouped-by-time-period</c> runs the
+    /// reset catch-up over every period before rendering, so a fixture whose <c>LastResetAt</c> makes a period
+    /// look due is rewritten by the first request: a completion row is appended, the streak re-scored, every
+    /// item un-ticked — all on a 200, and every row assertion above still passes against the pre-request
+    /// state. This runs the same three lazy mutations the read runs and asserts each is a no-op.
+    /// </summary>
+    [Fact]
+    public async Task Seed_LeavesEveryRoutinePeriodCurrent_SoTheGroupedReadDoesNotRewriteIt()
+    {
+        await SeedAsync();
+        var now = DateTime.UtcNow;
+
+        await using var db = Db();
+
+        var periods = await db.RoutineTimePeriods.IgnoreQueryFilters()
+            .Where(period => period.UserId == PrimaryUserId)
+            .Include(period => period.RoutineTodoListColl)
+            .ToListAsync(CancellationToken);
+
+        periods.Should().HaveCount(4);
+
+        foreach (var period in periods)
+        {
+            RoutineResetService.ComputeNextReset(period, now).Should().BeAfter(now,
+                $"the {period.Text} period must not be due, or the first grouped read closes a cycle the fixture did not seed");
+
+            RoutineResetService.CheckGrace(period, now).Should().BeFalse();
+            RoutineStreakFreezeService.RefreshFreezeBudget(period, now).Should().BeFalse(
+                $"the {period.Text} period's freeze window has to be the one a read would open, or the first read writes");
+            RoutineResetService.TryResetCatchUp(period, period.RoutineTodoListColl.ToList(), now).Should().BeNull();
+
+            // Each item's own cycle marker agrees with its period's: LastResetDate on the boundary that opened
+            // the current cycle, and LastCompletedAt inside it exactly when the item is done. That pair is how
+            // UpdateItemStreak decides whether the next tick scores, so a disagreement double-counts or refuses.
+            var cycleStart = period.LastResetAt is { } lastReset ? DateOnly.FromDateTime(lastReset) : (DateOnly?)null;
+            foreach (var item in period.RoutineTodoListColl)
+            {
+                if (cycleStart is null)
+                    continue;
+
+                item.LastResetDate.Should().Be(cycleStart, $"item {item.Id} sits in the {period.Text} period");
+                (DateOnly.FromDateTime(item.LastCompletedAt) >= cycleStart).Should().Be(item.IsDone,
+                    $"item {item.Id} is {(item.IsDone ? "done" : "not done")} this cycle, so its last completion must {(item.IsDone ? "" : "not ")}fall inside it");
+            }
+        }
+    }
+
+    /// <summary>
+    /// <c>RoutineTodoListItem.vue</c> picks its milestone icon from the item's <i>current</i> streak at
+    /// 7 / 30 / 90 / 180 / 365. The highest seeded streak was 12, so four of the five branches had never
+    /// rendered for anyone. One item per tier, and the response names each by the tier it clears.
+    /// </summary>
+    [Fact]
+    public async Task Seed_LeavesAnItemStreakInEveryMilestoneTier()
+    {
+        var body = await SeedAsync();
+
+        await using var db = Db();
+
+        var routines = await db.RoutineTodoLists.IgnoreQueryFilters()
+            .Where(routine => routine.UserId == PrimaryUserId)
+            .ToDictionaryAsync(routine => routine.Id, CancellationToken);
+
+        foreach (var (tier, key) in new[] { (7, "daily"), (30, "milestone30"), (90, "milestone90"), (180, "milestone180"), (365, "milestone365") })
+        {
+            var routine = routines[body.Routines[key]];
+            routine.Streak.Should().BeGreaterThanOrEqualTo(tier, $"routines.{key} is the fixture's ≥{tier} item");
+            routine.BestStreak.Should().BeGreaterThanOrEqualTo(routine.Streak, "a best below the current streak is a state no toggle produces");
+        }
+
+        // Distinct tiers, not one item clearing all of them: the icon is a switch on the highest tier reached,
+        // so five items at 400 would render one crown five times.
+        routines.Values.Select(routine => routine.Streak switch
+            {
+                >= 365 => 365, >= 180 => 180, >= 90 => 90, >= 30 => 30, >= 7 => 7, _ => 0
+            })
+            .Distinct()
+            .Should().Contain([7, 30, 90, 180, 365]);
+    }
+
+    /// <summary>
+    /// The rows above prove the ledger is stored; this proves the client is handed it. The grouped read and
+    /// the flat reads both render a period through <c>RoutineTimePeriodResponse.From</c>, and the flat ones go
+    /// through <c>RoutineTimePeriodReadRefresher</c> — so this runs that refresher over the fixture and checks
+    /// the response carries the history, the frozen flag, and the streak the rows were seeded to agree with.
+    /// Same reason as the estimate and the register: a field on the entity and on no response is invisible to
+    /// every spec while every row assertion passes.
+    /// </summary>
+    [Fact]
+    public async Task Seed_LeavesTheRoutineHistoryVisibleThroughTheReadPath()
+    {
+        var body = await SeedAsync();
+        var now = DateTime.UtcNow;
+
+        // The refresher scopes nothing itself and relies on the ambient IEntityWithUser filter. Every stock test
+        // host — the unauthenticated one included — resolves a user id for that filter, so from any of them the
+        // fixture's periods are invisible and the read renders nothing. A host with no ambient user at all is
+        // the state ScopeUserId documents as "apply no scoping", which is what the fixture accounts need here.
+        await using var host = CreateFactory(roles: null, userId: null,
+            configureServices: services => services.AddScoped<ILoggedUserService, NoAmbientUserService>());
+        await using var scope = host.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ids = new[] { body.RoutineTimePeriods["Weekly"], body.RoutineTimePeriods["Daily"] };
+        var rendered = await RoutineTimePeriodReadRefresher.RefreshAndRenderAsync(db, ids, now, CancellationToken);
+
+        rendered.Should().ContainKeys(ids);
+
+        var weekly = rendered[body.RoutineTimePeriods["Weekly"]];
+        weekly.CompletionHistory.Should().HaveCount(weekly.HistoryDepth,
+            "the read trims to HistoryDepth, and the fixture is seeded exactly that deep");
+        weekly.CompletionHistory.Should().Contain(record => record.IsFrozen)
+            .And.Contain(record => !record.IsFrozen && record.CompletedCount < record.TotalCount)
+            .And.Contain(record => record.CompletedCount == record.TotalCount);
+        weekly.CompletionHistory.Should().BeInAscendingOrder(record => record.PeriodStart);
+        weekly.Streak.Should().BeGreaterThan(0);
+        weekly.BestStreak.Should().BeGreaterThan(weekly.Streak, "the personal-bests panel shows a best that differs from the current run");
+        weekly.NextResetAt.Should().BeAfter(now);
+        weekly.FreezesRemaining.Should().BeGreaterThan(0, "the freeze affordance is hidden at zero");
+
+        // The two totals the SPA gates three surfaces on. Elapsed is the window, completed is the subset that
+        // met the threshold — strictly between zero and elapsed, or the consistency figure is 0% or 100% and
+        // proves nothing. The frozen cycle counts as elapsed and not as completed: it kept its 0 of 1.
+        weekly.TotalPeriodsElapsed.Should().Be(weekly.CompletionHistory.Count);
+        weekly.TotalPeriodsCompleted.Should().Be(
+            weekly.CompletionHistory.Count(record => record.TotalCount > 0
+                && (double)record.CompletedCount / record.TotalCount * 100 >= weekly.StreakThreshold));
+        weekly.TotalPeriodsCompleted.Should().BeGreaterThan(0).And.BeLessThan(weekly.TotalPeriodsElapsed);
+
+        var daily = rendered[body.RoutineTimePeriods["Daily"]];
+        daily.CompletionHistory.Should().NotBeEmpty();
+        daily.Streak.Should().BeGreaterThan(0);
+        daily.TotalPeriodsElapsed.Should().Be(daily.CompletionHistory.Count);
+        daily.TotalPeriodsCompleted.Should().Be(daily.TotalPeriodsElapsed - 1, "one Daily cycle fell short");
+    }
+
     // --- scope ------------------------------------------------------------------------------------
 
     /// <summary>
@@ -800,5 +1302,20 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
         await db.SaveChangesAsync(CancellationToken);
 
         activity.Id.Should().BeGreaterThan(ActivityTakeMedication);
+    }
+
+    /// <summary>
+    /// <c>BaseDbContext.ScopeUserId</c> is <c>IsAuthenticated ? GetUserId : null</c>, so this is the only way to
+    /// reach the null it documents as "apply no scoping" — the state every read of the fixture accounts from
+    /// inside a test host needs, since none of them is the identity a stock host resolves.
+    /// </summary>
+    private sealed class NoAmbientUserService : ILoggedUserService
+    {
+        public ClaimsPrincipal? LoggedUserPrincipal => null;
+        public bool IsAuthenticated => false;
+        public IEnumerable<string> GetRoles => [];
+        public string GetEmail => throw new InvalidOperationException("No user is signed in.");
+        public long GetUserId => throw new InvalidOperationException("No user is signed in.");
+        public long? GetUserIdOrNull => null;
     }
 }
