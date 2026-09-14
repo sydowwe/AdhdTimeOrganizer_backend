@@ -48,6 +48,33 @@ request: `TRequest : ICreateRequest<TEntity>` exposes `TEntity ToEntity`;
 | `BaseFilterSortEndpoint<TEntity, TResponse, TFilter>` | POST `/filter-sort` | Filter + sort without pagination — implement `ApplyCustomFiltering`; hooks `ApplyUserScoping`, `PostProcessItems(Async)` (runs after sorting, so an appended row lands last) |
 | `BaseGridEndpoint<TEntity, TResponse, TFilter>` | POST `/filtered-table` | Filter + sort + paginate — implement `ApplyCustomFiltering` |
 
+### Sort keys — what is sortable is the **response**, not the entity
+
+The sorting bases order the *projected* response, so a client key has to resolve to a member of the DTO,
+not of the model. A key may be a dotted path (`activity.name`, `activity.role.name`), pascalized segment
+by segment by `QueryableEntityExtensions.SortByMany`.
+
+- **An unresolvable key is an `InvalidSortKeyException`**, which `InvalidSortKeyMiddleware` answers with a
+  **400 whose `errors.sortBy` names the key** — never a 500, and never a quietly unsorted page (that
+  returns a plausible page in the default order, and on a paginated grid means rows the caller never
+  sees). The middleware is registered in `Program.cs` right inside `UseUnhandledExceptionHandler`; a host
+  that omits it falls back to the opaque 500.
+- **Don't swallow it.** An endpoint that wraps its handler in a `catch (Exception)` must rethrow this one
+  type — the two tracking distinct-entry tables do — or it reports a client's typo as a server fault.
+- **A key a shipped client sends is remapped, not left to fail.** A 400 is correct and still useless to the
+  person looking at the screen — a table renders its empty state for a failed request, so the error and a
+  genuinely empty list look identical. Override `PreprocessSortBy` with
+  `SortKeyExtensions.ExpandSortKey` / `RenameSortKey`
+  (`framework/Sydowwe.Framework/application/extensions/`): `GridMemoryAnchorEndpoint` expands one
+  `periodKey` column into `AnchorYear, AnchorMonth`, and the three reminder-definition reads accept
+  `nextOccurrence` as an alias for `nextOccurrenceAt` through one shared `ReminderDashboardSortKeys`.
+  An alias is compatibility for a client that already shipped — say which one, so it can be dropped.
+- **Better than either, where it fits: give the response the shape the client already asks for.** Nesting
+  the whole `ActivityResponse` made `activity.name` resolve natively on four grids that had been remapping
+  a flattened `activityName`, and made the activity's role and category sortable as a side effect.
+- A field filled in by `PostProcessItems` sorts on its default value. If it must be sortable, compute it
+  in the projection (`Projection` override + correlated subquery), as the profile and anchor grids do.
+
 ## Auth endpoints
 
 The auth flow has bases too, and they are easy to miss because they don't follow the `<Verb><Entity>`

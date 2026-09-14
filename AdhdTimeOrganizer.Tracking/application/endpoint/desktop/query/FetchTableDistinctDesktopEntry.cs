@@ -8,6 +8,7 @@ using Sydowwe.Framework.application.dto.request.@base.table;
 using Sydowwe.Framework.application.dto.response.@base;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.domain.exception;
 using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.query;
@@ -64,6 +65,13 @@ public class FetchTableDistinctDesktopEntry(DbContext dbContext)
                 ItemsCount = itemsCount,
                 PageCount = pageCount
             }, ct);
+        }
+        // A sort key that resolves to nothing is the caller's mistake, not this endpoint's: let it out to
+        // InvalidSortKeyMiddleware, which answers 400 naming the key. Swallowing it here reported a client
+        // error as "An internal error occurred." with a 500 — see InvalidSortKeyException.
+        catch (InvalidSortKeyException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

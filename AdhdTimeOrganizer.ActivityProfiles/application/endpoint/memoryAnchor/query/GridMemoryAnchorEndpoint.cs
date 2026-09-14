@@ -1,10 +1,12 @@
 using AdhdTimeOrganizer.ActivityProfiles.application.dto.filter;
 using AdhdTimeOrganizer.ActivityProfiles.application.dto.response;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.request.generic;
 using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.infrastructure.persistence;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.memoryAnchor.query;
 
@@ -14,16 +16,50 @@ public class GridMemoryAnchorEndpoint(DbContext dbContext)
     private readonly DbContext _dbContext = dbContext;
 
     /// <summary>
+    /// The one concern this grid lifts, on every set it reads. A <see cref="MemoryAnchor"/> deliberately
+    /// carries no archived filter of its own — an anchor is a record of something already done, and
+    /// archiving the activity afterwards is the normal case, not an edge one — but <c>Activity</c> does,
+    /// and this response projects the activity through a required navigation.
+    /// </summary>
+    /// <remarks>
+    /// Left in place, the filter turned that navigation into an inner join that dropped the row from the
+    /// page while <c>GetGridDataAsync</c> still counted it off the unprojected query: a grid reporting
+    /// <c>itemsCount: 1</c> with <c>items: []</c>, on no page the client can turn to. Not an exception,
+    /// not a log line — the shape of the projection alone decided it, which is why
+    /// <c>ArchivedActivityProfileReadTests</c> asserts on the row rather than on the status code.
+    /// Never <see cref="QueryFilters.UserScope"/> here, and never the argument-less overload: the two
+    /// Source subqueries below are scoped by hand, and the anchors by the global user filter.
+    /// </remarks>
+    private static readonly string[] LiftArchived = [AppQueryFilters.ActivityArchived];
+
+    /// <summary>
     /// The caller's profiles, behind the Source column. Scoped by hand through the Activity because neither
     /// profile is <c>IEntityWithUser</c> — the host's <c>AppQueryFilters.ActivityProfileUserScope</c> is
     /// what backs that up, and this slice cannot see it.
     /// </summary>
+    /// <remarks>
+    /// Lifts the archived concern for the same reason the anchors do, and it has to be lifted here too:
+    /// both profiles mirror <c>!Activity.IsArchived</c> onto themselves, so an anchor of an archived
+    /// activity would otherwise come back with a Source column reading "from nowhere" — the profiles it
+    /// came from hidden by the filter rather than absent.
+    /// </remarks>
     private IQueryable<ActivityBucketListProfile> ScopedBucketLists() =>
-        _dbContext.Set<ActivityBucketListProfile>().Where(p => p.Activity.UserId == User.GetId());
+        _dbContext.Set<ActivityBucketListProfile>()
+            .IgnoreNamedQueryFilters(LiftArchived)
+            .Where(p => p.Activity.UserId == User.GetId());
 
     /// <inheritdoc cref="ScopedBucketLists"/>
     private IQueryable<ActivityBacklogProfile> ScopedBacklogs() =>
-        _dbContext.Set<ActivityBacklogProfile>().Where(p => p.Activity.UserId == User.GetId());
+        _dbContext.Set<ActivityBacklogProfile>()
+            .IgnoreNamedQueryFilters(LiftArchived)
+            .Where(p => p.Activity.UserId == User.GetId());
+
+    /// <summary>
+    /// Lifts <see cref="LiftArchived"/> on the anchor set itself, which is what makes the count and the page
+    /// agree: it runs before <c>GetGridDataAsync</c> splits them, so both see the same rows.
+    /// </summary>
+    protected override IQueryable<MemoryAnchor> ApplyBaseFiltering(IQueryable<MemoryAnchor> query) =>
+        query.IgnoreNamedQueryFilters(LiftArchived);
 
     /// <summary>
     /// Overridden so the three Source fields are computed in SQL rather than overlaid afterwards: the base

@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.application.dashboard;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.detail;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
+using AdhdTimeOrganizer.History.application.service;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,9 @@ public class HistoryDetailPieChartEndpoint(DbContext db, IUserTimeZoneResolver t
 
         var records = await db.Set<ActivityHistory>()
             .AsNoTracking()
+            // Time already spent counts however the activity was filed since — see
+            // ActivityHistoryReadExtensions for what the required Activity join does without this.
+            .IncludingArchivedActivities()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Include(ah => ah.Activity).ThenInclude(a => a.Category)
             .Where(ah => ah.UserId == userId)

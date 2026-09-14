@@ -23,6 +23,11 @@ public record ActivityHistoryResponse : WithActivityResponse, IProjectionRespons
                 Name = e.Activity.Name,
                 Text = e.Activity.Text,
                 IsUnavoidable = e.Activity.IsUnavoidable,
+                // Left unprojected, this defaulted to false on every row. That was invisible while archived
+                // activities' sessions were being dropped from the list altogether; now that they are
+                // returned (see ActivityHistoryReadExtensions) it would be a lie the client cannot detect —
+                // a retired activity rendered exactly like a live one, in the one list that shows both.
+                IsArchived = e.Activity.IsArchived,
                 Role = new ActivityRoleResponse { Id = e.Activity.Role.Id, Name = e.Activity.Role.Name, Text = e.Activity.Role.Text, Color = e.Activity.Role.Color, Icon = e.Activity.Role.Icon },
                 Category = e.Activity.Category == null
                     ? null

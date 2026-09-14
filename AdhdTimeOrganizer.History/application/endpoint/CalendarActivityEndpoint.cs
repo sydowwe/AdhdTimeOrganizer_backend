@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.History.application.dto.request.calendar;
 using AdhdTimeOrganizer.History.application.dto.response.calendar;
+using AdhdTimeOrganizer.History.application.service;
 using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
@@ -47,6 +48,10 @@ public class CalendarActivityEndpoint(DbContext db, ICalendarDayLookup calendarD
 
         var histories = await db.Set<ActivityHistory>()
             .AsNoTracking()
+            // A calendar of what was done cannot lose a day's sessions because the activity was retired
+            // afterwards — and the day's totals here have to match the charts, which now lift the same
+            // concern. See ActivityHistoryReadExtensions.
+            .IncludingArchivedActivities()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Where(ah => ah.UserId == userId)
             .Where(ah => ah.StartTimestamp >= from && ah.StartTimestamp < to)

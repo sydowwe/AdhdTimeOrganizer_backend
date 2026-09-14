@@ -556,6 +556,12 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
     // action report does) will put whichever of those on screen. See UnhandledExceptionMiddleware.
     app.UseUnhandledExceptionHandler();
 
+    // Inside the 500 handler, so a failure to write its own 400 still becomes a logged 500: an unresolvable
+    // sort key is client input, not a server fault, and answers 400 naming the key. Must live here rather
+    // than in the grid bases — the reminder dashboards and the tracking distinct-entry tables sort without
+    // going through one. See InvalidSortKeyMiddleware.
+    app.UseInvalidSortKeyHandler();
+
     app.UseHttpsRedirection();
 
     // Swallow client-disconnect cancellations — not a server error

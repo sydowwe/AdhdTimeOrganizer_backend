@@ -251,6 +251,36 @@ silently ignores nothing:
   carries `UserScope`, all six archival filters share one name, and lifting `ActivityArchived` reveals
   archived rows **without** revealing another user's.
 
+### A filtered principal on a required navigation deletes the row, it does not blank it
+
+The trap behind both archived-activity bugs, and the reason a read that *keeps* rows a filter hides has
+to lift it explicitly. `ActivityHistory` and `MemoryAnchor` carry **no** archived filter — deliberately,
+because both record something already done — but they reach `Activity`, which does, through a required
+navigation. EF puts the filter in the join, so the row disappears entirely; it never arrives with a null
+or empty activity. This holds whether the activity is reached **by projection** (`e.Activity.Name` in an
+`IProjectionResponse`) or **by `Include`**, and it costs nothing at build time: no exception, no log line,
+a 200 with fewer rows.
+
+Two shapes it takes:
+
+- **A grid reports rows it cannot return.** `GetGridDataAsync` counts off the *unprojected* query and
+  pages off the projected one, so the anchor grid answered `itemsCount: 1` with `items: []` — a row on no
+  page the client can turn to.
+- **Two surfaces of one page disagree.** The history charts that join `Activity` dropped the archived
+  activity's sessions; `time-of-day`, `aggregate-by-activity` and the summary cards' own previous-period
+  total never join it and kept counting them. Same range, one number half the other.
+
+So: when a read is about **what already happened**, lift the concern — `ActivityHistoryReadExtensions.
+IncludingArchivedActivities()` in History, `AppQueryFilters.ActivityArchived` via the endpoint's
+`IgnoredQueryFilters` for a get-by-id. When it is a **picker**, don't: `FormSelectOptionsActivityHistory`
+offers activities to log against, and a retired one belongs nowhere on that list. And when the dependent
+carries the filter itself (the three `Activity*Profile` entities), the row is *meant* to leave with its
+activity — count included, which is what keeps it from becoming the first shape above.
+
+Guards are `ArchivedActivityHistoryReadTests` and `ArchivedActivityProfileReadTests`. Both assert on rows
+and totals, and the history one cross-checks the grouped charts against `time-of-day`, because a read that
+silently drops filtered rows still returns a well-formed, plausible page.
+
 ## Seeding
 
 One copy, in `framework/Sydowwe.Framework/infrastructure/persistence/seeder/`. Pick the seeder kind by

@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.application.dashboard;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.summary;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
+using AdhdTimeOrganizer.History.application.service;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,11 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResol
 
         var currentRecords = await db.Set<ActivityHistory>()
             .AsNoTracking()
+            // Both grouped reads lift the archived concern; the previous-period sum below never joined
+            // Activity and so always counted archived rows. Left as it was, this period dropped them and the
+            // period it is compared against did not, which is a percentChange between two different rules.
+            // See ActivityHistoryReadExtensions.
+            .IncludingArchivedActivities()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Include(ah => ah.Activity).ThenInclude(a => a.Category)
             .Where(ah => ah.UserId == userId)
@@ -38,6 +44,11 @@ public class HistorySummarySummaryCardsEndpoint(DbContext db, IUserTimeZoneResol
 
         var baselineQuery = db.Set<ActivityHistory>()
             .AsNoTracking()
+            // Both grouped reads lift the archived concern; the previous-period sum below never joined
+            // Activity and so always counted archived rows. Left as it was, this period dropped them and the
+            // period it is compared against did not, which is a percentChange between two different rules.
+            // See ActivityHistoryReadExtensions.
+            .IncludingArchivedActivities()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Include(ah => ah.Activity).ThenInclude(a => a.Category)
             .Where(ah => ah.UserId == userId);

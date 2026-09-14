@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
+using AdhdTimeOrganizer.History.application.service;
 using AdhdTimeOrganizer.History.application.dto.filter.history;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
@@ -18,11 +19,18 @@ public class FilterActivityHistoryEndpoint(DbContext dbContext, IUserTimeZoneRes
     // is only ever read on the line after it is written, within one request.
     private TimeZoneInfo _timeZone = TimeZoneInfo.Utc;
 
+    /// <summary>
+    /// Also the one hook this base offers before the projection runs, which is where the archived lift has to
+    /// go: <see cref="ActivityHistoryResponse"/> projects the activity through a required navigation, so
+    /// without it every session logged against an activity the user has since archived left this list —
+    /// while the charts above it went on counting the same rows. See
+    /// <see cref="ActivityHistoryReadExtensions"/>.
+    /// </summary>
     protected override async Task<IQueryable<ActivityHistory>> ApplyUserScoping(
         IQueryable<ActivityHistory> query, long userId, CancellationToken ct = default)
     {
         _timeZone = await timeZones.GetAsync(userId, ct);
-        return query;
+        return query.IncludingArchivedActivities();
     }
 
     protected override IQueryable<ActivityHistory> ApplyCustomFiltering(IQueryable<ActivityHistory> query, ActivityHistoryDetailFilter filter)

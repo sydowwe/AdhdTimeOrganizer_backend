@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.application.dashboard;
 using AdhdTimeOrganizer.History.application.dto.request.activityHistory.dashboard.summary;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
+using AdhdTimeOrganizer.History.application.service;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,10 @@ public class HistorySummaryPieChartEndpoint(DbContext db, IUserTimeZoneResolver 
 
         var records = await db.Set<ActivityHistory>()
             .AsNoTracking()
+            // The pie is about time already spent, so an activity archived since does not remove its slice —
+            // without the lift the required Activity join drops those rows, and this chart disagreed with the
+            // time-of-day chart beside it. See ActivityHistoryReadExtensions.
+            .IncludingArchivedActivities()
             .Include(ah => ah.Activity).ThenInclude(a => a.Role)
             .Include(ah => ah.Activity).ThenInclude(a => a.Category)
             .Where(ah => ah.UserId == userId)
