@@ -15,7 +15,7 @@ alike.
 
 ## Bounded context
 
-Owns: the nine entities and their EF configurations, 57 endpoints (23 profile, 24 lookup, 7 memory
+Owns: the nine entities and their EF configurations, 58 endpoints (23 profile, 24 lookup, 8 memory
 anchor, 3 leisure), their DTOs, 11 validators, 4 filter requests, 6 slice-only enums
 (`EnergyLevel`, `EffortType`, `DifficultyLevel`, `ReadinessStatus`, `LeisureSuggestionSource`,
 `LeisureSuggestionOutcome`), 4 per-user default seeders and 8 dev seeders.
@@ -80,6 +80,7 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   | 3 × `GetSelectOptions` (`/all-options`) | `.Where(p => p.Activity.UserId == userId)` on the projection |
   | 3 × `Create*ProfileValidator` | the activity is loaded as `a.Id == req.ActivityId && a.UserId == userId`, so a profile cannot be created against someone else's activity in the first place |
   | `DrawLeisureSuggestionEndpoint`, `RecordSeenLeisureSuggestionEndpoint` | the draw reaches the owner through `p.Activity.UserId` on all three profile sources; `seen` checks ownership of every activity id it was handed before writing a row for it |
+  | `GetAnchorEligibleActivitiesEndpoint` (`/memory-anchor/anchor-eligible-activities`) | reads `Activity` directly with `a.UserId == userId && !a.IsArchived`, then the same backlog-or-bucket-list subquery pair `CreateMemoryAnchorValidator` uses — the picker and the validator are two copies of one rule. `AnchorEligibleActivitiesTests` pins both halves |
 
   Every one of these is a no-op virtual or a hand-written predicate, so deleting one is silent —
   `ApplyUserScoping` and `AuthorizeAsync` not overridden still compile, and the route still answers 200.
@@ -152,7 +153,7 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   a lookup while a profile still referenced it.
 
 - **Registering with the host is four places, none of which break the build.** FastEndpoints
-  `o.Assemblies` in `Program.cs` (missing → all 57 routes 404);
+  `o.Assemblies` in `Program.cs` (missing → all 58 routes 404);
   `ModuleServiceExtensions.ModuleAssemblies` (missing → the 12 seeders register *twice*, since the
   `AppDomain` sweep then also sees them: the dev ones truncate and reseed twice, the per-user defaults
   double-insert); `AppDbContext.ApplyHostConfigurations` (missing → all eight tables vanish from the

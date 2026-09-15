@@ -22,9 +22,9 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 public class ActivityProfilesRouteSmokeTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
 {
     /// <summary>
-    /// The slice's 57 endpoints only route if its assembly is in the FastEndpoints
+    /// The slice's 58 endpoints only route if its assembly is in the FastEndpoints
     /// <c>o.Assemblies</c> list in <c>Program.cs</c> (<c>DisableAutoDiscovery = true</c>). Leaving it
-    /// out is not a build error — all 57 simply 404. One route per endpoint family, because the
+    /// out is not a build error — all 58 simply 404. One route per endpoint family, because the
     /// families reach the router three different ways: the profile endpoints declare explicit routes,
     /// the lookup and anchor grids get theirs from <c>BaseGridEndpoint</c>'s
     /// <c>EntityName.Kebaberize()</c> convention.

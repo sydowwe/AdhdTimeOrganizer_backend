@@ -93,16 +93,16 @@ instead of inheriting it (its `Configure` is not virtual) so it can add the `Cod
 
 ## Endpoints — `application/endpoint/`
 
-57 total, in six families. None of them declare an endpoint group; every route except the three
-leisure ones now comes from a base's `EntityName.Kebaberize()` convention rather than a literal
-string, so renaming one of those entities moves its route.
+58 total, in six families. None of them declare an endpoint group; every route except the three
+leisure ones and the anchor-eligibility picker now comes from a base's `EntityName.Kebaberize()`
+convention rather than a literal string, so renaming one of those entities moves its route.
 
 | Folder | Count | Routes |
 |---|---|---|
 | `backlog/` | 8 | `/api/activity-backlog-profile*` — derived. The only profile family with a `GetAll`; it uses the **plain** `Projection`, so its rows always say "not done", and it scopes by overriding `Filter` because `BaseGetAllEndpoint` has no `ApplyUserScoping` hook |
 | `bucketList/` | 7 | `/api/activity-bucket-list-profile*` — derived |
 | `project/` | 8 | `/api/activity-project-profile*` — derived, except the status-only `PATCH .../{id}/status`, which re-routes off `BasePatchEndpoint`'s `/{id}` in its `Configure` |
-| `memoryAnchor/` | 7 | `/api/memory-anchor/*` — derived |
+| `memoryAnchor/` | 8 | `/api/memory-anchor/*` — derived, plus the explicit `GET /api/memory-anchor/anchor-eligible-activities` (`GetAnchorEligibleActivitiesEndpoint`): the caller's un-archived activities with a backlog or bucket-list profile, as `SelectOptionResponse`s ordered by name. Already-anchored activities stay listed — the only create-time refusal is the two-per-month ceiling. It reads `Activity` directly, so it is not on any base and scopes by hand |
 | `lookup/{expectedCostTier,experienceType,locationType,weatherDependency}/` | 24 | `/api/activity-*-type/*` etc. — derived |
 | `leisureSuggestion/` | 3 | `POST /api/leisure-suggestion` (the ranked draw), `POST /api/leisure-suggestion/seen` (its outcome, 204) and `GET /api/leisure-weather-fit` (today's matching weather-dependency ids) — explicit routes, hand-written rather than base-derived |
 
