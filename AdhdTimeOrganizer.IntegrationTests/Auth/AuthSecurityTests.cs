@@ -63,38 +63,88 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
 
     // ── Login ─────────────────────────────────────────────────────────────────
 
-    [Fact]
-    public async Task Login_UnconfirmedEmail_Returns401_WithGenericMessage()
+    /// <summary>
+    /// Inserts a registered-but-unconfirmed account the way <c>UserManager</c> would, so
+    /// <c>FindByEmailAsync</c> (normalized columns) and the lockout bookkeeping (stamps, opt-in) both
+    /// see it. A bare <c>new User { Email }</c> is invisible to the login path.
+    /// </summary>
+    private async Task<long> SeedUnconfirmedUserAsync(string email, string password)
     {
-        const string email = "unconfirmed-sec-test@integration.com";
-        const string password = "Test@1234!";
-
-        await using (var db = (AppDbContext)Fixture.CreateDbContext())
+        await using var db = (AppDbContext)Fixture.CreateDbContext();
+        var user = new User
         {
-            var user = new User
-            {
-                Email = email,
-                EmailConfirmed = false,
-                Locale = AvailableLocales.En,
-                Timezone = TimeZoneInfo.Utc
-            };
-            user.PasswordHash = new PasswordHasher<User>().HashPassword(user, password);
-            db.Users.Add(user);
-            await db.SaveChangesAsync( TestContext.Current.CancellationToken);
-        }
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
+            UserName = email,
+            NormalizedUserName = email.ToUpperInvariant(),
+            EmailConfirmed = false,
+            LockoutEnabled = true,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            ConcurrencyStamp = Guid.NewGuid().ToString("N"),
+            Locale = AvailableLocales.En,
+            Timezone = TimeZoneInfo.Utc
+        };
+        user.PasswordHash = new PasswordHasher<User>().HashPassword(user, password);
+        db.Users.Add(user);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return user.Id;
+    }
 
+    private async Task<HttpResponseMessage> PostLoginAsync(string email, string password)
+    {
         var payload = new { Email = email, Password = password, StayLoggedIn = false, RecaptchaToken = "test", Timezone = "UTC" };
         using var request = new HttpRequestMessage(HttpMethod.Post, "auth/login");
         request.Headers.Add("X-Client-Id", Guid.NewGuid().ToString());
         request.Content = JsonContent.Create(payload);
 
         using var client = CreateCookieClient();
-        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    /// The 403 the client's resend-confirmation panel is built on. It is only ever produced <b>after</b>
+    /// the password verified, which is what keeps it from being a registration oracle — see the
+    /// sibling test for the wrong-password side. Guards against
+    /// <c>SignInManager.CheckPasswordSignInAsync</c> creeping back in: under
+    /// <c>SignIn.RequireConfirmedEmail</c> it answers <c>NotAllowed</c> before touching the hash and
+    /// collapses this branch into a 401.
+    /// </summary>
+    [Fact]
+    public async Task Login_UnconfirmedEmail_RightPassword_Returns403_EmailNotConfirmed()
+    {
+        const string email = "unconfirmed-right-pw@integration.com";
+        const string password = "Test@1234!";
+        await SeedUnconfirmedUserAsync(email, password);
+
+        using var response = await PostLoginAsync(email, password);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        body.Should().Contain("Email not confirmed");
+    }
+
+    /// <summary>
+    /// A wrong password against an unconfirmed address must look exactly like a wrong password against
+    /// anything else (401, generic message) <i>and</i> feed lockout. The old
+    /// <c>CheckPasswordSignInAsync</c> path short-circuited before <c>AccessFailedAsync</c>, so an
+    /// unconfirmed account could be brute-forced without ever locking.
+    /// </summary>
+    [Fact]
+    public async Task Login_UnconfirmedEmail_WrongPassword_Returns401_AndCountsTowardLockout()
+    {
+        const string email = "unconfirmed-wrong-pw@integration.com";
+        var userId = await SeedUnconfirmedUserAsync(email, "Test@1234!");
+
+        using var response = await PostLoginAsync(email, "Wrong@1234!");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        var body = await response.Content.ReadAsStringAsync( TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         body.Should().NotContain("Email not confirmed");
         body.Should().Contain("Invalid email or password");
+
+        await using var db = (AppDbContext)Fixture.CreateDbContext();
+        var user = await db.Users.SingleAsync(u => u.Id == userId, TestContext.Current.CancellationToken);
+        user.AccessFailedCount.Should().Be(1, "a wrong password against an unconfirmed account must count toward lockout");
     }
 
     // ── Email confirmation ────────────────────────────────────────────────────

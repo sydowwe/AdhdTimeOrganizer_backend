@@ -14,13 +14,12 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.passwordAuth;
 /// key this deployment uses.
 /// </summary>
 public class LoginUserEndpoint(
-    SignInManager<User> signInManager,
     UserManager<User> userManager,
     IJwtService<User> jwtService,
     IGoogleRecaptchaService googleRecaptchaService,
     IAuditService auditService,
     IOptions<TwoFactorOptions> twoFactorOptions)
-    : BaseLoginEndpoint<User>(signInManager, userManager, jwtService, googleRecaptchaService, auditService, twoFactorOptions)
+    : BaseLoginEndpoint<User>(userManager, jwtService, googleRecaptchaService, auditService, twoFactorOptions)
 {
     // Nothing to configure: route, AllowAnonymous, throttling (keyed on the trusted client-IP header),
     // the 2FA branch and auditing all come from the base.

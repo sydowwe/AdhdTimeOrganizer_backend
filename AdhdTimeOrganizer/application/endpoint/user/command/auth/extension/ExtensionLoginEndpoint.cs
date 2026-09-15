@@ -14,12 +14,11 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.extension;
 /// extension gate.
 /// </summary>
 public class ExtensionLoginEndpoint(
-    SignInManager<User> signInManager,
     UserManager<User> userManager,
     IJwtService<User> jwtService,
     IAuditService auditService,
     IOptions<TwoFactorOptions> twoFactorOptions)
-    : BaseExtensionLoginEndpoint<User>(signInManager, userManager, jwtService, auditService, twoFactorOptions)
+    : BaseExtensionLoginEndpoint<User>(userManager, jwtService, auditService, twoFactorOptions)
 {
     // This portal gates extension access per account; the framework default lets everyone in.
     protected override bool HasExtensionAccess(User user) => user.HasExtensionAccess;
