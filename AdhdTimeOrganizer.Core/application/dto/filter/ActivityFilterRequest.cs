@@ -26,4 +26,18 @@ public record ActivityFilterRequest : IFilterRequest
     public string? CategoryName { get; set; }
     public long? RoleId { get; set; }
     public long? CategoryId { get; set; }
+
+    /// <summary>
+    /// Any-of. This is what the settings table's role combobox sends (comma-joined in the URL); the scalar
+    /// <see cref="RoleId"/> above has no client sender. Null or empty means "no opinion".
+    /// </summary>
+    /// <remarks>
+    /// ⚠ The member name is the contract. System.Text.Json drops unknown members silently, so a client
+    /// sending <c>roleIds</c> to a record that only declared <c>RoleId</c> got the unfiltered grid with a
+    /// 200 — for three months. <c>GridFilterFieldNameTests</c> pins each name by asserting a narrowed count.
+    /// </remarks>
+    public long[]? RoleIds { get; set; }
+
+    /// <inheritdoc cref="RoleIds"/>
+    public long[]? CategoryIds { get; set; }
 }

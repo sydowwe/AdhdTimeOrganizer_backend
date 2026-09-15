@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.ActivityProfiles.application.dto.filter;
 using AdhdTimeOrganizer.ActivityProfiles.application.dto.response;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.Core.infrastructure.persistence;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.request.generic;
 using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
@@ -86,6 +87,19 @@ public class GridMemoryAnchorEndpoint(DbContext dbContext)
 
     protected override IQueryable<MemoryAnchor> ApplyCustomFiltering(IQueryable<MemoryAnchor> query, MemoryAnchorFilterRequest filter)
     {
+        // ILIKE over ToContainsPattern, like the activity grid: Contains is case-sensitive in Postgres and
+        // ILike does not escape % / _ on its own. See FreeTextFilterExtensions. The navigation is safe to
+        // walk here: ApplyBaseFiltering already lifted the archived filter that would otherwise turn it
+        // into a row-dropping inner join.
+        if (!string.IsNullOrWhiteSpace(filter.ActivityName))
+        {
+            var pattern = filter.ActivityName.ToContainsPattern();
+            query = query.Where(m => EF.Functions.ILike(m.Activity.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
+        }
+
+        if (filter.MinRating.HasValue)
+            query = query.Where(m => m.Rating >= filter.MinRating.Value);
+
         if (filter.AnchorMonth.HasValue)
             query = query.Where(m => m.AnchorMonth == filter.AnchorMonth.Value);
 

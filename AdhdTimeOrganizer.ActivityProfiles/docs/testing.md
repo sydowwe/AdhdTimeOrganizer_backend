@@ -87,6 +87,7 @@ everyone's profiles — is invisible in a single-user test, which is what you wr
 | `ActivityProfilesSeeders_AreRegisteredExactlyOnce` | This assembly is in `ModuleAssemblies` **and** reachable by the `AppDomain` sweep — double registration makes the dev seeders truncate and reseed twice and the per-user defaults double-insert |
 | `TheWeatherProvider_IsRegisteredExactlyOnce` | The typed `HttpClient` must stay marker-free. A lifetime marker "to help" registers it twice |
 | `ProfileRoutes_AreRegistered` · `LookupAndAnchorGridRoutes_AreRegistered` | FastEndpoints `o.Assemblies` in `Program.cs`. Missing, every route in this project 404s and nothing else notices |
+| `GridFilterFieldNameTests.{Backlog,BucketList,MemoryAnchor,Project}Grid_AcceptsClientFieldNames` (host suite) | The **member names** on the four filter records, posted under the client's camelCase spelling. `IFilterRequest` is an empty marker and System.Text.Json drops unknown members silently, so a client field the record doesn't declare returns the unfiltered grid with a 200 — which is what `activityName` and every id list did for three months (B11). Each case seeds a decoy and asserts it is dropped; a member added to a record gets a case here |
 
 Owned elsewhere but load-bearing for this project: `ModuleSchemaTests` (this assembly resolves to the
 `activity_profiles` schema — the resolver throws for anything unmapped, so a new entity here is

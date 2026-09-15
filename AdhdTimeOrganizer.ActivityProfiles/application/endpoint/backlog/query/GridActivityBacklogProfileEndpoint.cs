@@ -1,6 +1,8 @@
 using AdhdTimeOrganizer.ActivityProfiles.application.dto.filter;
 using AdhdTimeOrganizer.ActivityProfiles.application.dto.response;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
 using Sydowwe.Framework.application.extensions;
@@ -41,6 +43,46 @@ public class GridActivityBacklogProfileEndpoint(DbContext dbContext)
     protected override IQueryable<ActivityBacklogProfile> ApplyCustomFiltering(IQueryable<ActivityBacklogProfile> query,
         ActivityBacklogProfileFilterRequest filter)
     {
+        // ILIKE over ToContainsPattern, like the activity grid: Contains is case-sensitive in Postgres and
+        // ILike does not escape % / _ on its own. See FreeTextFilterExtensions.
+        if (!string.IsNullOrWhiteSpace(filter.ActivityName))
+        {
+            var pattern = filter.ActivityName.ToContainsPattern();
+            query = query.Where(p => EF.Functions.ILike(p.Activity.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
+        }
+
+        // Any-of on every list, and an empty list is "no opinion" — the combobox sends [] when every chip
+        // is cleared.
+        if (filter.LocationTypeIds is { Length: > 0 })
+            query = query.Where(p => filter.LocationTypeIds.Contains(p.LocationTypeId));
+
+        if (filter.WeatherDependencyIds is { Length: > 0 })
+            query = query.Where(p => filter.WeatherDependencyIds.Contains(p.WeatherDependencyId));
+
+        if (filter.ExpectedCostTierIds is { Length: > 0 })
+            query = query.Where(p => filter.ExpectedCostTierIds.Contains(p.ExpectedCostTierId));
+
+        if (filter.EnergyLevels is { Length: > 0 })
+            query = query.Where(p => filter.EnergyLevels.Contains(p.EnergyLevel));
+
+        if (filter.EffortTypes is { Length: > 0 })
+        {
+            // The column is EffortType?, and Npgsql's array converter refuses a non-nullable element type
+            // against it (a 500, not a translation failure), so the parameter is widened to match.
+            var effortTypes = filter.EffortTypes.Select(e => (EffortType?)e).ToArray();
+            query = query.Where(p => p.EffortType != null && effortTypes.Contains(p.EffortType));
+        }
+
+        if (filter.MaxDurationMinutes.HasValue)
+            query = query.Where(p => p.DurationMinutes <= filter.MaxDurationMinutes.Value);
+
+        if (filter.MinParticipants.HasValue)
+            query = query.Where(p => p.MinParticipants >= filter.MinParticipants.Value);
+
+        // A null MaxParticipants on the row is "any number", which never fits under a cap.
+        if (filter.MaxParticipants.HasValue)
+            query = query.Where(p => p.MaxParticipants != null && p.MaxParticipants.Value <= filter.MaxParticipants.Value);
+
         if (filter.EnergyLevel.HasValue)
             query = query.Where(p => p.EnergyLevel == filter.EnergyLevel.Value);
 

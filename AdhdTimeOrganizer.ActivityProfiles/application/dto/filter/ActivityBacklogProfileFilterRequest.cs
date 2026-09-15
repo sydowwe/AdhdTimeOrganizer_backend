@@ -3,8 +3,44 @@ using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.ActivityProfiles.application.dto.filter;
 
+/// <summary>
+/// The member names here are the contract with the leisure grids' filter chips and URL codecs.
+/// System.Text.Json drops unknown members silently, so a misnamed member is not an error — it is an
+/// unfiltered grid with a 200. <c>GridFilterFieldNameTests</c> pins every name by asserting a narrowed
+/// count; add a case there when adding a member here.
+/// </summary>
 public record ActivityBacklogProfileFilterRequest : IFilterRequest
 {
+    /// <summary>Case-insensitive contains on the activity's name.</summary>
+    public string? ActivityName { get; set; }
+
+    /// <summary>Any-of over the lookup ids. Null or empty means "no opinion".</summary>
+    public long[]? LocationTypeIds { get; set; }
+
+    /// <inheritdoc cref="LocationTypeIds"/>
+    public long[]? WeatherDependencyIds { get; set; }
+
+    /// <inheritdoc cref="LocationTypeIds"/>
+    public long[]? ExpectedCostTierIds { get; set; }
+
+    /// <summary>Any-of. The client's chips; <see cref="EnergyLevel"/> is the older exact-match scalar.</summary>
+    public EnergyLevel[]? EnergyLevels { get; set; }
+
+    /// <inheritdoc cref="EnergyLevels"/>
+    public EffortType[]? EffortTypes { get; set; }
+
+    /// <summary>Inclusive: keeps entries whose <c>DurationMinutes</c> is at most this.</summary>
+    public int? MaxDurationMinutes { get; set; }
+
+    /// <summary>Inclusive: keeps entries whose <c>MinParticipants</c> is at least this.</summary>
+    public int? MinParticipants { get; set; }
+
+    /// <summary>
+    /// Inclusive: keeps entries whose <c>MaxParticipants</c> is at most this. An entry with no upper bound
+    /// (<c>MaxParticipants</c> null) is "any number", so it never satisfies a cap and is dropped.
+    /// </summary>
+    public int? MaxParticipants { get; set; }
+
     public EnergyLevel? EnergyLevel { get; set; }
     public EffortType? EffortType { get; set; }
     /// <summary>

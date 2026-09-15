@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.ActivityProfiles.application.dto.filter;
 using AdhdTimeOrganizer.ActivityProfiles.application.dto.response;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.read.pageFilterSort;
 using Sydowwe.Framework.application.extensions;
@@ -41,6 +42,24 @@ public class GridActivityBucketListProfileEndpoint(DbContext dbContext)
     protected override IQueryable<ActivityBucketListProfile> ApplyCustomFiltering(IQueryable<ActivityBucketListProfile> query,
         ActivityBucketListProfileFilterRequest filter)
     {
+        // ILIKE over ToContainsPattern, like the activity grid: Contains is case-sensitive in Postgres and
+        // ILike does not escape % / _ on its own. See FreeTextFilterExtensions.
+        if (!string.IsNullOrWhiteSpace(filter.ActivityName))
+        {
+            var pattern = filter.ActivityName.ToContainsPattern();
+            query = query.Where(p => EF.Functions.ILike(p.Activity.Name, pattern, FreeTextFilterExtensions.EscapeCharacter));
+        }
+
+        // Any-of, and an empty list is "no opinion" — the combobox sends [] when every chip is cleared.
+        if (filter.ExperienceTypeIds is { Length: > 0 })
+            query = query.Where(p => filter.ExperienceTypeIds.Contains(p.ExperienceTypeId));
+
+        if (filter.MinComfortZoneStep.HasValue)
+            query = query.Where(p => p.ComfortZoneStep >= filter.MinComfortZoneStep.Value);
+
+        if (filter.MaxComfortZoneStep.HasValue)
+            query = query.Where(p => p.ComfortZoneStep <= filter.MaxComfortZoneStep.Value);
+
         if (filter.RequiresTravel.HasValue)
             query = query.Where(p => p.RequiresTravel == filter.RequiresTravel.Value);
 

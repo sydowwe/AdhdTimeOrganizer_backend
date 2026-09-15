@@ -132,6 +132,13 @@ public class GridActivityEndpoint(
         if (filter.CategoryId.HasValue)
             query = query.Where(a => a.CategoryId == filter.CategoryId.Value);
 
+        // Any-of, and an empty list is "no opinion" — the combobox sends [] when every chip is cleared.
+        if (filter.RoleIds is { Length: > 0 })
+            query = query.Where(a => filter.RoleIds.Contains(a.RoleId));
+
+        if (filter.CategoryIds is { Length: > 0 })
+            query = query.Where(a => a.CategoryId != null && filter.CategoryIds.Contains(a.CategoryId.Value));
+
         return query;
     }
 }

@@ -123,6 +123,31 @@ public class SortKeyRejectionTests(AppDbContextFixture fixture) : PostgresTestBa
     }
 
     /// <summary>
+    /// A key that <em>resolves</em> but lands on a nested object — <c>locationType</c> is a whole
+    /// <c>SelectOptionResponse</c>, <c>activity</c> a whole <c>ActivityResponse</c> — is refused the same
+    /// way, not handed to the provider. It used to be: nothing can ORDER BY an object, so it was a 500
+    /// (<c>errorId</c>) behind an empty table, and it is exactly the key a
+    /// <c>TableColumn('locationType', …, sortable)</c> emits unless its author already knows to send the
+    /// leaf. The hint names that leaf, so the 400 is also the fix.
+    /// </summary>
+    [Theory]
+    [InlineData("locationType", "locationType.text")]
+    [InlineData("activity", "activity.name")]
+    public async Task Grid_RejectsAKeyThatResolvesToANestedObject_AndNamesALeafToSortByInstead(string key, string leaf)
+    {
+        await using (var db = CreateDbContext())
+            await ActivityProfileTestSeedHelper.SeedBacklogProfileAsync(db, UserId, "Anything");
+
+        await AssertRejectedAsync(BacklogGridRoute, key);
+
+        var (_, body) = await PostAsync(BacklogGridRoute, GridBody(SortBy(key)));
+        body.Should().Contain(leaf,
+            "the object is not sortable but its scalar members are, and the client cannot guess which spelling it wanted");
+
+        await AssertAcceptedAsync(BacklogGridRoute, leaf);
+    }
+
+    /// <summary>
     /// The rejection is narrow: the grid's own keys and the no-sort page are untouched. <c>sortBy: []</c>
     /// is the case the board views send and the one that kept working throughout the outage, which is why
     /// the table views looked empty while the board views did not.
