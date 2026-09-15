@@ -222,6 +222,29 @@ Role names live in one place — `UserRoleEnum` (User · Admin · Root) with the
 admin-or-higher counterpart. There is no portal-side `PortalEndpointHelper` wrapper — call
 `IEndpoint.GetUserRole()` / `GetAdminRole()` directly. Never hard-code role strings.
 
+## Error bodies — `errorType`, not the status alone
+
+Every error body the app sends is `TypedErrorResponse`
+(`framework/Sydowwe.Framework/application/error/`): FastEndpoints' `statusCode` / `message` / `errors`
+plus **`errorType`**, the `ResultErrorType` member name as a string (`"DbUniqueViolationError"`). It
+exists because `EndpointHelper.ToStatusCode` flattens four situations onto 409 — a stale row, a unique
+violation, an FK refusal and a business `Conflict` — and three onto 403, and the client has to word
+them differently (*refresh and retry* / *pick another value* / *remove the dependents first* /
+*confirm your address*).
+
+- **Statuses are unchanged.** The field is additive; `ToStatusCode` is the same map it always was.
+- **Producing it:** `await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);` — `ErrorStatus`
+  (on `IEndpoint`) maps *and* stamps in one call, so a hand-written endpoint that sends a business
+  conflict passes `ResultErrorType.Conflict` rather than the literal `409`. Where the status is
+  deliberately not the mapped one (`PasswordSignInFlow` answers 403 for a lockout, not the 423
+  `ToStatusCode` would give), stamp only: `HttpContext.SetResultErrorType(...)`.
+- **It is absent, not null, when nothing stamped one** — FluentValidation 400s keep exactly the body
+  they had, `errors` map included.
+- **It is silent when unwired.** The type rides on `HttpContext.Items` and is rendered only by
+  `config.Errors.ResponseBuilder = TypedErrorResponse.Build` in `Program.cs`. Remove that line and
+  every endpoint still stamps, every status stays right, and the field just stops appearing.
+  `ErrorTypeContractTests` asserts on the response body for that reason.
+
 ## User scoping — the role gate is not what keeps other users' rows out
 
 And neither are the base endpoints. Since there is one shared set of bases, `ApplyUserScoping` on

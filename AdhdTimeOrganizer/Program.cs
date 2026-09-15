@@ -38,6 +38,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Serilog;
 using Serilog.Events;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.middleware;
 using Sydowwe.Framework.config;
 using Sydowwe.Framework.domain.auth;
@@ -621,6 +622,16 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
     {
         config.Endpoints.RoutePrefix = "api";
         config.Endpoints.ShortNames = true;
+
+        // Every error body carries the ResultErrorType behind it as `errorType`. Four different
+        // situations map to 409 (stale row / unique violation / FK refusal / business conflict) and
+        // three to 403, and the client cannot word them apart from a status code alone — it used to
+        // parse the prose or re-derive the distinction per endpoint. The mapping in
+        // EndpointHelper.ToStatusCode is untouched: this adds a field, it does not move a status.
+        // Without these two lines the endpoints still stamp their type and it is silently dropped,
+        // which is what ErrorTypeContractTests asserts against.
+        config.Errors.ResponseBuilder = TypedErrorResponse.Build;
+        config.Errors.ProducesMetadataType = typeof(TypedErrorResponse);
         config.Endpoints.Configurator = ep =>
         {
             if (ep.AllowedRoles is null || ep.AllowedRoles.Count == 0)

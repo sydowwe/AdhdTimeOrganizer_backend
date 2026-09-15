@@ -3,6 +3,8 @@ using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.command;
+using Sydowwe.Framework.application.error;
+using Sydowwe.Framework.domain.result;
 
 namespace AdhdTimeOrganizer.Core.application.endpoint.activity.role.command;
 
@@ -22,6 +24,12 @@ namespace AdhdTimeOrganizer.Core.application.endpoint.activity.role.command;
 /// anchors, timer presets. Refusing is the only non-destructive answer; the caller reassigns or deletes
 /// the activities first. Reuses the 409 the system-key path already established so the client needs no
 /// new branch, and mirrors the <c>canDelete</c> the role reads now carry.</para>
+///
+/// <para><b>Both stay 409; the bodies differ by <c>errorType</c>.</b> The system-key refusal is a
+/// business <see cref="ResultErrorType.Conflict"/> — nothing the user can clear — while the
+/// still-has-activities one is a <see cref="ResultErrorType.DbForeignKeyError"/>, the same type the
+/// database itself would raise, because the user can act on it by moving the dependents. That is the
+/// whole point of the field: the status alone cannot tell those two sentences apart.</para>
 /// </summary>
 public class DeleteActivityRoleEndpoint(DbContext dbContext)
     : BaseDeleteEndpoint<ActivityRole>(dbContext)
@@ -42,7 +50,7 @@ public class DeleteActivityRoleEndpoint(DbContext dbContext)
         if (systemKey is not null)
         {
             AddError("This is a system role the app files quick-created activities under, so it cannot be deleted. You can rename it instead.");
-            await Send.ErrorsAsync(409, ct);
+            await Send.ErrorsAsync(this.ErrorStatus(ResultErrorType.Conflict), ct);
             return;
         }
 
@@ -57,7 +65,7 @@ public class DeleteActivityRoleEndpoint(DbContext dbContext)
         if (activityCount > 0)
         {
             AddError($"{activityCount} activities are still filed under this role, and deleting it would delete them and their history too. Move them to another role first.");
-            await Send.ErrorsAsync(409, ct);
+            await Send.ErrorsAsync(this.ErrorStatus(ResultErrorType.DbForeignKeyError), ct);
             return;
         }
 

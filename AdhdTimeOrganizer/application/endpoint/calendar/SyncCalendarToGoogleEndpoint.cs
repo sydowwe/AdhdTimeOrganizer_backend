@@ -7,7 +7,9 @@ using Google;
 using Google.Apis.Calendar.v3.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.result;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar.command;
 
@@ -96,7 +98,7 @@ public class SyncCalendarToGoogleEndpoint(
         catch (GoogleApiException e) when (e.HttpStatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
             AddError("Google Calendar access was revoked or expired. Please reconnect it via /user/google-calendar/connect.");
-            await Send.ErrorsAsync(409, ct);
+            await Send.ErrorsAsync(this.ErrorStatus(ResultErrorType.Conflict), ct);
             return;
         }
         catch (GoogleApiException)

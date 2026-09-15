@@ -241,3 +241,13 @@ worth copying the shape of:
   reminder cases pin the `nextOccurrence` → `nextOccurrenceAt` alias on all three reads over a definition,
   asserted on order rather than on a 200: an alias that resolved to the wrong member, or a normalizer that
   dropped the entry instead of renaming it, returns a page that looks exactly as healthy.
+- `ErrorTypeContractTests` — the `errorType` field on the error body (see
+  `docs/claude/endpoints.md#error-bodies--errortype-not-the-status-alone`). The type travels on
+  `HttpContext.Items` and is only rendered by the `Errors.ResponseBuilder` the host installs in
+  `Program.cs`; drop that one line and every endpoint still stamps its type, every status is still
+  right, nothing throws and nothing logs — the field simply stops appearing, which a status-level test
+  sails straight through. So these parse the **body**, and they pair the two 409s on one endpoint
+  (`DeleteActivityRoleEndpoint` refuses a system role as a business `Conflict` and a role that still has
+  activities as `DbForeignKeyError`) because a mechanism that cannot tell those apart is the bug the
+  field exists to fix. The validation case asserts the field is **absent**, not null, on a
+  FluentValidation 400.

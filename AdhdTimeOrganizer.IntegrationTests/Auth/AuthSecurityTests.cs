@@ -121,6 +121,9 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         body.Should().Contain("Email not confirmed");
+        // B18: lockout answers 403 here too, so the status alone cannot drive the resend-confirmation
+        // panel. See ErrorTypeContractTests for the 409 half of the same contract.
+        body.Should().Contain("\"errorType\":\"EmailNotConfirmed\"");
     }
 
     /// <summary>

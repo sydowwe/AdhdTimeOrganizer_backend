@@ -6,10 +6,12 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.middleware;
 using Sydowwe.Framework.application.service.auth;
 using Sydowwe.Framework.config;
 using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.domain.result;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
 using Sydowwe.Framework.domain.serviceContract;
 
@@ -64,7 +66,10 @@ public class GoogleSignInEndpoint(
         else if (!user.HasGoogleOAuth || user.GoogleOAuthUserId != googleUserId)
         {
             AddError("Could not sign in with Google.");
-            await Send.ErrorsAsync(409, ct);
+            // Conflict, not EmailHasPassword: the message is deliberately vague so the response can't be
+            // used to probe how an address is registered, and a more specific errorType would leak
+            // exactly that.
+            await Send.ErrorsAsync(this.ErrorStatus(ResultErrorType.Conflict), ct);
             return;
         }
 
