@@ -98,21 +98,39 @@ public class ActivityHistoryWriteRuleTests(AppDbContextFixture fixture) : Postgr
     // ---- 2. length and id rules --------------------------------------------------------------------
 
     /// <summary>
-    /// A zero-length recording is legitimate -- <c>time-of-day</c> credits its start hour with one entry
-    /// and no seconds -- so the non-negative rule must be `>= 0`, not `> 0`.
+    /// B17 -- a recording of nothing is not information on any read path (the dashboards sum it, the
+    /// timeline draws a zero-width block, the calibration average divides by it). The SPA's capture views
+    /// discard sub-threshold sessions before the save dialog opens; this rule is the backstop for every
+    /// other client, so it is pinned on the wire: <c>{0,0}</c> answers a 400 keyed on <c>length</c>.
     /// </summary>
-    [Fact(DisplayName = "A zero-length recording is accepted and ends where it starts")]
-    public async Task Create_WithZeroLength_Succeeds_AndEndEqualsStart()
+    [Fact(DisplayName = "A zero-length recording is rejected, keyed on length")]
+    public async Task Create_WithZeroLength_IsRejected()
     {
         var activityId = await SeedActivityAsync("Write rules zero length");
 
         var response = await PostAsync(Body(activityId, hours: 0, minutes: 0));
 
+        await ShouldBeValidationErrorForAsync(response, "length");
+        (await CountRowsAsync(activityId)).Should().Be(0, "a rejected request must not have inserted");
+    }
+
+    /// <summary>
+    /// The boundary just above the rule. <c>IntTime</c> is whole minutes on the wire and in storage, so
+    /// one minute is the shortest recording any client can express; it must land, or the positive rule
+    /// has silently become a higher floor.
+    /// </summary>
+    [Fact(DisplayName = "A one-minute recording -- the shortest expressible -- is accepted")]
+    public async Task Create_WithOneMinuteLength_Succeeds()
+    {
+        var activityId = await SeedActivityAsync("Write rules one minute length");
+
+        var response = await PostAsync(Body(activityId, hours: 0, minutes: 1));
+
         await ShouldBeCreatedAsync(response);
 
         var row = await SingleRowAsync(activityId);
-        row.Length.TotalSeconds.Should().Be(0);
-        row.EndTimestamp.Should().Be(row.StartTimestamp,
+        row.Length.TotalSeconds.Should().Be(60);
+        row.EndTimestamp.Should().Be(row.StartTimestamp.AddMinutes(1),
             "EndTimestamp is a stored derivation of StartTimestamp + Length, and the attribution sink's "
             + "contiguous-window probe reads it");
     }
