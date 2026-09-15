@@ -226,7 +226,7 @@ public class ActivityRoleCreateTests(AppDbContextFixture fixture) : BaseCreateEn
     protected override string EndpointUrl => "api/activity-role";
     protected override bool IsAdminOnly => false;
     protected override Task<object> BuildValidPayloadAsync(DbContext db) =>
-        Task.FromResult<object>(new { Name = $"Created Role {Guid.NewGuid():N}", Color = "#abcdef" });
+        Task.FromResult<object>(new { Name = $"Created Role {Guid.NewGuid():N}", Color = ColorPalette.Blue });
 }
 
 [Collection("Postgres")]
@@ -237,7 +237,7 @@ public class ActivityRoleUpdateTests(AppDbContextFixture fixture) : BaseUpdateEn
     protected override HttpStatusCode UnauthorizedStatus => HttpStatusCode.NotFound;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.RoleAsync(db, FakeLoggedUserService.TestUserId, "Update Role");
     protected override Task<object> BuildValidPayloadAsync(DbContext db, long id) =>
-        Task.FromResult<object>(new { Name = "Updated Role", Color = "#123456" });
+        Task.FromResult<object>(new { Name = "Updated Role", Color = ColorPalette.Teal });
 
     protected override async Task<long?> SeedEntityOwnedByOtherUserAsync(DbContext db)
     {
@@ -302,7 +302,7 @@ public class ActivityCategoryCreateTests(AppDbContextFixture fixture) : BaseCrea
     protected override string EndpointUrl => "api/activity-category";
     protected override bool IsAdminOnly => false;
     protected override Task<object> BuildValidPayloadAsync(DbContext db) =>
-        Task.FromResult<object>(new { Name = $"Created Category {Guid.NewGuid():N}", Color = "#abcdef" });
+        Task.FromResult<object>(new { Name = $"Created Category {Guid.NewGuid():N}", Color = ColorPalette.Blue });
 }
 
 [Collection("Postgres")]
@@ -313,7 +313,7 @@ public class ActivityCategoryUpdateTests(AppDbContextFixture fixture) : BaseUpda
     protected override HttpStatusCode UnauthorizedStatus => HttpStatusCode.NotFound;
     protected override Task<long> SeedEntityAsync(DbContext db) => Seed.CategoryAsync(db, FakeLoggedUserService.TestUserId, "Update Category");
     protected override Task<object> BuildValidPayloadAsync(DbContext db, long id) =>
-        Task.FromResult<object>(new { Name = "Updated Category", Color = "#123456" });
+        Task.FromResult<object>(new { Name = "Updated Category", Color = ColorPalette.Teal });
 
     protected override async Task<long?> SeedEntityOwnedByOtherUserAsync(DbContext db)
     {
@@ -955,7 +955,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
     [Fact]
     public async Task ActivityRole_DuplicateNameSameUser_Returns409()
     {
-        var payload = new { Name = "Duplicate Role", Color = "#abcdef" };
+        var payload = new { Name = "Duplicate Role", Color = ColorPalette.Blue };
         var first = await CreateClient().PostAsJsonAsync("api/activity-role", payload, JsonOpts, TestContext.Current.CancellationToken);
         first.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -973,7 +973,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
 
         await using var factoryB = CreateFactory(["User"], otherUserId);
         var response = await factoryB.CreateClient()
-            .PostAsJsonAsync("api/activity-role", new { Name = "Shared Name Role", Color = "#123456" }, JsonOpts, TestContext.Current.CancellationToken);
+            .PostAsJsonAsync("api/activity-role", new { Name = "Shared Name Role", Color = ColorPalette.Teal }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
@@ -981,7 +981,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
     [Fact]
     public async Task ActivityCategory_DuplicateNameSameUser_Returns409()
     {
-        var payload = new { Name = "Duplicate Category", Color = "#abcdef" };
+        var payload = new { Name = "Duplicate Category", Color = ColorPalette.Blue };
         var first = await CreateClient().PostAsJsonAsync("api/activity-category", payload, JsonOpts, TestContext.Current.CancellationToken);
         first.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -999,7 +999,7 @@ public class ActivityAreaBehaviorTests(AppDbContextFixture fixture) : PostgresTe
 
         await using var factoryB = CreateFactory(["User"], otherUserId);
         var response = await factoryB.CreateClient()
-            .PostAsJsonAsync("api/activity-category", new { Name = "Shared Name Category", Color = "#123456" }, JsonOpts, TestContext.Current.CancellationToken);
+            .PostAsJsonAsync("api/activity-category", new { Name = "Shared Name Category", Color = ColorPalette.Teal }, JsonOpts, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
     }

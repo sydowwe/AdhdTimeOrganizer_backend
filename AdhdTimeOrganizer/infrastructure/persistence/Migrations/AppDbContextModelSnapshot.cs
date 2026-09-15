@@ -713,8 +713,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.Property<string>("Color")
                         .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("color");
 
                     b.Property<DateTime>("CreatedTimestamp")
@@ -781,8 +781,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.Property<string>("Color")
                         .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("color");
 
                     b.Property<DateTime>("CreatedTimestamp")
@@ -2222,8 +2222,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.Property<string>("Color")
                         .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("color");
 
                     b.Property<DateTime>("CreatedTimestamp")
@@ -2540,8 +2540,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.Property<string>("Color")
                         .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("color");
 
                     b.Property<DateTime>("CreatedTimestamp")
@@ -2673,8 +2673,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.Property<string>("Color")
                         .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("color");
 
                     b.Property<DateTime>("CreatedTimestamp")

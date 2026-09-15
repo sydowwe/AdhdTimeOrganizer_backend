@@ -6,6 +6,7 @@ using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.IntegrationTests.Reminders;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
@@ -100,7 +101,7 @@ public class CreateTodoListCategoryEndpointTests(AppDbContextFixture fixture) : 
     protected override Task<object> BuildValidPayloadAsync(DbContext db) => Task.FromResult<object>(new
     {
         Name = $"Category-{Guid.NewGuid():N}",
-        Color = "#ff00ff"
+        Color = ColorPalette.Fuchsia
     });
 }
 
@@ -117,7 +118,7 @@ public class UpdateTodoListCategoryEndpointTests(AppDbContextFixture fixture) : 
     protected override Task<object> BuildValidPayloadAsync(DbContext db, long id) => Task.FromResult<object>(new
     {
         Name = "Updated category",
-        Color = "#00ff00"
+        Color = ColorPalette.Green
     });
 
     protected override async Task<long?> SeedEntityOwnedByOtherUserAsync(DbContext db)

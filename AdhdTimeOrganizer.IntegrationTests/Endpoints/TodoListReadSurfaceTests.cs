@@ -9,6 +9,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.response.@base;
 using Sydowwe.Framework.application.dto.response.generic;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
@@ -624,7 +625,7 @@ public class TodoListUniqueNameTests(AppDbContextFixture fixture) : PostgresTest
     public async Task CreateTodoListCategory_DuplicateName_Returns409()
     {
         var client = CreateClient();
-        var payload = new { Name = "Chores", Color = "#ff00ff" };
+        var payload = new { Name = "Chores", Color = ColorPalette.Fuchsia };
 
         var first = await client.PostAsJsonAsync("api/todo-list-category", payload, JsonOpts, CancellationToken);
         first.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -648,7 +649,7 @@ public class TodoListUniqueNameTests(AppDbContextFixture fixture) : PostgresTest
         }
 
         var response = await CreateClient().PutAsJsonAsync($"api/todo-list-category/{renamedId}",
-            new { Name = "Chores", Color = "#00ff00" }, JsonOpts, CancellationToken);
+            new { Name = "Chores", Color = ColorPalette.Green }, JsonOpts, CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
@@ -685,7 +686,7 @@ public class TodoListUniqueNameTests(AppDbContextFixture fixture) : PostgresTest
         list.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var category = await client.PostAsJsonAsync("api/todo-list-category",
-            new { Name = "Chores", Color = "#ff00ff" }, JsonOpts, CancellationToken);
+            new { Name = "Chores", Color = ColorPalette.Fuchsia }, JsonOpts, CancellationToken);
         category.StatusCode.Should().Be(HttpStatusCode.Created);
 
         await using var verifyDb = CreateDbContext();

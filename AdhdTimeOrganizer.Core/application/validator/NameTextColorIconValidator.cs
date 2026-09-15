@@ -1,6 +1,7 @@
 using FastEndpoints;
 using FluentValidation;
 using Sydowwe.Framework.application.dto.request.@base;
+using Sydowwe.Framework.application.validator;
 using Sydowwe.Framework.domain;
 
 namespace AdhdTimeOrganizer.Core.application.validator;
@@ -13,11 +14,10 @@ public abstract class NameTextColorIconValidator<T> : Validator<T> where T : Nam
             .NotEmpty()
             .MaximumLength(EntityFieldLengths.Name);
 
+        // A palette name, never hex: the client's ColorPicker writes ColorPalette names and resolves
+        // them to a theme-aware pair, and the seeders store the same names.
         RuleFor(x => x.Color)
-            .NotEmpty()
-            .MaximumLength(EntityFieldLengths.Color)
-            .Matches("^#(?:[0-9a-fA-F]{3}){1,2}$")
-            .WithMessage("Color must be a valid hex color code (e.g. #FFFFFF or #FFF)");
+            .MustBePaletteColor();
 
         RuleFor(x => x.Icon)
             .MaximumLength(EntityFieldLengths.Icon);

@@ -49,7 +49,7 @@ public class ActivityRoleSystemKeyTests(AppDbContextFixture fixture) : PostgresT
         before!.Name.Should().Be("To-do list task");
 
         var rename = await client.PutAsJsonAsync($"api/activity-role/{before.Id}",
-            new { Name = "Úloha zo zoznamu", Color = "#123456" }, JsonOpts, CancellationToken);
+            new { Name = "Úloha zo zoznamu", Color = ColorPalette.Sky }, JsonOpts, CancellationToken);
         rename.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var after = await client.GetFromJsonAsync<ActivityRoleResponse>(
@@ -144,7 +144,7 @@ public class ActivityRoleSystemKeyTests(AppDbContextFixture fixture) : PostgresT
         var client = CreateClient();
 
         var created = await client.PostAsJsonAsync("api/activity-role",
-            new { Name = "My own role", Color = "#0f0f0f" }, JsonOpts, CancellationToken);
+            new { Name = "My own role", Color = ColorPalette.Zinc }, JsonOpts, CancellationToken);
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         var createdId = await created.Content.ReadFromJsonAsync<long>(JsonOpts, CancellationToken);
 
@@ -187,7 +187,7 @@ public class ActivityRoleSystemKeyTests(AppDbContextFixture fixture) : PostgresT
     {
         var client = CreateClient();
         var created = await client.PostAsJsonAsync("api/activity-role",
-            new { Name = "Disposable", Color = "#0f0f0f" }, JsonOpts, CancellationToken);
+            new { Name = "Disposable", Color = ColorPalette.Zinc }, JsonOpts, CancellationToken);
         var id = await created.Content.ReadFromJsonAsync<long>(JsonOpts, CancellationToken);
 
         var response = await client.DeleteAsync($"api/activity-role/{id}", CancellationToken);

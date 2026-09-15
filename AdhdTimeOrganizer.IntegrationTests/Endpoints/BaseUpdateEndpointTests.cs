@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Framework.Testing.baseTests;
 using Xunit;
@@ -26,5 +27,5 @@ public class UpdateActivityCategoryEndpointTests(AppDbContextFixture fixture)
         return category.Id;
     }
 
-    protected override Task<object> BuildValidPayloadAsync(DbContext db, long id) => Task.FromResult<object>(new { Name = "Updated", Color = "#00FF00", Text = "updated" });
+    protected override Task<object> BuildValidPayloadAsync(DbContext db, long id) => Task.FromResult<object>(new { Name = "Updated", Color = ColorPalette.Green, Text = "updated" });
 }
