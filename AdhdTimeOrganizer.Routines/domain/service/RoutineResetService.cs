@@ -351,8 +351,10 @@ public static class RoutineResetService
     /// every reset path through <see cref="OpenNewCycle"/>.
     /// <para>
     /// Deliberately read off the item alone rather than derived against <see cref="RoutineTimePeriod.LastResetAt"/>:
-    /// the two event handlers in the host that complete a routine item load it without its period, and a guard
-    /// they cannot call is a guard with two holes in it.
+    /// <c>ActivityTimeRecordedEventHandler</c> in the host completes a routine item without loading its period,
+    /// and a guard it cannot call is a guard with a hole in it. (<c>PlannerTaskIsDoneChangedEventHandler</c> does
+    /// load the period now, so it runs the lazy <see cref="TryReset(RoutineTimePeriod, RoutineTodoList, DateTime)"/>
+    /// first like the toggle endpoints.)
     /// </para>
     /// </summary>
     private static bool AlreadyCountedThisCycle(RoutineTodoList item) => item.BestStreakBeforeScore is not null;

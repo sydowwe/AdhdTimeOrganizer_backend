@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using AdhdTimeOrganizer.application.eventHandler;
+using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.IntegrationTests.Endpoints;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.IntegrationTests.Reminders;
@@ -13,6 +15,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Sydowwe.Framework.Testing;
 using Xunit;
@@ -469,6 +472,54 @@ public class RoutineToggleIsDoneTests(AppDbContextFixture fixture) : PostgresTes
         await using var verify = CreateDbContext();
         var reopened = await verify.Set<PlannerTask>().AsNoTracking().SingleAsync(t => t.Id == plannerTaskId, CancellationToken);
         reopened.Status.Should().Be(PlannerTaskStatus.NotStarted);
+    }
+
+    /// <summary>
+    /// The inbound direction — <c>PlannerTaskIsDoneChangedEventHandler</c> completing or reopening the routine
+    /// item — is a write site like the two toggle routes, so it owes the same lazy single-item reset before it
+    /// touches <c>IsDone</c>. Without it, a planner un-tick landing after the period elapsed but before any reset
+    /// ran walked back a score that belonged to the closed cycle, and a planner tick scored a cycle the item had
+    /// already missed. Drives the handler directly, the way <c>CompletionFanOutTests</c> does, so the pin does not
+    /// depend on which planner endpoint raises the event.
+    /// </summary>
+    [Fact]
+    public async Task PlannerHandler_OnAnElapsedPeriod_ResetsTheItemBeforeApplyingTheChange()
+    {
+        long untickedItemId, tickedItemId, untickedActivityId, tickedActivityId;
+        await using (var db = CreateDbContext())
+        {
+            var period = await SeedPeriodAsync(db, lastResetAt: DateTime.UtcNow.AddDays(-8));
+
+            // Done and scored (a record, 3 → 4) in the cycle that has since closed.
+            var unticked = await SeedItemAsync(db, period, "planner-untick-elapsed", isDone: true, streak: 4, lastResetDate: Today.AddDays(-8));
+            unticked.BestStreakBeforeScore = 3;
+            await db.SaveChangesAsync(CancellationToken);
+            (untickedItemId, untickedActivityId) = (unticked.Id, unticked.ActivityId);
+
+            // Left undone in the cycle that has since closed.
+            var ticked = await SeedItemAsync(db, period, "planner-tick-elapsed", streak: 6, lastResetDate: Today.AddDays(-8));
+            (tickedItemId, tickedActivityId) = (ticked.Id, ticked.ActivityId);
+        }
+
+        var scopeFactory = Fixture.UnauthenticatedFactory.Services.GetRequiredService<IServiceScopeFactory>();
+        var handler = new PlannerTaskIsDoneChangedEventHandler(scopeFactory, NullLogger<PlannerTaskIsDoneChangedEventHandler>.Instance);
+
+        await handler.HandleAsync(new PlannerTaskIsDoneChangedEvent(untickedActivityId, UserId, false, null), CancellationToken);
+        await handler.HandleAsync(new PlannerTaskIsDoneChangedEvent(tickedActivityId, UserId, true, null), CancellationToken);
+
+        var unticked2 = await LoadItemAsync(untickedItemId);
+        unticked2.IsDone.Should().BeFalse();
+        unticked2.LastResetDate.Should().Be(Today, "the handler noticed the elapsed period and reset the item first");
+        unticked2.Streak.Should().Be(4, "the reset closed the cycle with the item done, so its score stands and the un-tick has nothing to give back");
+        unticked2.BestStreak.Should().Be(4, "the record the closed cycle set is not the open cycle's to return");
+        unticked2.BestStreakBeforeScore.Should().BeNull();
+
+        var ticked2 = await LoadItemAsync(tickedItemId);
+        ticked2.IsDone.Should().BeTrue();
+        ticked2.LastResetDate.Should().Be(Today);
+        ticked2.Streak.Should().Be(1, "the reset broke the streak the item missed, and the tick scored the fresh cycle from zero");
+        ticked2.BestStreak.Should().Be(6, "the record survives the break");
+        ticked2.BestStreakBeforeScore.Should().Be(6, "the tick scored the open cycle, so an un-tick can still return it");
     }
 
     // ---- §4 (TEST-9) the step toggle -------------------------------------------------------------------

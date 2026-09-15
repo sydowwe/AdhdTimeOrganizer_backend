@@ -33,16 +33,26 @@ public class PlannerTaskIsDoneChangedEventHandler(IServiceScopeFactory scopeFact
     private static async Task SyncRoutineTodoList(AppDbContext dbContext, PlannerTaskIsDoneChangedEvent eventModel, CancellationToken ct)
     {
         var item = await dbContext.Set<RoutineTodoList>()
+            .Include(r => r.RoutineTimePeriod)
             .Include(r => r.Steps)
             .FirstOrDefaultAsync(r => r.ActivityId == eventModel.ActivityId && r.UserId == eventModel.UserId, ct);
 
         if (item == null)
             return;
 
+        var now = DateTime.UtcNow;
+
+        // The same lazy single-item reset the toggle endpoints run in BeforeToggle. Without it a planner un-tick
+        // landing after the period elapsed but before any reset ran would walk back a score that belongs to the
+        // closed cycle, and a tick would score a cycle the item had already missed. A lost race against another
+        // reset site is a DbUpdateException on save, which the caller's catch logs like any other sync failure.
+        RoutineResetService.CheckGrace(item.RoutineTimePeriod, now);
+        RoutineResetService.TryReset(item.RoutineTimePeriod, item, now);
+
         // In both directions: un-ticking the planner task is an un-tick of the routine item, and the streak
         // walk-back UpdateItemStreak does for the toggle endpoints has to happen here too.
         item.SetDone(eventModel.NewIsDone);
-        RoutineResetService.UpdateItemStreak(item, DateTime.UtcNow);
+        RoutineResetService.UpdateItemStreak(item, now);
     }
 
     private static async Task SyncTodoListItem(AppDbContext dbContext, PlannerTaskIsDoneChangedEvent eventModel, CancellationToken ct)
