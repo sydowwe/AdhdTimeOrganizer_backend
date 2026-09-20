@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
 using Humanizer;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
@@ -51,7 +52,7 @@ public abstract class BaseCreateStepEndpoint<TParent>(DbContext dbContext)
         if (result.Failed)
         {
             AddError(result.ErrorMessage ?? "An error occurred while adding the step.");
-            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+            await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
             return;
         }
 

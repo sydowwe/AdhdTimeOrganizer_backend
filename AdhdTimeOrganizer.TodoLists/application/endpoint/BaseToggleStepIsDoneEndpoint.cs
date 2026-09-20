@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
 using Humanizer;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
 
@@ -56,7 +57,7 @@ public abstract class BaseToggleStepIsDoneEndpoint<TEntity>(DbContext dbContext)
         if (result.Failed)
         {
             AddError(result.ErrorMessage ?? "An error occurred while toggling the step.");
-            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+            await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
             return;
         }
 

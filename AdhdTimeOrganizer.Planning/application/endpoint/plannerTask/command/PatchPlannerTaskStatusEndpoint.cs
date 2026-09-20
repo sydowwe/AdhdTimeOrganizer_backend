@@ -8,6 +8,7 @@ using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using FastEndpoints;
 using Humanizer;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
 
@@ -97,7 +98,7 @@ public class PatchPlannerTaskStatusEndpoint(
             // genuinely unrecognised fault stays a 500.
             var result = DbUtils.HandleException(ex, nameof(HandleAsync));
             AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+            await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
         }
     }
 }

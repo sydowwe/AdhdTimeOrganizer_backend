@@ -1,9 +1,9 @@
 using System.Linq.Expressions;
 using FastEndpoints;
 using FluentValidation.Results;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.entity.user;
-using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.domain.result;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
@@ -72,8 +72,9 @@ public static class MappingPatternUniquenessExtensions
         await endpoint.HttpContext.Response.SendErrorsAsync(
             endpoint.ValidationFailures,
             // Not a literal 409: a duplicate is the same unique violation the CRUD bases answer when the
-            // index catches one, and that mapping lives in one place.
-            EndpointHelper.ToStatusCode(ResultErrorType.DbUniqueViolationError),
+            // index catches one, and that mapping lives in one place. ErrorStatus also stamps the type
+            // onto the body's errorType, so the client words it as "pick another value" (B18).
+            endpoint.ErrorStatus(ResultErrorType.DbUniqueViolationError),
             cancellation: ct);
         return false;
     }

@@ -6,6 +6,7 @@ using FastEndpoints;
 using Humanizer;
 using Microsoft.Extensions.Options;
 using Sydowwe.Framework.application.dto.request.@base;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.domain.result;
@@ -68,7 +69,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
             if (newOrderResult.Failed)
             {
                 AddError(newOrderResult.ErrorMessage ?? "An error occurred during order calculation.");
-                await Send.ErrorsAsync(EndpointHelper.ToStatusCode(newOrderResult.ErrorType), ct);
+                await Send.ErrorsAsync(this.ErrorStatus(newOrderResult.ErrorType), ct);
                 return;
             }
 
@@ -82,7 +83,7 @@ public abstract class BaseChangeDisplayOrderTodoListEndpoint<TEntity>(DbContext 
                 AddError(result.ErrorMessage ?? "An error occurred during update.");
                 // Mapped, not a flat 500: a row_version loser on this save is the same 409 the calculation
                 // branch above already answers with, and the Summary block advertises.
-                await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+                await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
                 return;
             }
 

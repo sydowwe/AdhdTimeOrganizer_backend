@@ -10,22 +10,31 @@ wins over this doc.
 ## How to use it
 
 In an endpoint, after an operation returns a failed `Result`, translate the error
-type with the central helper instead of hand-rolling a `switch`:
+type with `this.ErrorStatus(...)` instead of hand-rolling a `switch`:
 
 ```csharp
 if (result.Failed)
 {
     AddError(result.ErrorMessage!);
-    await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+    await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
     return;
 }
 ```
 
+`ErrorStatus` (`Sydowwe.Framework.application.error.ResultErrorTypeExtensions`) is
+`EndpointHelper.ToStatusCode` **plus** a stamp on `HttpContext.Items` that the host's error
+response builder renders as the body's `errorType` field (B18). **Never call
+`EndpointHelper.ToStatusCode` directly from an endpoint** — it gives the same status and
+silently drops the type, so the client cannot tell a unique violation from a concurrency
+conflict; `ErrorStatusBypassGuardTests` fails the build's test run on any such call. In an
+extension method over `IEndpoint`, it is `endpoint.ErrorStatus(...)`. Where the status is
+hand-picked and must not follow the mapping (the login flow's 403 for a lockout), stamp only:
+`HttpContext.SetResultErrorType(...)`. See `docs/claude/endpoints.md`, "Error bodies".
+
 The framework `Base*Endpoint`s already do this. Hand-written endpoints should use
-`EndpointHelper.ToStatusCode` too, so status codes stay consistent across modules.
-(Several existing hand-rolled endpoints map their own subset — e.g. some map
-`ValidationError → 422`; the convention below is `ValidationError → 400`. Prefer the
-helper.)
+`ErrorStatus` too, so status codes stay consistent across modules. (Several existing
+hand-rolled endpoints map their own subset — e.g. some map `ValidationError → 422`; the
+convention below is `ValidationError → 400`. Prefer the helper.)
 
 ## Mapping table
 

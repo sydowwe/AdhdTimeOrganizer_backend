@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
 
@@ -85,7 +86,7 @@ public class SetArchivedActivityEndpoint(DbContext dbContext) : Endpoint<SetActi
         {
             var result = DbUtils.HandleException(ex, nameof(HandleAsync));
             AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+            await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
         }
     }
 }

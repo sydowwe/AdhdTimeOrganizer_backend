@@ -9,6 +9,7 @@ using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using FastEndpoints;
 using Humanizer;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
@@ -111,7 +112,7 @@ public class ApplyTemplatePlannerTaskEndpoint(
             // conflict. Same mapping PatchPlannerTaskStatusEndpoint uses.
             var result = DbUtils.HandleException(ex, "Create");
             AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(EndpointHelper.ToStatusCode(result.ErrorType), ct);
+            await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
         }
     }
 }
