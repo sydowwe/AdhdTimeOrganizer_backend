@@ -30,7 +30,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Seeding;
 /// adds nothing, one deleted day comes back, an override run destroys nothing). This file covers what that
 /// shape leaves open: a year gapped in several places, the window's <i>edges</i>, the <c>false</c> that
 /// <c>ResetDefaults</c> returns to its caller, the ambient-user case that breaks if the
-/// <c>IgnoreQueryFilters</c> goes, and the country code the seeder chooses.
+/// <c>IgnoreQueryFilters</c> goes, and the holiday key + name the public <c>SeedYear</c> overload writes.
 /// </para>
 /// <para>
 /// Every run gets a fresh DI scope, as production does — a single scope would leave the previous run's rows
@@ -226,7 +226,7 @@ public class CalendarSeederTests(AppDbContextFixture fixture) : PostgresTestBase
             "A's days are not the seeder's to touch when it was told to seed B");
     }
 
-    // ---- Scenario E — the country code the seeder chooses ---------------------------------------------
+    // ---- Scenario E — the holiday key and name land on the row together -------------------------------
 
     /// <summary>
     /// <c>CalendarSeeder</c> and <c>CalendarProvisioner</c> both build rows through
@@ -234,40 +234,35 @@ public class CalendarSeederTests(AppDbContextFixture fixture) : PostgresTestBase
     /// <c>LazyCalendarCreationTests.ALazilyCreatedDay_CarriesTheSameMetadataTheSeederWouldHaveGivenIt</c>
     /// already pins that the two agree on a day's metadata — not repeated here.
     /// <para>
-    /// What is unpinned is the <i>country code</i>. <c>SetupDefaults</c> passes
-    /// <c>HolidayCalendar.DefaultCountryCode</c>, but the public <c>SeedYear(year, countryCode, userId)</c>
-    /// overload lets a caller pass something else and nothing checks what happens then. 1 September is a
-    /// Slovak holiday and not a Czech one; 28 September is the reverse, which makes the pair a code that
-    /// cannot be satisfied by both.
+    /// What this pins is the pair itself, on both seeding paths: <c>HolidayKey</c> (what the client
+    /// translates) and <c>HolidayName</c> (the Slovak fallback) come from the same <c>HolidayCalendar</c>
+    /// entry, and an ordinary day carries neither. A factory that filled one and forgot the other would pass
+    /// every test that reads only the name.
     /// </para>
     /// </summary>
-    [Fact(DisplayName = "Setup uses the default country code; SeedYear honours the one it is handed")]
-    public async Task Setup_UsesTheDefaultCountryCode_AndSeedYearHonoursAnExplicitOne()
+    [Fact(DisplayName = "Setup and SeedYear both write the holiday key alongside its Slovak name")]
+    public async Task Setup_AndSeedYear_WriteTheHolidayKeyAndNameTogether()
     {
-        HolidayCalendar.DefaultCountryCode.Should().Be("SK", "the assertions below are written against it");
-
         var userId = await CreateUserAsync();
         await SetupDefaultsAsync(userId);
 
         await using (var db = CreateDbContext())
         {
-            (await HolidayNameAsync(db, userId, new DateOnly(ThisYear, 9, 1)))
-                .Should().Be("Deň Ústavy Slovenskej republiky", "SetupDefaults seeds the default country");
-            (await HolidayNameAsync(db, userId, new DateOnly(ThisYear, 9, 28)))
-                .Should().BeNull("Czech statehood day is not a Slovak holiday");
+            (await HolidayAsync(db, userId, new DateOnly(ThisYear, 9, 1)))
+                .Should().Be(("CONSTITUTION_DAY", "Deň Ústavy Slovenskej republiky"));
+            (await HolidayAsync(db, userId, new DateOnly(ThisYear, 9, 28)))
+                .Should().Be((null, null), "28 September is a Czech holiday, not a Slovak one");
         }
 
         // A year well outside the rolling window, so this cannot collide with what SetupDefaults wrote.
         var otherYear = ThisYear + 5;
         using (var scope = NewScope())
-            await SeederIn(scope).SeedYear(otherYear, "CZ", userId);
+            await SeederIn(scope).SeedYear(otherYear, userId);
 
         await using var afterDb = CreateDbContext();
         (await DatesOfAsync(afterDb, userId, otherYear)).Should().HaveCount(DaysIn(otherYear));
-        (await HolidayNameAsync(afterDb, userId, new DateOnly(otherYear, 9, 28)))
-            .Should().Be("Den české státnosti", "the overload seeds the country code it was handed");
-        (await HolidayNameAsync(afterDb, userId, new DateOnly(otherYear, 9, 1)))
-            .Should().BeNull("Slovak constitution day is not a Czech holiday");
+        (await HolidayAsync(afterDb, userId, new DateOnly(otherYear, 12, 25)))
+            .Should().Be(("CHRISTMAS_DAY", "Prvý sviatok vianočný"), "the public overload goes through the same factory");
     }
 
     // ---- helpers --------------------------------------------------------------------------------------
@@ -304,11 +299,15 @@ public class CalendarSeederTests(AppDbContextFixture fixture) : PostgresTestBase
             .Select(c => c.Id)
             .ToListAsync(CancellationToken);
 
-    private async Task<string?> HolidayNameAsync(DbContext db, long userId, DateOnly date) =>
-        await db.Set<Calendar>().IgnoreQueryFilters()
+    private async Task<(string? Key, string? Name)> HolidayAsync(DbContext db, long userId, DateOnly date)
+    {
+        var row = await db.Set<Calendar>().IgnoreQueryFilters()
             .Where(c => c.UserId == userId && c.Date == date)
-            .Select(c => c.HolidayName)
+            .Select(c => new { c.HolidayKey, c.HolidayName })
             .SingleAsync(CancellationToken);
+
+        return (row.HolidayKey, row.HolidayName);
+    }
 
     /// <summary>
     /// Deliberately not the registration endpoint: that runs <c>UserDefaultsService</c> and would leave the

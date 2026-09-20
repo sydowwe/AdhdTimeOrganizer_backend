@@ -10,6 +10,9 @@ public record CalendarActivityDaySummary
     public DayType DayType { get; init; }
     public int DayIndex { get; init; }
     public string? Label { get; init; }
+
+    /// <summary>Stable holiday key for the client to translate; <see cref="HolidayName"/> is the Slovak fallback.</summary>
+    public string? HolidayKey { get; init; }
     public string? HolidayName { get; init; }
     public TimeDto WakeUpTime { get; init; } = null!;
     public TimeDto BedTime { get; init; } = null!;

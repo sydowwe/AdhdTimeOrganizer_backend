@@ -25,8 +25,10 @@ public static class CalendarDayFactory
     /// <inheritdoc cref="DefaultWakeUpTime"/>
     public static readonly TimeOnly DefaultBedTime = new(0, 0);
 
-    public static Calendar Create(long userId, DateOnly date, string countryCode = HolidayCalendar.DefaultCountryCode)
+    public static Calendar Create(long userId, DateOnly date)
     {
+        var holiday = HolidayCalendar.ForDate(date);
+
         return new Calendar
         {
             UserId = userId,
@@ -34,7 +36,9 @@ public static class CalendarDayFactory
             DayType = DayTypeFor(date),
             // Holidays do not override the day type — a holiday on a Tuesday is still a Workday row with a
             // HolidayName, which is what the seeder has always produced and what the day view renders.
-            HolidayName = HolidayCalendar.ForDate(date, countryCode),
+            // Key and name are written together, from the same table entry, so they cannot disagree.
+            HolidayKey = holiday?.Key,
+            HolidayName = holiday?.Name,
             WakeUpTime = DefaultWakeUpTime,
             BedTime = DefaultBedTime
         };

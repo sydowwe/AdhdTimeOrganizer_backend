@@ -81,24 +81,24 @@ public class LazyCalendarCreationTests(AppDbContextFixture fixture) : PostgresTe
     }
 
     /// <summary>
-    /// A lazily created day is the same day the seeder would have made — day type and holiday name included.
-    /// This is the drift guard: the two creators share <c>CalendarDayFactory</c>, and if they ever stop, a day
-    /// planned in advance and the same day planned on the spot disagree about what it is, which no test that
-    /// only checks "a row exists" would catch.
+    /// A lazily created day is the same day the seeder would have made — day type, holiday key and holiday
+    /// name included. This is the drift guard: the two creators share <c>CalendarDayFactory</c>, and if they
+    /// ever stop, a day planned in advance and the same day planned on the spot disagree about what it is,
+    /// which no test that only checks "a row exists" would catch.
     /// </summary>
     [Theory]
-    // Christmas Day 2033 — a Sunday, so weekend *and* a holiday name.
-    [InlineData(2033, 12, 25, DayType.Weekend, "Prvý sviatok vianočný")]
+    // Christmas Day 2033 — a Sunday, so weekend *and* a holiday.
+    [InlineData(2033, 12, 25, DayType.Weekend, "CHRISTMAS_DAY", "Prvý sviatok vianočný")]
     // A plain Tuesday.
-    [InlineData(2033, 4, 19, DayType.Workday, null)]
-    // Slovak Constitution Day 2034, on a Friday — a workday that still carries its holiday name.
-    [InlineData(2034, 9, 1, DayType.Workday, "Deň Ústavy Slovenskej republiky")]
+    [InlineData(2033, 4, 19, DayType.Workday, null, null)]
+    // Slovak Constitution Day 2034, on a Friday — a workday that still carries its holiday.
+    [InlineData(2034, 9, 1, DayType.Workday, "CONSTITUTION_DAY", "Deň Ústavy Slovenskej republiky")]
     // Christmas Day 2034 — a Monday. There is no Holiday member in DayType (DOC-2), and
     // CalendarDayFactory:35-37 states the rule: "a holiday on a Tuesday is still a Workday row with a
     // HolidayName." A day type derived from the holiday rather than the weekday would fail here.
-    [InlineData(2034, 12, 25, DayType.Workday, "Prvý sviatok vianočný")]
+    [InlineData(2034, 12, 25, DayType.Workday, "CHRISTMAS_DAY", "Prvý sviatok vianočný")]
     public async Task ALazilyCreatedDay_CarriesTheSameMetadataTheSeederWouldHaveGivenIt(
-        int year, int month, int day, DayType expectedDayType, string? expectedHoliday)
+        int year, int month, int day, DayType expectedDayType, string? expectedHolidayKey, string? expectedHolidayName)
     {
         var activityId = await SeedActivityAsync($"lazy-meta-{year}-{month}-{day}");
         var date = new DateOnly(year, month, day);
@@ -107,7 +107,8 @@ public class LazyCalendarCreationTests(AppDbContextFixture fixture) : PostgresTe
 
         var calendar = await FindCalendarAsync(date);
         calendar!.DayType.Should().Be(expectedDayType);
-        calendar.HolidayName.Should().Be(expectedHoliday);
+        calendar.HolidayKey.Should().Be(expectedHolidayKey);
+        calendar.HolidayName.Should().Be(expectedHolidayName);
         calendar.WakeUpTime.Should().Be(new TimeOnly(8, 0), "the default sleep window the seeder has always used");
         calendar.BedTime.Should().Be(new TimeOnly(0, 0));
     }

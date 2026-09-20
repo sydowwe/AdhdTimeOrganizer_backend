@@ -34,23 +34,21 @@ public class CalendarSeeder(
     public async Task SetupDefaults(long userId, CancellationToken ct = default)
     {
         var years = SeedYears();
-        var countryCode = HolidayCalendar.DefaultCountryCode;
 
         foreach (var year in years)
-            await SeedYearForUser(year, countryCode, userId, ct);
+            await SeedYearForUser(year, userId, ct);
 
         logger.LogInformation("Completed seeding calendars for user {UserId} across years {Years}",
             userId, string.Join(", ", years));
     }
 
     /// <summary>
-    /// Seeds calendar data for a specific year and country for a specific user
+    /// Seeds calendar data for a specific year for a specific user
     /// </summary>
     /// <param name="year">Year to seed</param>
-    /// <param name="countryCode">Country code (SK, CZ)</param>
     /// <param name="userId">User ID to associate calendars with</param>
     /// <param name="ct">Cancellation token</param>
-    private async Task SeedYearForUser(int year, string countryCode, long userId, CancellationToken ct = default)
+    private async Task SeedYearForUser(int year, long userId, CancellationToken ct = default)
     {
         // Per missing date, not "the year has any rows at all": the unique index is (user_id, date),
         // so a year the user has partially deleted has to be filled in rather than skipped whole or
@@ -80,7 +78,7 @@ public class CalendarSeeder(
             // Day type, holiday name and the default sleep window all come from CalendarDayFactory, which
             // CalendarProvisioner also uses. A day filled in here and the same day created lazily on its first
             // task have to be the same day.
-            calendars.Add(CalendarDayFactory.Create(userId, date, countryCode));
+            calendars.Add(CalendarDayFactory.Create(userId, date));
         }
 
         if (calendars.Count == 0)
@@ -92,19 +90,18 @@ public class CalendarSeeder(
         await dbContext.Set<Calendar>().AddRangeAsync(calendars, ct);
         await dbContext.SaveChangesAsync(ct);
 
-        logger.LogInformation("Seeded {Count} calendar entries for year {Year} ({Country}) for user {UserId}",
-            calendars.Count, year, countryCode, userId);
+        logger.LogInformation("Seeded {Count} calendar entries for year {Year} for user {UserId}",
+            calendars.Count, year, userId);
     }
 
     /// <summary>
     /// Public method to seed a specific year for a user (can be called manually)
     /// </summary>
     /// <param name="year">Year to seed</param>
-    /// <param name="countryCode">Country code (SK, CZ)</param>
     /// <param name="userId">User ID to associate calendars with</param>
-    public async Task SeedYear(int year, string countryCode, long userId)
+    public async Task SeedYear(int year, long userId)
     {
-        await SeedYearForUser(year, countryCode, userId);
+        await SeedYearForUser(year, userId);
     }
 
     public async Task<bool> ResetDefaults(long userId, CancellationToken ct = default)

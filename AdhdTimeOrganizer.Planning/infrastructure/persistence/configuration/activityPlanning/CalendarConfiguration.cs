@@ -17,6 +17,7 @@ public class CalendarConfiguration : IEntityTypeConfiguration<Calendar>
 
         builder.EnumColumn(c => c.Location);
 
+        builder.Property(c => c.HolidayKey).HasMaxLength(50);
         builder.Property(c => c.HolidayName).HasMaxLength(200);
         builder.Property(c => c.Label).HasMaxLength(100);
         builder.Property(c => c.AppliedTemplateName).HasMaxLength(200);

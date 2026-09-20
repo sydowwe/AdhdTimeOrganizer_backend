@@ -25,6 +25,7 @@ public sealed record CalendarDaySummary(
     DayType DayType,
     int DayIndex,
     string? Label,
+    string? HolidayKey,
     string? HolidayName,
     TimeOnly WakeUpTime,
     TimeOnly BedTime);

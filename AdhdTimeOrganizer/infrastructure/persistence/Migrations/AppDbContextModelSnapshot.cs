@@ -1323,6 +1323,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("day_type");
 
+                    b.Property<string>("HolidayKey")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("holiday_key");
+
                     b.Property<string>("HolidayName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")

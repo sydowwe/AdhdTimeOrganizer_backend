@@ -13,6 +13,12 @@ public record CalendarResponse : IdResponse, IProjectionResponse<CalendarRespons
 
     public required int DayIndex { get; init; }
     public required DayType DayType { get; init; }
+
+    /// <summary>
+    /// Stable holiday key for the client to translate (<c>calendar.holidays.&lt;key&gt;</c>), null on an
+    /// ordinary day. <see cref="HolidayName"/> is the native Slovak name and travels alongside as the fallback.
+    /// </summary>
+    public string? HolidayKey { get; init; }
     public string? HolidayName { get; init; }
     public string? Label { get; init; }
 
@@ -50,6 +56,7 @@ public record CalendarResponse : IdResponse, IProjectionResponse<CalendarRespons
             Date = c.Date,
             DayIndex = c.Date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)c.Date.DayOfWeek,
             DayType = c.DayType,
+            HolidayKey = c.HolidayKey,
             HolidayName = c.HolidayName,
             Label = c.Label,
             WakeUpTime = new TimeDto(c.WakeUpTime.Hour, c.WakeUpTime.Minute),

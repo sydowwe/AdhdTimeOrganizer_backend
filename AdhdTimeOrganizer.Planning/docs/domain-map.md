@@ -307,13 +307,19 @@ product.
 
 | Type | Role |
 |---|---|
-| `HolidayCalendar` (`domain/service/`) | The holiday tables + Computus |
-| `CalendarDayFactory` (`domain/service/`) | What an unplanned day *is* — day type, holiday name, default sleep window (08:00 / 00:00) |
+| `HolidayCalendar` (`domain/service/`) | The Slovak holiday table + Computus; each entry is a `Holiday(Key, Name)` |
+| `CalendarDayFactory` (`domain/service/`) | What an unplanned day *is* — day type, holiday key + name, default sleep window (08:00 / 00:00) |
 | `ICalendarProvisioner` / `CalendarProvisioner` | Read-or-create for one (user, date) |
 
 Both creators go through `CalendarDayFactory`, and that is the point of it: a day filled in a year
 ahead and the same day created on its first task have to be the same day. Holidays do **not** override
 the day type — a holiday on a Tuesday is a `Workday` row with a `HolidayName`.
+
+Holidays are Slovak only, by decision (B19): `User` carries no country and there is no country
+preference. A row stores the pair `HolidayKey` (`CHRISTMAS_DAY` — stable, what the client translates
+through `calendar.holidays.<key>`) and `HolidayName` (the native Slovak name, the fallback for a reader
+with no locale table). Both are written once, from the same table entry; never rename a key — rows
+already carry it.
 
 The three callers of the provisioner are `CreatePlannerTaskEndpoint`, `UpdatePlannerTaskEndpoint` (a
 task dragged onto an unplanned day) and `ApplyTemplatePlannerTaskEndpoint` (**by date**; by id it
@@ -435,7 +441,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `PlannerStreakService` | Domain service (static, pure) | `Evaluate` one day, `Walk` the history. Owns the rules, no SQL | `domain/service/PlannerStreakService.cs` |
 | `PlanVsActualTrendService` | Domain service (static, pure) | `Aggregate`, `SpanMinutes`, `DriftMinutes`. Owns the arithmetic, no SQL | `domain/service/PlanVsActualTrendService.cs` |
 | `CalendarDayFactory` | Domain service (static) | What an unplanned day *is*. The single definition, shared by both creators | `domain/service/CalendarDayFactory.cs` |
-| `HolidayCalendar` | Domain service (static) | Holiday tables + Computus, by country code | `domain/service/HolidayCalendar.cs` |
+| `HolidayCalendar` | Domain service (static) | Slovak holiday table + Computus; `Holiday(Key, Name)` per date | `domain/service/HolidayCalendar.cs` |
 | `PlannerStreakReader` | Application service | The grouped read + qualifying predicate + day boundary | `application/service/taskPlanner/PlannerStreakReader.cs` |
 | `CalendarProvisioner` | Application service | Read-or-create one day; **commits**, scopes by hand, survives the unique-index race | `application/service/taskPlanner/CalendarProvisioner.cs` |
 | `ReminderRegistrationService` | Application service | The **only** seam to `Sydowwe.Reminders`: key format, schedule mapping, cancel-vs-register, user defaults | `application/service/ReminderRegistrationService.cs` |

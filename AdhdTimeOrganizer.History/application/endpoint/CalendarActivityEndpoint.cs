@@ -92,6 +92,7 @@ public class CalendarActivityEndpoint(DbContext db, ICalendarDayLookup calendarD
                 DayType = c.DayType,
                 DayIndex = c.DayIndex,
                 Label = c.Label,
+                HolidayKey = c.HolidayKey,
                 HolidayName = c.HolidayName,
                 WakeUpTime = new TimeDto(c.WakeUpTime.Hour, c.WakeUpTime.Minute),
                 BedTime = new TimeDto(c.BedTime.Hour, c.BedTime.Minute),

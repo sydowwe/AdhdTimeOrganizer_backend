@@ -13,7 +13,16 @@ public class Calendar : BaseEntityWithUser
     // Holiday among them: a public holiday is a Workday row carrying a HolidayName (see CalendarDayFactory),
     // so that "is it a holiday" and "what kind of day is it" stay separate questions.
     public required DayType DayType { get; set; }
-    public string? HolidayName { get; init; } // Name of the holiday (e.g., "Christmas", "New Year")
+
+    /// <summary>
+    /// Stable key of the public holiday on this date (<c>CHRISTMAS_DAY</c>), or null. What a client translates
+    /// through its locale table; never shown as-is. Written once by <c>CalendarDayFactory</c> together with
+    /// <see cref="HolidayName"/>, both off the same <c>HolidayCalendar</c> entry.
+    /// </summary>
+    public string? HolidayKey { get; init; }
+
+    /// <summary>The holiday's native Slovak name — the fallback for a reader that has no locale table.</summary>
+    public string? HolidayName { get; init; }
     public string? Label { get; set; } // "HomeOffice", "Office", custom labels - independent of holiday
 
     // Sleep schedule for this day
