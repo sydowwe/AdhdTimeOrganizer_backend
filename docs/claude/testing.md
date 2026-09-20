@@ -150,7 +150,16 @@ worth copying the shape of:
   without a concrete validator is silently unvalidated and the ceiling is a comment.
 - `ModuleWiringTests` — the whole composition root. Includes `IUserTimeZoneReader`, which is generic over the
   host's user type and so invisible to every marker scan: forget the host's closing registration and quiet
-  hours fall back to UTC for everyone, throwing nothing and logging nothing.
+  hours fall back to UTC for everyone, throwing nothing and logging nothing. `IUserLocaleReader` is pinned the
+  same way.
+- `NotificationLocaleTests` — notification text in the recipient's locale (B15), asserted on the bytes of all
+  three render points (bell, live push + mail, deferred flush). Every one of them still returns 200 and still
+  delivers when the locale stops being passed; only the language is wrong, which is the state the ask was filed
+  against.
+- `NotificationVocabularyTests` — subclass of the module's `BaseNotificationVocabularyTests`: every kind in this
+  portal's catalog is worded in every locale through the composed renderer. The portal's kinds are virtual
+  members on the framework's text tables (the module carries no app's vocabulary), so forgetting one — or the
+  `AddNotificationVocabulary` call — renders the generic "Nová notifikácia" with no error; this is the guard.
 - `PerUserDefaultMatcherTests` — no DB needed.
 - `ActivityRoleSystemKeyTests` — the three app-referenced activity roles resolve by `SystemKey` after the
   user renames them, and stay undeletable. The lookup they replaced was by display name, so a rename

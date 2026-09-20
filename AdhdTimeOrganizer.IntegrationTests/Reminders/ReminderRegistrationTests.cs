@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.scheduling;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Notifications.application;
 using Sydowwe.Notifications.domain.entity;
@@ -104,7 +105,7 @@ public class ReminderRegistrationTests(AppDbContextFixture fixture) : PostgresTe
         // round trip is only proved by running the payload back through the real renderer.
         await using var scope = factory.Services.CreateAsyncScope();
         var rendered = scope.ServiceProvider.GetRequiredService<INotificationTextRenderer>()
-            .Render(notification.Type, notification.PayloadJson);
+            .Render(notification.Type, notification.PayloadJson, AvailableLocales.En);
 
         rendered.Body.Should().Contain("Take the bins out");
     }

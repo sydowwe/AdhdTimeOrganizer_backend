@@ -809,6 +809,10 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
     /// produced by <c>NotificationTextRenderer</c> from the type plus the payload, and a payload it cannot
     /// bind falls through to a generic "Máte novú notifikáciu" rather than throwing — so a drifted payload
     /// seeds rows that look like a renderer bug and pass every row assertion in this class.
+    /// <para>
+    /// Rendered in Slovak on purpose, whatever the fixture account's locale: the fallback sentence is asserted
+    /// by its Slovak spelling, so the check has to run in the language it is spelled in.
+    /// </para>
     /// </summary>
     [Fact]
     public async Task Seed_LeavesEveryNotificationRenderingItsOwnText()
@@ -825,7 +829,7 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
 
         foreach (var notification in notifications)
         {
-            var (title, bodyText) = renderer.Render(notification.Type, notification.PayloadJson);
+            var (title, bodyText) = renderer.Render(notification.Type, notification.PayloadJson, AvailableLocales.Sk);
 
             title.Should().NotBeNullOrWhiteSpace();
             bodyText.Should().NotBe("Máte novú notifikáciu.",
@@ -834,7 +838,7 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
 
         // And the one kind whose payload carries a concrete value renders that value rather than its fallback.
         var digest = notifications.Single(notification => notification.Type == NotificationType.ReminderDigest);
-        renderer.Render(digest.Type, digest.PayloadJson).Body.Should().Contain("3");
+        renderer.Render(digest.Type, digest.PayloadJson, AvailableLocales.Sk).Body.Should().Contain("3");
     }
 
     // --- fixture item 12: the reminders register and its dashboards -------------------------------

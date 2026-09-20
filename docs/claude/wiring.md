@@ -17,8 +17,8 @@ touching anything below, because **none of these break the build**.
   means the dispatch scan runs twice per fire, two of each seeder means every seeder runs twice.
   Nothing throws or logs.
 - **Generic-over-`TUser` services can't be scanned** — `NotificationService<User>`,
-  `IDeferredNotificationDispatcher` and `UserTimeZoneReader<User>` are closed by hand in
-  `AddModuleServices`, same as the framework user services in `AddDependencyInjection`.
+  `IDeferredNotificationDispatcher`, `UserTimeZoneReader<User>` and `UserLocaleReader<User>` are closed by
+  hand in `AddModuleServices`, same as the framework user services in `AddDependencyInjection`.
 - **Module services take a plain `DbContext`** (that's how they stay host-agnostic), so
   `AddModuleServices` aliases `DbContext` → `AppDbContext`. Without it ~34 of them fail to activate.
 - **FastEndpoints discovery is an explicit assembly list** in `Program.cs`. A module missing from it is
@@ -47,6 +47,17 @@ touching anything below, because **none of these break the build**.
   to UTC and is enforced an hour or two off the one the settings page displays. `ModuleWiringTests`
   (`UserTimeZoneReader_IsRegisteredClosedOverTheHostsUserType`) and
   `QuietHoursUserZoneAndLateDeliveryTests` are the guards.
+- **`IUserLocaleReader` is its sibling** (B15): notification text is rendered in each recipient's
+  `User.Locale`, read through this seam, and the module ships it generic over the user type for the same
+  reason. Its absence is at least loud — `NotificationService` and the bell endpoint take it in their
+  constructors — but `ModuleWiringTests` (`UserLocaleReader_IsRegisteredClosedOverTheHostsUserType`) pins the
+  concrete type so a stub cannot quietly make everyone read Slovak; `NotificationLocaleTests` asserts the bytes.
+- **This host words the notification kinds it raises** — `AddNotificationVocabulary` registers
+  `SkPortalNotificationTexts` / `EnPortalNotificationTexts` (`infrastructure/notification/`) through
+  `NotificationTextOptions`, with `Cz` pointed at the Slovak table. The framework's tables word only the kinds
+  its own modules raise; the routine nudges, the pomodoro boundary and the personal reminder are this portal's
+  and would render the generic "Nová notifikácia" without this call — nothing throws. Adding a kind to the
+  catalog means wording it in both tables; `NotificationVocabularyTests` is what turns a forgotten one red.
 - **This host declares which notification kinds it raises** — `AddNotificationCatalog` in
   `ModuleServiceExtensions` fills `NotificationCatalogOptions.SupportedTypes` with the ten members of
   `NotificationType` some producer here actually calls `NotifyAsync` with. That is what

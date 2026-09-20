@@ -126,6 +126,23 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
     }
 
     /// <summary>
+    /// The locale seam (B15), same generic-over-<c>User</c> shape as the zone reader and closed by the same
+    /// hand-written line. Unlike the zone reader its absence is loud — the dispatcher and the bell endpoint
+    /// take it as a constructor dependency — but the concrete type is still asserted so a host-side stub
+    /// that resolves and returns nothing (every account reads the module default) cannot quietly take its
+    /// place.
+    /// </summary>
+    [Fact]
+    public void UserLocaleReader_IsRegisteredClosedOverTheHostsUserType()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+
+        var reader = scope.ServiceProvider.GetRequiredService<IUserLocaleReader>();
+
+        Assert.IsType<UserLocaleReader<User>>(reader);
+    }
+
+    /// <summary>
     /// Both modules' job handlers are discoverable by key. The Scheduler dispatcher matches
     /// <c>RecurringJobRegistration.HandlerKey</c> against these at fire time, so a handler missing from DI is
     /// a job that fires into nothing.
@@ -205,6 +222,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         AssertRegisteredOnce<INotificationService>(sp);
         AssertRegisteredOnce<IQuietHoursReader>(sp);
         AssertRegisteredOnce<IUserTimeZoneReader>(sp);
+        AssertRegisteredOnce<IUserLocaleReader>(sp);
         AssertRegisteredOnce<IReminderRegistry>(sp);
         AssertRegisteredOnce<IScheduler>(sp);
         AssertRegisteredOnce<ICronEvaluator>(sp);

@@ -25,7 +25,10 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 [Collection("Postgres")]
 public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotificationCatalogTests(fixture)
 {
-    protected override IReadOnlySet<NotificationType> ExpectedCatalog { get; } = new HashSet<NotificationType>
+    protected override IReadOnlySet<NotificationType> ExpectedCatalog => Catalog;
+
+    /// <summary>Shared with <see cref="NotificationVocabularyTests"/>: one second copy, two contracts keyed on it.</summary>
+    public static readonly IReadOnlySet<NotificationType> Catalog = new HashSet<NotificationType>
     {
         NotificationType.DeadlineApproaching,
         NotificationType.ReminderDigest,

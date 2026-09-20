@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.infrastructure.notification;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
@@ -12,7 +13,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.user;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Notifications.application;
+using Sydowwe.Notifications.application.text;
 using Sydowwe.Notifications.domain.entity;
 using Sydowwe.Notifications.infrastructure;
 using Sydowwe.Notifications.infrastructure.email;
@@ -135,6 +138,11 @@ public static class ModuleServiceExtensions
         // ModuleWiringTests pins it.
         services.AddScoped<IUserTimeZoneReader, UserTimeZoneReader<User>>();
 
+        // And the language each notification is rendered in (B15) — same generic-over-User shape, same reason
+        // no scan can see it. This one at least fails loudly: NotificationService and the bell endpoint take
+        // it as a constructor dependency, so a missing line is a resolution error on the first send or read.
+        services.AddScoped<IUserLocaleReader, UserLocaleReader<User>>();
+
         // The only INotificationPayloadEnricher in the solution, and it carries no lifetime marker (it is
         // meant as the host-supplied default). Swap for a real enricher if payloads ever need overlays.
         services.AddScoped<INotificationPayloadEnricher, NoOpNotificationPayloadEnricher>();
@@ -158,6 +166,7 @@ public static class ModuleServiceExtensions
     private static void AddModuleOptions(IServiceCollection services, IConfiguration configuration)
     {
         AddNotificationCatalog(services);
+        AddNotificationVocabulary(services);
 
         services.Configure<PushNotificationOptions>(configuration.GetSection(PushNotificationOptions.SectionName));
         services.Configure<EmailNotificationOptions>(configuration.GetSection(EmailNotificationOptions.SectionName));
@@ -210,4 +219,21 @@ public static class ModuleServiceExtensions
             // Raised on demand by SendTestNotificationEndpoint, so the user can silence it like any other.
             NotificationType.Test
         ]);
+
+    /// <summary>
+    /// The words for the kinds in the catalog above (B15). The framework's tables word only the kinds its own
+    /// modules raise — a kind this portal raises (the routine nudges, the pomodoro boundary, the personal
+    /// reminder) renders the generic "Nová notifikácia" out of them, so the portal's subclasses are registered
+    /// here, one per language. <c>Cz</c> is pointed at the Slovak table on purpose: the module's own fallback
+    /// for it is the module's Slovak, which lacks this portal's kinds, and the client ships no Czech either.
+    /// <c>NotificationVocabularyTests</c> renders every catalogued kind in every locale and refuses the fallback.
+    /// </summary>
+    private static void AddNotificationVocabulary(IServiceCollection services)
+    {
+        var sk = new SkPortalNotificationTexts();
+        services.Configure<NotificationTextOptions>(o => o
+            .Use(AvailableLocales.Sk, sk)
+            .Use(AvailableLocales.Cz, sk)
+            .Use(AvailableLocales.En, new EnPortalNotificationTexts()));
+    }
 }

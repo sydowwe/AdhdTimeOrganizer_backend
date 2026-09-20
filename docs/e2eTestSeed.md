@@ -252,9 +252,11 @@ Same rule as the eight above — each was fully built and rendered nothing, beca
 13. **An admin account, and six reminders for its views to show.** See the section below — this one is two
     fixture gaps, not one, and either alone leaves all five reminder views unrenderable.
 
-⚠ **The bell's text is Slovak regardless of the account's locale.** `NotificationTextRenderer` is documented
-as "v1 with sk-SK defaults" and takes no culture, so these rows render in Slovak for the `EN` fixture account.
-That is the app's behaviour, not the fixture's — a spec must not locate a notification by its English text.
+The bell's text follows the account's locale (B15, 2026-09-21): the `EN` fixture account reads English titles
+and bodies, rendered at read time from the type + payload. User-authored payload content — the
+`DeadlineApproaching` activity name, the `Test` message — is rendered verbatim, so the fixture writes those in
+English. Before B15 the renderer took no culture and every row rendered in Slovak whatever the locale; a spec
+written against that (locating a notification by Slovak text) needs its locator changed.
 
 ### The admin account, and why it is a third account
 
