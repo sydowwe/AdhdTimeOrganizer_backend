@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
@@ -124,6 +125,48 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         // B18: lockout answers 403 here too, so the status alone cannot drive the resend-confirmation
         // panel. See ErrorTypeContractTests for the 409 half of the same contract.
         body.Should().Contain("\"errorType\":\"EmailNotConfirmed\"");
+        // B21: the lockout instant belongs to the lockout 403 only — absent, not null, on this one.
+        body.Should().NotContain("lockoutEndUtc");
+    }
+
+    /// <summary>
+    /// B21: the lockout 403 carries the instant the lock lifts as <c>lockoutEndUtc</c>, so a localised
+    /// client can count down without parsing the English sentence in <c>generalErrors</c>. Like
+    /// <c>errorType</c> this rides on <c>HttpContext.Items</c> and is only rendered by the
+    /// <c>Errors.ResponseBuilder</c> installed in <c>Program.cs</c> — drop that line and the endpoint still
+    /// stamps it, the status stays 403, and the field silently disappears, hence the body assertion.
+    /// Lockout is checked before confirmation, so an unconfirmed account is enough to reach the branch.
+    /// </summary>
+    [Fact]
+    public async Task Login_LockedOut_Returns403_WithLockoutEndUtc()
+    {
+        const string email = "locked-out@integration.com";
+        var userId = await SeedUnconfirmedUserAsync(email, "Test@1234!");
+
+        using (var scope = Fixture.UnauthenticatedFactory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+            var user = await userManager.FindByIdAsync(userId.ToString());
+            for (var i = 0; i < 5; i++)
+                await userManager.AccessFailedAsync(user!);
+        }
+
+        var before = DateTimeOffset.UtcNow;
+        using var response = await PostLoginAsync(email, "Test@1234!");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden, "B18: deliberately 403, not 423");
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        body.Should().Contain("Too many failed login attempts", "older clients still word-match the sentence");
+        body.Should().Contain("\"errorType\":\"UserLockedOut\"");
+
+        using var json = JsonDocument.Parse(body);
+        json.RootElement.TryGetProperty("lockoutEndUtc", out var lockoutEndUtc).Should().BeTrue();
+        lockoutEndUtc.GetString().Should().EndWith("Z", "the contract is ISO-8601 in UTC");
+        var lockoutEnd = lockoutEndUtc.GetDateTimeOffset();
+        // IdentityServiceExtensions: 5 attempts, 5 minutes. Not asserting the policy, only that the
+        // instant is the one Identity stamped, i.e. in the future and no further than the window.
+        lockoutEnd.Should().BeAfter(before);
+        lockoutEnd.Should().BeOnOrBefore(before.AddMinutes(5).AddSeconds(5));
     }
 
     /// <summary>
