@@ -39,6 +39,9 @@ public class FetchTableDistinctDesktopEntryValidator
             RuleFor(x => x.Filter!.ProcessName).MustBeValidRegexWhenRegexMatch(x => x.Filter!.ProcessNameMatchType);
             RuleFor(x => x.Filter!.ProductName).MustBeValidRegexWhenRegexMatch(x => x.Filter!.ProductNameMatchType);
             RuleFor(x => x.Filter!.WindowTitle).MustBeValidRegexWhenRegexMatch(x => x.Filter!.WindowTitleMatchType);
+
+            // Null is "All"; an undefined member is a 400 here rather than a fall-through in the endpoint (B24).
+            RuleFor(x => x.Filter!.Coverage).IsInEnum();
         });
     }
 }

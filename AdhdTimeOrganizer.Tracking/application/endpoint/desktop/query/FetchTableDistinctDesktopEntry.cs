@@ -1,7 +1,11 @@
+using AdhdTimeOrganizer.Tracking.application.dto.@enum;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper.mapping;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FastEndpoints;
 using Sydowwe.Framework.application.dto.request.@base.table;
@@ -37,9 +41,10 @@ public class FetchTableDistinctDesktopEntry(DbContext dbContext)
     {
         try
         {
+            var userId = User.GetId();
             var query = dbContext.Set<DesktopActivityEntry>().AsNoTracking();
 
-            query = query.FilteredByUser(User.GetId());
+            query = query.FilteredByUser(userId);
 
             if (req is { UseFilter: true, Filter: not null })
                 query = ApplyCustomFiltering(query, req.Filter);
@@ -54,17 +59,25 @@ public class FetchTableDistinctDesktopEntry(DbContext dbContext)
                     WindowTitle = g.Key.WindowTitle
                 });
 
-            var itemsCount = await distinctQuery.CountAsync(ct);
-            var pageCount = (int)Math.Ceiling((double)itemsCount / req.ItemsPerPage);
+            // B24: the same rule set the heartbeat attributes with, so `coveredBy` is what the ingest would
+            // do with the tuple today — not a client-side approximation over two paged lists. The target
+            // navigations are loaded for the chip text; the heartbeat has no use for them.
+            var rules = new DesktopMappingRuleSet(await DesktopMappingRuleSet.ActiveFor(dbContext, userId)
+                .AsNoTracking()
+                .Include(m => m.Activity)
+                .Include(m => m.Role)
+                .Include(m => m.Category)
+                .ToListAsync(ct));
 
-            var items = await distinctQuery.SortByManyAndPaginate(req.SortBy, req.ItemsPerPage, req.Page).ToListAsync(ct);
+            var coverage = req is { UseFilter: true, Filter.Coverage: { } requested } ? requested : MappingCoverage.All;
 
-            await Send.OkAsync(new BaseGridResponse<TrackerDesktopDistinctEntriesResponse>
-            {
-                Items = items,
-                ItemsCount = itemsCount,
-                PageCount = pageCount
-            }, ct);
+            var grid = await distinctQuery.ToCoverageGridAsync(req.SortBy, req.ItemsPerPage, req.Page, coverage,
+                row => rules.Resolve(row.ProcessName, row.ProductName, row.WindowTitle) is { } rule
+                    ? MappingCoverageResponse.From(rule)
+                    : null,
+                ct);
+
+            await Send.OkAsync(grid, ct);
         }
         // A sort key that resolves to nothing is the caller's mistake, not this endpoint's: let it out to
         // InvalidSortKeyMiddleware, which answers 400 naming the key. Swallowing it here reported a client

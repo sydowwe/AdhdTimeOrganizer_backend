@@ -30,6 +30,9 @@ public class FetchTableDistinctAndroidEntryValidator
             // A Regex match type now reaches Postgres as `~*` rather than a LIKE (CQ-12).
             RuleFor(x => x.Filter!.PackageName).MustBeValidRegexWhenRegexMatch(x => x.Filter!.PackageNameMatchType);
             RuleFor(x => x.Filter!.AppLabel).MustBeValidRegexWhenRegexMatch(x => x.Filter!.AppLabelMatchType);
+
+            // Null is "All"; an undefined member is a 400 here rather than a fall-through in the endpoint (B24).
+            RuleFor(x => x.Filter!.Coverage).IsInEnum();
         });
     }
 }

@@ -1,7 +1,11 @@
+using AdhdTimeOrganizer.Tracking.application.dto.@enum;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper.mapping;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.dto.request.@base.table;
@@ -37,9 +41,10 @@ public class FetchTableDistinctAndroidEntry(DbContext dbContext)
     {
         try
         {
+            var userId = User.GetId();
             var query = dbContext.Set<AndroidSessionData>().AsNoTracking();
 
-            query = query.FilteredByUser(User.GetId());
+            query = query.FilteredByUser(userId);
 
             if (req is { UseFilter: true, Filter: not null })
                 query = ApplyCustomFiltering(query, req.Filter);
@@ -53,17 +58,25 @@ public class FetchTableDistinctAndroidEntry(DbContext dbContext)
                     AppLabel = g.Key.AppLabel
                 });
 
-            var itemsCount = await distinctQuery.CountAsync(ct);
-            var pageCount = (int)Math.Ceiling((double)itemsCount / req.ItemsPerPage);
+            // B24: the android twin of the desktop grid's chip. ⚠ On this source the sync does not apply the
+            // rules yet, so `coveredBy` reads "an active rule exists that would match" and nothing more —
+            // see AndroidMappingRuleSet, which is where the sync should resolve from when it does.
+            var rules = new AndroidMappingRuleSet(await AndroidMappingRuleSet.ActiveFor(dbContext, userId)
+                .AsNoTracking()
+                .Include(m => m.Activity)
+                .Include(m => m.Role)
+                .Include(m => m.Category)
+                .ToListAsync(ct));
 
-            var items = await distinctQuery.SortByManyAndPaginate(req.SortBy, req.ItemsPerPage, req.Page).ToListAsync(ct);
+            var coverage = req is { UseFilter: true, Filter.Coverage: { } requested } ? requested : MappingCoverage.All;
 
-            await Send.OkAsync(new BaseGridResponse<AndroidDistinctEntriesResponse>
-            {
-                Items = items,
-                ItemsCount = itemsCount,
-                PageCount = pageCount
-            }, ct);
+            var grid = await distinctQuery.ToCoverageGridAsync(req.SortBy, req.ItemsPerPage, req.Page, coverage,
+                row => rules.Resolve(row.PackageName, row.AppLabel) is { } rule
+                    ? MappingCoverageResponse.From(rule)
+                    : null,
+                ct);
+
+            await Send.OkAsync(grid, ct);
         }
         // A sort key that resolves to nothing is the caller's mistake, not this endpoint's: let it out to
         // InvalidSortKeyMiddleware, which answers 400 naming the key. Swallowing it here reported a client
