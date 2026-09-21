@@ -36,13 +36,15 @@ by storing the verdict on the entry.
 | `TrackerDesktopMappingByPattern` | `tracker_desktop_mapping_by_pattern` | Pattern → `Activity`/`Role`/`Category`, or `IsIgnored`. Matched in-memory by `MatchesPattern`. **Many** patterns to one activity; `activity_id` is `Cascade` with a pinned constraint name. The unique key is the pattern: `(UserId, ProcessName, ProductName, WindowTitle)`, `NULLS NOT DISTINCT`. | `domain/model/entity/desktop/` |
 | `TrackerAndroidMappingByPattern` | `tracker_android_mapping_by_pattern` | Android equivalent; unique on `(UserId, PackageName, AppLabel)`. | `domain/model/entity/android/` |
 
-Two enums: `TrackerMappingTypeEnum` (`domain/model/enum/`) — the mapping's target shape, a filter-side
+Four enums: `TrackerMappingTypeEnum` (`domain/model/enum/`) — the mapping's target shape, a filter-side
 convenience over the check constraint below, and **shared by both mapping tables** (it was
 `TrackerDesktopMappingTypeEnum` until CQ-15, which is correct by value on the android grid and misleading
-by name) — and `BaselineType` (`application/dto/enum/`), the dashboards' comparison window (`Last7Days` /
-`Last30Days` / `SameWeekday` / `AllTime`). On both grid filters it is **optional**: null means every
-target shape, and an undefined value is a 400 from the grid validators' `IsInEnum` rather than the switch's
-throw.
+by name); `BaselineType` (`application/dto/enum/`), the dashboards' comparison window (`Last7Days` /
+`Last30Days` / `SameWeekday` / `AllTime`); and the B24 pair in `application/dto/enum/` —
+`MappingCoverage` (`All` / `Uncovered` / `Covered`, the distinct-entries grids' filter) and
+`MappingCoverageTarget` (`Activity` / `RoleOrCategory` / `Ignored`, the three check-constraint groups
+a `coveredBy` chip names). On the grid filters the enums are **optional**: null means no opinion, and an
+undefined value is a 400 from the grid validators' `IsInEnum` rather than a fall-through.
 
 ## Invariants
 
@@ -72,11 +74,13 @@ throw.
   which answers the ordinary case with the same 409 the index would while naming the pattern the caller
   already has (CQ-11). The update side excludes the row under edit, or every edit that leaves the pattern
   alone would collide with itself.
-- **The most specific matching mapping wins a desktop entry.** *App-enforced* — the heartbeat orders the
-  user's active rules by the number of pattern columns they constrain, then by id, and takes the first
-  match. Nothing ordered the list before CQ-16, so "ignore GitHub everywhere except in Chrome" resolved
-  to whatever order an unordered read returned. Ordering does not resolve two equally specific rules that
-  genuinely overlap; it makes the winner stable and explicable.
+- **The most specific matching mapping wins a desktop entry.** *App-enforced* — `DesktopMappingRuleSet`
+  orders the user's active rules by the number of pattern columns they constrain, then by id, and takes
+  the first match; the heartbeat attributes through it and the distinct-entries grid's `coveredBy` chip
+  resolves through it (B24), so the two cannot disagree. Nothing ordered the list before CQ-16, so
+  "ignore GitHub everywhere except in Chrome" resolved to whatever order an unordered read returned.
+  Ordering does not resolve two equally specific rules that genuinely overlap; it makes the winner stable
+  and explicable.
 - **One android session per `(user, device, package, start)`.** *DB-enforced* — this is what makes the
   sync endpoint's re-send idempotent. The endpoint keys off the same tuple *within* a batch as well as
   against the stored rows, so a phone that repeats a session inside one payload gets it counted as a
@@ -143,7 +147,7 @@ assuming a path.
 | Area | Route prefix | Endpoints |
 |---|---|---|
 | Desktop ingest | `/activity-tracking/desktop` | `DesktopActivityHeartbeatEndpoint` (`/heartbeat`) — ⚠ ingest only, see `summary.md` |
-| Desktop dashboards | `/activity-tracking/desktop` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, process-details, distinct-processes, `grid` |
+| Desktop dashboards | `/activity-tracking/desktop` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, process-details, distinct-processes, `grid` — the distinct-entries grid; see **The distinct-entries grids** below |
 | Desktop mappings | `/activity-tracking/desktop/settings` | create / update / delete / `grid`, plus `fetch-categories-and-roles-by-pattern`. Update is a **full replace including the target** (see Invariants) |
 | Web-extension ingest | `/activity-tracking/web-extension` | `WebExtensionDataHeartbeatEndpoint` (`/heartbeat`) |
 | Web-extension dashboards | `/activity-tracking/web-extension` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, domain-details |
@@ -206,6 +210,36 @@ have to report on *the same* primary sessions the timeline draws, and a drifted 
 the strip disagree with the chart above it while both endpoints' tests passed. Android needs none of
 it — its ledger already stores real sessions.
 
+## The distinct-entries grids — `desktop/query/FetchTableDistinctDesktopEntry`, `android/query/FetchTableDistinctAndroidEntry`
+
+`POST /activity-tracking/desktop/grid` groups the raw desktop ledger by `(ProductName, ProcessName,
+WindowTitle)`; the android one groups sessions by `(PackageName, AppLabel)`. Both are the raw
+observation record — a tuple a rule already covers keeps appearing, because the heartbeat still stores
+the entry (only an ignore rule drops it). What tells the user which rows still need a decision is
+**`coveredBy`** on every row (B24): `null` when no active rule matches, otherwise
+`{ mappingId, target: "Activity" | "RoleOrCategory" | "Ignored", targetName }` — the rule id to deep-link
+into the Mappings tab, the target group, and the chip text (activity name; role and/or category joined
+with ` · `; null for an ignore rule).
+
+**Contract, not implementation:**
+
+- `coveredBy` is the rule the ingest would pick *today*, resolved through the same `DesktopMappingRuleSet`
+  the heartbeat attributes with — active rules only, specificity order, first match wins. An inactive
+  rule covers nothing; an ignore rule covers (rows recorded before it was created still read "ignored by
+  rule N", and drain over retention).
+- The filter gains **`coverage`**: `"All" | "Uncovered" | "Covered"`, nullable, null = `All`. Patterns
+  have no SQL translation, so anything but `All` materialises the whole sorted distinct set, resolves it
+  in memory and pages there — `itemsCount` / `pageCount` are exact, and this is the one place the grids
+  read more than a page (`MappingCoverageGridExtensions`, one copy for both).
+- `coveredBy` is computed after the query and is **not a sort key**; the framework answers a sort on it
+  with the nested-object 400.
+- ⚠ On android the chip is "an active rule exists that would match" and nothing more — see the summary's
+  gotcha on the unapplied android rules.
+
+`DesktopDistinctEntryGridTests` / `AndroidDistinctEntryGridTests` pin the chip (incl. the
+specificity-order agreement with the heartbeat), both filter arms with exact counts, and the 400 on an
+undefined `coverage`; `GridFilterFieldNameTests` pins the wire spelling.
+
 ## The unified dashboards — `application/endpoint/unified/query/`
 
 Six endpoints under `/activity-tracking/unified` that answer over **all three ledgers at once**. They
@@ -256,6 +290,9 @@ and is therefore denied to extension clients by the `Program.cs` configurator's 
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `DailyWindowSet` | Domain helper | Turns a day span + time-of-day window into the per-day windows every dashboard reads, and lays out the stacked-bars bands | `domain/helper/DailyWindowSet.cs` |
+| `PatternMatcher` · `DesktopMappingRuleSet` · `AndroidMappingRuleSet` | Domain helper | **The one matcher** — a user's active rules in specificity-then-id order and the first-match resolve, per table; the string-level matcher with its per-instance regex cache and 100 ms timeout. Used by the heartbeat to attribute and by the two distinct-entries grids to compute `coveredBy` (B24), so the two cannot disagree | `domain/helper/mapping/` |
+| `IPatternMappingRule` | Entity contract | The target half both mapping tables share (`IsActive`, `IsIgnored`, `Activity`/`Role`/`Category`), so `MappingCoverageResponse.From` describes either | `domain/model/entity/IPatternMappingRule.cs` |
+| `MappingCoverageGridExtensions` | Endpoint helper | Pages a distinct-entries grid and fills `coveredBy`; the in-memory `coverage` filter with exact counts, in one copy for desktop and android | `application/endpoint/extensions/` |
 | `TimelineSegmentBuilder` | Domain helper | Stitches windows into sessions — **one copy**, shared by the timelines and the focus-metrics dashboards so the strip cannot disagree with the chart | `domain/helper/TimelineSegmentBuilder.cs` |
 | `FocusMetricsCalculator` | Domain helper | The four fragmentation measures and their definitions, computed inside one day-window and rolled up | `domain/helper/FocusMetricsCalculator.cs` |
 | `TrackingSource` | Domain helper | The three sources; the enum's numeric order **is** level 2 of the overlap rule, and the wire names are spelled out | `domain/helper/unified/TrackingSource.cs` |

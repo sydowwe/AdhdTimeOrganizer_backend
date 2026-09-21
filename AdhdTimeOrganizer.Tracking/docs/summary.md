@@ -139,13 +139,23 @@ would only make the agent re-send the window. That makes a break here silent;
   match type. Adding a target field without extending the first constraint lets a rule be saved that
   matches nothing.
 
-- **Patterns are matched in memory, not in SQL.** The heartbeat loads a user's active mappings and runs
-  `MatchesPattern` over them per entry — the `PatternMatchType` modes have no SQL translation. The
-  `Regex` and `Wildcard` modes run user-authored patterns on the ingest thread, so they are compiled
-  once per request and given a 100 ms match timeout; a pattern that times out counts as "no match".
-  **First match wins, and the list is ordered before it is walked** — by pattern columns set, then id,
-  so "ignore GitHub everywhere except in Chrome" resolves to the narrower rule rather than to whatever
-  order the read returned (CQ-16).
+- **Patterns are matched in memory, not in SQL, and in exactly one place:
+  `domain/helper/mapping/`.** `DesktopMappingRuleSet` / `AndroidMappingRuleSet` load a user's *active*
+  rules and resolve a tuple to its first matching rule — the `PatternMatchType` modes have no SQL
+  translation. The `Regex` and `Wildcard` modes run user-authored patterns on the request thread, so
+  `PatternMatcher` compiles each once per instance and gives it a 100 ms match timeout; a pattern that
+  times out counts as "no match". **First match wins, and the list is ordered before it is walked** —
+  by pattern columns set, then id, so "ignore GitHub everywhere except in Chrome" resolves to the
+  narrower rule rather than to whatever order the read returned (CQ-16). The heartbeat attributes with
+  it **and the two distinct-entries grids compute their `coveredBy` chip with it** (B24), which is why
+  it must not be re-implemented at a second call site: the grid's only job is to say what the ingest
+  would do with a tuple today.
+
+- **The android rules are applied by nothing.** `AndroidSyncEndpoint` stores sessions without reading
+  `TrackerAndroidMappingByPattern`; the only readers are the android distinct-entries grid's
+  `coveredBy` chip (B24) and the `canDelete` scan. On that source the chip means "an active rule exists
+  that would match", with no attribution behind it. `AndroidMappingRuleSet` is where the sync should
+  resolve from when it starts to, so the grid and the ingest agree from day one.
 
 - **Seeder `Order` is banded.** Tracking's `WebExtensionDataSeeder` sits at 600. See
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md` before adding a seeder
