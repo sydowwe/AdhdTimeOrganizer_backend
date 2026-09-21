@@ -74,11 +74,11 @@ public class WebExtensionStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneR
                     .Where(a => a.TotalSeconds < minSeconds)
                     .ToList();
 
-                // Combine small activities into "Other" bucket
+                // Combine small activities into the folded-tail bucket
                 if (belowThreshold.Count > 0)
                     aboveThreshold.Add(new WebExtensionStackedBarsEntry
                     {
-                        Domain = "_other",
+                        Domain = FoldedRow.Sentinel,
                         ActiveSeconds = belowThreshold.Sum(x => x.ActiveSeconds),
                         BackgroundSeconds = belowThreshold.Sum(x => x.BackgroundSeconds)
                     });

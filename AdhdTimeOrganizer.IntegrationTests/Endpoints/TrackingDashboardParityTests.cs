@@ -28,6 +28,12 @@ public class TrackingDashboardParityTests(AppDbContextFixture fixture) : Postgre
 {
     private const long UserId = FakeLoggedUserService.TestUserId;
 
+    /// <summary>
+    /// The wire value, spelled out rather than referenced, so this pins the contract the client reads
+    /// instead of restating whatever the server happens to hold in a constant.
+    /// </summary>
+    private const string FoldedRowSentinel = "_other";
+
     private static readonly DateOnly Day = new(2026, 6, 1);
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -55,7 +61,7 @@ public class TrackingDashboardParityTests(AppDbContextFixture fixture) : Postgre
     }
 
     /// <summary>
-    /// When a threshold <i>is</i> asked for, what it excludes is folded into an <c>Other</c> slice — the
+    /// When a threshold <i>is</i> asked for, what it excludes is folded into the <c>_other</c> row — the
     /// shape both sibling pies and the merged one already take — rather than dropped on the floor.
     /// </summary>
     [Fact]
@@ -68,10 +74,93 @@ public class TrackingDashboardParityTests(AppDbContextFixture fixture) : Postgre
         var apps = AppSeconds(pie);
 
         apps.Should().NotContainKey("Small");
-        apps.Should().ContainKey("Other");
-        apps["Other"].Should().Be(10);
+        apps.Should().ContainKey(FoldedRowSentinel);
+        apps[FoldedRowSentinel].Should().Be(10);
         apps.Values.Sum().Should().Be(TotalSeconds(pie),
             "folding the tail keeps the identity the filter would otherwise break");
+    }
+
+    /// <summary>
+    /// One sentinel for "the tail, folded" across every pie that folds. The four pies emitted the human
+    /// word <c>Other</c> while the three stacked-bars routes emitted <c>_other</c>, and the client knows
+    /// only the second: it translates that row, colours it neutrally and refuses to select it. A literal
+    /// <c>Other</c> reached a Slovak legend untranslated and was clickable, so the page drilled down into
+    /// an app that does not exist.
+    ///
+    /// <para>The assertion is on the identity field — the one the client branches on — rather than on any
+    /// display text, and it is on every folding route at once because the value's whole job is to be the
+    /// same on all of them.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("desktop")]
+    [InlineData("web-extension")]
+    [InlineData("android")]
+    [InlineData("unified")]
+    public async Task PieChart_FoldsTheTailUnderTheSameSentinelOnEverySource(string source)
+    {
+        await SeedDesktopAsync(("big", "Big", 10_000), ("small", "Small", 10));
+        await SeedWebExtensionAsync(("big.example", "https://big.example/", 10_000), ("small.example", "https://small.example/", 10));
+        await SeedAndroidAsync(("com.example.big", "Big", 10_000), ("com.example.small", "Small", 10));
+
+        var body = source == "unified"
+            ? new
+            {
+                dateFrom = Day,
+                dateTo = Day,
+                from = new { hours = 0, minutes = 0 },
+                to = new { hours = 23, minutes = 59 },
+                minPercent = (double?)5.0,
+                sources = new[] { "android" }
+            }
+            : PieRequest(5.0);
+
+        var pie = await PostAsync($"/api/activity-tracking/{source}/pie-chart", body);
+
+        var identities = PieIdentities(source, pie);
+
+        identities.Should().Contain(FoldedRowSentinel,
+            "the sub-threshold tail is folded rather than dropped, and the row it lands in is the one the " +
+            "client recognises");
+        identities.Should().NotContain("Other",
+            "a human word in the identity field renders untranslated and drills down as if it were an app");
+    }
+
+    /// <summary>
+    /// The stacked-bars half of the same contract. These three routes already emitted <c>_other</c> and
+    /// were only rerouted through the shared constant, so without this the pie theory is the sole thing
+    /// pinning the value: change the constant, update that one test, and the bars would drift along
+    /// unobserved while still agreeing with the server. The unified bars route has no threshold and never
+    /// folds, so it is not on the list.
+    /// </summary>
+    [Theory]
+    [InlineData("desktop")]
+    [InlineData("web-extension")]
+    [InlineData("android")]
+    public async Task StackedBars_FoldTheTailUnderTheSameSentinelOnEverySource(string source)
+    {
+        await SeedDesktopAsync(("big", "Big", 10_000), ("small", "Small", 10));
+        await SeedWebExtensionAsync(("big.example", "https://big.example/", 10_000), ("small.example", "https://small.example/", 10));
+        await SeedAndroidAsync(("com.example.big", "Big", 10_000), ("com.example.small", "Small", 10));
+
+        // Every seeded row starts inside the 12:00–13:00 band, so the big and the small item share a
+        // band and the threshold has something to fold in it.
+        var bands = await PostAsync($"/api/activity-tracking/{source}/stacked-bars", new
+        {
+            dateFrom = Day,
+            dateTo = Day,
+            from = new { hours = 0, minutes = 0 },
+            to = new { hours = 23, minutes = 59 },
+            windowMinutes = 60,
+            minSeconds = 100
+        });
+
+        var identities = StackedBarsIdentities(source, bands);
+
+        identities.Should().Contain(FoldedRowSentinel,
+            "the sub-threshold segment is folded rather than dropped, and the segment it lands in is the " +
+            "one the client recognises");
+        identities.Should().NotContain("Other",
+            "a human word in the identity field renders untranslated and is selectable as if it were an app");
     }
 
     /// <summary>
@@ -156,6 +245,45 @@ public class TrackingDashboardParityTests(AppDbContextFixture fixture) : Postgre
         from = new { hours = 0, minutes = 0 },
         to = new { hours = 23, minutes = 59 },
         minPercent
+    };
+
+    /// <summary>
+    /// Every identity field of every row of a pie, whichever route drew it — the fields the client keys
+    /// selection and translation off, not the ones it prints.
+    /// </summary>
+    private static List<string> PieIdentities(string source, JsonElement pie) => source switch
+    {
+        "desktop" => pie.GetProperty("processes").EnumerateArray()
+            .SelectMany(p => new[] { p.GetProperty("processName"), p.GetProperty("productName") })
+            .Select(p => p.GetString()!).ToList(),
+        "web-extension" => pie.GetProperty("domains").EnumerateArray()
+            .Select(d => d.GetProperty("domain").GetString()!).ToList(),
+        "android" => pie.GetProperty("apps").EnumerateArray()
+            .SelectMany(a => new[] { a.GetProperty("packageName"), a.GetProperty("appLabel") })
+            .Select(a => a.GetString()!).ToList(),
+        "unified" => pie.GetProperty("items").EnumerateArray()
+            .Select(i => i.GetProperty("label").GetString()!).ToList(),
+        _ => throw new ArgumentOutOfRangeException(nameof(source), source, "unknown pie route")
+    };
+
+    /// <summary>
+    /// Every identity field of every segment of every band of a stacked-bars response, whichever route
+    /// drew it — the stacked-bars twin of <see cref="PieIdentities"/>.
+    /// </summary>
+    private static List<string> StackedBarsIdentities(string source, JsonElement bands) => source switch
+    {
+        "desktop" => bands.EnumerateArray()
+            .SelectMany(w => w.GetProperty("activities").EnumerateArray())
+            .SelectMany(a => new[] { a.GetProperty("processName"), a.GetProperty("productName") })
+            .Select(a => a.GetString()!).ToList(),
+        "web-extension" => bands.EnumerateArray()
+            .SelectMany(w => w.GetProperty("activities").EnumerateArray())
+            .Select(a => a.GetProperty("domain").GetString()!).ToList(),
+        "android" => bands.EnumerateArray()
+            .SelectMany(w => w.GetProperty("apps").EnumerateArray())
+            .SelectMany(a => new[] { a.GetProperty("packageName"), a.GetProperty("appLabel") })
+            .Select(a => a.GetString()!).ToList(),
+        _ => throw new ArgumentOutOfRangeException(nameof(source), source, "unknown stacked-bars route")
     };
 
     private static Dictionary<string, long> AppSeconds(JsonElement pie) =>

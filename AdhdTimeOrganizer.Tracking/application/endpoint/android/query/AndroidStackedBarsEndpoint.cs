@@ -110,8 +110,8 @@ public class AndroidStackedBarsEndpoint(DbContext db, IUserTimeZoneResolver time
                 if (below.Count > 0)
                     above.Add(new AndroidWindowApp
                     {
-                        PackageName = "_other",
-                        AppLabel = "_other",
+                        PackageName = FoldedRow.Sentinel,
+                        AppLabel = FoldedRow.Sentinel,
                         Seconds = below.Sum(a => a.Seconds)
                     });
 

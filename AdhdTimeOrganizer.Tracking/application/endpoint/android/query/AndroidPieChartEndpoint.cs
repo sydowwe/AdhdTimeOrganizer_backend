@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android.dashboard;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
@@ -62,7 +63,7 @@ public class AndroidPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
 
         List<AndroidAppPieData> result;
 
-        // No threshold unless the client asked for one, and what it excludes is folded into an "Other"
+        // No threshold unless the client asked for one, and what it excludes is folded into the sentinel
         // slice rather than dropped — the same shape the desktop and web-extension pies take. Discarding
         // the tail would leave sum(apps.seconds) short of the totals printed above the chart.
         if (req.MinPercent.HasValue && totalSeconds > 0)
@@ -76,8 +77,8 @@ public class AndroidPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
             if (below.Count > 0)
                 result.Add(new AndroidAppPieData
                 {
-                    PackageName = "Other",
-                    AppLabel = "Other",
+                    PackageName = FoldedRow.Sentinel,
+                    AppLabel = FoldedRow.Sentinel,
                     Seconds = below.Sum(a => a.Seconds),
                     TotalSeconds = below.Sum(a => a.Seconds)
                 });

@@ -3,6 +3,7 @@ using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.unifie
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.unified;
 using AdhdTimeOrganizer.Tracking.application.service.unified;
 using AdhdTimeOrganizer.Tracking.application.validator.unified;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
 
@@ -17,9 +18,6 @@ namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.unifi
 public class UnifiedPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZones)
     : Endpoint<UnifiedPieChartRequest, UnifiedPieChartResponse>
 {
-    /// <summary>The bucket the below-threshold items fold into, exactly as on the per-source pies.</summary>
-    private const string OtherLabel = "Other";
-
     public override void Configure()
     {
         Post("/activity-tracking/unified/pie-chart");
@@ -30,7 +28,7 @@ public class UnifiedPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
             s.Description =
                 "Aggregates the selected trackers into one breakdown by item, with overlapping " +
                 "wall-clock time credited to a single source, optionally folding items below a " +
-                "percentage threshold into 'Other'.";
+                "percentage threshold into the '_other' row.";
             s.Response<UnifiedPieChartResponse>(200, "Success");
             s.Response(400, "Bad request");
         });
@@ -113,7 +111,7 @@ public class UnifiedPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
         // the totals the page prints above them.
         above.Add(new UnifiedPieItemDto
         {
-            Label = OtherLabel,
+            Label = FoldedRow.Sentinel,
             ActiveSeconds = below.Sum(item => item.ActiveSeconds),
             BackgroundSeconds = below.Sum(item => item.BackgroundSeconds),
             TotalSeconds = below.Sum(item => item.TotalSeconds),

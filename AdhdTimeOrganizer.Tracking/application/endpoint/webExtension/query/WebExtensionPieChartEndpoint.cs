@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.pieChart;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
@@ -80,12 +81,12 @@ public class WebExtensionPieChartEndpoint(DbContext db, IUserTimeZoneResolver ti
 
             result = domainsAboveThreshold;
 
-            // Add "Other" category if there are domains below threshold
+            // Fold the domains below the threshold into the sentinel row rather than dropping them
             if (domainsBelowThreshold.Any())
             {
                 var otherCategory = new DomainPieDataDto
                 {
-                    Domain = "Other",
+                    Domain = FoldedRow.Sentinel,
                     ActiveSeconds = domainsBelowThreshold.Sum(x => x.ActiveSeconds),
                     BackgroundSeconds = domainsBelowThreshold.Sum(x => x.BackgroundSeconds),
                     TotalSeconds = domainsBelowThreshold.Sum(x => x.TotalSeconds),

@@ -74,8 +74,8 @@ public class DesktopStackedBarsEndpoint(DbContext dbContext, IUserTimeZoneResolv
                 if (belowThreshold.Count > 0)
                     aboveThreshold.Add(new DesktopStackedBarsEntry
                     {
-                        ProcessName = "_other",
-                        ProductName = "_other",
+                        ProcessName = FoldedRow.Sentinel,
+                        ProductName = FoldedRow.Sentinel,
                         ActiveSeconds = belowThreshold.Sum(x => x.ActiveSeconds),
                         BackgroundSeconds = belowThreshold.Sum(x => x.BackgroundSeconds)
                     });

@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.desktop.dashboard.pieChart;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
@@ -78,8 +79,8 @@ public class DesktopPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
             if (below.Count > 0)
                 result.Add(new DesktopPieDataDto
                 {
-                    ProcessName = "Other",
-                    ProductName = "Other",
+                    ProcessName = FoldedRow.Sentinel,
+                    ProductName = FoldedRow.Sentinel,
                     ActiveSeconds = below.Sum(x => x.ActiveSeconds),
                     BackgroundSeconds = below.Sum(x => x.BackgroundSeconds),
                     TotalSeconds = below.Sum(x => x.TotalSeconds),
