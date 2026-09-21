@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.IntegrationTests.Reminders;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -167,6 +168,76 @@ file static class DistinctSeed
         db.Set<TrackerDesktopMappingByPattern>().Add(mapping);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return mapping.Id;
+    }
+
+    /// <summary>
+    /// A desktop rule with any target shape, for the B24 coverage cases. The pattern columns are the
+    /// caller's — a window-title constraint is what makes one rule more specific than another.
+    /// </summary>
+    public static async Task<long> DesktopRuleAsync(
+        DbContext db, long userId,
+        string? processName = null, PatternMatchType processMatch = PatternMatchType.Exact,
+        string? windowTitle = null, PatternMatchType windowTitleMatch = PatternMatchType.Exact,
+        long? activityId = null, long? roleId = null, long? categoryId = null, bool ignored = false,
+        bool isActive = true)
+    {
+        var mapping = new TrackerDesktopMappingByPattern
+        {
+            UserId = userId,
+            ProcessName = processName,
+            ProcessNameMatchType = processName == null ? null : processMatch,
+            WindowTitle = windowTitle,
+            WindowTitleMatchType = windowTitle == null ? null : windowTitleMatch,
+            IsActive = isActive,
+            IsIgnored = ignored ? true : null,
+            ActivityId = activityId,
+            RoleId = roleId,
+            CategoryId = categoryId
+        };
+
+        db.Set<TrackerDesktopMappingByPattern>().Add(mapping);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return mapping.Id;
+    }
+
+    /// <summary>The android twin of <see cref="DesktopRuleAsync"/>.</summary>
+    public static async Task<long> AndroidRuleAsync(
+        DbContext db, long userId,
+        string? packageName = null, PatternMatchType packageMatch = PatternMatchType.Exact,
+        string? appLabel = null, PatternMatchType appLabelMatch = PatternMatchType.Exact,
+        long? activityId = null, bool ignored = false, bool isActive = true)
+    {
+        var mapping = new TrackerAndroidMappingByPattern
+        {
+            UserId = userId,
+            PackageName = packageName,
+            PackageNameMatchType = packageName == null ? null : packageMatch,
+            AppLabel = appLabel,
+            AppLabelMatchType = appLabel == null ? null : appLabelMatch,
+            IsActive = isActive,
+            IsIgnored = ignored ? true : null,
+            ActivityId = activityId
+        };
+
+        db.Set<TrackerAndroidMappingByPattern>().Add(mapping);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return mapping.Id;
+    }
+
+    /// <summary>
+    /// Reads a row's <c>coveredBy</c> as the client will: null when the tuple is undecided, otherwise the
+    /// rule id, the target group name (string enum, no naming policy) and the chip text.
+    /// </summary>
+    public static (long MappingId, string Target, string? TargetName)? CoveredBy(JsonElement row)
+    {
+        var covered = row.GetProperty("coveredBy");
+        if (covered.ValueKind == JsonValueKind.Null)
+            return null;
+
+        return (
+            covered.GetProperty("mappingId").GetInt64(),
+            covered.GetProperty("target").GetString()!,
+            covered.GetProperty("targetName").ValueKind == JsonValueKind.Null ? null : covered.GetProperty("targetName").GetString());
     }
 
     /// <summary>
@@ -333,6 +404,210 @@ public class DesktopDistinctEntryGridTests(AppDbContextFixture fixture) : Postgr
         containsNames.Should().NotContain(otherName);
     }
 
+    // ---- B24: coveredBy + coverage ----------------------------------------------------------------
+
+    /// <summary>
+    /// B24 — a row names the active rule that matches it, with the rule id (the deep link), the target
+    /// group and the activity's name (the chip text); a row no rule matches carries an explicit null. The
+    /// ledger keeps listing a mapped tuple by design (§103), so this field is the only thing on the screen
+    /// that says which rows still need a decision.
+    /// </summary>
+    [Fact(DisplayName = "B24: desktop/grid says which active rule covers each tuple, null when none")]
+    public async Task Grid_CoveredBy_NamesTheRuleTheIngestWouldPick()
+    {
+        var token = DistinctSeed.Token();
+        var mapped = $"vlc-{token}.exe";
+        var undecided = $"undecided-{token}.exe";
+        long activityId, mappingId;
+
+        await using (var db = CreateDbContext())
+        {
+            activityId = await ActivityProfileTestSeedHelper.SeedActivityAsync(db, UserId, $"Read a Novel {token}");
+            mappingId = await DistinctSeed.DesktopRuleAsync(db, UserId, processName: mapped, activityId: activityId);
+
+            await DistinctSeed.DesktopEntryAsync(db, UserId, mapped, "VLC", "Documentary.mkv", 0);
+            await DistinctSeed.DesktopEntryAsync(db, UserId, undecided, "Nothing", "no rule", 1);
+        }
+
+        var body = await PostAsync(DistinctSeed.FilteredBody(
+            new { processName = $"-{token}.exe", processNameMatchType = DistinctSeed.ContainsMatch }));
+
+        var mappedRow = body.Items.Single(i => i.GetProperty("processName").GetString() == mapped);
+        DistinctSeed.CoveredBy(mappedRow).Should().Be((mappingId, "Activity", $"Read a Novel {token}"),
+            "the chip needs the rule id to link to, the target group, and the activity name to render");
+
+        var undecidedRow = body.Items.Single(i => i.GetProperty("processName").GetString() == undecided);
+        DistinctSeed.CoveredBy(undecidedRow).Should().BeNull("no active rule matches this tuple");
+    }
+
+    /// <summary>
+    /// B24 rule 1 — the grid answers with the rule the <em>ingest</em> would pick, which means the
+    /// heartbeat's specificity order (CQ-16): a rule constraining process <em>and</em> window title beats a
+    /// process-only rule that also matches. Both sides resolve through <c>DesktopMappingRuleSet</c>; this is
+    /// the pin that they keep doing so, because a grid re-implementing "first match" over an unordered read
+    /// would disagree with attribution and still return a well-formed 200.
+    /// </summary>
+    [Fact(DisplayName = "B24: coveredBy is the most specific matching rule, as the heartbeat resolves it")]
+    public async Task Grid_CoveredBy_PrefersTheMoreSpecificRule_LikeTheIngest()
+    {
+        var token = DistinctSeed.Token();
+        var processName = $"chrome-{token}.exe";
+        long broadRuleId, narrowRuleId;
+
+        await using (var db = CreateDbContext())
+        {
+            var broad = await ActivityProfileTestSeedHelper.SeedActivityAsync(db, UserId, $"Browsing {token}");
+            var narrow = await ActivityProfileTestSeedHelper.SeedActivityAsync(db, UserId, $"Code review {token}");
+
+            // The broad rule is older (lower id) — id order alone would pick it; specificity must win first.
+            broadRuleId = await DistinctSeed.DesktopRuleAsync(db, UserId,
+                processName: processName, activityId: broad);
+            narrowRuleId = await DistinctSeed.DesktopRuleAsync(db, UserId,
+                processName: processName, windowTitle: "GitHub", windowTitleMatch: PatternMatchType.Contains, activityId: narrow);
+
+            await DistinctSeed.DesktopEntryAsync(db, UserId, processName, "Chrome", "Pull request · GitHub", 0);
+            await DistinctSeed.DesktopEntryAsync(db, UserId, processName, "Chrome", "YouTube", 1);
+        }
+
+        var body = await PostAsync(DistinctSeed.FilteredBody(
+            new { processName, processNameMatchType = DistinctSeed.ExactMatch }));
+
+        var github = body.Items.Single(i => i.GetProperty("windowTitle").GetString() == "Pull request · GitHub");
+        DistinctSeed.CoveredBy(github)!.Value.MappingId.Should().Be(narrowRuleId,
+            "two columns constrained beats one, regardless of which rule is older");
+
+        var youtube = body.Items.Single(i => i.GetProperty("windowTitle").GetString() == "YouTube");
+        DistinctSeed.CoveredBy(youtube)!.Value.MappingId.Should().Be(broadRuleId,
+            "the narrow rule does not match this title, so the process-only rule is the ingest's answer");
+    }
+
+    /// <summary>
+    /// B24 rules 2 and 3 side by side. An inactive rule matches nothing at ingest, so a tuple only it
+    /// matches is <em>uncovered</em> — toggling a rule off makes its tuples reappear as undecided. An
+    /// ignore rule does not drop rows already in the ledger, and those read "ignored by rule N", not
+    /// undecided; <c>targetName</c> is null because there is nothing to name.
+    /// </summary>
+    [Fact(DisplayName = "B24: an inactive rule does not cover; an ignore rule does, with no target name")]
+    public async Task Grid_CoveredBy_SkipsInactiveRules_AndReportsIgnoreRules()
+    {
+        var token = DistinctSeed.Token();
+        var inactiveProcess = $"inactive-{token}.exe";
+        var ignoredProcess = $"ignored-{token}.exe";
+        long ignoreRuleId;
+
+        await using (var db = CreateDbContext())
+        {
+            var activityId = await ActivityProfileTestSeedHelper.SeedActivityAsync(db, UserId, $"Switched off {token}");
+            await DistinctSeed.DesktopRuleAsync(db, UserId, processName: inactiveProcess, activityId: activityId, isActive: false);
+            ignoreRuleId = await DistinctSeed.DesktopRuleAsync(db, UserId, processName: ignoredProcess, ignored: true);
+
+            await DistinctSeed.DesktopEntryAsync(db, UserId, inactiveProcess, "Off", "a window", 0);
+            await DistinctSeed.DesktopEntryAsync(db, UserId, ignoredProcess, "Ignored", "a window", 1);
+        }
+
+        var body = await PostAsync(DistinctSeed.FilteredBody(
+            new { processName = $"-{token}.exe", processNameMatchType = DistinctSeed.ContainsMatch }));
+
+        var inactiveRow = body.Items.Single(i => i.GetProperty("processName").GetString() == inactiveProcess);
+        DistinctSeed.CoveredBy(inactiveRow).Should().BeNull("a rule with isActive: false matches nothing at ingest");
+
+        var ignoredRow = body.Items.Single(i => i.GetProperty("processName").GetString() == ignoredProcess);
+        DistinctSeed.CoveredBy(ignoredRow).Should().Be((ignoreRuleId, "Ignored", (string?)null));
+    }
+
+    /// <summary>
+    /// The third target group. The chip text for a role/category rule is the two names joined with
+    /// <c>·</c> when both are set — the client has nothing else to render it from without a second request
+    /// per row.
+    /// </summary>
+    [Fact(DisplayName = "B24: a role+category rule reports RoleOrCategory with both names joined")]
+    public async Task Grid_CoveredBy_JoinsRoleAndCategoryNames()
+    {
+        var token = DistinctSeed.Token();
+        var processName = $"slack-{token}.exe";
+        long ruleId;
+
+        await using (var db = CreateDbContext())
+        {
+            var roleId = await DistinctSeed.RoleAsync(db, UserId, $"Work {token}");
+            var categoryId = await DistinctSeed.CategoryAsync(db, UserId, $"Chat {token}");
+            ruleId = await DistinctSeed.DesktopRuleAsync(db, UserId, processName: processName, roleId: roleId, categoryId: categoryId);
+
+            await DistinctSeed.DesktopEntryAsync(db, UserId, processName, "Slack", "general", 0);
+        }
+
+        var body = await PostAsync(DistinctSeed.FilteredBody(
+            new { processName, processNameMatchType = DistinctSeed.ExactMatch }));
+
+        DistinctSeed.CoveredBy(body.Items.Single())
+            .Should().Be((ruleId, "RoleOrCategory", $"Work {token} · Chat {token}"));
+    }
+
+    /// <summary>
+    /// The <c>coverage</c> filter is resolved in memory over the whole distinct set (patterns have no SQL
+    /// translation that agrees with the ingest), so its <c>itemsCount</c> and paging have to be exact
+    /// anyway — "12 still to decide" is a header the client prints from it. Sent as the client's camelCase
+    /// wire name and the string enum member, so this cannot pass by agreeing with the server's spelling.
+    /// </summary>
+    [Fact(DisplayName = "B24: coverage=Uncovered / Covered narrow the grid and count exactly")]
+    public async Task Grid_CoverageFilter_NarrowsAndCountsExactly()
+    {
+        var token = DistinctSeed.Token();
+        var processName = $"coverage-{token}.exe";
+
+        await using (var db = CreateDbContext())
+        {
+            var activityId = await ActivityProfileTestSeedHelper.SeedActivityAsync(db, UserId, $"Decided {token}");
+            await DistinctSeed.DesktopRuleAsync(db, UserId,
+                processName: processName, windowTitle: "decided", windowTitleMatch: PatternMatchType.Contains, activityId: activityId);
+
+            await DistinctSeed.DesktopEntryAsync(db, UserId, processName, "Coverage", "decided one", 0);
+            await DistinctSeed.DesktopEntryAsync(db, UserId, processName, "Coverage", "decided two", 1);
+            for (var i = 0; i < 5; i++)
+                await DistinctSeed.DesktopEntryAsync(db, UserId, processName, "Coverage", $"open {i}", 2 + i);
+        }
+
+        var all = await PostAsync(DistinctSeed.FilteredBody(
+            new { processName, processNameMatchType = DistinctSeed.ExactMatch }));
+        all.ItemsCount.Should().Be(7, "no coverage value is no opinion — the grid stays the raw observation record");
+
+        var uncovered = await PostAsync(DistinctSeed.FilteredBody(
+            new { processName, processNameMatchType = DistinctSeed.ExactMatch, coverage = "Uncovered" },
+            itemsPerPage: 2, page: 2));
+        uncovered.ItemsCount.Should().Be(5, "five tuples have no matching rule");
+        uncovered.PageCount.Should().Be(3, "five at two per page");
+        uncovered.Items.Should().HaveCount(2, "page 2 of 3 is full");
+        uncovered.Items.Select(i => i.GetProperty("windowTitle").GetString())
+            .Should().OnlyContain(t => t!.StartsWith("open "));
+        uncovered.Items.Select(DistinctSeed.CoveredBy).Should().OnlyContain(c => c == null);
+
+        var covered = await PostAsync(DistinctSeed.FilteredBody(
+            new { processName, processNameMatchType = DistinctSeed.ExactMatch, coverage = "Covered" }));
+        covered.ItemsCount.Should().Be(2, "two tuples match the rule");
+        covered.Items.Select(i => i.GetProperty("windowTitle").GetString())
+            .Should().BeEquivalentTo("decided one", "decided two");
+        covered.Items.Select(DistinctSeed.CoveredBy).Should().OnlyContain(c => c != null);
+
+        var explicitAll = await PostAsync(DistinctSeed.FilteredBody(
+            new { processName, processNameMatchType = DistinctSeed.ExactMatch, coverage = "All" }));
+        explicitAll.ItemsCount.Should().Be(7);
+    }
+
+    /// <summary>
+    /// An undefined coverage value is a 400 from the validator's <c>IsInEnum</c>, not a silent fall-through
+    /// to <c>All</c> — a client sending garbage would otherwise get the full grid with a 200, which is the
+    /// exact shape of failure B11 was written about. Sent as a number: the string converter still accepts
+    /// integers, so an out-of-range one binds and reaches the validator rather than dying in the binder.
+    /// </summary>
+    [Fact(DisplayName = "B24: an undefined coverage value is a 400")]
+    public async Task Grid_CoverageFilter_RejectsAnUndefinedValue()
+    {
+        var response = await CreateClient().PostAsJsonAsync(DistinctSeed.DesktopGridUrl,
+            DistinctSeed.FilteredBody(new { coverage = 99 }), DistinctSeed.Json, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     [Fact]
     public async Task Grid_Unauthenticated_Returns401()
     {
@@ -417,6 +692,96 @@ public class AndroidDistinctEntryGridTests(AppDbContextFixture fixture) : Postgr
         var collapsed = body.Items.Single(i => i.GetProperty("appLabel").GetString() == "Collapse");
         collapsed.GetProperty("id").GetInt64().Should().Be(ids.Min(),
             "the row key is the lowest id in the group");
+    }
+
+    // ---- B24: coveredBy + coverage ----------------------------------------------------------------
+
+    /// <summary>
+    /// B24 on the android grid. ⚠ <c>AndroidSyncEndpoint</c> does not apply the android rules, so here
+    /// <c>coveredBy</c> means "an active rule exists that would match" and carries no attribution meaning.
+    /// The resolution still goes through <c>AndroidMappingRuleSet</c> — the same specificity-then-id,
+    /// first-match, active-only walk as desktop — so when the sync does adopt the rules it resolves from
+    /// the same place and the grid stays truthful. Both the inactive and the ignore arms are pinned here
+    /// too because the android set orders and filters on its own columns.
+    /// </summary>
+    [Fact(DisplayName = "B24: android/grid says which active rule would match each pair, null when none")]
+    public async Task Grid_CoveredBy_NamesTheMatchingRule()
+    {
+        var token = DistinctSeed.Token();
+        var mapped = $"com.mapped.{token}";
+        var narrowed = $"com.narrowed.{token}";
+        var inactive = $"com.inactive.{token}";
+        var undecided = $"com.undecided.{token}";
+        long activityId, packageRuleId, ignoreRuleId;
+
+        await using (var db = CreateDbContext())
+        {
+            activityId = await ActivityProfileTestSeedHelper.SeedActivityAsync(db, UserId, $"Podcasts {token}");
+            packageRuleId = await DistinctSeed.AndroidRuleAsync(db, UserId, packageName: mapped, activityId: activityId);
+
+            // A package-only rule (older) and a package+label ignore rule: the two-column rule must win.
+            await DistinctSeed.AndroidRuleAsync(db, UserId, packageName: narrowed, activityId: activityId);
+            ignoreRuleId = await DistinctSeed.AndroidRuleAsync(db, UserId, packageName: narrowed, appLabel: "Beta", ignored: true);
+
+            await DistinctSeed.AndroidRuleAsync(db, UserId, packageName: inactive, activityId: activityId, isActive: false);
+
+            await DistinctSeed.AndroidSessionAsync(db, UserId, mapped, "Mapped", 0);
+            await DistinctSeed.AndroidSessionAsync(db, UserId, narrowed, "Beta", 1);
+            await DistinctSeed.AndroidSessionAsync(db, UserId, inactive, "Inactive", 2);
+            await DistinctSeed.AndroidSessionAsync(db, UserId, undecided, "Undecided", 3);
+        }
+
+        var body = await PostAsync(DistinctSeed.FilteredBody(
+            new { packageName = $".{token}", packageNameMatchType = DistinctSeed.ContainsMatch }));
+
+        JsonElement Row(string packageName) => body.Items.Single(i => i.GetProperty("packageName").GetString() == packageName);
+
+        DistinctSeed.CoveredBy(Row(mapped)).Should().Be((packageRuleId, "Activity", $"Podcasts {token}"));
+        DistinctSeed.CoveredBy(Row(narrowed)).Should().Be((ignoreRuleId, "Ignored", (string?)null),
+            "package + label constrained beats package alone, whichever is older");
+        DistinctSeed.CoveredBy(Row(inactive)).Should().BeNull("an inactive rule covers nothing");
+        DistinctSeed.CoveredBy(Row(undecided)).Should().BeNull();
+    }
+
+    /// <summary>The android twin of the desktop <c>coverage</c> case — exact count and paging over the in-memory resolve.</summary>
+    [Fact(DisplayName = "B24: android/grid coverage=Uncovered / Covered narrow the grid and count exactly")]
+    public async Task Grid_CoverageFilter_NarrowsAndCountsExactly()
+    {
+        var token = DistinctSeed.Token();
+        var packageName = $"com.coverage.{token}";
+
+        await using (var db = CreateDbContext())
+        {
+            var activityId = await ActivityProfileTestSeedHelper.SeedActivityAsync(db, UserId, $"Decided {token}");
+            await DistinctSeed.AndroidRuleAsync(db, UserId,
+                packageName: packageName, appLabel: "decided", appLabelMatch: PatternMatchType.Contains, activityId: activityId);
+
+            await DistinctSeed.AndroidSessionAsync(db, UserId, packageName, "decided one", 0);
+            for (var i = 0; i < 3; i++)
+                await DistinctSeed.AndroidSessionAsync(db, UserId, packageName, $"open {i}", 1 + i);
+        }
+
+        var uncovered = await PostAsync(DistinctSeed.FilteredBody(
+            new { packageName, packageNameMatchType = DistinctSeed.ExactMatch, coverage = "Uncovered" },
+            itemsPerPage: 2, page: 2));
+        uncovered.ItemsCount.Should().Be(3);
+        uncovered.PageCount.Should().Be(2);
+        uncovered.Items.Should().ContainSingle("three at two per page leaves one on page 2")
+            .Which.GetProperty("appLabel").GetString().Should().StartWith("open ");
+
+        var covered = await PostAsync(DistinctSeed.FilteredBody(
+            new { packageName, packageNameMatchType = DistinctSeed.ExactMatch, coverage = "Covered" }));
+        covered.ItemsCount.Should().Be(1);
+        covered.Items.Single().GetProperty("appLabel").GetString().Should().Be("decided one");
+    }
+
+    [Fact(DisplayName = "B24: android/grid rejects an undefined coverage value with a 400")]
+    public async Task Grid_CoverageFilter_RejectsAnUndefinedValue()
+    {
+        var response = await CreateClient().PostAsJsonAsync(DistinctSeed.AndroidGridUrl,
+            DistinctSeed.FilteredBody(new { coverage = 99 }), DistinctSeed.Json, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

@@ -5,8 +5,12 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.android;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Xunit;
 using static AdhdTimeOrganizer.IntegrationTests.Endpoints.ActivityProfileTestSeedHelper;
@@ -14,7 +18,8 @@ using static AdhdTimeOrganizer.IntegrationTests.Endpoints.ActivityProfileTestSee
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 /// <summary>
-/// B11 — the five grids accept the field names the client actually sends, one test per grid.
+/// B11 — the five grids accept the field names the client actually sends, one test per grid. B24 adds
+/// the two distinct-entries grids for their <c>coverage</c> field.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -187,6 +192,66 @@ public class GridFilterFieldNameTests(AppDbContextFixture fixture) : PostgresTes
             ("readinessStatuses", new Dictionary<string, object?> { ["readinessStatuses"] = new[] { "ReadyToStart" } }));
     }
 
+    // ---- activity-tracking/desktop/grid + android/grid (B24) ------------------------------------------
+
+    /// <summary>
+    /// B24's <c>coverage</c> field on the desktop distinct-entries grid. The match is a tuple an active rule
+    /// covers, the decoy one nothing covers; <c>Covered</c> has to keep the first and drop the second. The
+    /// token-narrowing <c>processName</c> rides along so the page is this test's own rows (<c>PERF-4</c>:
+    /// the grid has no date bound).
+    /// </summary>
+    [Fact(DisplayName = "B24: activity-tracking/desktop/grid filters by coverage")]
+    public async Task DesktopDistinctGrid_AcceptsClientFieldNames()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        long matchId, decoyId;
+        await using (var db = CreateDbContext())
+        {
+            var activityId = await ActivityProfileTestSeedHelper.SeedActivityAsync(db, UserId, $"Covered {token}");
+            db.Set<TrackerDesktopMappingByPattern>().Add(new TrackerDesktopMappingByPattern
+            {
+                UserId = UserId, ProcessName = $"match-{token}.exe", ProcessNameMatchType = PatternMatchType.Exact,
+                IsActive = true, ActivityId = activityId
+            });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+            matchId = await SeedDesktopEntryAsync(db, $"match-{token}.exe", minuteOffset: 0);
+            decoyId = await SeedDesktopEntryAsync(db, $"decoy-{token}.exe", minuteOffset: 1);
+        }
+
+        await AssertNarrowsAsync("api/activity-tracking/desktop/grid", matchId, decoyId,
+            ("coverage", new Dictionary<string, object?>
+            {
+                ["processName"] = $"-{token}.exe", ["processNameMatchType"] = "Contains", ["coverage"] = "Covered"
+            }));
+    }
+
+    /// <summary>The android twin — same field, same wire spelling, its own rule table.</summary>
+    [Fact(DisplayName = "B24: activity-tracking/android/grid filters by coverage")]
+    public async Task AndroidDistinctGrid_AcceptsClientFieldNames()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        long matchId, decoyId;
+        await using (var db = CreateDbContext())
+        {
+            db.Set<TrackerAndroidMappingByPattern>().Add(new TrackerAndroidMappingByPattern
+            {
+                UserId = UserId, PackageName = $"com.match.{token}", PackageNameMatchType = PatternMatchType.Exact,
+                IsActive = true, IsIgnored = true
+            });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+            matchId = await SeedAndroidSessionAsync(db, $"com.match.{token}", minuteOffset: 0);
+            decoyId = await SeedAndroidSessionAsync(db, $"com.decoy.{token}", minuteOffset: 1);
+        }
+
+        await AssertNarrowsAsync("api/activity-tracking/android/grid", matchId, decoyId,
+            ("coverage", new Dictionary<string, object?>
+            {
+                ["packageName"] = $".{token}", ["packageNameMatchType"] = "Contains", ["coverage"] = "Covered"
+            }));
+    }
+
     // ---- helpers --------------------------------------------------------------------------------------
 
     /// <summary>
@@ -265,6 +330,35 @@ public class GridFilterFieldNameTests(AppDbContextFixture fixture) : PostgresTes
         db.Set<ActivityProjectProfile>().Add(profile);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return profile.Id;
+    }
+
+    /// <summary>Inside the 2026 partition and UTC — see <c>TrackingDistinctEntryGridTests</c> for why both matter.</summary>
+    private static readonly DateTime TrackingInstant = new(2026, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+
+    private static async Task<long> SeedDesktopEntryAsync(DbContext db, string processName, int minuteOffset)
+    {
+        var entry = new DesktopActivityEntry
+        {
+            UserId = UserId, WindowStart = TrackingInstant.AddMinutes(minuteOffset),
+            ProcessName = processName, ProductName = "B24", WindowTitle = "a window", ExecutablePath = $"/usr/bin/{processName}",
+            IsFullscreen = false, ActiveSeconds = 60, BackgroundSeconds = 0, IsPlayingSound = false, ActiveMonitor = 0
+        };
+        db.Set<DesktopActivityEntry>().Add(entry);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return entry.Id;
+    }
+
+    private static async Task<long> SeedAndroidSessionAsync(DbContext db, string packageName, int minuteOffset)
+    {
+        var start = TrackingInstant.AddMinutes(minuteOffset);
+        var session = new AndroidSessionData
+        {
+            UserId = UserId, DeviceId = "b24-device", PackageName = packageName, AppLabel = "B24",
+            SessionStartUtc = start, SessionEndUtc = start.AddSeconds(300), DurationSeconds = 300
+        };
+        db.Set<AndroidSessionData>().Add(session);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return session.Id;
     }
 
     private static async Task<long> SeedAnchorAsync(DbContext db, long activityId, int rating)
