@@ -34,6 +34,19 @@ equivalents actually live (after B/E), or the review docs deleted as other-repo 
 - 31 stale doc references to MojaDigitalnaFirma.AdminPortal / HBCleaning.Tests across module docs/
 - Two files still staged-added-but-deleted (ValueRequest.cs, GetByDateCalendarValidator.cs) — will commit as deletions if you don't git restore them
 
+8. B14 — Google Calendar OAuth (server side landed 2026-09-21, commit 1e0dc3b; framework 23e13fe pushed, parent NOT pushed):
+- Google Cloud console: on the OAUTH2_GOOGLE_CLIENT_ID client, add `https://localhost:3000/google-calendar/callback` as an
+  authorised redirect URI, and `<PAGE_URL>/google-calendar/callback` for every other environment. The API derives the URI
+  from PAGE_URL now (the old `GoogleCalendar:RedirectUri` key is gone), so a missing registration surfaces as Google's own
+  `redirect_uri_mismatch` page — not a server error.
+- Confirm the production API host shares a registrable domain with PAGE_URL (`adhdtimeorganizer.com` ↔ e.g.
+  `api.adhdtimeorganizer.com`). The state cookie is `SameSite=Strict`; on an unrelated domain it will not ride the
+  POST /connect and every connect is the "state is missing" 400 again. The repo does not record the API host.
+- Frontend: read `configured` off `GET /api/user/google-calendar/status` (hide Connect / "not available here" when false);
+  `GET …/auth-url` also answers 503 `errorType: "ServiceNotConfigured"`. F33 (send `state` on connect) is required — the
+  validator rejects an empty state.
+- Push `dev` when ready.
+
 
 Done and verified
 
