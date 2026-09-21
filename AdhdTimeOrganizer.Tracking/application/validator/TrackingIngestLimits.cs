@@ -98,4 +98,13 @@ public static class TrackingIngestLimits
 
     /// <summary>TrackerAndroidMappingByPattern.PackageName / AppLabel — <c>varchar(255)</c>.</summary>
     public const int MaxAndroidMappingPatternLength = 255;
+
+    /// <summary>AndroidSessionData.PackageName — <c>varchar(255)</c>.</summary>
+    public const int MaxAndroidPackageNameLength = 255;
+
+    /// <summary>AndroidSessionData.AppLabel — <c>varchar(255)</c>.</summary>
+    public const int MaxAndroidAppLabelLength = 255;
+
+    /// <summary>AndroidSessionData.DeviceId — <c>varchar(100)</c>.</summary>
+    public const int MaxAndroidDeviceIdLength = 100;
 }

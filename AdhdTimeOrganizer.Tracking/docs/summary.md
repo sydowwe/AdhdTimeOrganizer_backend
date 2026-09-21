@@ -22,7 +22,7 @@ Owns:
   `infrastructure/persistence/configuration/activityHistory/` folder. **The folder name lied** — they
   were always Tracking's, and they moved with their entities. Do not assign files to projects by
   directory here.
-- **38 endpoints** under `application/endpoint/` — one folder per source (`desktop/`, `webExtension/`,
+- **39 endpoints** under `application/endpoint/` — one folder per source (`desktop/`, `webExtension/`,
   `android/`, `unified/`, each split `command/` + `query/`): desktop ingest + dashboards,
   web-extension ingest + dashboards, android sync + dashboards, the six unified dashboards, and the two
   pattern-mapping settings grids with their CRUD.

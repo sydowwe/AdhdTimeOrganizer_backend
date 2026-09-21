@@ -5,7 +5,7 @@ using Sydowwe.Framework.domain.helper;
 namespace AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking;
 
 /// <summary>
-/// The base the two details endpoints bind. They take an instant <see cref="From"/>/<see cref="To"/>
+/// The base the three details endpoints bind. They take an instant <see cref="From"/>/<see cref="To"/>
 /// envelope rather than a day span, because their caller opens them from a dashboard selection and
 /// hands them its outer bounds.
 ///

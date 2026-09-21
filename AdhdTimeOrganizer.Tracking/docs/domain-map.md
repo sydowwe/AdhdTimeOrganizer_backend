@@ -148,7 +148,7 @@ assuming a path.
 | Web-extension ingest | `/activity-tracking/web-extension` | `WebExtensionDataHeartbeatEndpoint` (`/heartbeat`) |
 | Web-extension dashboards | `/activity-tracking/web-extension` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, domain-details |
 | Android ingest | `/activity-tracking/android` | `AndroidSyncEndpoint` (`/sync`) |
-| Android dashboards | `/activity-tracking/android` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, `grid` |
+| Android dashboards | `/activity-tracking/android` | pie-chart, stacked-bars, summary-cards, timeline, focus-metrics, app-details, `grid` |
 | Android mappings | `/activity-tracking/android/settings` | create / update / delete / `grid`; update as above |
 | Unified dashboards | `/activity-tracking/unified` | sources, pie-chart, summary-cards, stacked-bars, timeline, focus-metrics — see **The unified dashboards** below |
 
@@ -160,8 +160,13 @@ the range. It resolves through `domain/helper/DailyWindowSet.cs`, which also lay
 bands. Read the span continuously instead and every endpoint still returns a well-formed 200 with
 silently inflated totals — `TrackingDashboardDateRangeTests` is the guard, and it asserts on the
 numbers. The two timelines take the span members for uniformity and reject anything but a single day.
-The two details endpoints take an instant envelope plus the optional
-`windowStartMinutes`/`windowEndMinutes` pair that carries the same daily window across.
+The three details endpoints (`process-details`, `domain-details`, `app-details`) take an instant
+envelope plus the optional `windowStartMinutes`/`windowEndMinutes` pair that carries the same daily
+window across; a row counts whole when its start instant falls inside a day's window. The android one
+answers over real session rows, so beside the total it carries the session count, first/last use,
+mean and longest session, a per-device list and a per-local-day list — and deliberately no
+active/background split, because the source has none. `TrackingDetailsEndpointsTests` pins all three
+side by side.
 
 **There is one request class per dashboard, not one per source.** `PieChartRequest`,
 `SummaryCardsRequest`, `StackedBarsRequest`, `BaseTimelineRequest` and `FocusMetricsRequest` are each

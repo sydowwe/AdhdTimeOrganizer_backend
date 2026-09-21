@@ -49,16 +49,17 @@ public static class DashboardDateRangeRules
     }
 
     /// <summary>
-    /// The span the two details endpoints accept. Narrower than <see cref="MaxSpanDays"/> because a
+    /// The span the three details endpoints accept. Narrower than <see cref="MaxSpanDays"/> because a
     /// details panel is a drill-down into one dashboard slice, and its read is filtered by a single
-    /// process or domain — a predicate no index supports, so the span is the only thing bounding it.
+    /// process, domain or package — a predicate no index supports on the two partitioned ledgers, so the
+    /// span is the only thing bounding it.
     /// </summary>
     public const int MaxDetailsSpanDays = 31;
 
     /// <summary>
-    /// The envelope rules both details endpoints share. Hoisted out of the two validators because the
-    /// span cap was on one of them and not the other (<c>PERF-3</c>), which is exactly the drift this
-    /// class exists to stop.
+    /// The envelope rules every details endpoint shares. Hoisted out of the validators because the span
+    /// cap was on one of them and not the other (<c>PERF-3</c>), which is exactly the drift this class
+    /// exists to stop.
     /// </summary>
     public static void ApplyDetailsDateRangeRules<T>(this AbstractValidator<T> validator)
         where T : DailyWindowMaskRequest

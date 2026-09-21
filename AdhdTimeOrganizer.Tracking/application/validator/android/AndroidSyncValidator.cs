@@ -8,7 +8,7 @@ public class AndroidSyncValidator : Validator<AndroidSyncRequest>
 {
     public AndroidSyncValidator()
     {
-        RuleFor(x => x.DeviceId).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.DeviceId).NotEmpty().MaximumLength(TrackingIngestLimits.MaxAndroidDeviceIdLength);
         RuleFor(x => x.SyncedUpToUtc).NotEmpty();
         RuleFor(x => x.Sessions).NotNull();
 
@@ -21,8 +21,8 @@ public class AndroidSyncValidator : Validator<AndroidSyncRequest>
 
         RuleForEach(x => x.Sessions).ChildRules(s =>
         {
-            s.RuleFor(x => x.PackageName).NotEmpty().MaximumLength(255);
-            s.RuleFor(x => x.AppLabel).NotEmpty().MaximumLength(255);
+            s.RuleFor(x => x.PackageName).NotEmpty().MaximumLength(TrackingIngestLimits.MaxAndroidPackageNameLength);
+            s.RuleFor(x => x.AppLabel).NotEmpty().MaximumLength(TrackingIngestLimits.MaxAndroidAppLabelLength);
             // Bounded as well as non-empty because the endpoint logs both verbatim when they do not parse
             // (CQ-22) — they are unvalidated free text on a per-request path.
             s.RuleFor(x => x.SessionStartUtc).NotEmpty().MaximumLength(TrackingIngestLimits.MaxInstantStringLength);

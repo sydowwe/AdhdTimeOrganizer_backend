@@ -14,16 +14,19 @@ using Xunit;
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 
 /// <summary>
-/// The two details panels — <c>GET /desktop/process-details</c> and
-/// <c>GET /web-extension/domain-details</c>. They are the same endpoint twice with different nouns, so
-/// every case here is mirrored across both: the pair has drifted apart once already (the span cap was
-/// on one and not the other, <c>PERF-3</c>) and neither half of the drift showed up as a failure.
+/// The three details panels — <c>GET /desktop/process-details</c>,
+/// <c>GET /web-extension/domain-details</c> and <c>GET /android/app-details</c> (B23). They are the same
+/// endpoint three times with different nouns, so every envelope case here is mirrored across all of
+/// them: the original pair drifted apart once already (the span cap was on one and not the other,
+/// <c>PERF-3</c>) and neither half of the drift showed up as a failure. The android one has its own
+/// cases on top for the figures the other two do not carry — session count, first/last use, the
+/// per-device and per-day lists, and the folded-tail sentinel.
 ///
-/// <para>They are also the only two <b>GET</b> endpoints among the module's dashboards. Everything binds
+/// <para>They are also the only <b>GET</b> endpoints among the module's dashboards. Everything binds
 /// off the query string via <c>[QueryParam]</c>, and <c>from</c>/<c>to</c> here are an <b>instant
 /// envelope</b> — the outer bounds of whatever span the caller had on screen — not the
 /// <c>TimeDto</c> time-of-day window every POST dashboard takes. Sending the dashboard shape at these
-/// two binds nothing and gets a 400 that looks like a validator problem.</para>
+/// binds nothing and gets a 400 that looks like a validator problem.</para>
 ///
 /// <para>The user's zone is <b>Europe/Bratislava</b>, not the fixture default of UTC. The window-mask
 /// members are minutes past midnight <i>on the user's clock</i>, so against a UTC user a correct fold
@@ -39,6 +42,7 @@ public class TrackingDetailsEndpointsTests(AppDbContextFixture fixture) : Postgr
 
     private const string ProcessRoute = "/api/activity-tracking/desktop/process-details";
     private const string DomainRoute = "/api/activity-tracking/web-extension/domain-details";
+    private const string AppRoute = "/api/activity-tracking/android/app-details";
 
     private static readonly TimeZoneInfo Bratislava = TimeZoneInfo.FindSystemTimeZoneById("Europe/Bratislava");
 
@@ -131,7 +135,89 @@ public class TrackingDetailsEndpointsTests(AppDbContextFixture fixture) : Postgr
                 "the page list is a partition of the same rows the totals came from");
     }
 
+    /// <summary>
+    /// The android twin, over session rows. Every header figure is asserted against a seed where each of
+    /// them differs from the others, because a panel that printed the total under "longest session" or
+    /// the session count under "devices" would still be a well-formed 200.
+    /// </summary>
+    [Fact]
+    public async Task AppDetails_ReturnTheFiguresForTheNamedApp()
+    {
+        await SeedAndroidAsync(
+            NewAndroid(Day1.AddHours(10), "com.spotify.music", "Spotify", seconds: 100),
+            NewAndroid(Day1.AddHours(11), "com.spotify.music", "Spotify", seconds: 50),
+            NewAndroid(Day1.AddHours(12), "com.spotify.music", "Spotify", seconds: 30),
+            NewAndroid(Day1.AddHours(10), "com.other.app", "Other", seconds: 999));
+
+        var details = await GetAsync($"{AppRoute}?{OneDay}&packageName=com.spotify.music");
+
+        details.GetProperty("packageName").GetString().Should().Be("com.spotify.music");
+        details.GetProperty("appLabel").GetString().Should().Be("Spotify");
+        details.GetProperty("totalSeconds").GetInt64().Should().Be(180,
+            "only the three spotify rows count");
+        details.GetProperty("sessions").GetInt32().Should().Be(3,
+            "sessions is the number of session rows behind the panel");
+        details.GetProperty("meanSessionSeconds").GetInt64().Should().Be(60);
+        details.GetProperty("longestSessionSeconds").GetInt64().Should().Be(100);
+        details.GetProperty("firstUseUtc").GetDateTime().ToUniversalTime()
+            .Should().Be(Day1.AddHours(10), "the earliest session's start");
+        details.GetProperty("lastUseUtc").GetDateTime().ToUniversalTime()
+            .Should().Be(Day1.AddHours(12).AddSeconds(30), "the latest session's end, not its start");
+
+        details.TryGetProperty("activeSeconds", out _).Should().BeFalse(
+            "the android source has no foreground/background split and the response must not invent one");
+        details.TryGetProperty("backgroundSeconds", out _).Should().BeFalse();
+    }
+
     // ---- 2. the secondary list ------------------------------------------
+
+    /// <summary>
+    /// The android panel's two lists. Devices are ordered by seconds descending, like desktop's window
+    /// titles; days are ordered by date, on the user's clock — a 23:30 Bratislava session is 21:30Z, and
+    /// bucketing by UTC date would file it under the day before. Both lists partition the same rows the
+    /// totals came from.
+    /// </summary>
+    [Fact]
+    public async Task AppDetails_GroupByDeviceAndByLocalDay()
+    {
+        // 2026-06-02 23:30 in Bratislava (UTC+2 in June) is 21:30Z on the same UTC day; 2026-06-01 23:30
+        // local is 21:30Z on 06-01. Envelope is two whole UTC days.
+        var lateOnDay1Local = new DateTime(2026, 6, 1, 21, 30, 0, DateTimeKind.Utc);
+        var lateOnDay2Local = new DateTime(2026, 6, 2, 21, 30, 0, DateTimeKind.Utc);
+        // 2026-06-02 00:30 in Bratislava is 06-01 22:30Z -- a UTC-date bucket would put it on 06-01.
+        var earlyOnDay2Local = new DateTime(2026, 6, 1, 22, 30, 0, DateTimeKind.Utc);
+
+        await SeedAndroidAsync(
+            NewAndroid(lateOnDay1Local, "com.spotify.music", "Spotify", seconds: 100, deviceId: "phone"),
+            NewAndroid(earlyOnDay2Local, "com.spotify.music", "Spotify", seconds: 40, deviceId: "tablet"),
+            NewAndroid(lateOnDay2Local, "com.spotify.music", "Spotify", seconds: 10, deviceId: "phone"));
+
+        var details = await GetAsync(
+            $"{AppRoute}?{Envelope(Day1, Day1.AddDays(2))}&packageName=com.spotify.music");
+
+        var devices = details.GetProperty("devices").EnumerateArray().ToList();
+        devices.Select(d => d.GetProperty("deviceId").GetString())
+            .Should().Equal(new[] { "phone", "tablet" }, "ordered by seconds descending");
+        devices[0].GetProperty("totalSeconds").GetInt64().Should().Be(110);
+        devices[0].GetProperty("sessions").GetInt32().Should().Be(2);
+        devices[1].GetProperty("totalSeconds").GetInt64().Should().Be(40);
+        devices[1].GetProperty("sessions").GetInt32().Should().Be(1);
+
+        var days = details.GetProperty("days").EnumerateArray().ToList();
+        days.Select(d => d.GetProperty("date").GetString())
+            .Should().Equal(new[] { "2026-06-01", "2026-06-02" }, "one entry per local day with rows, by date");
+        days[0].GetProperty("totalSeconds").GetInt64().Should().Be(100,
+            "only the 23:30 session on 06-01 -- the 00:30 one on 06-02 is the next local day even though " +
+            "it is still 06-01 in UTC");
+        days[0].GetProperty("sessions").GetInt32().Should().Be(1);
+        days[1].GetProperty("totalSeconds").GetInt64().Should().Be(50);
+        days[1].GetProperty("sessions").GetInt32().Should().Be(2);
+
+        devices.Sum(d => d.GetProperty("totalSeconds").GetInt64())
+            .Should().Be(details.GetProperty("totalSeconds").GetInt64());
+        days.Sum(d => d.GetProperty("totalSeconds").GetInt64())
+            .Should().Be(details.GetProperty("totalSeconds").GetInt64());
+    }
 
     /// <summary>
     /// Window titles are grouped, ordered by time descending, and the two flag-derived numbers come only
@@ -256,6 +342,37 @@ public class TrackingDetailsEndpointsTests(AppDbContextFixture fixture) : Postgr
             .Should().Contain("Domain not found.");
     }
 
+    /// <inheritdoc cref="ProcessDetails_ReturnNotFoundForAProcessWithNoRows"/>
+    [Fact]
+    public async Task AppDetails_ReturnNotFoundForAnAppWithNoRows()
+    {
+        await SeedAndroidAsync(NewAndroid(Day1.AddHours(10), "com.spotify.music", "Spotify", seconds: 100));
+
+        var response = await GetRawAsync($"{AppRoute}?{OneDay}&packageName=com.never.installed");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await response.Content.ReadAsStringAsync(CancellationToken))
+            .Should().Contain("App not found.");
+    }
+
+    /// <summary>
+    /// The pie folds its sub-threshold tail into a <c>_other</c> row and the client refuses to select it.
+    /// Asked anyway, the sentinel is not resolved to the folded apps and not to a row that happens to
+    /// carry that package name either — it is a 404 like any other unknown package.
+    /// </summary>
+    [Fact]
+    public async Task AppDetails_ReturnNotFoundForTheFoldedTailSentinel()
+    {
+        await SeedAndroidAsync(
+            NewAndroid(Day1.AddHours(10), "com.spotify.music", "Spotify", seconds: 100),
+            NewAndroid(Day1.AddHours(11), "_other", "_other", seconds: 100));
+
+        var response = await GetRawAsync($"{AppRoute}?{OneDay}&packageName=_other");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            "the sentinel is not an app, even when a row carrying it exists");
+    }
+
     // ---- 5. cross-user ---------------------------------------------------
 
     /// <summary>
@@ -319,6 +436,35 @@ public class TrackingDetailsEndpointsTests(AppDbContextFixture fixture) : Postgr
         theirsOnly.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    /// <inheritdoc cref="ProcessDetails_DoNotSeeAnotherUsersRows"/>
+    [Fact]
+    public async Task AppDetails_DoNotSeeAnotherUsersRows()
+    {
+        await using (var db = CreateDbContext())
+        {
+            await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
+
+            db.Set<AndroidSessionData>().AddRange(
+                NewAndroid(Day1.AddHours(10), "com.shared.app", "Shared", seconds: 60, userId: UserId),
+                NewAndroid(Day1.AddHours(10), "com.shared.app", "Shared", seconds: 9_000,
+                    deviceId: "their-phone", userId: ReminderSeedHelper.OtherUserId),
+                NewAndroid(Day1.AddHours(11), "com.theirs.only", "Theirs", seconds: 9_000,
+                    deviceId: "their-phone", userId: ReminderSeedHelper.OtherUserId));
+
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        var shared = await GetAsync($"{AppRoute}?{OneDay}&packageName=com.shared.app");
+        shared.GetProperty("totalSeconds").GetInt64().Should().Be(60,
+            "the other user's 9000 seconds under the same package are not the caller's");
+        shared.GetProperty("sessions").GetInt32().Should().Be(1);
+        shared.GetProperty("devices").GetArrayLength().Should().Be(1,
+            "the other user's device must not appear in the caller's device list either");
+
+        var theirsOnly = await GetRawAsync($"{AppRoute}?{OneDay}&packageName=com.theirs.only");
+        theirsOnly.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     // ---- 6 & 8. the daily window mask -----------------------------------
 
     /// <summary>
@@ -359,6 +505,32 @@ public class TrackingDetailsEndpointsTests(AppDbContextFixture fixture) : Postgr
         details.GetProperty("entries").GetInt32().Should().Be(2);
     }
 
+    /// <summary>
+    /// The android twin of <see cref="DomainDetails_ApplyTheDailyWindowMask"/> and
+    /// <see cref="DomainDetails_TakeTheWholeEnvelopeWhenNoMaskIsSent"/> in one: the same seed, asked
+    /// both ways. A session is counted whole by where it <i>starts</i>, the same rule desktop's entries
+    /// follow, so the 02:00 session is dropped by the mask and kept without it.
+    /// </summary>
+    [Fact]
+    public async Task AppDetails_ApplyTheDailyWindowMaskAndTakeTheWholeEnvelopeWithoutIt()
+    {
+        await SeedAndroidAsync(
+            NewAndroid(InsideWindow, "com.spotify.music", "Spotify", seconds: 600),
+            NewAndroid(InsideEnvelopeOnlyAtNight, "com.spotify.music", "Spotify", seconds: 6_000));
+
+        var masked = await GetAsync($"{AppRoute}?{MaskedEnvelope}&packageName=com.spotify.music{Mask}");
+        masked.GetProperty("totalSeconds").GetInt64().Should().Be(600,
+            "09:00-17:00 on the user's clock keeps the midday session and drops the 02:00 one");
+        masked.GetProperty("sessions").GetInt32().Should().Be(1);
+        masked.GetProperty("days").GetArrayLength().Should().Be(1,
+            "the day list is built from the masked rows, so the night session does not add a day");
+
+        var unmasked = await GetAsync($"{AppRoute}?{MaskedEnvelope}&packageName=com.spotify.music");
+        unmasked.GetProperty("totalSeconds").GetInt64().Should().Be(6_600,
+            "with no window named the envelope is continuous and the 02:00 session counts");
+        unmasked.GetProperty("sessions").GetInt32().Should().Be(2);
+    }
+
     // ---- 7. half a mask --------------------------------------------------
 
     /// <summary>
@@ -371,6 +543,8 @@ public class TrackingDetailsEndpointsTests(AppDbContextFixture fixture) : Postgr
     [InlineData(ProcessRoute, "processName=code.exe", "&windowEndMinutes=1020")]
     [InlineData(DomainRoute, "domain=github.com", "&windowStartMinutes=540")]
     [InlineData(DomainRoute, "domain=github.com", "&windowEndMinutes=1020")]
+    [InlineData(AppRoute, "packageName=com.spotify.music", "&windowStartMinutes=540")]
+    [InlineData(AppRoute, "packageName=com.spotify.music", "&windowEndMinutes=1020")]
     public async Task Details_RejectHalfAWindowMask_With400(string route, string identifier, string halfMask)
     {
         var response = await GetRawAsync($"{route}?{MaskedEnvelope}&{identifier}{halfMask}");
@@ -390,6 +564,7 @@ public class TrackingDetailsEndpointsTests(AppDbContextFixture fixture) : Postgr
     [Theory]
     [InlineData(ProcessRoute, "processName=code.exe")]
     [InlineData(DomainRoute, "domain=github.com")]
+    [InlineData(AppRoute, "packageName=com.spotify.music")]
     public async Task Details_RejectARangeLongerThan31Days_With400(string route, string identifier)
     {
         var response = await GetRawAsync(
@@ -426,6 +601,8 @@ public class TrackingDetailsEndpointsTests(AppDbContextFixture fixture) : Postgr
     [InlineData(ProcessRoute, "")]
     [InlineData(DomainRoute, "domain=")]
     [InlineData(DomainRoute, "")]
+    [InlineData(AppRoute, "packageName=")]
+    [InlineData(AppRoute, "")]
     public async Task Details_RejectAnEmptyIdentifier_With400(string route, string identifier)
     {
         var response = await GetRawAsync($"{route}?{OneDay}&{identifier}");
@@ -456,6 +633,34 @@ public class TrackingDetailsEndpointsTests(AppDbContextFixture fixture) : Postgr
         await using var db = CreateDbContext();
         db.Set<WebExtensionActivityEntry>().AddRange(rows);
         await db.SaveChangesAsync(CancellationToken);
+    }
+
+    private async Task SeedAndroidAsync(params AndroidSessionData[] rows)
+    {
+        await using var db = CreateDbContext();
+        db.Set<AndroidSessionData>().AddRange(rows);
+        await db.SaveChangesAsync(CancellationToken);
+    }
+
+    private static AndroidSessionData NewAndroid(
+        DateTime sessionStart,
+        string packageName,
+        string appLabel,
+        long seconds,
+        string deviceId = "phone",
+        long userId = UserId)
+    {
+        var start = DateTime.SpecifyKind(sessionStart, DateTimeKind.Utc);
+        return new AndroidSessionData
+        {
+            UserId = userId,
+            DeviceId = deviceId,
+            PackageName = packageName,
+            AppLabel = appLabel,
+            SessionStartUtc = start,
+            SessionEndUtc = start.AddSeconds(seconds),
+            DurationSeconds = seconds
+        };
     }
 
     private static DesktopActivityEntry NewDesktop(
