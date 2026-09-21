@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.infrastructure.security;
@@ -6,10 +5,10 @@ using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.deskto
 using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper.mapping;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
-using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.infrastructure.security;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.command;
@@ -56,9 +55,9 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
         var processedCount = 0;
         var attributedActivityIds = new HashSet<long>();
 
-        var mappings = OrderBySpecificity(await dbContext.Set<TrackerDesktopMappingByPattern>()
-            .Where(m => m.UserId == userId && m.IsActive)
-            .ToListAsync(ct));
+        // The one matcher: active rules, specificity order, first match wins (CQ-16). The distinct-entries
+        // grid resolves its coveredBy chip through the same class, so what it shows is what happens here.
+        var rules = new DesktopMappingRuleSet(await DesktopMappingRuleSet.ActiveFor(dbContext, userId).ToListAsync(ct));
 
         // CQ-8: what this window already holds. UserId, WindowStart and the derived RecordDate are fixed
         // for the request, so (ProcessName, WindowTitle) is the rest of the unique index — an agent
@@ -73,8 +72,6 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
             .Select(x => (x.ProcessName, x.WindowTitle))
             .ToHashSet();
 
-        var matcher = new PatternMatcher();
-
         foreach (var entry in CollapseCollidingEntries(req.Entries))
         {
             // Seeded from the stored rows and grown as this batch is written, exactly as AndroidSyncEndpoint
@@ -83,8 +80,7 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
             if (!seenKeys.Add((entry.ProcessName, entry.WindowTitle)))
                 continue;
 
-            // First match wins, and the list is ordered so that "first" means something (CQ-16).
-            var match = mappings.FirstOrDefault(m => matcher.MatchesPattern(m, entry));
+            var match = rules.Resolve(entry.ProcessName, entry.ProductName, entry.WindowTitle);
 
             if (match?.IsIgnored == true)
                 continue;
@@ -123,35 +119,6 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
 
         await Send.ResponseAsync(processedCount, cancellation: ct);
     }
-
-    /// <summary>
-    /// Orders the user's rules so that the first one matching an entry is a defined answer rather than
-    /// whatever order Postgres happened to return (CQ-16).
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Two rules can match one entry — "any window titled *GitHub*" and "chrome.exe with a window titled
-    /// *GitHub*" are both legitimate, and the second is what the user meant when they wrote it. Nothing
-    /// ordered the list before, so which of them attributed the seconds depended on the plan for an
-    /// unordered read; it was stable in practice and stable for the wrong reason, and an insert or a
-    /// vacuum could change it without anything changing in the user's rules.
-    /// </para>
-    /// <para>
-    /// Specificity first — the number of pattern columns a rule constrains, since a rule naming two
-    /// columns matches a strict subset of what its one-column prefix matches — then the id, so the older
-    /// of two equally specific rules wins. Ordering does not resolve genuinely overlapping rules of the
-    /// same shape (two wildcards on the same column); it makes the winner stable and explicable, which is
-    /// what the user needs to be able to reason about their own list.
-    /// </para>
-    /// </remarks>
-    private static List<TrackerDesktopMappingByPattern> OrderBySpecificity(List<TrackerDesktopMappingByPattern> mappings) =>
-        mappings
-            .OrderByDescending(m =>
-                (m.ProcessName != null ? 1 : 0) +
-                (m.ProductName != null ? 1 : 0) +
-                (m.WindowTitle != null ? 1 : 0))
-            .ThenBy(m => m.Id)
-            .ToList();
 
     /// <summary>
     /// Folds the entries that would collide on <c>DesktopActivityEntry</c>'s unique index into one row each,
@@ -210,75 +177,5 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
                 await attributionSink.TotalSecondsOnDayAsync(dbContext, userId, activityId, day, ct)));
 
         await new ActivityTimeRecordedEvent(userId, day, totals).PublishAsync(Mode.WaitForAll, ct);
-    }
-
-    /// <summary>
-    /// Matches entries against the user's mapping rows. The <c>Regex</c> and <c>Wildcard</c> patterns are
-    /// user-authored and run <em>entries × active mappings</em> times per heartbeat, so each one is parsed
-    /// once per request and every match is bounded by <see cref="MatchTimeout"/> — without that, one
-    /// catastrophic pattern (<c>(a+)+$</c> against a long window title) would pin a request thread on
-    /// every heartbeat the agent posts. A pattern that times out counts as "no match".
-    /// </summary>
-    private sealed class PatternMatcher
-    {
-        private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(100);
-
-        private readonly Dictionary<(string Pattern, PatternMatchType MatchType), Regex> compiled = new();
-
-        public bool MatchesPattern(TrackerDesktopMappingByPattern mapping, DesktopActivityEntryDto entry)
-        {
-            if (mapping.ProcessName != null && mapping.ProcessNameMatchType != null)
-                if (!MatchesString(entry.ProcessName, mapping.ProcessName, mapping.ProcessNameMatchType.Value))
-                    return false;
-
-            if (mapping.ProductName != null && mapping.ProductNameMatchType != null)
-                if (!MatchesString(entry.ProductName, mapping.ProductName, mapping.ProductNameMatchType.Value))
-                    return false;
-
-            if (mapping.WindowTitle != null && mapping.WindowTitleMatchType != null)
-                if (!MatchesString(entry.WindowTitle, mapping.WindowTitle, mapping.WindowTitleMatchType.Value))
-                    return false;
-
-            return true;
-        }
-
-        private bool MatchesString(string? value, string pattern, PatternMatchType matchType)
-        {
-            if (value == null)
-                return false;
-            return matchType switch
-            {
-                PatternMatchType.Exact => string.Equals(value, pattern, StringComparison.OrdinalIgnoreCase),
-                PatternMatchType.Contains => value.Contains(pattern, StringComparison.OrdinalIgnoreCase),
-                PatternMatchType.Wildcard or PatternMatchType.Regex => IsRegexMatch(value, pattern, matchType),
-                _ => false
-            };
-        }
-
-        private bool IsRegexMatch(string value, string pattern, PatternMatchType matchType)
-        {
-            try
-            {
-                return GetRegex(pattern, matchType).IsMatch(value);
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                return false;
-            }
-        }
-
-        private Regex GetRegex(string pattern, PatternMatchType matchType)
-        {
-            if (compiled.TryGetValue((pattern, matchType), out var regex))
-                return regex;
-
-            var expression = matchType == PatternMatchType.Wildcard
-                ? "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$"
-                : pattern;
-
-            regex = new Regex(expression, RegexOptions.IgnoreCase, MatchTimeout);
-            compiled[(pattern, matchType)] = regex;
-            return regex;
-        }
     }
 }

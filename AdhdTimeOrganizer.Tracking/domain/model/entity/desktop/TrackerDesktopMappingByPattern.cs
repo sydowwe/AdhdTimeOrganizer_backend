@@ -4,7 +4,7 @@ using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 
-public class TrackerDesktopMappingByPattern : BaseEntityWithUser
+public class TrackerDesktopMappingByPattern : BaseEntityWithUser, IPatternMappingRule
 {
     public string? ProcessName { get; set; }
     public PatternMatchType? ProcessNameMatchType { get; set; }

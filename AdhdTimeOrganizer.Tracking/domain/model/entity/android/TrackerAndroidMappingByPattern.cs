@@ -4,7 +4,7 @@ using Sydowwe.Framework.domain.@enum;
 
 namespace AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.android;
 
-public class TrackerAndroidMappingByPattern : BaseEntityWithUser
+public class TrackerAndroidMappingByPattern : BaseEntityWithUser, IPatternMappingRule
 {
     public string? PackageName { get; set; }
     public PatternMatchType? PackageNameMatchType { get; set; }
