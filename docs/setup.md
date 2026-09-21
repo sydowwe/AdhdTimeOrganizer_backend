@@ -73,6 +73,7 @@ Set via the container environment (or a `.env` loaded by `DotNetEnv` in developm
 | `ROOT_ADMIN_USERNAME` / `ROOT_ADMIN_PASSWORD` / `ROOT_ADMIN_ENTRAID_ID` | Seeded root admin |
 | `COMPANY_DOMAIN` | Allowed company email domain |
 | `RECAPTCHA_SECRET` | Google reCAPTCHA verification |
+| `OAUTH2_GOOGLE_CLIENT_ID` / `OAUTH2_GOOGLE_CLIENT_SECRET` | Google OAuth client — sign-in, **and** the Google Calendar consent flow unless `GoogleCalendar:ClientId` / `:ClientSecret` override it. Register `<PAGE_URL>/google-calendar/callback` as an authorised redirect URI on this client for every environment; the API derives it from `PAGE_URL`, there is no separate setting. Absent → `GET /api/user/google-calendar/status` says `configured: false` and the flow is hidden, not broken. |
 | `LIBRE_OFFICE_URL` | LibreOffice service for document conversion |
 | `TRUSTED_PROXY_NETWORKS` | Trusted reverse-proxy ranges (see above) |
 | `FIELD_ENCRYPTION_KEY` | AES-256 key (base64, 32 bytes) for at-rest encryption of high-sensitivity columns — see below |

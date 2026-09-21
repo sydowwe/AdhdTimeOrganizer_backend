@@ -46,8 +46,10 @@ public class AppDbContextFixture : PostgresContainerFixture<Program, AppDbContex
         Environment.SetEnvironmentVariable("MAIL_SMTP_PORT", "123");
         Environment.SetEnvironmentVariable("MAIL_SMTP_SERVER", "test");
         Environment.SetEnvironmentVariable("MAIL_SMTP_USERNAME", "test");
-        Environment.SetEnvironmentVariable("OAUTH2_GOOGLE_CLIENT_ID", "test");
-        Environment.SetEnvironmentVariable("OAUTH2_GOOGLE_CLIENT_SECRET", "test");
+        // Distinct values: the calendar auth-url test asserts the URL carries the id and not the secret,
+        // which "test"/"test" could not tell apart. The calendar flow falls back to this client (B14).
+        Environment.SetEnvironmentVariable("OAUTH2_GOOGLE_CLIENT_ID", "test-google-client-id");
+        Environment.SetEnvironmentVariable("OAUTH2_GOOGLE_CLIENT_SECRET", "test-google-client-secret");
         Environment.SetEnvironmentVariable("ROOT_ADMIN_EMAIL", "root@test.com");
     }
 

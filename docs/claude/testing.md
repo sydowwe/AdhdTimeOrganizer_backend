@@ -148,6 +148,16 @@ worth copying the shape of:
   edges — a cap that rejects its own boundary is indistinguishable from a correct one otherwise — and it needs
   its own test at all because FastEndpoints resolves validators by exact request type, so a request type
   without a concrete validator is silently unvalidated and the ceiling is a comment.
+- `GoogleCalendarConnectionTests.StateCookie_RoundTripsThroughCookieContainer` — the OAuth `state` cookie's
+  **path** (backend ask B14). It was scoped to `/user/google-calendar` while FastEndpoints' `RoutePrefix`
+  puts the reader at `/api/user/google-calendar/connect`, so no browser ever sent it and every real connect
+  was the "state is missing" 400 — while the suite stayed green, because every other connect test writes the
+  `Cookie` header by hand and never exercises the scope rule. This one drives an `https` client with
+  `HandleCookies = true` (a `CookieContainer` applies the same prefix rule a browser does, and refuses a
+  `Secure` cookie over plain http, so the base address matters), sets no header itself, and asserts a 204
+  **and** that the replay is `CookieMissing` — proving the delete used the same derived path as the set.
+  `AuthUrl_NotConfigured_Returns503_NotABrokenUrl` pins the other silent one: an empty client id used to
+  produce a well-formed 200 whose URL Google bounces on its own error page.
 - `ModuleWiringTests` — the whole composition root. Includes `IUserTimeZoneReader`, which is generic over the
   host's user type and so invisible to every marker scan: forget the host's closing registration and quiet
   hours fall back to UTC for everyone, throwing nothing and logging nothing. `IUserLocaleReader` is pinned the

@@ -295,7 +295,8 @@ something the base classes do not.
 | SuggestionPatternViewInstaller | Installer | Creates missing pattern views at boot from embedded SQL | `infrastructure/persistence/SuggestionPatternViewInstaller.cs` |
 | SeedUserIdProvider | Service | `ISeedUserProvider` — how Framework seeders find users | `infrastructure/persistence/seeder/SeedUserIdProvider.cs` |
 | PerUserDefaultMatcher | Helper | Shared matching for per-user default seeders | `infrastructure/persistence/seeder/userDefault/PerUserDefaultMatcher.cs` |
-| GoogleSignInService / GoogleCalendarService | External services | Google OAuth identity; calendar push | `infrastructure/extService/` |
+| GoogleSignInService / GoogleCalendarService | External services | Google OAuth identity; calendar push. The calendar flow falls back to the sign-in client (`OAUTH2_GOOGLE_*`), derives its redirect URI from `PAGE_URL`, and reports `IsConfigured` so the endpoints answer 503 / `configured: false` instead of a URL Google rejects (B14) | `infrastructure/extService/` |
+| GoogleCalendarStateCookie | Helper | The OAuth `state` cookie; its path is the executing endpoint's parent (`/api/user/google-calendar`), never a literal, or the `RoutePrefix` puts `connect` outside it (B14) | `application/endpoint/user/command/googleCalendar/GoogleCalendarStateCookie.cs` |
 | ExtensionRoleClaimsProvider | Claims provider | Grants the `ActivityTracking` role to extension tokens | `infrastructure/extService/user/auth/ExtensionRoleClaimsProvider.cs` |
 | PortalAuthorizationPolicies | Security | The `ActivityTracking` policy gating tracking endpoints | `infrastructure/security/PortalAuthorizationPolicies.cs` |
 | DependencyInjectionExtensions / ModuleServiceExtensions | Composition | The two non-overlapping marker scans; `DbContext` → `AppDbContext` alias | `config/dependencyInjection/` |
