@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
 
@@ -68,7 +69,7 @@ public class QuickEditActivityEndpoint(DbContext dbContext) : Endpoint<QuickEdit
             if (result.Failed)
             {
                 AddError(result.ErrorMessage!);
-                await Send.ErrorsAsync(400, ct);
+                await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
                 return;
             }
 
@@ -78,7 +79,7 @@ public class QuickEditActivityEndpoint(DbContext dbContext) : Endpoint<QuickEdit
         {
             var result = DbUtils.HandleException(ex, nameof(HandleAsync));
             AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
+            await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
         }
     }
 }

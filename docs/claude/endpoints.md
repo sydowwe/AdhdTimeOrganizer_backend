@@ -233,11 +233,25 @@ them differently (*refresh and retry* / *pick another value* / *remove the depen
 *confirm your address*).
 
 - **Statuses are unchanged.** The field is additive; `ToStatusCode` is the same map it always was.
-- **Producing it:** `await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);` — `ErrorStatus`
-  (on `IEndpoint`) maps *and* stamps in one call, so a hand-written endpoint that sends a business
-  conflict passes `ResultErrorType.Conflict` rather than the literal `409`. Where the status is
-  deliberately not the mapped one (`PasswordSignInFlow` answers 403 for a lockout, not the 423
-  `ToStatusCode` would give), stamp only: `HttpContext.SetResultErrorType(...)`.
+- **Producing it — two forms, both one call.** Mapped status:
+  `await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);` — `ErrorStatus` (on `IEndpoint`)
+  maps *and* stamps, so a business conflict passes `ResultErrorType.Conflict` rather than the literal
+  `409`. Hand-picked status (the auth flow's 401s, `PasswordSignInFlow`'s 403 for a lockout where
+  `ToStatusCode` would say 423): `await Send.ErrorsAsync(result.ErrorType, 401, ct);` — the typed
+  overload of FastEndpoints' `Send.ErrorsAsync` in `ResultErrorTypeExtensions`, which stamps and sends.
+  There is no public "stamp only" call on purpose: FastEndpoints' own `Send.ErrorsAsync(int, ct)` has
+  no parameter for the type, so a separate stamp is the half that gets forgotten — the 2FA login's
+  lockout 401 went out typeless that way (B25).
+- **The guard has two arms**, both in `ErrorStatusBypassGuardTests`: a text scan for a bare
+  `EndpointHelper.ToStatusCode(` outside the two allowed files, and a Roslyn walk that fails on any
+  `Send.ErrorsAsync(...)` inside an `if (x.Failed)` branch that is neither of the two forms above. The
+  walk is scoped to `.Failed` branches: a literal 404 after a null check has no type in hand to drop.
+- **`lockoutEndUtc`** is the optional fourth argument of the typed overload
+  (`Send.ErrorsAsync(type, status, lockoutEnd, ct)`) and appears on the two lockout responses only:
+  the password step's 403 and the 2FA step's 401. Both carry `errorType: "UserLockedOut"`; the 2FA
+  step stays 401 so a client keeps reading a 401 on an auth route as "not signed in". The wrong code
+  that *trips* the lock answers as the lockout, not as `InvalidTwoFactorAuthToken` — same as Identity
+  and the password step.
 - **It is absent, not null, when nothing stamped one** — FluentValidation 400s keep exactly the body
   they had, `errors` map included.
 - **It is silent when unwired.** The type rides on `HttpContext.Items` and is rendered only by

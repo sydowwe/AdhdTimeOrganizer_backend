@@ -5,6 +5,8 @@ using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.domain.helper;
@@ -282,6 +284,123 @@ public class ErrorStatusBypassGuardTests
 
         File.ReadAllText(wrapper).Should().Contain(BypassCall,
             "ErrorStatus is documented as 'ToStatusCode plus the stamp'; if it no longer delegates, the allow-list above is stale");
+    }
+
+    /// <summary>
+    /// The second bypass, which the text scan above cannot see: a failed <c>Result</c> answered with a
+    /// hand-picked status through the bare FastEndpoints <c>Send.ErrorsAsync(int, ct)</c>. That call has
+    /// no parameter for the type, so the type the <c>Result</c> carried is simply dropped — the 2FA login's
+    /// lockout 401 went out that way (B25) and no status-asserting test could tell.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A syntax walk rather than a regex, because the shape is structural: inside the <c>if (x.Failed)</c>
+    /// branch (or the <c>else</c> of <c>if (!x.Failed)</c>), every <c>Send.ErrorsAsync(...)</c> must be one
+    /// of the two typed forms — <c>Send.ErrorsAsync(this.ErrorStatus(type), ct)</c> when the status is the
+    /// mapped one, or <c>Send.ErrorsAsync(type, status, [lockoutEnd,] ct)</c> when it is hand-picked. A
+    /// literal-first or status-first call in that branch is the drop.
+    /// </para>
+    /// <para>
+    /// Deliberately scoped to <c>.Failed</c> branches: a literal 404 after a null check has no type in hand
+    /// to drop, and typing those is a different (and much larger) change. Widen this when that lands.
+    /// </para>
+    /// </remarks>
+    [Fact(DisplayName = "No endpoint answers a failed Result with a bare Send.ErrorsAsync — the type it carries must reach the body")]
+    public void NoFailedResultBranch_SendsErrorsWithoutTheType()
+    {
+        var root = RepositoryRoot();
+
+        var offenders = Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !IsExcluded(root, path))
+            .SelectMany(path => TypelessSendsInFailedBranches(path)
+                .Select(line => $"{Path.GetRelativePath(root, path)}:{line}"))
+            .OrderBy(site => site, StringComparer.Ordinal)
+            .ToList();
+
+        offenders.Should().BeEmpty(
+            "each of these has a failed Result in hand and sends its message without the type — use " +
+            "`Send.ErrorsAsync(result.ErrorType, <status>, ct)` to keep the literal status, or " +
+            "`Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct)` for the mapped one. " +
+            "See docs/claude/endpoints.md, 'Error bodies'");
+    }
+
+    /// <summary>Line numbers (1-based) of every typeless <c>Send.ErrorsAsync</c> in a <c>.Failed</c> branch of the file.</summary>
+    private static IEnumerable<int> TypelessSendsInFailedBranches(string path)
+    {
+        var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path);
+
+        foreach (var ifStatement in tree.GetRoot().DescendantNodes().OfType<IfStatementSyntax>())
+        {
+            var branch = FailedBranch(ifStatement);
+            if (branch is null)
+                continue;
+
+            foreach (var send in branch.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
+            {
+                if (send.Expression is not MemberAccessExpressionSyntax { Name.Identifier.Text: "ErrorsAsync", Expression: IdentifierNameSyntax { Identifier.Text: "Send" } })
+                    continue;
+                if (IsTypedSend(send))
+                    continue;
+
+                yield return send.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The statements that run when the result failed: the <c>then</c> of <c>if (x.Failed)</c>, the
+    /// <c>else</c> of <c>if (!x.Failed)</c>, or null when the condition is about something else.
+    /// </summary>
+    private static StatementSyntax? FailedBranch(IfStatementSyntax ifStatement)
+    {
+        var condition = ifStatement.Condition;
+        var negated = false;
+        while (true)
+        {
+            switch (condition)
+            {
+                case ParenthesizedExpressionSyntax paren:
+                    condition = paren.Expression;
+                    continue;
+                case PrefixUnaryExpressionSyntax { RawKind: (int)SyntaxKind.LogicalNotExpression } not:
+                    negated = !negated;
+                    condition = not.Operand;
+                    continue;
+            }
+
+            break;
+        }
+
+        if (condition is not MemberAccessExpressionSyntax { Name.Identifier.Text: "Failed" })
+            return null;
+
+        return negated ? ifStatement.Else?.Statement : ifStatement.Statement;
+    }
+
+    /// <summary>
+    /// The two forms that carry a type: the first argument is <c>ErrorStatus(...)</c> (mapped status,
+    /// stamped inside), or the call is the typed overload — a type first and the status second.
+    /// </summary>
+    private static bool IsTypedSend(InvocationExpressionSyntax send)
+    {
+        var args = send.ArgumentList.Arguments;
+        if (args.Count == 0)
+            return false;
+
+        var first = args[0].Expression;
+        if (first is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Name.Identifier.Text: "ErrorStatus" } or IdentifierNameSyntax { Identifier.Text: "ErrorStatus" } })
+            return true;
+
+        // Typed overload: (ResultErrorType? type, int status, ...). Without a semantic model the
+        // tell is the second argument being the status — a literal or a *StatusCode member — while
+        // the first is not a literal.
+        if (args.Count < 2 || first is LiteralExpressionSyntax)
+            return false;
+
+        var second = args[1].Expression;
+        return second is LiteralExpressionSyntax { RawKind: (int)SyntaxKind.NumericLiteralExpression }
+               || second is MemberAccessExpressionSyntax { Name.Identifier.Text: "StatusCode" }
+               || second is IdentifierNameSyntax { Identifier.Text: "statusCode" or "status" };
     }
 
     private static bool IsExcluded(string root, string path)

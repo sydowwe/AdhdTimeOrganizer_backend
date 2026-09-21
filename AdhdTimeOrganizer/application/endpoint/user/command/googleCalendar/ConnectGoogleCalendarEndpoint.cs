@@ -36,18 +36,16 @@ public class ConnectGoogleCalendarEndpoint(
         {
             // Both are a 400 the client answers with "start over"; the type only says whether the
             // cookie never arrived (path / SameSite / expiry) or arrived with another flow's state.
-            HttpContext.SetResultErrorType(hasStateCookie ? ResultErrorType.BadRequest : ResultErrorType.CookieMissing);
             AddError("The OAuth state is missing or does not match. Please restart the Google Calendar connection flow.");
-            await Send.ErrorsAsync(400, ct);
+            await Send.ErrorsAsync(hasStateCookie ? ResultErrorType.BadRequest : ResultErrorType.CookieMissing, 400, ct);
             return;
         }
 
         var refreshToken = await googleCalendarService.ExchangeCodeForRefreshToken(req.Code);
         if (refreshToken is null)
         {
-            HttpContext.SetResultErrorType(ResultErrorType.ExternalServiceError);
             AddError("Failed to obtain refresh token from Google. Ensure access_type=offline and prompt=consent were used.");
-            await Send.ErrorsAsync(400, ct);
+            await Send.ErrorsAsync(ResultErrorType.ExternalServiceError, 400, ct);
             return;
         }
 

@@ -28,8 +28,10 @@ response builder renders as the body's `errorType` field (B18). **Never call
 silently drops the type, so the client cannot tell a unique violation from a concurrency
 conflict; `ErrorStatusBypassGuardTests` fails the build's test run on any such call. In an
 extension method over `IEndpoint`, it is `endpoint.ErrorStatus(...)`. Where the status is
-hand-picked and must not follow the mapping (the login flow's 403 for a lockout), stamp only:
-`HttpContext.SetResultErrorType(...)`. See `docs/claude/endpoints.md`, "Error bodies".
+hand-picked and must not follow the mapping (the login flow's 403 for a lockout, the 2FA step's
+401s), use the typed overload `Send.ErrorsAsync(result.ErrorType, <status>, ct)` — it stamps and
+sends in one call; the same guard's Roslyn arm fails on a bare `Send.ErrorsAsync(<status>, ct)`
+inside an `if (x.Failed)` branch (B25). See `docs/claude/endpoints.md`, "Error bodies".
 
 The framework `Base*Endpoint`s already do this. Hand-written endpoints should use
 `ErrorStatus` too, so status codes stay consistent across modules. (Several existing

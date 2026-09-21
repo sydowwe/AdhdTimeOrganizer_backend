@@ -258,60 +258,141 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         req2.Content = JsonContent.Create(payload);
         var res2 = await client.SendAsync(req2, TestContext.Current.CancellationToken);
         res2.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        // B25: a spent session says so, so the dialog sends the user back to the password step instead
+        // of inviting a retype into a token that can never succeed. No instant — nothing is locked.
+        var body2 = await res2.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        body2.Should().Contain("\"errorType\":\"Unauthorized\"");
+        body2.Should().NotContain("lockoutEndUtc");
     }
 
-    [Fact]
-    public async Task TwoFa_Extension_LockedOutAccount_Returns401()
+    /// <summary>
+    /// A confirmed, 2FA-enabled, lockout-enabled account with no authenticator key, inserted the way
+    /// <c>UserManager</c> would so the lockout bookkeeping (<c>AccessFailedAsync</c> / <c>UpdateAsync</c>)
+    /// finds the stamps it throws without. No key means every TOTP is wrong, which is what the two
+    /// lockout tests below need.
+    /// </summary>
+    private async Task<long> SeedTwoFactorUserAsync(string email)
     {
-        const string email = "2fa-lockout-sec-test@integration.com";
-        long lockedUserId;
-
-        await using (var db = (AppDbContext)Fixture.CreateDbContext())
+        await using var db = (AppDbContext)Fixture.CreateDbContext();
+        var user = new User
         {
-            var user = new User
-            {
-                Email = email,
-                NormalizedEmail = email.ToUpperInvariant(),
-                UserName = email,
-                NormalizedUserName = email.ToUpperInvariant(),
-                EmailConfirmed = true,
-                TwoFactorEnabled = true,
-                // AccessFailedAsync only ever locks an account that opted into lockout; without this
-                // the failed-count climbs and IsLockedOutAsync stays false.
-                LockoutEnabled = true,
-                // Identity's lockout bookkeeping (AccessFailedAsync/UpdateAsync) throws without one.
-                SecurityStamp = Guid.NewGuid().ToString("N"),
-                ConcurrencyStamp = Guid.NewGuid().ToString("N"),
-                Locale = AvailableLocales.En,
-                Timezone = TimeZoneInfo.Utc
-            };
-            user.PasswordHash = new PasswordHasher<User>().HashPassword(user, "Test@1234!");
-            db.Users.Add(user);
-            await db.SaveChangesAsync( TestContext.Current.CancellationToken);
-            lockedUserId = user.Id;
-        }
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
+            UserName = email,
+            NormalizedUserName = email.ToUpperInvariant(),
+            EmailConfirmed = true,
+            TwoFactorEnabled = true,
+            // AccessFailedAsync only ever locks an account that opted into lockout; without this
+            // the failed-count climbs and IsLockedOutAsync stays false.
+            LockoutEnabled = true,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            ConcurrencyStamp = Guid.NewGuid().ToString("N"),
+            Locale = AvailableLocales.En,
+            Timezone = TimeZoneInfo.Utc
+        };
+        user.PasswordHash = new PasswordHasher<User>().HashPassword(user, "Test@1234!");
+        db.Users.Add(user);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return user.Id;
+    }
 
-        using (var scope = Fixture.UnauthenticatedFactory.Services.CreateScope())
-        {
-            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
-            var user = await userManager.FindByIdAsync(lockedUserId.ToString());
-            // Exhaust failed attempts to trigger Identity lockout
-            for (var i = 0; i < 5; i++)
-                await userManager.AccessFailedAsync(user!);
-        }
+    private async Task AccessFailedAsync(long userId, int times)
+    {
+        using var scope = Fixture.UnauthenticatedFactory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        for (var i = 0; i < times; i++)
+            await userManager.AccessFailedAsync(user!);
+    }
 
-        var pendingToken = IssuePendingToken(lockedUserId);
-
-        var payload = new { Email = email, Token = "000000", StayLoggedIn = false, PendingAuthToken = pendingToken };
+    /// <summary>One code attempt against a fresh pending token — the shape a real client walks.</summary>
+    private async Task<HttpResponseMessage> PostExtensionTwoFaAsync(long userId, string email, string code)
+    {
+        var payload = new { Email = email, Token = code, StayLoggedIn = false, PendingAuthToken = IssuePendingToken(userId) };
         using var request = new HttpRequestMessage(HttpMethod.Post, "auth/login/2fa/extension");
         request.Content = JsonContent.Create(payload);
 
         using var client = CreateCookieClient();
-        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    /// B25: the 2FA step's lockout 401 is <c>Login_LockedOut_Returns403_WithLockoutEndUtc</c> minus the
+    /// status — same <c>errorType</c>, same <c>lockoutEndUtc</c>. The status stays 401 on purpose: a
+    /// client must keep reading a 401 on an auth route as "not signed in", so the body is the only thing
+    /// that separates "locked out" from "wrong code" here. Same silent mechanism as B18/B21, hence the
+    /// body assertion.
+    /// </summary>
+    private static async Task AssertLockedOutTwoFaBodyAsync(HttpResponseMessage response, DateTimeOffset before)
+    {
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized, "B25 adds fields to the body, it does not move the status");
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        body.Should().Contain("locked", "older clients still word-match the sentence");
+        body.Should().Contain("\"errorType\":\"UserLockedOut\"");
+
+        using var json = JsonDocument.Parse(body);
+        json.RootElement.TryGetProperty("lockoutEndUtc", out var lockoutEndUtc).Should().BeTrue();
+        lockoutEndUtc.GetString().Should().EndWith("Z", "the contract is ISO-8601 in UTC");
+        var lockoutEnd = lockoutEndUtc.GetDateTimeOffset();
+        // IdentityServiceExtensions: 5 attempts, 5 minutes. Not asserting the policy, only that the
+        // instant is the one Identity stamped, i.e. in the future and no further than the window.
+        lockoutEnd.Should().BeAfter(before);
+        lockoutEnd.Should().BeOnOrBefore(before.AddMinutes(5).AddSeconds(5));
+    }
+
+    /// <summary>
+    /// The lock landed between the password step and the code — a concurrent password burst from
+    /// elsewhere. The one branch where "wrong code" would be flatly misleading.
+    /// </summary>
+    [Fact]
+    public async Task TwoFa_Extension_AlreadyLockedOut_Returns401_UserLockedOut_WithLockoutEndUtc()
+    {
+        const string email = "2fa-lockout-sec-test@integration.com";
+        var userId = await SeedTwoFactorUserAsync(email);
+        await AccessFailedAsync(userId, 5);
+
+        var before = DateTimeOffset.UtcNow;
+        using var response = await PostExtensionTwoFaAsync(userId, email, "000000");
+
+        await AssertLockedOutTwoFaBodyAsync(response, before);
+    }
+
+    /// <summary>
+    /// The wrong code that <i>trips</i> the lock reports the lock, the same as Identity's own
+    /// <c>PasswordSignInAsync</c> and as <c>PasswordSignInFlow</c> on the password that trips it. Before
+    /// B25 this attempt answered <c>InvalidTwoFactorAuthToken</c> and the user only learned they were
+    /// locked on their next sign-in.
+    /// </summary>
+    [Fact]
+    public async Task TwoFa_Extension_WrongCodeThatTripsLockout_Returns401_UserLockedOut_WithLockoutEndUtc()
+    {
+        const string email = "2fa-lockout-trip-sec-test@integration.com";
+        var userId = await SeedTwoFactorUserAsync(email);
+        await AccessFailedAsync(userId, 4);
+
+        var before = DateTimeOffset.UtcNow;
+        using var response = await PostExtensionTwoFaAsync(userId, email, "000000");
+
+        await AssertLockedOutTwoFaBodyAsync(response, before);
+    }
+
+    /// <summary>The sub-threshold wrong code names itself and carries no instant — nothing is locked yet.</summary>
+    [Fact]
+    public async Task TwoFa_Extension_WrongCodeBelowThreshold_Returns401_InvalidTwoFactorAuthToken()
+    {
+        const string email = "2fa-wrong-code-sec-test@integration.com";
+        var userId = await SeedTwoFactorUserAsync(email);
+
+        using var response = await PostExtensionTwoFaAsync(userId, email, "000000");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        var body = await response.Content.ReadAsStringAsync( TestContext.Current.CancellationToken);
-        body.Should().Contain("locked");
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        body.Should().Contain("\"errorType\":\"InvalidTwoFactorAuthToken\"");
+        body.Should().NotContain("lockoutEndUtc", "absent, not null, on everything but the lockout");
+
+        await using var db = (AppDbContext)Fixture.CreateDbContext();
+        var user = await db.Users.SingleAsync(u => u.Id == userId, TestContext.Current.CancellationToken);
+        user.AccessFailedCount.Should().Be(1, "a wrong code must keep counting toward lockout");
     }
 
     // ── Token reuse detection ────────────────────────────────────────────────

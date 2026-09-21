@@ -40,7 +40,7 @@ public class GoogleSignInEndpoint(
         if (googleSignInResult.Failed)
         {
             AddError("Failed to verify Google sign-in code.");
-            await Send.ErrorsAsync(400, ct);
+            await Send.ErrorsAsync(googleSignInResult.ErrorType, 400, ct);
             return;
         }
 
@@ -131,7 +131,7 @@ public class GoogleSignInEndpoint(
             AddError(result.Outcome is UserRegistrationOutcome.DuplicateUser
                 ? "Could not sign in with Google."
                 : result.ErrorMessage!);
-            await Send.ErrorsAsync(result.StatusCode, ct);
+            await Send.ErrorsAsync(result.ErrorType, result.StatusCode, ct);
             return null;
         }
 

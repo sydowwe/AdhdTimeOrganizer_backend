@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.Core.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.persistence;
 
@@ -70,7 +71,7 @@ public class CloneActivityEndpoint(DbContext dbContext) : Endpoint<QuickEditActi
             if (result.Failed)
             {
                 AddError(result.ErrorMessage!);
-                await Send.ErrorsAsync(400, ct);
+                await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
                 return;
             }
 
@@ -80,7 +81,7 @@ public class CloneActivityEndpoint(DbContext dbContext) : Endpoint<QuickEditActi
         {
             var result = DbUtils.HandleException(ex, nameof(HandleAsync));
             AddError(result.ErrorMessage!);
-            await Send.ErrorsAsync(400, ct);
+            await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
         }
     }
 }

@@ -76,7 +76,7 @@ public class SetArchivedActivityEndpoint(DbContext dbContext) : Endpoint<SetActi
             if (result.Failed)
             {
                 AddError(result.ErrorMessage!);
-                await Send.ErrorsAsync(400, ct);
+                await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
                 return;
             }
 
