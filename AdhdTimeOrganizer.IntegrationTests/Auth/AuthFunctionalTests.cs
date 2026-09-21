@@ -143,6 +143,7 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
         var setup = await setupResponse.Content.ReadFromJsonAsync<TwoFactorAuthResponse>( TestContext.Current.CancellationToken);
         setup!.TwoFactorEnabled.Should().BeTrue();
         setup.QrCode.Should().NotBeNullOrEmpty();
+        setup.SharedKey.Should().NotBeNullOrEmpty("the key must be readable without decoding the QR image (B22)");
         setup.RecoveryCodes.Should().NotBeNullOrEmpty("first-time setup issues the initial recovery codes");
 
         using (var scope = Fixture.UnauthenticatedFactory.Services.CreateScope())
@@ -150,8 +151,48 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
             var user = await userManager.FindByIdAsync(userId.ToString());
             (await userManager.GetAuthenticatorKeyAsync(user!))
-                .Should().NotBeNullOrEmpty("setup must persist the authenticator key");
+                .Should().Be(setup.SharedKey, "sharedKey is the very key Identity stores, not a re-encoding of it");
         }
+
+        // The whole point of the string: a client computes a code from it alone — no PNG decoding, no
+        // server-side help — and the 2FA step accepts it. The setup call left the partial-auth cookie
+        // in place, so the same client can finish the login it started.
+        var totp = GenerateTotp(setup.SharedKey!, DateTimeOffset.UtcNow);
+        var verifyResponse = await cookieClient.PostAsJsonAsync("auth/login/2fa",
+            new { Token = totp, StayLoggedIn = false }, TestContext.Current.CancellationToken);
+        verifyResponse.StatusCode.Should().Be(HttpStatusCode.NoContent,
+            "a TOTP generated from sharedKey must satisfy the 2FA step exactly as one from a scanned QR would");
+    }
+
+    /// <summary>
+    /// RFC 6238 / 4226, six digits, 30-second step, HMAC-SHA1 — the parameters Identity's
+    /// <c>AuthenticatorTokenProvider</c> verifies against, and what <c>otplib</c> defaults to on the
+    /// e2e side. Written out rather than pulled in as a package because the test's claim is precisely
+    /// that the bare base32 string is enough to produce a valid code.
+    /// </summary>
+    private static string GenerateTotp(string base32Key, DateTimeOffset at)
+    {
+        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        var bits = 0;
+        var buffer = 0;
+        var key = new List<byte>();
+        foreach (var c in base32Key.TrimEnd('=').ToUpperInvariant())
+        {
+            buffer = (buffer << 5) | alphabet.IndexOf(c);
+            bits += 5;
+            if (bits < 8) continue;
+            key.Add((byte)(buffer >> (bits - 8)));
+            bits -= 8;
+        }
+
+        var step = at.ToUnixTimeSeconds() / 30;
+        var counter = new byte[8];
+        for (var i = 7; i >= 0; i--, step >>= 8) counter[i] = (byte)(step & 0xff);
+
+        var hash = System.Security.Cryptography.HMACSHA1.HashData(key.ToArray(), counter);
+        var offset = hash[^1] & 0x0f;
+        var binary = ((hash[offset] & 0x7f) << 24) | (hash[offset + 1] << 16) | (hash[offset + 2] << 8) | hash[offset + 3];
+        return (binary % 1_000_000).ToString("D6");
     }
 
     // ── Logout ────────────────────────────────────────────────────────────────
