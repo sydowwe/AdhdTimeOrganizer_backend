@@ -45,10 +45,18 @@ public class PlannerTask : BasePlannerTask
     /// by every status-mutation call site (PatchPlannerTaskStatusEndpoint, TodoListItemIsDoneChangedEventHandler,
     /// RoutineTodoListIsDoneChangedEventHandler).
     /// Callers that also want to set actual times for InProgress/Completed do so after calling this.
+    /// <para>
+    /// A skip reason only ever sits on a <c>Cancelled</c> task: a transition to <c>Cancelled</c> stores
+    /// <paramref name="skipReason"/> (trimmed, blank ⇒ null — a re-skip overwrites), and any other status clears
+    /// it, so a restored task does not keep the reason for a skip that no longer holds.
+    /// </para>
     /// </summary>
-    public void ApplyStatus(PlannerTaskStatus newStatus)
+    public void ApplyStatus(PlannerTaskStatus newStatus, string? skipReason = null)
     {
         Status = newStatus;
+        SkipReason = newStatus == PlannerTaskStatus.Cancelled && !string.IsNullOrWhiteSpace(skipReason)
+            ? skipReason.Trim()
+            : null;
         if (newStatus is PlannerTaskStatus.Cancelled or PlannerTaskStatus.NotStarted)
         {
             ActualStartTime = null;

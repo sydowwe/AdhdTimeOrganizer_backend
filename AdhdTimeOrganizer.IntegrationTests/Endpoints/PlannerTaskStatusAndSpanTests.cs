@@ -177,7 +177,116 @@ public class PlannerTaskStatusAndSpanTests(AppDbContextFixture fixture) : Postgr
             "the span-patch validator refuses the same shape -- the two paths no longer disagree");
     }
 
+    // ─── B26: skipReason — written by the status patch only, and only on a Cancelled task ───────────────
+
+    [Fact(DisplayName = "B26: skipping stores the trimmed reason, a re-skip overwrites it, and restoring clears it")]
+    public async Task SkipReason_StoredOnCancel_OverwrittenOnReskip_ClearedOnRestore()
+    {
+        var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", "  Ran out of time  ")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await LoadAsync(taskId)).SkipReason.Should().Be("Ran out of time",
+            "the status patch used to drop this key silently — the value must land, trimmed");
+
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", "Felt unwell")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await LoadAsync(taskId)).SkipReason.Should().Be("Felt unwell", "a re-skip overwrites the old reason");
+
+        // The home widget's Restore: notStarted with an explicit null reason.
+        (await PatchStatusWithReasonAsync(taskId, "notStarted", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var restored = await LoadAsync(taskId);
+        restored.Status.Should().Be(PlannerTaskStatus.NotStarted);
+        restored.SkipReason.Should().BeNull("a restored task must not keep the reason for a skip that no longer holds");
+    }
+
+    [Fact(DisplayName = "B26: completing a skipped task clears its reason")]
+    public async Task SkipReason_ClearedWhenCancelledTaskIsCompleted()
+    {
+        var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", "Injured")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await PatchStatusWithReasonAsync(taskId, "completed", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await LoadAsync(taskId)).SkipReason.Should().BeNull("an orphaned skip reason on a completed row is exactly the bug rule 2 closes");
+    }
+
+    [Fact(DisplayName = "B26: a blank reason is stored as null")]
+    public async Task SkipReason_BlankIsNull()
+    {
+        var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", "   ")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var task = await LoadAsync(taskId);
+        task.Status.Should().Be(PlannerTaskStatus.Cancelled);
+        task.SkipReason.Should().BeNull();
+    }
+
+    [Theory(DisplayName = "B26: a reason beside any status but Cancelled is a 400; a null one is accepted")]
+    [InlineData("notStarted")]
+    [InlineData("inProgress")]
+    [InlineData("completed")]
+    public async Task SkipReason_WithNonCancelledStatus_IsRejected(string status)
+    {
+        var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+
+        var rejected = await PatchStatusWithReasonAsync(taskId, status, "Ran out of time");
+        rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest, "a value the status would silently drop is refused, not swallowed");
+        (await LoadAsync(taskId)).Status.Should().Be(PlannerTaskStatus.NotStarted, "the rejected patch must not have been applied");
+
+        (await PatchStatusWithReasonAsync(taskId, status, null)).StatusCode.Should().Be(HttpStatusCode.NoContent,
+            "the client always sends skipReason: null beside a non-cancelled status");
+    }
+
+    [Fact(DisplayName = "B26: a reason over 500 characters is a 400")]
+    public async Task SkipReason_OverColumnLength_IsRejected()
+    {
+        var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", new string('x', 501))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", new string('x', 500))).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact(DisplayName = "B26: the full PUT keeps the reason while the task stays Cancelled, never writes it, and clears it on leaving")]
+    public async Task SkipReason_FullPut_KeepsOnCancelled_ClearsOnLeaving()
+    {
+        var (calendarId, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", "Ran out of time")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var activityId = (await LoadAsync(taskId)).ActivityId;
+
+        // A skipped task moved later, with whatever reason the client last read in the body.
+        (await PutAsync(taskId, activityId, calendarId, "Cancelled", 11, "Something else")).StatusCode.Should().Be(HttpStatusCode.OK);
+        var moved = await LoadAsync(taskId);
+        moved.StartTime.Should().Be(new TimeOnly(11, 0));
+        moved.SkipReason.Should().Be("Ran out of time", "the PUT is not a writer of the reason; the status patch is");
+
+        (await PutAsync(taskId, activityId, calendarId, "NotStarted", 12, "Ran out of time")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await LoadAsync(taskId)).SkipReason.Should().BeNull("a PUT that leaves Cancelled clears the reason, same as the status patch");
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
+
+    private async Task<PlannerTask> LoadAsync(long taskId)
+    {
+        await using var db = CreateDbContext();
+        return await db.Set<PlannerTask>().AsNoTracking().SingleAsync(t => t.Id == taskId, CancellationToken);
+    }
+
+    // Mirrors the client's exact body: all four keys, camelCase status, explicit nulls.
+    private Task<HttpResponseMessage> PatchStatusWithReasonAsync(long taskId, string status, string? skipReason) =>
+        CreateClient().PatchAsJsonAsync($"api/planner-task/{taskId}/status",
+            new { status, actualStartTime = (object?)null, actualEndTime = (object?)null, skipReason }, JsonOpts, CancellationToken);
+
+    private Task<HttpResponseMessage> PutAsync(long taskId, long activityId, long calendarId, string status, int startHour, string? skipReason) =>
+        CreateClient().PutAsJsonAsync($"api/planner-task/{taskId}", new
+        {
+            StartTime = new { Hours = startHour, Minutes = 0 },
+            EndTime = new { Hours = startHour + 1, Minutes = 0 },
+            IsBackground = false,
+            ActivityId = activityId,
+            Status = status,
+            CalendarId = calendarId,
+            SkipReason = skipReason
+        }, JsonOpts, CancellationToken);
 
     private async Task<(long CalendarId, long TaskId)> SeedTaskAsync(TimeOnly start, TimeOnly end)
     {

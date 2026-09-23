@@ -29,7 +29,7 @@ public class PatchPlannerTaskStatusEndpoint(
         Summary(s =>
         {
             s.Summary = "Update planner task status";
-            s.Description = "Updates task status with side effects: resets ActualStart/EndTime for Cancelled/NotStarted statuses, publishes status change event if task date is today";
+            s.Description = "Updates task status with side effects: resets ActualStart/EndTime for Cancelled/NotStarted statuses, stores SkipReason on Cancelled and clears it on any other status, publishes status change event if task date is today";
             s.Response(204, "Updated");
             s.Response(404, "Not found");
             s.Response(400, "Bad request or validation error");
@@ -53,7 +53,7 @@ public class PatchPlannerTaskStatusEndpoint(
                 return;
             }
 
-            entity.ApplyStatus(request.Status);
+            entity.ApplyStatus(request.Status, request.SkipReason);
 
             switch (request.Status)
             {

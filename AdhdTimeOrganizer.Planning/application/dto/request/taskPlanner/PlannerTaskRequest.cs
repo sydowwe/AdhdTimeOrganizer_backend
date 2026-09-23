@@ -74,6 +74,12 @@ public record PlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<PlannerTas
         entity.Notes = Notes;
         entity.ActivityId = ActivityId;
         entity.ImportanceId = ImportanceId;
+        // Not a writer of SkipReason — PATCH /planner-task/{id}/status is the one place a skip is recorded.
+        // But a PUT that moves the task out of Cancelled must not keep the reason for a skip that no longer
+        // holds (ApplyStatus's rule); one that stays Cancelled (a skipped task moved later) keeps it. Not
+        // ApplyStatus itself: that would also start clearing actual times on the PUT, which it never has.
+        if (Status != PlannerTaskStatus.Cancelled)
+            entity.SkipReason = null;
         entity.Status = Status;
         // Left alone when the caller named its day by date instead — the endpoint has already resolved that
         // into CalendarId on the entity, and overwriting it with 0 here would orphan the task.
