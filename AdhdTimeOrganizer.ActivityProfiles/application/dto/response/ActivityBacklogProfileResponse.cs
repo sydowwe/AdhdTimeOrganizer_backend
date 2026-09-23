@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.ActivityProfiles.domain.model;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
@@ -46,6 +47,21 @@ public record ActivityBacklogProfileResponse : WithActivityResponse, IProjection
 
     /// <inheritdoc cref="LocationType"/>
     public required SelectOptionResponse WeatherDependency { get; init; }
+
+    /// <summary>
+    /// The <see cref="WeatherDependencyCodes.Effective"/> value of <see cref="WeatherDependency"/>: the row's
+    /// stored <c>Code</c>, else <see cref="WeatherDependencyCodes.Infer"/> of its text, else null. Null means
+    /// "unrecognised row", and the client treats it as no weather opinion for this entry — as it does
+    /// <see cref="WeatherDependencyCodes.None"/>, which is why this has to be on the row at all: the
+    /// weather-fit set always contains <c>none</c>, so ids alone cannot tell "fits any weather" from "fits
+    /// today's".
+    ///
+    /// <para><b>Two-stage on purpose.</b> The projections carry only the stored column, because
+    /// <see cref="WeatherDependencyCodes.Infer"/> has no SQL translation; every endpoint serving this DTO then
+    /// finishes it with <see cref="WithEffectiveWeatherDependencyCode"/> after the rows are loaded. Optional
+    /// rather than <c>required</c> so the other responses that point at this one need not change.</para>
+    /// </summary>
+    public string? WeatherDependencyCode { get; init; }
 
     public required EnergyLevel EnergyLevel { get; init; }
     public EffortType? EffortType { get; init; }
@@ -123,9 +139,17 @@ public record ActivityBacklogProfileResponse : WithActivityResponse, IProjection
             ExpectedCostTierId = e.ExpectedCostTierId,
             ExpectedCostTier = new SelectOptionResponse { Id = e.ExpectedCostTier.Id, Text = e.ExpectedCostTier.Text },
             DurationMinutes = e.DurationMinutes,
-            IsRepeatable = e.IsRepeatable
+            IsRepeatable = e.IsRepeatable,
+            WeatherDependencyCode = e.WeatherDependency.Code
         });
     }
+
+    /// <summary>
+    /// Fills <see cref="WeatherDependencyCode"/> from the label when the projection found no stored code. Run
+    /// on every row after it is loaded — see the two-stage note on the property.
+    /// </summary>
+    public ActivityBacklogProfileResponse WithEffectiveWeatherDependencyCode() =>
+        this with { WeatherDependencyCode = WeatherDependencyCodes.Effective(WeatherDependencyCode, WeatherDependency.Text) };
 
     /// <summary>
     /// <see cref="Projection"/> plus the two completion fields, computed as correlated subqueries over
@@ -172,6 +196,7 @@ public record ActivityBacklogProfileResponse : WithActivityResponse, IProjection
             ExpectedCostTier = new SelectOptionResponse { Id = e.ExpectedCostTier.Id, Text = e.ExpectedCostTier.Text },
             DurationMinutes = e.DurationMinutes,
             IsRepeatable = e.IsRepeatable,
+            WeatherDependencyCode = e.WeatherDependency.Code,
             IsAnchored = !e.IsRepeatable && anchors.Any(m => m.ActivityId == e.ActivityId),
             MemoryAnchorId = e.IsRepeatable
                 ? null

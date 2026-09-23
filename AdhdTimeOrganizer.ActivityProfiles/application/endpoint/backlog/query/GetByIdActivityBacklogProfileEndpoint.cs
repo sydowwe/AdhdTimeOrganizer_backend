@@ -30,10 +30,13 @@ public class GetByIdActivityBacklogProfileEndpoint(DbContext dbContext, IReferen
     /// The projection has no anchors to reach (see <see cref="ActivityBacklogProfileResponse.Projection"/>),
     /// so they are overlaid from a second read rather than letting this route answer
     /// <c>isAnchored: false</c> for an entry the grid shows as done. Repeatable entries are never anchored —
-    /// same rule as <c>ProjectionWithAnchors</c>.
+    /// same rule as <c>ProjectionWithAnchors</c>. The weather code is finished here too, for the reason on
+    /// <see cref="ActivityBacklogProfileResponse.WeatherDependencyCode"/>.
     /// </summary>
     protected override async Task<ActivityBacklogProfileResponse> PostProcessAsync(ActivityBacklogProfileResponse entity, CancellationToken ct)
     {
+        entity = entity.WithEffectiveWeatherDependencyCode();
+
         if (entity.IsRepeatable)
             return entity;
 

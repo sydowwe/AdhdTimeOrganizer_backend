@@ -30,6 +30,16 @@ public class GridActivityBacklogProfileEndpoint(DbContext dbContext)
         query => ActivityBacklogProfileResponse.ProjectionWithAnchors(query, ScopedAnchors());
 
     /// <summary>
+    /// The one field that cannot be computed in SQL: the label inference has no translation. So it does sort
+    /// as its pre-fill value — the stored code, null for every user-created row — exactly as the note on
+    /// <see cref="Projection"/> warns. That is harmless here, because nothing sorts or filters on
+    /// <c>weatherDependencyCode</c>; the grid's weather filter and sort go through the lookup id and text.
+    /// Don't "fix" this by moving it into the projection.
+    /// </summary>
+    protected override List<ActivityBacklogProfileResponse> PostProcessItems(List<ActivityBacklogProfileResponse> items) =>
+        items.Select(item => item.WithEffectiveWeatherDependencyCode()).ToList();
+
+    /// <summary>
     /// Ownership belongs here, not in <see cref="ApplyCustomFiltering"/> — the base only calls that one
     /// when the request carries a filter, so a caller sending <c>useFilter: false</c> would otherwise get
     /// every user's profiles. ActivityBacklogProfile is not IEntityWithUser, so the host's

@@ -5,9 +5,11 @@ namespace AdhdTimeOrganizer.ActivityProfiles.domain.model;
 /// tokens.
 ///
 /// <para>These are the same four the client already has locale keys for
-/// (<c>enums.weatherDependency.{sunny,snow,dry,none}</c>). They never cross the wire — the weather endpoint
-/// resolves them into lookup <b>ids</b> precisely so the client never has to reason about them — but keeping
-/// the spelling identical is what lets a future contract expose them without a translation table.</para>
+/// (<c>enums.weatherDependency.{sunny,snow,dry,none}</c>), spelled identically so they cross the wire without
+/// a translation table. Two contracts carry them: the weather endpoint resolves them into lookup <b>ids</b>,
+/// and every backlog row carries its own <see cref="Effective"/> code as <c>weatherDependencyCode</c> — the
+/// latter so the picker can tell a "don't care" row, which fits every day, from one that really depends on
+/// the weather.</para>
 ///
 /// <para>Not an enum, and deliberately: the value is a persisted column on a user-editable row, so it has to
 /// survive a member being renamed or removed. An unrecognised code is simply a row that matches no weather.</para>
@@ -25,6 +27,15 @@ public static class WeatherDependencyCodes
 
     /// <summary>Wants snow on the ground.</summary>
     public const string Snow = "snow";
+
+    /// <summary>
+    /// The code a row actually means: its stored <paramref name="code"/> when it has one, else whatever
+    /// <see cref="Infer"/> reads off its label, else null. The one rule every reader applies — the weather-fit
+    /// endpoint and the backlog row's <c>WeatherDependencyCode</c> must never disagree about the same row.
+    ///
+    /// <para>The stored code always wins, so renaming a seeded row does not change what it means.</para>
+    /// </summary>
+    public static string? Effective(string? code, string? text) => code ?? Infer(text);
 
     /// <summary>
     /// Best-effort guess at a code from a row's label, for rows that carry none — anything the user created

@@ -21,4 +21,11 @@ public class GetAllActivityBacklogProfileEndpoint(DbContext dbContext) : BaseGet
     /// </summary>
     protected override IQueryable<ActivityBacklogProfile> Filter(IQueryable<ActivityBacklogProfile> query) =>
         query.Where(p => p.Activity.UserId == User.GetId());
+
+    /// <summary>
+    /// See <see cref="ActivityBacklogProfileResponse.WeatherDependencyCode"/> — the label inference runs after
+    /// the load, on every route that serves this DTO.
+    /// </summary>
+    protected override List<ActivityBacklogProfileResponse> PostProcessItems(List<ActivityBacklogProfileResponse> items) =>
+        items.Select(item => item.WithEffectiveWeatherDependencyCode()).ToList();
 }

@@ -104,7 +104,7 @@ public class GetLeisureWeatherFitEndpoint(
         // A row with no stored code gets one guessed from its label rather than being silently dropped: rows the
         // user created themselves never carry one, and they are exactly the rows a keen user leans on.
         var matchingIds = rows
-            .Where(row => (row.Code ?? WeatherDependencyCodes.Infer(row.Text)) is { } code && matchingCodes.Contains(code))
+            .Where(row => WeatherDependencyCodes.Effective(row.Code, row.Text) is { } code && matchingCodes.Contains(code))
             .Select(row => row.Id)
             .ToList();
 
