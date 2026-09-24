@@ -215,6 +215,26 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
             "the stale rows in both views are skipped and the day still gets its other suggestion");
     }
 
+    /// <summary>
+    /// B27 part 5. The handler loads the calendar with <c>FindAsync</c> and never compares its <c>UserId</c> with
+    /// the caller's; what keeps another account's calendar out is the per-user global query filter on
+    /// <c>Calendar</c>, which <c>FindAsync</c> applies. This pins that the route answers 404, not suggestions
+    /// steered by someone else's date and day type.
+    /// </summary>
+    [Fact(DisplayName = "Another user's calendar id is a 404, not their day's suggestions")]
+    public async Task ForeignCalendar_IsNotFound()
+    {
+        var foreignUserId = await ActivityMergeTestSupport.SecondUserAsync(
+            Fixture, $"repeating-suggestions-foreign-{Guid.NewGuid():N}@test.com");
+
+        long foreignCalendarId;
+        await using (var db = CreateDbContext())
+            foreignCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 6, 14), foreignUserId, CancellationToken);
+
+        var response = await CreateClient().GetAsync($"api/repeating-planner-task/suggestions/{foreignCalendarId}", CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private async Task SeedSameWeekdayTaskAsync(

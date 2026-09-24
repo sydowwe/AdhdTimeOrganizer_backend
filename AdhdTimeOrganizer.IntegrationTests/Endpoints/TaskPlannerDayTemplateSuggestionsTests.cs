@@ -22,6 +22,12 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// two source days (or the weekday) on purpose, so each test sees only the pattern kind it is about.
 /// </para>
 /// <para>
+/// B27 added a second tier after the history one: an active template whose own <c>ScheduledDays</c> or
+/// <c>SuggestedForDayType</c> matches the day is suggested with no history (<c>PatternType 2</c> / <c>3</c>).
+/// The history tests therefore seed through <see cref="SeedHistoryOnlyTemplateAsync"/>, whose metadata
+/// matches none of their days — otherwise the seed helper's default <c>Workday</c> tag would add a row.
+/// </para>
+/// <para>
 /// <c>CQ-13</c> is the last test here: <c>applied_template_id</c> carries <b>no foreign key</b>, so deleting a
 /// template leaves the stamp dangling and the view row outlives its principal until the host-side refresh job
 /// runs again. Projecting through the null navigation was a 500 on a page load, caused by an action the user
@@ -41,7 +47,7 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
 
         await using (var db = CreateDbContext())
         {
-            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, "Tuesday routine", CancellationToken);
+            templateId = await SeedHistoryOnlyTemplateAsync(db, "Tuesday routine");
             await StampAsync(db, templateId, target.AddDays(-7), DayType.Workday);
             await StampAsync(db, templateId, target.AddDays(-14), DayType.Vacation); // differing day types: no DayType pattern
             tuesdayCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken);
@@ -73,7 +79,7 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
 
         await using (var db = CreateDbContext())
         {
-            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, "Sunday routine", CancellationToken);
+            templateId = await SeedHistoryOnlyTemplateAsync(db, "Sunday routine");
             await StampAsync(db, templateId, target.AddDays(-7), DayType.Workday);
             await StampAsync(db, templateId, target.AddDays(-14), DayType.Vacation);
             calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken);
@@ -98,7 +104,7 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
 
         await using (var db = CreateDbContext())
         {
-            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, "Holiday routine", CancellationToken);
+            templateId = await SeedHistoryOnlyTemplateAsync(db, "Holiday routine");
             // Two different weekdays, so only the DayType grouping reaches the threshold.
             await StampAsync(db, templateId, target.AddDays(-3), DayType.Vacation);
             await StampAsync(db, templateId, target.AddDays(-9), DayType.Vacation);
@@ -124,8 +130,8 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
 
         await using (var db = CreateDbContext())
         {
-            usedTwice = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, "Applied twice", CancellationToken);
-            usedThreeTimes = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, "Applied three times", CancellationToken);
+            usedTwice = await SeedHistoryOnlyTemplateAsync(db, "Applied twice");
+            usedThreeTimes = await SeedHistoryOnlyTemplateAsync(db, "Applied three times");
 
             await StampAsync(db, usedTwice, target.AddDays(-7), DayType.Workday);
             await StampAsync(db, usedTwice, target.AddDays(-14), DayType.Vacation);
@@ -165,7 +171,9 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
         long foreignCalendarId, ownCalendarId;
         await using (var db = CreateDbContext())
         {
-            var foreignTemplateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, foreignUserId, "Theirs", CancellationToken);
+            // Tagged for the very weekday and day type of the own calendar, so neither tier may leak it.
+            var foreignTemplateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, foreignUserId, "Theirs", CancellationToken, DayType.Workday, [target.AddDays(1).DayOfWeek]);
             await StampAsync(db, foreignTemplateId, target.AddDays(-7), DayType.Workday, foreignUserId);
             await StampAsync(db, foreignTemplateId, target.AddDays(-14), DayType.Vacation, foreignUserId);
             foreignCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, foreignUserId, CancellationToken);
@@ -193,8 +201,8 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
 
         await using (var db = CreateDbContext())
         {
-            deletedTemplateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, "Doomed", CancellationToken);
-            survivingTemplateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, "Survivor", CancellationToken);
+            deletedTemplateId = await SeedHistoryOnlyTemplateAsync(db, "Doomed");
+            survivingTemplateId = await SeedHistoryOnlyTemplateAsync(db, "Survivor");
 
             await StampAsync(db, deletedTemplateId, target.AddDays(-7), DayType.Workday);
             await StampAsync(db, deletedTemplateId, target.AddDays(-14), DayType.Vacation);
@@ -216,7 +224,149 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
             "the stale row is skipped and the day still gets its other suggestion");
     }
 
+    // ─── B27: what the user set on the template ──────────────────────────────
+
+    [Fact(DisplayName = "B27: a template scheduled for Tuesdays is suggested on a Tuesday with no history at all")]
+    public async Task ScheduledDays_SuggestWithoutHistory()
+    {
+        var target = new DateOnly(2028, 4, 4); // Tuesday
+        long templateId, tuesdayCalendarId, wednesdayCalendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Tuesdays", CancellationToken, DayType.Special, [DayOfWeek.Tuesday]);
+            tuesdayCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken);
+            wednesdayCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target.AddDays(1), UserId, CancellationToken);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        var suggestion = (await GetSuggestionsAsync(tuesdayCalendarId)).Should().ContainSingle().Subject;
+        suggestion.Template.Id.Should().Be(templateId);
+        suggestion.PatternType.Should().Be(2);
+        suggestion.PatternLabel.Should().Be(nameof(DayOfWeek.Tuesday));
+        suggestion.OccurrenceCount.Should().Be(0);
+
+        (await GetSuggestionsAsync(wednesdayCalendarId)).Should().BeEmpty("the template is scheduled for Tuesdays only");
+    }
+
+    [Fact(DisplayName = "B27: a template suggested for Vacation days is suggested on a Vacation day with no history at all")]
+    public async Task SuggestedForDayType_SuggestsWithoutHistory()
+    {
+        var target = new DateOnly(2028, 4, 4);
+        long templateId, vacationCalendarId, workdayCalendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Vacation", CancellationToken, DayType.Vacation);
+            vacationCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken, DayType.Vacation);
+            workdayCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target.AddDays(1), UserId, CancellationToken);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        var suggestion = (await GetSuggestionsAsync(vacationCalendarId)).Should().ContainSingle().Subject;
+        suggestion.Template.Id.Should().Be(templateId);
+        suggestion.PatternType.Should().Be(3);
+        suggestion.PatternLabel.Should().Be(nameof(DayType.Vacation));
+        suggestion.OccurrenceCount.Should().Be(0);
+
+        (await GetSuggestionsAsync(workdayCalendarId)).Should().BeEmpty("a Workday is not a Vacation");
+    }
+
+    [Fact(DisplayName = "B27: history ranks first, then templates matching weekday and day type, then those matching one")]
+    public async Task HistoryRanksBeforeMetadata_AndDoubleMatchBeforeSingle()
+    {
+        var target = new DateOnly(2028, 4, 4); // Tuesday, Workday
+        long historyId, bothId, dayTypeOnlyId, dayOnlyId, calendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            historyId = await SeedHistoryOnlyTemplateAsync(db, "Applied on Tuesdays");
+            await StampAsync(db, historyId, target.AddDays(-7), DayType.Workday);
+            await StampAsync(db, historyId, target.AddDays(-14), DayType.Vacation);
+
+            dayTypeOnlyId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Workdays", CancellationToken, DayType.Workday);
+            dayOnlyId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Tuesdays", CancellationToken, DayType.Special, [DayOfWeek.Tuesday]);
+            // Seeded last, so an id-ordered result would not put it ahead of the single matches by accident.
+            bothId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Workday Tuesdays", CancellationToken, DayType.Workday, [DayOfWeek.Tuesday]);
+
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarId);
+        suggestions.Should().HaveCount(4);
+        suggestions[0].Template.Id.Should().Be(historyId);
+        suggestions[0].PatternType.Should().Be(0);
+        suggestions[1].Template.Id.Should().Be(bothId);
+        suggestions[1].PatternType.Should().Be(2, "a double match reports the weekday");
+        suggestions.Skip(2).Select(s => (s.Template.Id, s.PatternType))
+            .Should().BeEquivalentTo([(dayTypeOnlyId, 3), (dayOnlyId, 2)]);
+    }
+
+    /// <summary>
+    /// Two applications on Tuesdays that were both Workdays put the template in the view twice — once per
+    /// pattern type — and it is also tagged for Tuesdays and Workdays, so both metadata rules match it too.
+    /// Four reasons, one row: the history one.
+    /// </summary>
+    [Fact(DisplayName = "B27: a template matched by several patterns is suggested once, by its history")]
+    public async Task EachTemplate_AppearsOnce()
+    {
+        var target = new DateOnly(2028, 4, 4);
+        long templateId, calendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Everything matches", CancellationToken, DayType.Workday, [DayOfWeek.Tuesday]);
+            await StampAsync(db, templateId, target.AddDays(-7), DayType.Workday);
+            await StampAsync(db, templateId, target.AddDays(-14), DayType.Workday);
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        var suggestion = (await GetSuggestionsAsync(calendarId)).Should().ContainSingle().Subject;
+        suggestion.Template.Id.Should().Be(templateId);
+        suggestion.PatternType.Should().Be(0, "history outranks metadata, and on a tie the weekday pattern wins");
+        suggestion.OccurrenceCount.Should().Be(2);
+    }
+
+    [Fact(DisplayName = "B27: a switched-off template is never suggested, by history or by metadata")]
+    public async Task InactiveTemplate_IsNeverSuggested()
+    {
+        var target = new DateOnly(2028, 4, 4);
+        long calendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            var inactiveId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Switched off", CancellationToken, DayType.Workday, [DayOfWeek.Tuesday], isActive: false);
+            await StampAsync(db, inactiveId, target.AddDays(-7), DayType.Workday);
+            await StampAsync(db, inactiveId, target.AddDays(-14), DayType.Workday);
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        (await GetSuggestionsAsync(calendarId)).Should().BeEmpty();
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A template whose own metadata matches none of this file's target days — no calendar here is
+    /// <c>Special</c> and <c>ScheduledDays</c> is empty — so it can only be suggested through history.
+    /// </summary>
+    private Task<long> SeedHistoryOnlyTemplateAsync(DbContext db, string name) =>
+        PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, name, CancellationToken, DayType.Special);
 
     /// <summary>
     /// A day the template was applied to. Only <c>applied_template_id</c> matters to the view, so the stamp is
