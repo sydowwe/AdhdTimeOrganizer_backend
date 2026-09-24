@@ -235,8 +235,8 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
         string expiredAccessToken;
         using (var scope = Fixture.UnauthenticatedFactory.Services.CreateScope())
         {
-            refreshToken = await scope.ServiceProvider.GetRequiredService<IRefreshTokenService>()
-                .GenerateRefreshTokenAsync(userId, AuthMethodEnum.Password, false, "unknown");
+            refreshToken = (await scope.ServiceProvider.GetRequiredService<IRefreshTokenService>()
+                .GenerateRefreshTokenAsync(userId, AuthMethodEnum.Password, false, "unknown")).Token;
 
             expiredAccessToken = CreateExpiredAccessToken(
                 scope.ServiceProvider.GetRequiredService<IEcdsaKeyProvider>(), userId);

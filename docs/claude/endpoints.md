@@ -134,6 +134,13 @@ The four session endpoints touch no user *object*, only `User.GetId()`, so they 
 two revoke endpoints sit under Framework's `command/auth/` even though their portal subclasses live in
 `command/settings/`, matching how `BaseChangePasswordEndpoint` already splits.
 
+⚠ **A session's `id` is a GUID and stable across refreshes (B28).** `GET /user/sessions` lists
+`RefreshToken.SessionId`, and `DELETE /user/sessions/{id:guid}` takes it. It used to be the refresh-token
+row id, a number that changed on every refresh, so an id the client read went stale at the next
+rotation. The `guid` constraint is also what keeps `DELETE /user/sessions/all` off the single-session
+route. Every revoke endpoint now stops the revoked sessions' **access** tokens at their next request, not
+only their refresh. See [wiring.md](wiring.md#auth-plumbing-outside-the-endpoints).
+
 **Google sign-in is portal-only, deliberately.** `GoogleSignInEndpoint`, `IGoogleSignInService` /
 `GoogleSignInService`, and the `GoogleSignIn*` DTOs all stay in `AdhdTimeOrganizer`. It was moved to
 Framework once and reverted: a *usable* provider has to ship the implementation, which puts

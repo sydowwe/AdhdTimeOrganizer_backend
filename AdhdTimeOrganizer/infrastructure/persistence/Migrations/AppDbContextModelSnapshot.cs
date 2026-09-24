@@ -3605,6 +3605,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("character varying(45)")
                         .HasColumnName("revoked_by_ip");
 
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
                     b.Property<bool>("StayLoggedIn")
                         .HasColumnType("boolean")
                         .HasColumnName("stay_logged_in");
@@ -3635,6 +3639,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("ExpiresAt")
                         .HasDatabaseName("ix_refresh_token_expires_at");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_refresh_token_session_id");
 
                     b.HasIndex("TokenHash")
                         .HasDatabaseName("ix_refresh_token_token_hash");

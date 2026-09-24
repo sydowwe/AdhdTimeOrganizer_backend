@@ -127,6 +127,46 @@ the "one attempt per password step" guarantee that `TwoFactorAuthService.Validat
 enforces (keyed on the pending token's `jti`) holds only within one instance. Running a second instance
 lets a pending token be spent once per process. Redis before scaling out.
 
+**Session revocation reaches the access token (B28).** A revoke of any kind (one session, all others,
+logout, logout-all, a password change or reset, an e-mail change, the refresh-reuse response, account
+deletion) stops the session's access token at its **next request**. Before B28 it only stopped the
+refresh, leaving the access token good for its remaining 15 minutes. The pieces:
+
+- **The session id.** `RefreshToken.SessionId` (`user.refresh_token.session_id`, indexed) is minted at
+  login and copied on every rotation, so it names the *session*. The row `Id` names only the current
+  link. Every access token carries it as the `sid` claim (`AuthClaims.SessionId`). Read it with
+  `ClaimsPrincipal.GetSessionIdOrNull()`, never by the literal: JwtBearer's inbound mapping renames
+  `sid` to `ClaimTypes.Sid`.
+- **The check.** `IdentityServiceExtensions` wires `OnTokenValidated =
+  SessionRevocationBearerEvents.RejectRevokedSessionAsync`. It calls
+  `ISessionRevocationService.IsSessionLiveAsync` (`framework/…/extService/user/auth/SessionRevocationService.cs`),
+  and on a dead session it calls `context.Fail`: a plain 401, **no** `X-Token-Expired`. A token with no
+  `sid` (minted before this deployed) passes until it expires. The line fails silently if removed;
+  `SessionRevocationTests` is the guard.
+- **Source of truth is the refresh-token table**: a session is live while a non-revoked row holds its
+  id. The cache is read-through with two keys per session. The "revoked" key is checked first and lives
+  `RevokedVerdictTtl` (16.5 min: `AuthTokenLifetimes.AccessToken` + `ClockSkew` + 1 min). The "live" key
+  lives `LiveVerdictTtl` (60 s). A miss, or a throwing cache, queries the table, so a cold cache after a
+  restart can never let a revoked session through.
+- **Every revoke goes through `IRefreshTokenService`**, which reports the sessions it revoked. Don't
+  write `IsRevoked` by hand: the refresh dies, and a cached live verdict keeps the access token working
+  for up to 60 s. Account deletion is the one path that bypasses it (the rows cascade), so
+  `BaseDeleteUserAccountEndpoint` snapshots the ids before the delete and reports them after.
+- ⚠ **Per-process, like the 2FA guard.** With the in-memory cache a revoke is immediate on the instance
+  that served it. Another instance keeps a live verdict it already cached for at most 60 s, then asks
+  the database. A shared `IDistributedCache` (Redis) makes it immediate everywhere; nothing else changes.
+- **Open SignalR connections** are authenticated once, at handshake, so the per-request check never sees
+  them. `NotificationHub` files each connection under its `sid`, and Notifications'
+  `ISessionRevocationListener` aborts them on revoke. That is also per-process: a connection on another
+  instance lives until it drops, and its reconnect then fails the handshake.
+- **Only a rotated token counts as theft.** `ValidateRefreshTokenAsync` refuses a token revoked
+  *without* a replacement link (logout, a session revoke, revoke-others, a credential reset, an expiry)
+  and does nothing else. Only a token that was *rotated* and then replayed past the 5 s grace window
+  triggers the revoke-everything response. Before this split, the revoked device's first refresh (which
+  the client always makes on its first 401) was read as reuse, so revoking a device signed out the revoker
+  too. Don't merge the two branches back: `SessionRevocationTests.RevokeSession_ThenTheRevokedDeviceRefreshes_…`
+  and `RefreshTokenServiceTests.ValidateRefreshToken_*` pin both sides.
+
 **Refresh-token cleanup — `framework/Sydowwe.Framework/infrastructure/extService/user/auth/RefreshTokenCleanupService.cs`.**
 `BackgroundService` next to the `RefreshTokenService` it drives; hosts register it with
 `AddHostedService<RefreshTokenCleanupService>()`. First sweep runs at **startup**, then every `Interval`

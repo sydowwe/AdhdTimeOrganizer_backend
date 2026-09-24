@@ -36,7 +36,9 @@ public static class IdentityServiceExtensions
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = keyProvider.GetSigningKey(),
                     ValidAlgorithms = [keyProvider.SecurityAlgorithm],
-                    ClockSkew = TimeSpan.FromSeconds(30)
+                    // Shared with the session-revocation cache, whose "revoked" marker must outlive
+                    // every token it can reject — see AuthTokenLifetimes.
+                    ClockSkew = AuthTokenLifetimes.ClockSkew
                 };
                 options.Events = new JwtBearerEvents
                 {
@@ -56,9 +58,14 @@ public static class IdentityServiceExtensions
 
                         return Task.CompletedTask;
                     },
+                    // A revoked session's token 401s at its next request instead of living out its
+                    // 15 minutes. Remove this line and nothing fails except that guarantee —
+                    // SessionRevocationTests is what notices.
+                    OnTokenValidated = SessionRevocationBearerEvents.RejectRevokedSessionAsync,
                     OnAuthenticationFailed = context =>
                     {
-                        // Set custom header for expired tokens
+                        // Set custom header for expired tokens. Not reached for a revoked session:
+                        // OnTokenValidated fails it without an exception, so the header stays truthful.
                         if (context.Exception is SecurityTokenExpiredException)
                             context.Response.Headers.Append("X-Token-Expired", "true");
                         return Task.CompletedTask;

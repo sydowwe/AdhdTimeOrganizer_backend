@@ -270,3 +270,21 @@ worth copying the shape of:
   activities as `DbForeignKeyError`) because a mechanism that cannot tell those apart is the bug the
   field exists to fix. The validation case asserts the field is **absent**, not null, on a
   FluentValidation 400.
+- `SessionRevocationTests` (`Auth/`): a revoked session's access token 401s at its next request (B28).
+  The check is one `OnTokenValidated` line in `IdentityServiceExtensions`; remove it and every endpoint
+  still works, every revoke still returns 204, and the refresh still dies. Only the unexpired access
+  token keeps authenticating, so the tests replay that token on a **raw** client after each of the seven
+  revoke paths and assert the status. (Mutation-checked: without the line, every test in the class fails except the hub one, which doesn't depend on it.)
+  Each test signs in a fresh account (`AuthTestBase.CreateRealUserAsync`) because revoking the shared
+  fixture user's sessions reaches other tests, and each probes before the revoke so the revoke has to
+  override a cached "live" verdict. `RevokedSession_StaysRejected_WhenTheCacheHasForgottenIt` evicts
+  the cache entries and pins the database fallback, the one failure the design must not have (a
+  revoked session passing silently). The hub test casts `Fixture.UnauthenticatedFactory` to
+  `WebApplicationFactory<Program>` for its `Server`: the connection registry and the cache are per host,
+  so a second factory would hold a connection no revoke in the test can reach. Two tests drive the
+  client's real follow-up (the revoked devices each refresh once) and assert the revoker survives. That
+  pins the split in `ValidateRefreshTokenAsync` between a deliberately revoked token (refused) and a
+  rotated one replayed late (theft, revoke everything).
+  `UserAccountDeletionTests.DeleteAccount_ThenReplayingTheOldSession_KillsRefreshAndTheLiveAccessToken`
+  is the deletion half. It fails if `BaseDeleteUserAccountEndpoint` stops reporting the cascaded sessions,
+  because the delete request itself cached the session as live.

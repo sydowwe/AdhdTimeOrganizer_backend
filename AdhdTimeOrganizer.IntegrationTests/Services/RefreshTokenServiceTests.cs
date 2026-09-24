@@ -1,8 +1,11 @@
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
 using Sydowwe.Framework.Testing;
@@ -23,9 +26,10 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         using var scope = Scope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
 
-        var token = await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password, false, "unknown");
+        var issued = await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password, false, "unknown");
 
-        token.Should().NotBeNullOrEmpty();
+        issued.Token.Should().NotBeNullOrEmpty();
+        issued.SessionId.Should().NotBeEmpty("every login starts a session with an id of its own");
     }
 
     [Fact]
@@ -67,7 +71,7 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
     {
         using var scope = Scope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
-        var token = await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
+        var token = (await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password)).Token;
 
         var (isValid, _, _, _, userId, error) = await service.ValidateRefreshTokenAsync(token);
 
@@ -89,29 +93,67 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         error.Should().NotBeNullOrEmpty();
     }
 
+    /// <summary>
+    /// A token revoked on purpose (logout, a session revoke, a credential reset) has no replacement link. Its
+    /// session is already dead, so presenting it again is refused and touches nothing else. This test used to
+    /// pin the opposite: the revoked device's first refresh signed out every other session of the account.
+    /// </summary>
     [Fact]
-    public async Task ValidateRefreshToken_RevokedToken_ReturnsFalseAndRevokesAllUserTokens()
+    public async Task ValidateRefreshToken_DeliberatelyRevokedToken_IsRefusedAndLeavesOtherSessionsAlone()
     {
-        string token1;
+        string revoked;
+        IssuedRefreshToken other;
         using (var scope = Scope())
         {
             var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
-            token1 = await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
-            await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
-            await service.RevokeRefreshTokenAsync(token1);
+            revoked = (await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password)).Token;
+            other = await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
+            await service.RevokeRefreshTokenAsync(revoked);
         }
 
-        // Attempting to validate the revoked token triggers the reuse-attack protection
-        using var scope2 = Scope();
-        var service2 = scope2.ServiceProvider.GetRequiredService<IRefreshTokenService>();
-        var (isValid, _, _, _, userId, _) = await service2.ValidateRefreshTokenAsync(token1);
+        using (var scope = Scope())
+        {
+            var (isValid, _, _, _, userId, error) = await scope.ServiceProvider.GetRequiredService<IRefreshTokenService>()
+                .ValidateRefreshTokenAsync(revoked);
 
-        isValid.Should().BeFalse();
-        userId.Should().BeNull();
+            isValid.Should().BeFalse();
+            userId.Should().BeNull();
+            error.Should().Be("Refresh token has been revoked");
+        }
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
-        var anyActive = await db.RefreshTokens.AnyAsync(r => r.UserId == UserId && !r.IsRevoked, TestContext.Current.CancellationToken);
-        anyActive.Should().BeFalse();
+        (await db.RefreshTokens.AnyAsync(r => r.SessionId == other.SessionId && !r.IsRevoked, TestContext.Current.CancellationToken))
+            .Should().BeTrue("a deliberately revoked token is not evidence that anyone else holds the account's tokens");
+    }
+
+    /// <summary>
+    /// The reuse-attack response is unchanged for what it exists for: a <i>rotated</i> token replayed after
+    /// the grace window means two parties hold the chain, so every token for the user is revoked.
+    /// </summary>
+    [Fact]
+    public async Task ValidateRefreshToken_RotatedTokenReplayedAfterTheGraceWindow_RevokesAllUserTokens()
+    {
+        string rotated;
+        using (var scope = Scope())
+        {
+            var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+            rotated = (await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password)).Token;
+            await service.RotateRefreshTokenAsync(rotated, UserId, AuthMethodEnum.Password, true);
+            await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
+        }
+
+        await using (var db = (AppDbContext)Fixture.CreateDbContext())
+            await db.RefreshTokens
+                .Where(r => r.ReplacedByTokenHash != null)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.RevokedAt, DateTime.UtcNow.AddMinutes(-1)), TestContext.Current.CancellationToken);
+
+        using (var scope = Scope())
+            (await scope.ServiceProvider.GetRequiredService<IRefreshTokenService>().ValidateRefreshTokenAsync(rotated))
+                .IsValid.Should().BeFalse();
+
+        await using var check = (AppDbContext)Fixture.CreateDbContext();
+        (await check.RefreshTokens.AnyAsync(r => r.UserId == UserId && !r.IsRevoked, TestContext.Current.CancellationToken))
+            .Should().BeFalse("a rotated token replayed outside the grace window is the theft signature");
     }
 
     [Fact]
@@ -119,7 +161,7 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
     {
         using var scope = Scope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
-        var token = await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
+        var token = (await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password)).Token;
 
         await service.RevokeRefreshTokenAsync(token, "127.0.0.1");
 
@@ -159,8 +201,8 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         using (var scope = Scope())
         {
             var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
-            oldToken = await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
-            newToken = await service.RotateRefreshTokenAsync(oldToken, UserId, AuthMethodEnum.Password, true, "127.0.0.1");
+            oldToken = (await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password)).Token;
+            newToken = (await service.RotateRefreshTokenAsync(oldToken, UserId, AuthMethodEnum.Password, true, "127.0.0.1"))?.Token;
         }
 
         newToken.Should().NotBeNullOrEmpty().And.NotBe(oldToken);
@@ -181,7 +223,7 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
     {
         using var scope = Scope();
         var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
-        var token = await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
+        var token = (await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password)).Token;
 
         (await service.RotateRefreshTokenAsync(token, UserId, AuthMethodEnum.Password, true, "127.0.0.1"))
             .Should().NotBeNull();
@@ -189,6 +231,81 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         // Replaying the already-rotated token must not mint a second live chain.
         (await service.RotateRefreshTokenAsync(token, UserId, AuthMethodEnum.Password, true, "127.0.0.1"))
             .Should().BeNull();
+    }
+
+    /// <summary>
+    /// The session id is what the access token's <c>sid</c> claim, the session list and the revoke route all
+    /// key on. If rotation minted a fresh one, the id a client read would stop matching after its next
+    /// refresh (the bug B28 replaced) and a revoke could never reach the access tokens minted since.
+    /// </summary>
+    [Fact]
+    public async Task RotateRefreshToken_CarriesTheSessionIdForward()
+    {
+        IssuedRefreshToken first;
+        IssuedRefreshToken? second, third;
+        using (var scope = Scope())
+        {
+            var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+            first = await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
+            second = await service.RotateRefreshTokenAsync(first.Token, UserId, AuthMethodEnum.Password, true, "127.0.0.1");
+            third = await service.RotateRefreshTokenAsync(second!.Token, UserId, AuthMethodEnum.Password, true, "127.0.0.1");
+        }
+
+        second!.SessionId.Should().Be(first.SessionId);
+        third!.SessionId.Should().Be(first.SessionId);
+
+        await using var db = (AppDbContext)Fixture.CreateDbContext();
+        (await db.RefreshTokens.CountAsync(r => r.SessionId == first.SessionId, TestContext.Current.CancellationToken))
+            .Should().Be(3, "every link of the chain carries the session id, not only the live one");
+    }
+
+    /// <summary>
+    /// Revoking by session id is also scoped by user, so an id can never reach another account's rows. Driven
+    /// by writing a second user's row under the same session id — something the service itself never does.
+    /// </summary>
+    [Fact]
+    public async Task RevokeSessionById_NeverTouchesAnotherUsersRowsWithTheSameSessionId()
+    {
+        var otherUserId = await SeedOtherUserAsync();
+
+        IssuedRefreshToken mine;
+        using (var scope = Scope())
+            mine = await scope.ServiceProvider.GetRequiredService<IRefreshTokenService>()
+                .GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password);
+
+        await using (var db = (AppDbContext)Fixture.CreateDbContext())
+        {
+            db.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = otherUserId,
+                SessionId = mine.SessionId,
+                TokenHash = Guid.NewGuid().ToString("N"),
+                ExpiresAt = DateTime.UtcNow.AddDays(1),
+                StayLoggedIn = false,
+                AuthMethod = AuthMethodEnum.Password
+            });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        using (var scope = Scope())
+            (await scope.ServiceProvider.GetRequiredService<IRefreshTokenService>()
+                .RevokeSessionByIdAsync(mine.SessionId, UserId, currentTokenHash: null))
+                .Should().Be((true, false));
+
+        await using var check = (AppDbContext)Fixture.CreateDbContext();
+        (await check.RefreshTokens.IgnoreQueryFilters()
+                .AnyAsync(r => r.UserId == otherUserId && !r.IsRevoked, TestContext.Current.CancellationToken))
+            .Should().BeTrue("a revoke by session id must stay inside the caller's account");
+    }
+
+    private async Task<long> SeedOtherUserAsync()
+    {
+        using var scope = Scope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var email = $"rt-other-{Guid.NewGuid():N}@integration.com";
+        var user = new User { Email = email, UserName = email, EmailConfirmed = true, Locale = AvailableLocales.En, Timezone = TimeZoneInfo.Utc };
+        (await userManager.CreateAsync(user, AppDbContextFixture.TestUserPassword)).Succeeded.Should().BeTrue();
+        return user.Id;
     }
 
     [Fact]

@@ -58,6 +58,10 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
         builder.HasIndex(rt => rt.ExpiresAt)
             .HasDatabaseName("ix_refresh_token_expires_at");
 
+        // Read by the per-request session check whenever its verdict is not cached (SessionRevocationService).
+        builder.HasIndex(rt => rt.SessionId)
+            .HasDatabaseName("ix_refresh_token_session_id");
+
         builder.Property(rt => rt.UserAgent).HasMaxLength(512);
         builder.Property(rt => rt.IpAddress).HasMaxLength(45);
     }

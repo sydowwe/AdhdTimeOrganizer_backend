@@ -490,36 +490,6 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
 {
     private const string Password = Seed.Password;
 
-    private static async Task<(long UserId, string Email)> CreateRealUserAsync(
-        IPostgresFixture fx, string emailPrefix, string password)
-    {
-        var email = $"{emailPrefix}-{Guid.NewGuid():N}@integration.com";
-        await using var db = (AppDbContext)fx.CreateDbContext();
-        var user = new User
-        {
-            Email = email,
-            NormalizedEmail = email.ToUpperInvariant(),
-            UserName = email,
-            NormalizedUserName = email.ToUpperInvariant(),
-            EmailConfirmed = true,
-            SecurityStamp = Guid.NewGuid().ToString("N"),
-            ConcurrencyStamp = Guid.NewGuid().ToString("N"),
-            Locale = AvailableLocales.En,
-            Timezone = TimeZoneInfo.Utc
-        };
-        user.PasswordHash = new PasswordHasher<User>().HashPassword(user, password);
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
-
-        // Without a role assignment the JWT authenticates but 403s on every endpoint (Program.cs's
-        // global configurator defaults to Roles("User","Admin","Root")).
-        var roleId = await db.Roles.Where(r => r.Name == PortalRoleCatalog.User).Select(r => r.Id).FirstAsync();
-        db.UserRoles.Add(new IdentityUserRole<long> { UserId = user.Id, RoleId = roleId });
-        await db.SaveChangesAsync();
-
-        return (user.Id, email);
-    }
-
     private static HttpRequestMessage DeleteRequest(string password, string? twoFactorToken = null) =>
         new(HttpMethod.Delete, "user/account")
         {
@@ -742,17 +712,18 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
     /// container would obediently drop the cookies the delete response clears, which is precisely the
     /// client-side courtesy an attacker holding a stolen session would skip.
     /// <para>
-    /// <b>Session revocation is only half-complete, and this test pins that.</b> The refresh path really is
-    /// dead — the token row cascaded away with the user, so the session cannot be extended. The access token
-    /// is a stateless ECDSA JWT and nothing revalidates it against the database: there is no
-    /// <c>OnTokenValidated</c> hook and no <c>SecurityStampValidator</c> anywhere in this solution, so it
-    /// keeps authenticating until it expires (<c>JwtService.AccessTokenExpiry</c>, 15 minutes). Reads return
-    /// nothing, because the rows are gone; writes fail on the user FK. If a stamp/existence check is ever
-    /// added, this assertion flips to 401 — and that failure is the intended signal, not a regression.
+    /// <b>Both halves of the session die with the account (B28).</b> The refresh token cascaded away with the
+    /// user row. The access token is still a correctly signed, unexpired JWT, but its <c>sid</c> names a session
+    /// with no live row, so <c>SessionRevocationBearerEvents</c> refuses it at the next request. The endpoint
+    /// also reports the session ids it read before the delete, because the cascade bypasses the refresh-token
+    /// service; without that a session whose "live" verdict was cached would outlive the account for up to
+    /// <c>SessionRevocationService.LiveVerdictTtl</c>. Until B28 this test pinned the opposite (the access token
+    /// kept authenticating for its full 15 minutes) under the name
+    /// <c>…KillsRefreshButNotTheLiveAccessToken</c>.
     /// </para>
     /// </summary>
     [Fact]
-    public async Task DeleteAccount_ThenReplayingTheOldSession_KillsRefreshButNotTheLiveAccessToken()
+    public async Task DeleteAccount_ThenReplayingTheOldSession_KillsRefreshAndTheLiveAccessToken()
     {
         var (_, email) = await CreateRealUserAsync(Fixture, "delete-replay", Password);
 
@@ -771,12 +742,10 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         using var probeRequest = new HttpRequestMessage(HttpMethod.Get, "timer-preset");
         probeRequest.Headers.Add("Cookie", sessionCookies);
         var probeResponse = await client.SendAsync(probeRequest, TestContext.Current.CancellationToken);
-        probeResponse.StatusCode.Should().Be(HttpStatusCode.OK,
-            "documented residual: the stateless access token is not revalidated against the user table, so it "
-            + "outlives the account until it expires -- see this test's remarks");
-
-        (await probeResponse.Content.ReadAsStringAsync(CancellationToken))
-            .Should().NotContain("\"id\"", "whatever the stale token still reaches, it must find no data");
+        probeResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "the access token is unexpired and correctly signed, but its session died with the account");
+        probeResponse.Headers.Contains("X-Token-Expired").Should().BeFalse(
+            "the token has not expired; its session is gone, and the header must say only what is true");
     }
 
     /// <summary>
