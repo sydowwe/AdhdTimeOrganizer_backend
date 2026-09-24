@@ -157,8 +157,15 @@ refresh, leaving the access token good for its remaining 15 minutes. The pieces:
   the database. A shared `IDistributedCache` (Redis) makes it immediate everywhere; nothing else changes.
 - **Open SignalR connections** are authenticated once, at handshake, so the per-request check never sees
   them. `NotificationHub` files each connection under its `sid`, and Notifications'
-  `ISessionRevocationListener` aborts them on revoke. That is also per-process: a connection on another
-  instance lives until it drops, and its reconnect then fails the handshake.
+  `ISessionRevocationListener` aborts them on revoke. The hub re-checks the session after filing the
+  connection, which covers a revoke that lands mid-handshake. That is also per-process: a connection on
+  another instance lives until it drops, and its reconnect then fails the handshake.
+- **A token without `sid` passes, so nothing else may mint one under the access-token audience.** The 2FA
+  pending token (issued after the password alone) is signed with the same key and used to share the
+  audience, so JwtBearer accepted it as an access token and the role-less `[Authorize]` hub opened without
+  the second factor. It now has its own audience (`JwtService.TwoFactorPendingAudience`, `JWT_AUDIENCE` +
+  `:2fa-pending`). Pinned by `AuthSecurityTests.PendingTwoFactorToken_IsRefusedAsAnAccessToken`. A pending
+  token issued before that deployed is refused by the 2FA step; the user re-enters the password.
 - **Only a rotated token counts as theft.** `ValidateRefreshTokenAsync` refuses a token revoked
   *without* a replacement link (logout, a session revoke, revoke-others, a credential reset, an expiry)
   and does nothing else. Only a token that was *rotated* and then replayed past the 5 s grace window

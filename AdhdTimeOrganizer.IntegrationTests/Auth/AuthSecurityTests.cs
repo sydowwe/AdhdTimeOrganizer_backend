@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.application.dto.request.user;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
+using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.Testing;
 using Xunit;
 
@@ -234,6 +235,33 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
     {
         using var scope = Fixture.UnauthenticatedFactory.Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<IJwtService>().IssueTwoFactorPendingToken(userId, false);
+    }
+
+    /// <summary>
+    /// The partial-auth token is issued after the password alone and signed with the access-token key, so
+    /// whatever it authenticates is reachable without the second factor. The notification hub is the probe
+    /// because it is <c>[Authorize]</c> with no role: a role-gated endpoint would 403 the role-less token and
+    /// hide the hole. Both carriers are tried — the <c>Authorization</c> header is how a non-browser client
+    /// sends it, and nothing stops a user copying their own cookie into the access-token one.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PendingTwoFactorToken_IsRefusedAsAnAccessToken(bool asBearer)
+    {
+        var pendingToken = IssuePendingToken(FakeLoggedUserService.TestUserId);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/hubs/notifications/negotiate?negotiateVersion=1");
+        if (asBearer)
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", pendingToken);
+        else
+            request.Headers.Add("Cookie", $"{AuthCookies.AuthTokenName}={pendingToken}");
+
+        using var client = CreateRawClient();
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "a token that only proves the password must not open anything the second factor guards");
     }
 
     [Fact]
