@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.application.dto;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
@@ -29,7 +30,7 @@ public class PatchPlannerTaskStatusEndpoint(
         Summary(s =>
         {
             s.Summary = "Update planner task status";
-            s.Description = "Updates task status with side effects: resets ActualStart/EndTime for Cancelled/NotStarted statuses, stores SkipReason on Cancelled and clears it on any other status, publishes status change event if task date is today";
+            s.Description = "Updates task status with side effects: resets ActualStart/EndTime for Cancelled/NotStarted statuses, stores SkipReason or SkipReasonKey on Cancelled (a built-in label sent as text is stored as its key) and clears both on any other status, publishes status change event if task date is today";
             s.Response(204, "Updated");
             s.Response(404, "Not found");
             s.Response(400, "Bad request or validation error");
@@ -53,7 +54,9 @@ public class PatchPlannerTaskStatusEndpoint(
                 return;
             }
 
-            entity.ApplyStatus(request.Status, request.SkipReason);
+            // The validator has already rejected an unknown key, so a failed parse here only means none was sent.
+            SkipReasonKey? skipReasonKey = SkipReasonKeyTokens.TryParse(request.SkipReasonKey, out var key) ? key : null;
+            entity.ApplyStatus(request.Status, request.SkipReason, skipReasonKey);
 
             switch (request.Status)
             {

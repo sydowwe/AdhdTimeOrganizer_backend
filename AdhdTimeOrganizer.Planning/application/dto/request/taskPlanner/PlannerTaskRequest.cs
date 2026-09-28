@@ -79,7 +79,10 @@ public record PlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<PlannerTas
         // holds (ApplyStatus's rule); one that stays Cancelled (a skipped task moved later) keeps it. Not
         // ApplyStatus itself: that would also start clearing actual times on the PUT, which it never has.
         if (Status != PlannerTaskStatus.Cancelled)
+        {
             entity.SkipReason = null;
+            entity.SkipReasonKey = null;
+        }
         entity.Status = Status;
         // Left alone when the caller named its day by date instead — the endpoint has already resolved that
         // into CalendarId on the entity, and overwriting it with 0 here would orphan the task.

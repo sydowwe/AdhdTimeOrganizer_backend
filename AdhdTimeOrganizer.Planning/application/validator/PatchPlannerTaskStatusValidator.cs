@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.application.validator;
+using AdhdTimeOrganizer.Planning.application.dto;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using FastEndpoints;
@@ -37,5 +38,21 @@ public class PatchPlannerTaskStatusValidator : Validator<PatchPlannerTaskStatusR
             .Must((req, _) => req.Status == PlannerTaskStatus.Cancelled)
             .WithMessage("SkipReason is only allowed when Status is Cancelled.")
             .When(x => !string.IsNullOrWhiteSpace(x.SkipReason));
+
+        RuleFor(x => x.SkipReasonKey)
+            .Must(k => SkipReasonKeyTokens.TryParse(k, out _))
+            .WithMessage($"SkipReasonKey must be one of: {SkipReasonKeyTokens.NoTime}, {SkipReasonKeyTokens.NotRelevant}, {SkipReasonKeyTokens.NoEnergy}.")
+            .When(x => x.SkipReasonKey != null);
+
+        RuleFor(x => x.SkipReasonKey)
+            .Must((req, _) => req.Status == PlannerTaskStatus.Cancelled)
+            .WithMessage("SkipReasonKey is only allowed when Status is Cancelled.")
+            .When(x => x.SkipReasonKey != null);
+
+        // One reason per skip. Picking which of the two to keep would silently drop the other.
+        RuleFor(x => x)
+            .Must(x => x.SkipReasonKey == null || string.IsNullOrWhiteSpace(x.SkipReason))
+            .WithName(nameof(PatchPlannerTaskStatusRequest.SkipReasonKey))
+            .WithMessage("Send either SkipReasonKey or SkipReason, not both.");
     }
 }

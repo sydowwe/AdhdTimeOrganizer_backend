@@ -237,10 +237,10 @@ public class PlanVsActualTrendTests(AppDbContextFixture fixture) : PostgresTestB
 
     // ─── the PlannerBatchLimits.MaxSummaryRangeDays ceiling ──────────────────
 
-    // The three routes that take a { From, Until } window and are bounded only by it. They are pinned together
+    // The four routes that take a { From, Until } window and are bounded only by it. They are pinned together
     // on purpose: they share one constant and two identically-worded rules across three separate validator
-    // classes (PlanVsActualTrendValidator, CalendarTaskSummariesValidator, CalendarFilterValidator), and
-    // nothing but a theory over all three makes one of them drifting visible.
+    // classes (PlanVsActualTrendValidator — used by the trend and the skip summary — CalendarTaskSummariesValidator,
+    // CalendarFilterValidator), and nothing but a theory over all of them makes one drifting visible.
     //
     // calendar/filter is here because it used to be the odd one out — PERF-2: same window, no cap at all, so a
     // 1900 → 2100 filter scanned the user's whole calendar table with two correlated subqueries per row.
@@ -248,6 +248,9 @@ public class PlanVsActualTrendTests(AppDbContextFixture fixture) : PostgresTestB
     public const string TaskSummariesRoute = "api/calendar/task-summaries";
     public const string TrendRoute = "api/planner-task/plan-vs-actual-trend";
     public const string CalendarFilterRoute = "api/calendar/filter";
+    // B1: shares the trend's request type and validator outright, so it cannot drift from the trend — but it is
+    // a fourth route, and the theory is what proves it is actually wired to that validator.
+    public const string SkipSummaryRoute = "api/planner-task/skip-summary";
 
     /// <summary>
     /// The ceiling is counted <b>inclusively</b> — <c>Until.DayNumber - From.DayNumber + 1</c> — so a year and a
@@ -258,6 +261,7 @@ public class PlanVsActualTrendTests(AppDbContextFixture fixture) : PostgresTestB
     [InlineData(TaskSummariesRoute)]
     [InlineData(TrendRoute)]
     [InlineData(CalendarFilterRoute)]
+    [InlineData(SkipSummaryRoute)]
     public async Task Range_AtTheCeiling_IsAccepted(string route)
     {
         var response = await PostRangeAsync(route, new DateOnly(2029, 1, 1), new DateOnly(2030, 1, 1));
@@ -274,6 +278,7 @@ public class PlanVsActualTrendTests(AppDbContextFixture fixture) : PostgresTestB
     [InlineData(TaskSummariesRoute)]
     [InlineData(TrendRoute)]
     [InlineData(CalendarFilterRoute)]
+    [InlineData(SkipSummaryRoute)]
     public async Task Range_OneDayOverTheCeiling_IsRejectedWithTheLimitInTheMessage(string route)
     {
         var response = await PostRangeAsync(route, new DateOnly(2029, 1, 1), new DateOnly(2030, 1, 2));
@@ -292,6 +297,7 @@ public class PlanVsActualTrendTests(AppDbContextFixture fixture) : PostgresTestB
     [InlineData(TaskSummariesRoute)]
     [InlineData(TrendRoute)]
     [InlineData(CalendarFilterRoute)]
+    [InlineData(SkipSummaryRoute)]
     public async Task Range_OfASingleDay_IsAccepted(string route)
     {
         var response = await PostRangeAsync(route, new DateOnly(2029, 1, 1), new DateOnly(2029, 1, 1));
@@ -308,6 +314,7 @@ public class PlanVsActualTrendTests(AppDbContextFixture fixture) : PostgresTestB
     [InlineData(TaskSummariesRoute)]
     [InlineData(TrendRoute)]
     [InlineData(CalendarFilterRoute)]
+    [InlineData(SkipSummaryRoute)]
     public async Task Range_WithUntilBeforeFrom_IsRejectedOnEveryRangeRoute(string route)
     {
         var response = await PostRangeAsync(route, new DateOnly(2029, 4, 10), new DateOnly(2029, 4, 1));
@@ -325,6 +332,7 @@ public class PlanVsActualTrendTests(AppDbContextFixture fixture) : PostgresTestB
     [InlineData(TaskSummariesRoute)]
     [InlineData(TrendRoute)]
     [InlineData(CalendarFilterRoute)]
+    [InlineData(SkipSummaryRoute)]
     public async Task Range_TwoCenturies_IsRejectedOnEveryRangeRoute(string route)
     {
         var response = await PostRangeAsync(route, new DateOnly(1900, 1, 1), new DateOnly(2100, 1, 1));

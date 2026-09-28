@@ -10,8 +10,9 @@ rather than a project of their own.
 Owns: `Calendar`, `BasePlannerTask` and its three concrete shapes (`PlannerTask`,
 `RepeatingPlannerTask`, `TemplatePlannerTask`), `TaskPlannerDayTemplate`, `TaskImportance`,
 `UserPlannerSettings`, `Reminder`, the three `PlannerSuggestionFrom*` read-models, their EF
-configurations, ~58 endpoints, their DTOs and 14 validator files, the four domain services
-(`PlannerStreakService`, `PlanVsActualTrendService`, `CalendarDayFactory`, `HolidayCalendar`), the
+configurations, ~59 endpoints, their DTOs and 14 validator files, the five domain services
+(`PlannerStreakService`, `PlanVsActualTrendService`, `SkipSummaryService`, `CalendarDayFactory`,
+`HolidayCalendar`), the
 three application services (`CalendarProvisioner`, `PlannerStreakReader`,
 `ReminderRegistrationService`), the two Core seam implementations, the two cross-slice event
 handlers, and five seeders.
@@ -96,7 +97,8 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   and for the same reason: it is told which user to act for, and filtered it would read no row and
   try to insert a duplicate onto the unique `(user_id, date)`.
 
-- **`GetPlanVsActualTrendPlannerTaskEndpoint` filters `UserId` by hand**, not through the host's
+- **`GetPlanVsActualTrendPlannerTaskEndpoint` and `GetSkipSummaryPlannerTaskEndpoint` filter `UserId`
+  by hand**, not through the host's
   global `IEntityWithUser` filter — the slice compiles against a plain `DbContext` and cannot see it,
   and the id is already in hand for the timezone. The four batched calendar entry points do the
   opposite and lean on the filter alone, which is why an unowned day comes back
@@ -107,10 +109,12 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   them, turning one bad day into a whole failed batch. The batched template apply re-reads the
   template afterwards, since clearing detaches it.
 
-- **The rule/query splits are load-bearing, in three places.** `PlannerStreakReader` owns the
+- **The rule/query splits are load-bearing, in four places.** `PlannerStreakReader` owns the
   qualifying-task predicate and the day boundary, `PlannerStreakService` owns the rules;
   `GetPlanVsActualTrendPlannerTaskEndpoint` owns the eligibility predicate, `PlanVsActualTrendService`
-  owns the arithmetic; `PlannerTemplateApplier` and `CalendarDayTypeRule` each have exactly one
+  owns the arithmetic; `GetSkipSummaryPlannerTaskEndpoint` / `SkipSummaryService` split the same way,
+  and the two range reads share one last-eligible-day rule (`TaskPlannerHelper.LastDayThatIsOver`) because
+  the client renders them as the same "this period"; `PlannerTemplateApplier` and `CalendarDayTypeRule` each have exactly one
   implementation behind two callers. A second place deciding any of these is how the two ends of a
   feature start disagreeing about the same number.
 

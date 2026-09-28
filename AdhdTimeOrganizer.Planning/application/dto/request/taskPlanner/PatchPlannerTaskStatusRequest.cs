@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.dto;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using Sydowwe.Framework.application.dto.dto;
 
@@ -16,4 +17,11 @@ public record PatchPlannerTaskStatusRequest
     /// full PUT never sets it.
     /// </summary>
     public string? SkipReason { get; init; }
+
+    /// <summary>
+    /// A built-in skip reason by key — <c>"noTime" | "notRelevant" | "noEnergy"</c> (<see cref="SkipReasonKeyTokens"/>).
+    /// Only accepted beside <c>Cancelled</c>, never together with a non-blank <see cref="SkipReason"/>, and an
+    /// unknown key is a 400. Cleared on any transition out of Cancelled, like the text.
+    /// </summary>
+    public string? SkipReasonKey { get; init; }
 }

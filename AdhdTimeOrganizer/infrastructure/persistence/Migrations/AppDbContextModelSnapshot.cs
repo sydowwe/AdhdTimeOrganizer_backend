@@ -1454,6 +1454,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("skip_reason");
 
+                    b.Property<string>("SkipReasonKey")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("skip_reason_key");
+
                     b.Property<long?>("SourceTemplateTaskId")
                         .HasColumnType("bigint")
                         .HasColumnName("source_template_task_id");

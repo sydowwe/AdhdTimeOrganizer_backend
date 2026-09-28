@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
+using AdhdTimeOrganizer.Planning.application.dto;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using Sydowwe.Framework.application.dto.dto;
@@ -15,6 +16,9 @@ public record PlannerTaskResponse : BasePlannerTaskResponse, IProjectionResponse
     public long? SourceTemplateTaskId { get; init; }
 
     public string? SkipReason { get; init; }
+
+    /// <summary><c>"noTime" | "notRelevant" | "noEnergy"</c>, or null. At most one of this and <see cref="SkipReason"/> is non-null.</summary>
+    public string? SkipReasonKey { get; init; }
 
     public required long CalendarId { get; init; }
 
@@ -76,6 +80,12 @@ public record PlannerTaskResponse : BasePlannerTaskResponse, IProjectionResponse
             ActualEndTime = t.ActualEndTime != null ? new TimeDto(t.ActualEndTime.Value.Hour, t.ActualEndTime.Value.Minute) : null,
             SourceTemplateTaskId = t.SourceTemplateTaskId,
             SkipReason = t.SkipReason,
+            // Inline rather than SkipReasonKeyTokens.Token(...) so it stays translatable if a caller composes on
+            // the projection (BaseSortEndpoint sorts after it).
+            SkipReasonKey = t.SkipReasonKey == domain.model.@enum.SkipReasonKey.NoTime ? SkipReasonKeyTokens.NoTime
+                : t.SkipReasonKey == domain.model.@enum.SkipReasonKey.NotRelevant ? SkipReasonKeyTokens.NotRelevant
+                : t.SkipReasonKey == domain.model.@enum.SkipReasonKey.NoEnergy ? SkipReasonKeyTokens.NoEnergy
+                : null,
             CalendarId = t.CalendarId,
             TodolistItemId = t.TodolistItemId,
             Color = t.Activity.Role.Color,

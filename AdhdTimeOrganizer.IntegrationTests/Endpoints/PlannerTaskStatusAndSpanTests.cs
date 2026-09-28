@@ -184,8 +184,8 @@ public class PlannerTaskStatusAndSpanTests(AppDbContextFixture fixture) : Postgr
     {
         var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
 
-        (await PatchStatusWithReasonAsync(taskId, "cancelled", "  Ran out of time  ")).StatusCode.Should().Be(HttpStatusCode.NoContent);
-        (await LoadAsync(taskId)).SkipReason.Should().Be("Ran out of time",
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", "  Meeting ran long  ")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await LoadAsync(taskId)).SkipReason.Should().Be("Meeting ran long",
             "the status patch used to drop this key silently — the value must land, trimmed");
 
         (await PatchStatusWithReasonAsync(taskId, "cancelled", "Felt unwell")).StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -250,20 +250,114 @@ public class PlannerTaskStatusAndSpanTests(AppDbContextFixture fixture) : Postgr
     public async Task SkipReason_FullPut_KeepsOnCancelled_ClearsOnLeaving()
     {
         var (calendarId, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
-        (await PatchStatusWithReasonAsync(taskId, "cancelled", "Ran out of time")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", "Meeting ran long")).StatusCode.Should().Be(HttpStatusCode.NoContent);
         var activityId = (await LoadAsync(taskId)).ActivityId;
 
         // A skipped task moved later, with whatever reason the client last read in the body.
         (await PutAsync(taskId, activityId, calendarId, "Cancelled", 11, "Something else")).StatusCode.Should().Be(HttpStatusCode.OK);
         var moved = await LoadAsync(taskId);
         moved.StartTime.Should().Be(new TimeOnly(11, 0));
-        moved.SkipReason.Should().Be("Ran out of time", "the PUT is not a writer of the reason; the status patch is");
+        moved.SkipReason.Should().Be("Meeting ran long", "the PUT is not a writer of the reason; the status patch is");
 
         (await PutAsync(taskId, activityId, calendarId, "NotStarted", 12, "Ran out of time")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await LoadAsync(taskId)).SkipReason.Should().BeNull("a PUT that leaves Cancelled clears the reason, same as the status patch");
     }
 
+    // ─── B1: skipReasonKey — the three built-in reasons stored as keys ────────────────────────────────
+
+    [Fact(DisplayName = "B1: a key is stored as the key, with no text, and reads back camelCase on the response")]
+    public async Task SkipReasonKey_StoredAndReadBack()
+    {
+        var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+
+        (await PatchStatusWithKeyAsync(taskId, "cancelled", "notRelevant", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var task = await LoadAsync(taskId);
+        task.SkipReasonKey.Should().Be(SkipReasonKey.NotRelevant);
+        task.SkipReason.Should().BeNull();
+
+        var response = await CreateClient().GetFromJsonAsync<PlannerTaskResponse>($"api/planner-task/{taskId}", JsonOpts, CancellationToken);
+        response!.SkipReasonKey.Should().Be("notRelevant", "the wire spelling is the client's, not the C# member name");
+        response.SkipReason.Should().BeNull();
+    }
+
+    /// <summary>
+    /// The contract is that the six built-in labels never come back as text. The migration converted the rows
+    /// already written; this is the write-side half, which holds whichever client — old home widget, day planner
+    /// — sends the label as text.
+    /// </summary>
+    [Theory(DisplayName = "B1: a built-in label sent as text, in either locale, is stored as its key")]
+    [InlineData("Ran out of time", SkipReasonKey.NoTime)]
+    [InlineData("Nestihol som", SkipReasonKey.NoTime)]
+    [InlineData("Not relevant any more", SkipReasonKey.NotRelevant)]
+    [InlineData("Už nie je aktuálne", SkipReasonKey.NotRelevant)]
+    [InlineData("No energy for it", SkipReasonKey.NoEnergy)]
+    [InlineData("  Nemal som energiu ", SkipReasonKey.NoEnergy)]
+    public async Task SkipReason_BuiltInLabel_IsStoredAsKey(string label, SkipReasonKey expected)
+    {
+        var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", label)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var task = await LoadAsync(taskId);
+        task.SkipReasonKey.Should().Be(expected);
+        task.SkipReason.Should().BeNull("at most one of the two is ever set");
+    }
+
+    [Theory(DisplayName = "B1: a near-miss of a built-in label stays text")]
+    [InlineData("ran out of time")]
+    [InlineData("Ran out of time again")]
+    public async Task SkipReason_NearMissOfALabel_StaysText(string text)
+    {
+        var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+
+        (await PatchStatusWithReasonAsync(taskId, "cancelled", text)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var task = await LoadAsync(taskId);
+        task.SkipReason.Should().Be(text);
+        task.SkipReasonKey.Should().BeNull();
+    }
+
+    [Theory(DisplayName = "B1: an unknown key, a key beside text, and a key beside any status but Cancelled are all 400s")]
+    [InlineData("cancelled", "tooTired", null)]
+    [InlineData("cancelled", "NoTime", null)]
+    [InlineData("cancelled", "noTime", "Meeting ran long")]
+    [InlineData("completed", "noTime", null)]
+    [InlineData("notStarted", "noTime", null)]
+    public async Task SkipReasonKey_InvalidCombinations_AreRejected(string status, string key, string? text)
+    {
+        var (_, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+
+        (await PatchStatusWithKeyAsync(taskId, status, key, text)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var task = await LoadAsync(taskId);
+        task.Status.Should().Be(PlannerTaskStatus.NotStarted, "the rejected patch must not have been applied");
+        task.SkipReasonKey.Should().BeNull();
+    }
+
+    [Fact(DisplayName = "B1: leaving Cancelled clears the key, through the status patch and through the PUT")]
+    public async Task SkipReasonKey_ClearedOnLeavingCancelled()
+    {
+        var (calendarId, taskId) = await SeedTaskAsync(new TimeOnly(9, 0), new TimeOnly(10, 0));
+        var activityId = (await LoadAsync(taskId)).ActivityId;
+
+        (await PatchStatusWithKeyAsync(taskId, "cancelled", "noTime", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await PatchStatusWithReasonAsync(taskId, "notStarted", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await LoadAsync(taskId)).SkipReasonKey.Should().BeNull("a restored task must not keep the key for a skip that no longer holds");
+
+        (await PatchStatusWithKeyAsync(taskId, "cancelled", "noEnergy", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await PutAsync(taskId, activityId, calendarId, "Cancelled", 11, null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await LoadAsync(taskId)).SkipReasonKey.Should().Be(SkipReasonKey.NoEnergy, "a skipped task moved later keeps its key");
+
+        (await PutAsync(taskId, activityId, calendarId, "NotStarted", 12, null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await LoadAsync(taskId)).SkipReasonKey.Should().BeNull("a PUT that leaves Cancelled clears the key, same as the status patch");
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
+
+    private Task<HttpResponseMessage> PatchStatusWithKeyAsync(long taskId, string status, string? skipReasonKey, string? skipReason) =>
+        CreateClient().PatchAsJsonAsync($"api/planner-task/{taskId}/status",
+            new { status, actualStartTime = (object?)null, actualEndTime = (object?)null, skipReason, skipReasonKey }, JsonOpts, CancellationToken);
 
     private async Task<PlannerTask> LoadAsync(long taskId)
     {

@@ -215,6 +215,46 @@ no plan to drift from.
 | `PlanVsActualTrendRequest` / `…Response` | `application/dto/{request,response}/taskPlanner/` |
 | `PlanVsActualTrendValidator` | `application/validator/PlanVsActualTrendValidator.cs` |
 
+### Skip summary (B1)
+
+`POST /planner-task/skip-summary` — skipped tasks over an inclusive date range, grouped by reason and
+by planned start hour, rendered under the trend. **Derived, never stored**: an un-skip simply leaves
+the next read. The single-day half is client-only (the day view holds every `status`/`skipReason`).
+
+A **sibling** of the trend, not more fields on it: the trend's population drops `Cancelled`, this one
+is built from it, and the client fetches the two independently so a failed skip aggregate never costs
+the month its trend. What they share is the **range** — the same `PlanVsActualTrendRequest` and
+validator, and the same last eligible day via `TaskPlannerHelper.LastDayThatIsOver`.
+
+| Question | Answer |
+|---|---|
+| Which tasks count? | Not `IsBackground`, on a day **strictly before the user's today** — every status. `Cancelled` is the numerator; the rest are the per-hour base rate |
+| Is a skip made today counted? | **No**, though it is final: today's not-yet-reached tasks would inflate the per-hour denominator, and "this period" must mean the same days as the trend |
+| How are reasons grouped? | By **key** when the skip has one (`reasonKey`), otherwise by **exact stored text**, ordinal; neither is its own group. No folding and no cap — the client folds once more (`skipReasonGroups.ts`), in one place for both the single-day and range lines, and truncating could hide the group that folding would have made largest |
+| Which hour? | `StartTime.Hour` as stored; a task wrapping midnight counts where it starts. Hours with nothing planned are omitted |
+| Nothing eligible? | `200` with `skippedCount: 0` and empty lists — the client renders nothing |
+
+| Type | File |
+|---|---|
+| `SkipSummaryService` | `domain/service/SkipSummaryService.cs` — `Aggregate` over rows, no SQL |
+| `GetSkipSummaryPlannerTaskEndpoint` | `application/endpoint/plannerTask/query/` — the eligibility predicate |
+| `SkipSummaryResponse` | `application/dto/response/taskPlanner/SkipSummaryResponse.cs` |
+
+### Skip reasons — text or key
+
+A skipped task carries **at most one** of `SkipReason` (free text, ≤ 500) and `SkipReasonKey`
+(`NoTime` / `NotRelevant` / `NoEnergy` — the home widget's three built-in reasons). Both are written
+only by `PATCH …/status` through `PlannerTask.ApplyStatus`, and both are cleared on any transition out
+of `Cancelled` (the PUT clears them too, and never writes either).
+
+| Question | Answer |
+|---|---|
+| Wire format? | camelCase tokens — `"noTime"`, `"notRelevant"`, `"noEnergy"` — mapped explicitly in `SkipReasonKeyTokens`, **not** by the serializer (the host's bare `JsonStringEnumConverter` would write `"NoTime"`). Stored as the member name (`EnumColumn`) |
+| What if the label arrives as text? | Text equal to one of the six shipped labels (EN + SK, `SkipReasonKeyLabels`) **exactly** is stored as its key. The contract is that those six never come back as text, whichever client sent them. Near-misses stay text |
+| Rows written before keys? | Converted by the `SkipReasonKeys` migration with the same table. Rewording a label or adding a locale means a new row in `SkipReasonKeyLabels` **and** a data migration |
+| Invalid requests? | An unknown or mis-cased key, a key beside a non-blank `skipReason`, or a key beside any status but `Cancelled` — all 400 |
+| `UserPlannerSettings.PredefinedSkipReasons`? | User-defined presets stay free text. Keys are only for the three built-ins |
+
 ### The one-request day plan
 
 `GET /calendar/day-plan/{date}` returns the calendar row, its planner tasks ordered by start time,
@@ -403,6 +443,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `FilterPlannerTaskEndpoint` | Query (`BaseFilterEndpoint`) | The day-planner view's read — keyed on calendar id + time window | `query/GetFilteredSortedPlannerTask.cs` |
 | `FormSelectOptionsPlannerTaskEndpoint` | Query (`BaseActivityFormSelectOptionsEndpoint`) | Activity/role/category options for the task form | `query/FormSelectOptionsPlannerTaskEndpoint.cs` |
 | `GetPlanVsActualTrendPlannerTaskEndpoint` | Query (custom) | `POST /planner-task/plan-vs-actual-trend`; owns the eligibility predicate | `query/GetPlanVsActualTrendPlannerTaskEndpoint.cs` |
+| `GetSkipSummaryPlannerTaskEndpoint` | Query (custom) | `POST /planner-task/skip-summary`; owns the eligibility predicate, shares the trend's request, validator and last eligible day | `query/GetSkipSummaryPlannerTaskEndpoint.cs` |
 
 ### Endpoints — repeating tasks, template tasks, day templates, importance, settings
 
@@ -440,6 +481,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 |---|---|---|---|
 | `PlannerStreakService` | Domain service (static, pure) | `Evaluate` one day, `Walk` the history. Owns the rules, no SQL | `domain/service/PlannerStreakService.cs` |
 | `PlanVsActualTrendService` | Domain service (static, pure) | `Aggregate`, `SpanMinutes`, `DriftMinutes`. Owns the arithmetic, no SQL | `domain/service/PlanVsActualTrendService.cs` |
+| `SkipSummaryService` | Domain service (static, pure) | `Aggregate` — reason groups by exact value, per-hour planned/skipped. No SQL | `domain/service/SkipSummaryService.cs` |
 | `CalendarDayFactory` | Domain service (static) | What an unplanned day *is*. The single definition, shared by both creators | `domain/service/CalendarDayFactory.cs` |
 | `HolidayCalendar` | Domain service (static) | Slovak holiday table + Computus; `Holiday(Key, Name)` per date | `domain/service/HolidayCalendar.cs` |
 | `PlannerStreakReader` | Application service | The grouped read + qualifying predicate + day boundary | `application/service/taskPlanner/PlannerStreakReader.cs` |

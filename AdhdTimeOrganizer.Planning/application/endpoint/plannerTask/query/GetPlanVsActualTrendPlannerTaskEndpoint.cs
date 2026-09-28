@@ -60,15 +60,14 @@ public class GetPlanVsActualTrendPlannerTaskEndpoint(DbContext dbContext, IUserT
         // UTC boundary would let a Bratislava user's evening count as tomorrow and pull an unfinished day into
         // the aggregate.
         var timezone = await timeZones.GetAsync(userId, ct);
-        var today = TaskPlannerHelper.TodayIn(timezone);
 
         // "Materially over" is resolved as *strictly before the user's today*, and today is excluded however
         // late in the day the request arrives. This is stricter than the single-day block, which shows for the
         // viewed day once it is mostly done, and deliberately so: a partial today contributes tasks that have
         // simply not come around yet, and every one of them lands in NeverHappenedCount — dragging a
-        // thirty-day trend by a day that has not failed at anything. Over a range, dropping one day costs
-        // nothing; miscounting it costs the number its meaning.
-        var lastEligibleDay = req.Until < today ? req.Until : today.AddDays(-1);
+        // thirty-day trend by a day that has not failed at anything. Shared with the skip summary, which the
+        // client renders beside this and which must cover the same days.
+        var lastEligibleDay = TaskPlannerHelper.LastDayThatIsOver(req.Until, timezone);
 
         // No rows can qualify once the range starts after the last day that is over — including a range
         // entirely in the future, which must answer "nothing to say" rather than fail.

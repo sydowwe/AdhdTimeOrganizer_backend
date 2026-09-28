@@ -22,6 +22,7 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
         builder.Property(p => p.Location).HasMaxLength(200);
         builder.Property(p => p.Notes).HasMaxLength(1000);
         builder.Property(p => p.SkipReason).HasMaxLength(500);
+        builder.EnumColumn(p => p.SkipReasonKey).HasMaxLength(20);
         builder.Property(p => p.GoogleEventId).HasMaxLength(200);
 
         builder.HasOne(p => p.Calendar)

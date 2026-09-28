@@ -18,6 +18,28 @@ public static class TaskPlannerHelper
     public static DateOnly TodayIn(TimeZoneInfo timeZone)
         => DateOnly.FromDateTime(WallClockZone.FromUtc(DateTime.UtcNow, timeZone));
 
+    /// <summary>
+    /// The last day of a range-aggregate window that is <b>materially over</b>: <paramref name="until"/>, capped at
+    /// the day before the user's today. A result before the range's <c>From</c> means no day qualifies — a range
+    /// entirely in the future, or entirely today — and the caller answers with zeroes rather than failing.
+    /// <para>
+    /// Today is excluded however late in the day the request arrives. A partial today contributes tasks that
+    /// have simply not come around yet — the trend would count every one as never happened, and the skip
+    /// summary would count every one in a per-hour denominator it cannot yet have a numerator for. Over a range,
+    /// dropping one day costs nothing; miscounting it costs the number its meaning.
+    /// </para>
+    /// <para>
+    /// One implementation behind both range reads (<c>GetPlanVsActualTrendPlannerTaskEndpoint</c>,
+    /// <c>GetSkipSummaryPlannerTaskEndpoint</c>) on purpose: the client renders the two side by side, both
+    /// described as "this period", and they must mean the same days.
+    /// </para>
+    /// </summary>
+    public static DateOnly LastDayThatIsOver(DateOnly until, TimeZoneInfo timeZone)
+    {
+        var today = TodayIn(timeZone);
+        return until < today ? until : today.AddDays(-1);
+    }
+
 
     public static IQueryable<PlannerTask> WithIncludes(this IQueryable<PlannerTask> query)
     {

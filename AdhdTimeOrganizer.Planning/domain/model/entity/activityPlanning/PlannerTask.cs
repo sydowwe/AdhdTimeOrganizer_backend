@@ -8,6 +8,10 @@ public class PlannerTask : BasePlannerTask
     public TimeOnly? ActualStartTime { get; set; }
     public TimeOnly? ActualEndTime { get; set; }
     public string? SkipReason { get; set; }
+
+    /// <summary>A built-in skip reason, by key. At most one of this and <see cref="SkipReason"/> is non-null.</summary>
+    public SkipReasonKey? SkipReasonKey { get; set; }
+
     public long? SourceTemplateTaskId { get; set; } // Track which template task this came from
 
     public string? GoogleEventId { get; set; }
@@ -50,13 +54,31 @@ public class PlannerTask : BasePlannerTask
     /// <paramref name="skipReason"/> (trimmed, blank ⇒ null — a re-skip overwrites), and any other status clears
     /// it, so a restored task does not keep the reason for a skip that no longer holds.
     /// </para>
+    /// <para>
+    /// <see cref="SkipReasonKey"/> follows the same rules, and at most one of the two is set. A
+    /// <paramref name="skipReasonKey"/> wins (the validator rejects sending both); free text equal to a built-in
+    /// label exactly is stored as its key (<see cref="SkipReasonKeyLabels"/>), so the six labels never come
+    /// back as text whichever client wrote them.
+    /// </para>
     /// </summary>
-    public void ApplyStatus(PlannerTaskStatus newStatus, string? skipReason = null)
+    public void ApplyStatus(PlannerTaskStatus newStatus, string? skipReason = null, SkipReasonKey? skipReasonKey = null)
     {
         Status = newStatus;
-        SkipReason = newStatus == PlannerTaskStatus.Cancelled && !string.IsNullOrWhiteSpace(skipReason)
-            ? skipReason.Trim()
-            : null;
+        SkipReason = null;
+        SkipReasonKey = null;
+        if (newStatus == PlannerTaskStatus.Cancelled)
+        {
+            if (skipReasonKey is not null)
+                SkipReasonKey = skipReasonKey;
+            else if (!string.IsNullOrWhiteSpace(skipReason))
+            {
+                var text = skipReason.Trim();
+                if (SkipReasonKeyLabels.TryGetKey(text, out var key))
+                    SkipReasonKey = key;
+                else
+                    SkipReason = text;
+            }
+        }
         if (newStatus is PlannerTaskStatus.Cancelled or PlannerTaskStatus.NotStarted)
         {
             ActualStartTime = null;
