@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
@@ -36,6 +38,7 @@ public class TodoListItemDailyRecapTests(AppDbContextFixture fixture) : Postgres
     private long _taskPriorityId;
     private long _writeReportActivityId;
     private long _tidyDeskActivityId;
+    private long _readNovelActivityId;
 
     protected override async Task SeedAsync(DbContext db)
     {
@@ -45,7 +48,8 @@ public class TodoListItemDailyRecapTests(AppDbContextFixture fixture) : Postgres
 
         var writeReport = new Activity { UserId = UserId, Name = "Write the report", RoleId = role.Id };
         var tidyDesk = new Activity { UserId = UserId, Name = "Tidy the desk", RoleId = role.Id };
-        db.Set<Activity>().AddRange(writeReport, tidyDesk);
+        var readNovel = new Activity { UserId = UserId, Name = "Read a novel", RoleId = role.Id };
+        db.Set<Activity>().AddRange(writeReport, tidyDesk, readNovel);
 
         var todoList = new TodoList { UserId = UserId, Name = "Recap List" };
         db.Set<TodoList>().Add(todoList);
@@ -57,17 +61,19 @@ public class TodoListItemDailyRecapTests(AppDbContextFixture fixture) : Postgres
 
         _writeReportActivityId = writeReport.Id;
         _tidyDeskActivityId = tidyDesk.Id;
+        _readNovelActivityId = readNovel.Id;
         _todoListId = todoList.Id;
         _taskPriorityId = priority.Id;
     }
 
-    private async Task<long> CreateItemAsync(HttpClient client, long activityId)
+    private async Task<long> CreateItemAsync(HttpClient client, long activityId, long? pairedLeisureActivityId = null)
     {
         var response = await client.PostAsJsonAsync("/api/todo-list-item", new
         {
             activityId,
             taskPriorityId = _taskPriorityId,
-            todoListId = _todoListId
+            todoListId = _todoListId,
+            pairedLeisureActivityId
         }, JsonOpts, CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -274,8 +280,10 @@ public class TodoListItemDailyRecapTests(AppDbContextFixture fixture) : Postgres
     }
 
     /// <summary>
-    /// Day bounding is half-open UTC. The two edge instants are what a closed range or an off-by-one
-    /// would get wrong, and neither would fail loudly.
+    /// Day bounding is half-open, in the user's zone — UTC for the fixture's test user, so the edges
+    /// here are UTC midnights. The two edge instants are what a closed range or an off-by-one would get
+    /// wrong, and neither would fail loudly. The zone itself is pinned by
+    /// <see cref="Recap_BoundsTheDayInTheUsersZone"/>.
     /// </summary>
     [Fact]
     public async Task Recap_IsScopedToItsOwnDay()
@@ -335,6 +343,143 @@ public class TodoListItemDailyRecapTests(AppDbContextFixture fixture) : Postgres
 
         recordings.Should().ContainSingle("deleting a task must not delete the time recorded against it")
             .Which.TodoListItemId.Should().BeNull();
+    }
+
+    private async Task SetCompletedAsync(long id, DateTime completedUtc)
+    {
+        await using var db = CreateDbContext();
+        var item = await db.Set<TodoListItem>().FirstAsync(i => i.Id == id, CancellationToken);
+        item.CompletedTimestamp = completedUtc;
+        await db.SaveChangesAsync(CancellationToken);
+    }
+
+    /// <summary>
+    /// The earned-reward strip keys a waiting reward by item and offers the paired activity, so each row
+    /// has to carry both, plus the completion instant it expires from. Asserted on the raw JSON as well:
+    /// a field missing from the wire deserialises to a default indistinguishable from "no pairing".
+    /// </summary>
+    [Fact]
+    public async Task Recap_CarriesTheItemId_ThePairing_AndTheCompletionInstant()
+    {
+        var client = CreateUserRoleClient();
+
+        var pairedId = await CreateItemAsync(client, _writeReportActivityId, _readNovelActivityId);
+        var plainId = await CreateItemAsync(client, _tidyDeskActivityId);
+        await CompleteAsync(client, pairedId);
+        await CompleteAsync(client, plainId);
+
+        var recap = await RecapAsync(client, Today);
+
+        var paired = recap.Items.Should().ContainSingle(i => i.ItemId == pairedId).Subject;
+        paired.Name.Should().Be("Write the report");
+        paired.PairedLeisureActivityId.Should().Be(_readNovelActivityId);
+        paired.CompletedTimestamp.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        paired.RewardTaken.Should().BeFalse("nothing has been logged on the leisure activity yet");
+
+        var plain = recap.Items.Should().ContainSingle(i => i.ItemId == plainId).Subject;
+        plain.PairedLeisureActivityId.Should().BeNull("an unpaired item is still in the recap; the client filters");
+        plain.RewardTaken.Should().BeFalse();
+
+        var raw = await client.GetStringAsync($"/api/todo-list-item/daily-recap?date={Today:yyyy-MM-dd}", CancellationToken);
+        using var doc = JsonDocument.Parse(raw);
+        var rows = doc.RootElement.GetProperty("items").EnumerateArray().ToList();
+
+        var pairedRow = rows.Single(r => r.GetProperty("itemId").GetInt64() == pairedId);
+        pairedRow.GetProperty("pairedLeisureActivityId").GetInt64().Should().Be(_readNovelActivityId);
+        pairedRow.GetProperty("rewardTaken").GetBoolean().Should().BeFalse();
+        pairedRow.GetProperty("completedTimestamp").GetString().Should().EndWith("Z",
+            "the client reads the instant in the user's zone, so it has to arrive marked as UTC");
+
+        var plainRow = rows.Single(r => r.GetProperty("itemId").GetInt64() == plainId);
+        plainRow.GetProperty("pairedLeisureActivityId").ValueKind.Should().Be(JsonValueKind.Null,
+            "the contract is an explicit null, not an absent field");
+    }
+
+    /// <summary>
+    /// "Taken" is derived: a recording of the paired activity that starts at or after the completion.
+    /// One that started before it was not the reward, however close — that is the case a plain "any
+    /// recording today" check would get wrong.
+    /// </summary>
+    [Fact]
+    public async Task RewardTaken_OnlyByARecordingOfThePairedActivity_StartingAfterCompletion()
+    {
+        var client = CreateUserRoleClient();
+        var id = await CreateItemAsync(client, _writeReportActivityId, _readNovelActivityId);
+        await CompleteAsync(client, id);
+
+        // Pinned mid-day so the "after" recording cannot spill into tomorrow on a run near midnight.
+        var completedAt = DateTime.UtcNow.Date.AddHours(10);
+        await SetCompletedAsync(id, completedAt);
+
+        await LogTimeAsync(_readNovelActivityId, null, completedAt.AddMinutes(-30), 600);
+        // The item's own activity, after completion: time spent on the work is not the reward.
+        await LogTimeAsync(_writeReportActivityId, null, completedAt.AddMinutes(30), 600);
+
+        (await RecapAsync(client, Today)).Items.Should().ContainSingle()
+            .Which.RewardTaken.Should().BeFalse("the only leisure recording started before the item was done");
+
+        await LogTimeAsync(_readNovelActivityId, null, completedAt.AddHours(1), 1800);
+
+        (await RecapAsync(client, Today)).Items.Should().ContainSingle()
+            .Which.RewardTaken.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Reopening un-earns: the interceptor clears the stamp, and a row with no stamp is not in the recap.
+    /// </summary>
+    [Fact]
+    public async Task ReopenedItem_LeavesTheRecap()
+    {
+        var client = CreateUserRoleClient();
+        var id = await CreateItemAsync(client, _writeReportActivityId, _readNovelActivityId);
+        await CompleteAsync(client, id);
+
+        (await RecapAsync(client, Today)).Items.Should().ContainSingle(i => i.ItemId == id);
+
+        var undo = await client.PatchAsJsonAsync("/api/todo-list-item/toggle-is-done", new
+        {
+            ids = new[] { id },
+            forceValue = false
+        }, JsonOpts, CancellationToken);
+        undo.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await RecapAsync(client, Today)).Items.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// The day is the user's. In July Bratislava is UTC+2, so 00:30 local on the 15th is 22:30 UTC on
+    /// the 14th: under a UTC day it lands in the wrong recap and its reward never waits. The logged time
+    /// and the reward recording sit in the same early-morning window, so all three reads are pinned to
+    /// the user's day, not just the item query. Fixed dates keep the offset exactly two hours.
+    /// </summary>
+    [Fact]
+    public async Task Recap_BoundsTheDayInTheUsersZone()
+    {
+        await using (var db = CreateDbContext())
+        {
+            var user = await db.Set<User>().IgnoreQueryFilters().SingleAsync(u => u.Id == UserId, CancellationToken);
+            user.Timezone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Bratislava");
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        var client = CreateUserRoleClient();
+        var id = await CreateItemAsync(client, _writeReportActivityId, _readNovelActivityId);
+        await CompleteAsync(client, id);
+
+        var completedAt = new DateTime(2026, 7, 14, 22, 30, 0, DateTimeKind.Utc);
+        await SetCompletedAsync(id, completedAt);
+        await LogTimeAsync(_writeReportActivityId, id, new DateTime(2026, 7, 14, 22, 5, 0, DateTimeKind.Utc), 1200);
+        await LogTimeAsync(_readNovelActivityId, null, new DateTime(2026, 7, 14, 23, 0, 0, DateTimeKind.Utc), 1800);
+
+        var local15th = await RecapAsync(client, new DateOnly(2026, 7, 15));
+        var row = local15th.Items.Should().ContainSingle(
+            "00:30 in Bratislava on the 15th is the 15th for the user, whatever UTC calls it").Subject;
+        row.ItemId.Should().Be(id);
+        row.TimeLoggedSeconds.Should().Be(1200, "00:05 local is inside the user's 15th");
+        row.RewardTaken.Should().BeTrue("01:00 local is after completion and inside the user's 15th");
+
+        (await RecapAsync(client, new DateOnly(2026, 7, 14))).Items.Should().BeEmpty(
+            "the UTC date of the completion is not the user's date");
     }
 
     /// <summary>

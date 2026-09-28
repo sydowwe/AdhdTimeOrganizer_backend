@@ -95,7 +95,7 @@ than in Framework: each is typed on `BaseTodoListItem`.
 | `GetAllTodoListItemEndpoint` | Endpoint | `GET /todo-list-item?todoListId=` — the to-do view's list read. **`TodoListId` is required** (`GetAllTodoListItemValidator`): the unfiltered call is a 400, not every item the caller owns (`PERF-1`). Ordered by `DisplayOrder`; the list id is not ownership-checked because the query is scoped to the caller's items, so a foreign id is an empty page | `…/todoListItem/query/GetAllTodoListItemEndpoint.cs` |
 | `GetByIdTodoListItemEndpoint` | Endpoint | Single read | `…/todoListItem/query/GetByIdTodoListItemEndpoint.cs` |
 | `GetDashboardTodoListItemEndpoint` | Endpoint | `GET …/dashboard-widget` — open items due within `TodoListSettings.DashboardHorizonDays` (3) days, by due date; the window closes on **the user's own date**, resolved via `IUserTimeZoneResolver` | `…/todoListItem/query/GetDashboardTodoListItemEndpoint.cs` |
-| `GetDailyRecapTodoListItemEndpoint` | Endpoint | `GET …/daily-recap` — items completed on a day + per-item logged time via `ITodoListItemLoggedTimeSource`. Half-open UTC day range; explicit `UserId` filter | `…/todoListItem/query/GetDailyRecapTodoListItemEndpoint.cs` |
+| `GetDailyRecapTodoListItemEndpoint` | Endpoint | `GET …/daily-recap` — items completed on a day + per-item logged time, pairing, completion instant and derived `rewardTaken`, via `ITodoListItemLoggedTimeSource`. Half-open day range in the **user's** zone; explicit `UserId` filter | `…/todoListItem/query/GetDailyRecapTodoListItemEndpoint.cs` |
 | `CreateStepTodoListItemEndpoint` | Endpoint | Checklist step create (subclasses the base) | `…/todoListItem/steps/CreateStepTodoListItemEndpoint.cs` |
 | `UpdateStepTodoListItemEndpoint` | Endpoint | Checklist step update | `…/todoListItem/steps/UpdateStepTodoListItemEndpoint.cs` |
 | `DeleteStepTodoListItemEndpoint` | Endpoint | Checklist step delete | `…/todoListItem/steps/DeleteStepTodoListItemEndpoint.cs` |
@@ -263,6 +263,20 @@ that an item may not be paired with its own activity.
 Widening the match to the item's activity looks like it can only find more rows, and in fact
 double-counts whenever two items share an activity. A completed item with no recording appears at
 zero seconds; declining the prompt is an ordinary outcome, not a gap.
+
+**The daily recap is the source of "earned today" for temptation bundling.** Each row carries
+`itemId`, `pairedLeisureActivityId`, `completedTimestamp` and a derived `rewardTaken`, and the home
+screen's reward strip is built from it. `rewardTaken` is **derived, never recorded**: true once a
+recording of the paired activity starts at or after the item's completion and before the user's day
+ends. Two accepted imprecisions: a reward still running has no recording yet and reads `false`, and
+one recording satisfies every item paired to that activity that was done before it started. There is
+deliberately no claim row and no tally of taken or declined rewards. Reopening an item un-earns it —
+the interceptor clears `CompletedTimestamp`, so the row leaves the recap.
+
+**The recap's day is the user's day**, resolved through `IUserTimeZoneResolver`, and all three reads
+(completions, logged time, reward starts) use the same `[from, to)` instants. It used to be a UTC day,
+which put anything done in the first hours after local midnight into the previous day's recap for
+every user east of Greenwich.
 
 ## Glossary
 

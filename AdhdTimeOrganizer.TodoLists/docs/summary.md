@@ -84,7 +84,10 @@ project's bases.
   widened to "any time logged against this item's activity": two items can share one activity, so
   that fallback credits the same seconds twice. An item with no recording is an **ordinary** case
   (the prompt gets declined) and appears at zero, not omitted. See
-  `AdhdTimeOrganizer.Core/application/seam/README.md`.
+  `AdhdTimeOrganizer.Core/application/seam/README.md`. The same seam derives each row's
+  `rewardTaken` from recordings of the **paired leisure activity** (keyed on `ActivityId`, the one
+  place that is right), and the recap bounds its day in the user's zone — the home screen's
+  earned-reward strip treats this recap as the truth about "earned today".
 
 - **The merge repoint has a collapse case, and it lives in this slice.**
   `TodoListActivityReferenceSource` counts `ActivityId` and `PairedLeisureActivityId` as two separate

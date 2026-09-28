@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
 using AdhdTimeOrganizer.TodoLists.application.validator;
@@ -23,8 +24,16 @@ namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListItem
 /// <c>ActivityHistory</c>, which this slice cannot see. The seam resolves as a single service, so a
 /// missing registration throws here at activation rather than reporting every day as empty.
 /// </para>
+/// <para>
+/// The day is the user's, resolved through <see cref="IUserTimeZoneResolver"/> like the dashboard widget
+/// beside it. The home screen's earned-reward strip reads this recap as its source of "earned today", so
+/// a UTC day would drop the first hours after local midnight for everyone east of Greenwich.
+/// </para>
 /// </remarks>
-public class GetDailyRecapTodoListItemEndpoint(DbContext db, ITodoListItemLoggedTimeSource loggedTime)
+public class GetDailyRecapTodoListItemEndpoint(
+    DbContext db,
+    ITodoListItemLoggedTimeSource loggedTime,
+    IUserTimeZoneResolver timeZones)
     : Endpoint<TodoListItemDailyRecapRequest, TodoListItemDailyRecapResponse>
 {
     public override void Configure()
@@ -45,10 +54,12 @@ public class GetDailyRecapTodoListItemEndpoint(DbContext db, ITodoListItemLogged
     {
         var userId = User.GetId();
 
-        // Half-open UTC range, matching how every History dashboard bounds a day — a closed range on
-        // TimeOnly.MaxValue drops whatever lands in the final tick.
-        var from = req.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var to = from.AddDays(1);
+        // The user's day, not UTC's: the client sends its own calendar date, and an item finished at
+        // 00:30 in Bratislava is 22:30 UTC the day before. Half-open, and both ends resolved separately
+        // rather than from + 24h, because a DST transition day is 23 or 25 hours long.
+        var timeZone = await timeZones.GetAsync(userId, ct);
+        var from = WallClockZone.ToUtc(req.Date, TimeOnly.MinValue, timeZone);
+        var to = WallClockZone.ToUtc(req.Date.AddDays(1), TimeOnly.MinValue, timeZone);
 
         // Filtered on UserId explicitly rather than leaning on AppDbContext's global filter: this is
         // the row set the response is built from, and it must follow the id that was authenticated.
@@ -58,7 +69,13 @@ public class GetDailyRecapTodoListItemEndpoint(DbContext db, ITodoListItemLogged
                         && i.CompletedTimestamp != null
                         && i.CompletedTimestamp >= from && i.CompletedTimestamp < to)
             .OrderBy(i => i.CompletedTimestamp)
-            .Select(i => new { i.Id, i.Activity.Name })
+            .Select(i => new
+            {
+                i.Id,
+                i.Activity.Name,
+                i.PairedLeisureActivityId,
+                CompletedTimestamp = i.CompletedTimestamp!.Value
+            })
             .ToListAsync(ct);
 
         if (completed.Count == 0)
@@ -69,8 +86,18 @@ public class GetDailyRecapTodoListItemEndpoint(DbContext db, ITodoListItemLogged
             return;
         }
 
-        var secondsByItem = await loggedTime.LoggedSecondsOnDayAsync(
-            db, userId, completed.Select(c => c.Id).ToList(), req.Date, ct);
+        var secondsByItem = await loggedTime.LoggedSecondsBetweenAsync(
+            db, userId, completed.Select(c => c.Id).ToList(), from, to, ct);
+
+        // "Taken" is derived from History rather than recorded: the reward counts once a recording of the
+        // paired activity starts at or after the item's completion, before the day ends. The latest start
+        // per activity is enough to answer that for every item paired to it.
+        var latestRewardStart = await loggedTime.LatestStartBetweenAsync(
+            db, userId,
+            completed.Where(c => c.PairedLeisureActivityId != null)
+                .Select(c => c.PairedLeisureActivityId!.Value)
+                .ToList(),
+            from, to, ct);
 
         var items = completed
             .Select(c => new DailyRecapItem
@@ -78,7 +105,13 @@ public class GetDailyRecapTodoListItemEndpoint(DbContext db, ITodoListItemLogged
                 Name = c.Name,
                 // Absent means no recording was saved for that item — the prompt is declined often
                 // enough that a completed task with no time against it is an ordinary case, not a gap.
-                TimeLoggedSeconds = secondsByItem.GetValueOrDefault(c.Id)
+                TimeLoggedSeconds = secondsByItem.GetValueOrDefault(c.Id),
+                ItemId = c.Id,
+                PairedLeisureActivityId = c.PairedLeisureActivityId,
+                CompletedTimestamp = c.CompletedTimestamp,
+                RewardTaken = c.PairedLeisureActivityId is { } paired
+                              && latestRewardStart.TryGetValue(paired, out var started)
+                              && started >= c.CompletedTimestamp
             })
             .ToList();
 

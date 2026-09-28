@@ -51,6 +51,9 @@ Each one exists because the failure it catches produces no exception, no log lin
 | `TodoListItemDailyRecapTests.EditingAnAlreadyDoneItem_DoesNotRestampIt` | The transition-only guard. Without it, editing a note walks a finished task into today's recap |
 | `TodoListItemDailyRecapTests.TimeIsAttributedByItem_NotByActivity` | `ITodoListItemLoggedTimeSource` keys off `ActivityHistory.TodoListItemId` only. Widening it to the activity looks like it can only find *more* and in fact double-counts |
 | `TodoListItemDailyRecapTests` (`ZeroDay_ReturnsAnEmptyArray_NotNull`, `ItemCompletedWithoutARecording_AppearsWithZeroSeconds`) | The two ordinary-but-easily-broken payload shapes |
+| `TodoListItemDailyRecapTests.Recap_CarriesTheItemId_ThePairing_AndTheCompletionInstant` | The reward strip's wire contract, on raw JSON: explicit `null` pairing, `Z`-suffixed instant. A dropped field deserialises to "no pairing" and nothing fails |
+| `TodoListItemDailyRecapTests.RewardTaken_OnlyByARecordingOfThePairedActivity_StartingAfterCompletion` | `rewardTaken` is the paired activity only, started at or after completion — not "any recording today", and not time on the item's own activity |
+| `TodoListItemDailyRecapTests.Recap_BoundsTheDayInTheUsersZone` | All three reads use the user's day. A UTC day drops 00:30 local into yesterday's recap for a Bratislava user |
 | `TodoListItemPairingTests.DeletingThePairedLeisureActivity_UnpairsTheTask_ButKeepsIt` | **SetNull, not Cascade.** If the FK is ever regenerated as required, deleting a leisure activity silently deletes every task bundled with it |
 | `TodoListItemPairingTests.Create_RoundTripsThePairedActivityId_ThroughBothReads` | The id survives create and *both* read paths — a dropped projection is indistinguishable from "not paired" on the frontend |
 | `TodoListItemPairingTests.{Create,Update}_RejectsPairingATaskWithItsOwnActivity` | The self-pairing rule, both entry points |

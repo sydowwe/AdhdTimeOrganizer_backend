@@ -3,8 +3,9 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.Core.application.seam;
 
 /// <summary>
-/// Answers "how many seconds were logged against each of these to-do items on this day?" without the
-/// caller naming the slice that owns the time ledger.
+/// Answers "how many seconds were logged against each of these to-do items on this day?" — and, for
+/// temptation bundling, "was this paired leisure activity started since?" — without the caller naming the
+/// slice that owns the time ledger.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -42,7 +43,28 @@ public interface ITodoListItemLoggedTimeSource : ISeam
     /// caller passes the id it authenticated and this must not attribute to whoever is ambient.
     /// </param>
     /// <param name="todoListItemIds">Items to report on. An empty collection returns an empty map.</param>
-    /// <param name="day">The day to scope to, interpreted as a half-open UTC range.</param>
-    Task<IReadOnlyDictionary<long, long>> LoggedSecondsOnDayAsync(
-        DbContext db, long userId, IReadOnlyCollection<long> todoListItemIds, DateOnly day, CancellationToken ct);
+    /// <param name="fromUtc">Inclusive start of the day, as a UTC instant.</param>
+    /// <param name="toUtc">
+    /// Exclusive end of the day, as a UTC instant. The caller resolves both ends in the user's own zone;
+    /// a user's day is not UTC's, and is not always 24 hours long either.
+    /// </param>
+    Task<IReadOnlyDictionary<long, long>> LoggedSecondsBetweenAsync(
+        DbContext db, long userId, IReadOnlyCollection<long> todoListItemIds, DateTime fromUtc, DateTime toUtc,
+        CancellationToken ct);
+
+    /// <summary>
+    /// The latest recording start in <c>[fromUtc, toUtc)</c> for each of <paramref name="activityIds"/> —
+    /// what the daily recap derives "this item's paired reward was taken" from.
+    /// </summary>
+    /// <remarks>
+    /// Keyed on <c>ActivityHistory.ActivityId</c>, deliberately not on <c>TodoListItemId</c>: the question
+    /// is whether the user went and did the leisure activity, and that recording is not linked to the item
+    /// that earned it. The caller compares the returned start against each item's completion instant; a
+    /// latest start at or after it means some recording started after it within the range. Activities with
+    /// no recording in range are <b>absent</b>, for the same reason as
+    /// <see cref="LoggedSecondsBetweenAsync"/>.
+    /// </remarks>
+    Task<IReadOnlyDictionary<long, DateTime>> LatestStartBetweenAsync(
+        DbContext db, long userId, IReadOnlyCollection<long> activityIds, DateTime fromUtc, DateTime toUtc,
+        CancellationToken ct);
 }

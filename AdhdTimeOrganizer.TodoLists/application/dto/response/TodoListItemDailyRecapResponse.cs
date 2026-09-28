@@ -14,10 +14,38 @@ public record DailyRecapItem
     /// recordings carried an item link.
     /// </summary>
     public required long TimeLoggedSeconds { get; init; }
+
+    /// <summary>
+    /// The item's id. The client keys an earned reward by item, because two items may share one leisure
+    /// activity and each one's reward is dismissed or started on its own.
+    /// </summary>
+    public required long ItemId { get; init; }
+
+    /// <summary>
+    /// The leisure activity this item was paired with (temptation bundling), or null when it has none.
+    /// A backlog profile's id is its activity id, so the client resolves the reward's name and duration
+    /// itself. Every completed item is returned regardless — the client filters on this.
+    /// </summary>
+    public long? PairedLeisureActivityId { get; init; }
+
+    /// <summary>
+    /// When the item was completed, as a UTC instant. Never null — a recap row is completed by definition.
+    /// </summary>
+    public required DateTime CompletedTimestamp { get; init; }
+
+    /// <summary>
+    /// Whether the paired reward has been taken: a recording of <see cref="PairedLeisureActivityId"/>
+    /// started at or after <see cref="CompletedTimestamp"/> and before the end of the recapped day.
+    /// Derived, not recorded, so a reward still running (no recording yet) reads <c>false</c>, and one
+    /// recording satisfies every item paired to that activity that was completed before it started.
+    /// Always <c>false</c> when there is no pairing.
+    /// </summary>
+    public required bool RewardTaken { get; init; }
 }
 
 /// <summary>
-/// The items this user completed on one day, with the time recorded against each.
+/// The items this user completed on one day of their own calendar, in completion order, with the time
+/// recorded against each.
 /// </summary>
 public record TodoListItemDailyRecapResponse
 {

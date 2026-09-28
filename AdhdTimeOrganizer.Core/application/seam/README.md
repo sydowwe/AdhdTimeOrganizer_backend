@@ -109,7 +109,11 @@ None of these break the build, and only one of them throws.
   task. Widening it to "any time logged against this item's activity" — which looks like it would
   only ever find *more* — double-counts, because two to-do items may share one activity and would
   each be credited the same seconds. `TodoListItemDailyRecapTests.TimeIsAttributedByItem_NotByActivity`
-  is the guard, and it asserts on the returned totals rather than on the query.
+  is the guard, and it asserts on the returned totals rather than on the query. Its second method,
+  `LatestStartBetweenAsync`, keys on `ActivityId` **deliberately** — it answers "was the paired
+  leisure activity started after the item was done", and that recording carries no item link.
+  `TodoListItemDailyRecapTests.RewardTaken_OnlyByARecordingOfThePairedActivity_StartingAfterCompletion`
+  guards it. Both methods take the day as UTC instants the caller resolved in the user's zone.
 - **`IUserOwnedReferenceVerifier` is the one that fails *closed*.** `ReferencedIdOwnershipService`
   looks a verifier up by key and answers `false` when none matches, so a slice dropped from
   `ModuleAssemblies` or a renamed key rejects every write carrying that id instead of waving them all

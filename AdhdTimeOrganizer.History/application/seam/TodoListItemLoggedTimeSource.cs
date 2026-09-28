@@ -11,16 +11,12 @@ namespace AdhdTimeOrganizer.History.application.seam;
 /// </summary>
 public sealed class TodoListItemLoggedTimeSource : ITodoListItemLoggedTimeSource, IScopedService
 {
-    public async Task<IReadOnlyDictionary<long, long>> LoggedSecondsOnDayAsync(
-        DbContext db, long userId, IReadOnlyCollection<long> todoListItemIds, DateOnly day, CancellationToken ct)
+    public async Task<IReadOnlyDictionary<long, long>> LoggedSecondsBetweenAsync(
+        DbContext db, long userId, IReadOnlyCollection<long> todoListItemIds, DateTime fromUtc, DateTime toUtc,
+        CancellationToken ct)
     {
         if (todoListItemIds.Count == 0)
             return new Dictionary<long, long>();
-
-        // Half-open UTC range, matching how every History dashboard bounds a day. A closed range on
-        // TimeOnly.MaxValue drops whatever lands in the final tick.
-        var from = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var to = from.AddDays(1);
 
         var ids = todoListItemIds.Distinct().ToList();
 
@@ -35,7 +31,7 @@ public sealed class TodoListItemLoggedTimeSource : ITodoListItemLoggedTimeSource
             .Where(h => h.UserId == userId
                         && h.TodoListItemId != null
                         && ids.Contains(h.TodoListItemId.Value)
-                        && h.StartTimestamp >= from && h.StartTimestamp < to)
+                        && h.StartTimestamp >= fromUtc && h.StartTimestamp < toUtc)
             .Select(h => new { ItemId = h.TodoListItemId!.Value, h.Length })
             .ToListAsync(ct);
 
@@ -45,5 +41,25 @@ public sealed class TodoListItemLoggedTimeSource : ITodoListItemLoggedTimeSource
         return rows
             .GroupBy(r => r.ItemId)
             .ToDictionary(g => g.Key, g => g.Sum(r => (long)r.Length.TotalSeconds));
+    }
+
+    public async Task<IReadOnlyDictionary<long, DateTime>> LatestStartBetweenAsync(
+        DbContext db, long userId, IReadOnlyCollection<long> activityIds, DateTime fromUtc, DateTime toUtc,
+        CancellationToken ct)
+    {
+        if (activityIds.Count == 0)
+            return new Dictionary<long, DateTime>();
+
+        var ids = activityIds.Distinct().ToList();
+
+        // UserId filtered explicitly for the same reason as above. No Activity join, so the archived
+        // filter on Activity never applies: a reward taken on an activity archived since still counts.
+        return await db.Set<ActivityHistory>()
+            .Where(h => h.UserId == userId
+                        && ids.Contains(h.ActivityId)
+                        && h.StartTimestamp >= fromUtc && h.StartTimestamp < toUtc)
+            .GroupBy(h => h.ActivityId)
+            .Select(g => new { ActivityId = g.Key, LatestStart = g.Max(h => h.StartTimestamp) })
+            .ToDictionaryAsync(r => r.ActivityId, r => r.LatestStart, ct);
     }
 }

@@ -193,7 +193,9 @@ Archived activities pass; archival is not ownership. Guarded by
 - **`TodoListItemLoggedTimeSource` (`application/seam/`) must key on `TodoListItemId` only.** It
   serves TodoLists' daily recap through Core's `ITodoListItemLoggedTimeSource`. Widening it to match
   on the activity looks strictly more generous and is wrong: two to-do items may share one activity,
-  and the same seconds would be credited to both.
+  and the same seconds would be credited to both. Its second method, `LatestStartBetweenAsync`, is the
+  one that *does* key on `ActivityId`, on purpose: it answers "was the paired leisure activity started
+  after this item was done", and that recording is never linked to the item. Don't unify the two.
 - **A save touching `ActivityHistory` needs the three materialized views to exist**, or Postgres
   fails with 42P01. The app installs them via `SuggestionPatternViewInstaller` (embedded resources);
   the test fixture applies `sqlScripts/*.sql` in `AppDbContextFixture.OnSchemaCreatedAsync`. If
