@@ -53,7 +53,16 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
         var dayOfMonth = date.Day;
 
         var result = new List<SuggestionResponse>();
-        var coveredActivityIds = new HashSet<long>();
+
+        // An activity already on this day is not a suggestion: offering it again only invites a duplicate task.
+        // Every status counts — a cancelled task is a decision about the day, not a gap in it. Seeding the
+        // covered set with these suppresses all three tiers below.
+        var coveredActivityIds = (await dbContext.Set<PlannerTask>()
+                .Where(t => t.CalendarId == calendarId)
+                .Select(t => t.ActivityId)
+                .Distinct()
+                .ToListAsync(ct))
+            .ToHashSet();
 
         // 1. User-set suggestions (RepeatingPlannerTask)
         var tasks = await dbContext.Set<RepeatingPlannerTask>()
@@ -70,7 +79,7 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
             .Include(t => t.Activity).ThenInclude(a => a.Category)
             .ToListAsync(ct);
 
-        var matchedTasks = tasks.Where(task => task.RecurrenceType switch
+        var matchedTasks = tasks.Where(task => !coveredActivityIds.Contains(task.ActivityId) && task.RecurrenceType switch
         {
             RecurrenceType.DayOfWeek => task.ScheduledDays.Contains(date.DayOfWeek.ToString()),
             RecurrenceType.DayOfMonth => task.ScheduledDates.Contains(date.Day),

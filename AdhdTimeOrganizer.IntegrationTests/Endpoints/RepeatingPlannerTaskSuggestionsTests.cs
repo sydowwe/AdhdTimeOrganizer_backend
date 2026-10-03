@@ -171,6 +171,54 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     }
 
     /// <summary>
+    /// An activity that already has a <c>PlannerTask</c> on the day is not suggested for it, from any tier —
+    /// the planner's <b>+</b> on such a suggestion created a second task for the same activity. The user-set
+    /// row's task is <c>NotStarted</c> and the pattern row's is <c>Cancelled</c>, pinning that every status
+    /// counts. A third activity with the same pattern and nothing planned is the control: a guard that
+    /// dropped every suggestion would otherwise pass.
+    /// </summary>
+    [Fact(DisplayName = "An activity already planned on the day is not suggested for it, from any tier")]
+    public async Task ActivityAlreadyPlannedOnTheDay_IsNotSuggested()
+    {
+        var target = new DateOnly(2027, 6, 21);
+        long userSetActivityId, patternActivityId, controlActivityId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            userSetActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-planned-user-set", ct: TestContext.Current.CancellationToken);
+            patternActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-planned-pattern", ct: TestContext.Current.CancellationToken);
+            controlActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-planned-control", ct: TestContext.Current.CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: TestContext.Current.CancellationToken);
+
+            var repeatingId = await PlanningTestSeedHelper.SeedRepeatingPlannerTaskAsync(
+                db, userSetActivityId, recurrenceType: RecurrenceType.DayOfWeek, ct: TestContext.Current.CancellationToken);
+            var repeating = await db.Set<AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning.RepeatingPlannerTask>()
+                .SingleAsync(t => t.Id == repeatingId, CancellationToken);
+            repeating.ScheduledDays.Add(target.DayOfWeek.ToString());
+            await db.SaveChangesAsync(CancellationToken);
+
+            foreach (var activityId in new[] { patternActivityId, controlActivityId })
+            {
+                for (var weeksAgo = 1; weeksAgo <= 3; weeksAgo++)
+                    await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo);
+            }
+
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(
+                db, userSetActivityId, calendarTargetId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: TestContext.Current.CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(
+                db, patternActivityId, calendarTargetId, new TimeOnly(11, 0), new TimeOnly(12, 0),
+                status: PlannerTaskStatus.Cancelled, ct: TestContext.Current.CancellationToken);
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        suggestions.Should().NotContain(s => s.Activity.Id == userSetActivityId, "the user-set suggestion's activity is already on the day");
+        suggestions.Should().NotContain(s => s.Activity.Id == patternActivityId, "the pattern's activity is already on the day, cancelled or not");
+        suggestions.Should().ContainSingle(s => s.Activity.Id == controlActivityId)
+            .Which.SourceType.Should().Be(SuggestionSourceType.PlannedPattern);
+    }
+
+    /// <summary>
     /// TEST-13 / <c>CQ-13</c>. A materialized view lags its base tables by design, so a row can name an
     /// activity that is already gone — and deleting an activity <b>cascades its planner tasks away</b>
     /// (<c>PlannerDeleteBehaviorTests</c>), so this is the case where the view row outlives both. Both tiers
