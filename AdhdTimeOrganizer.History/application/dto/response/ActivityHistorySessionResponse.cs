@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.History.domain.model.@enum;
+using Sydowwe.Framework.domain.valueObject;
 
 namespace AdhdTimeOrganizer.History.application.dto.response.activityHistory;
 
@@ -13,6 +14,9 @@ public record ActivityHistorySessionResponse
     public required TimerSessionOutcome Outcome { get; init; }
     public int? PlannedFocusPeriods { get; init; }
     public int? CompletedFocusPeriods { get; init; }
+
+    /// <summary>The focus time the timer was set for; null on sessions written before it was sent.</summary>
+    public IntTime? PlannedLength { get; init; }
 }
 
 /// <summary>The answer to <c>POST /activity-history/session</c>.</summary>

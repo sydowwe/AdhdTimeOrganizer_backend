@@ -47,6 +47,26 @@ public class CreateActivityHistorySessionValidator : Validator<CreateActivityHis
             RuleFor(x => x.CompletedFocusPeriods).Null().WithMessage("A Timer session has no focus periods.");
         });
 
+        RuleFor(x => x.PlannedLength)
+            .Must(l => l!.TotalSeconds > 0)
+            .When(x => x.PlannedLength is not null)
+            .WithMessage("PlannedLength must be positive when sent.");
+
+        // ---- the item link: ActivityHistoryValidator's rules, verbatim -------------------------------
+
+        RuleFor(x => x.TodoListItemId)
+            .GreaterThan(0)
+            .When(x => x.TodoListItemId.HasValue);
+
+        RuleFor(x => x.RoutineTodoListId)
+            .GreaterThan(0)
+            .When(x => x.RoutineTodoListId.HasValue);
+
+        RuleFor(x => x)
+            .Must(x => !(x.TodoListItemId.HasValue && x.RoutineTodoListId.HasValue))
+            .WithMessage("A session cannot be linked to both a to-do item and a routine item.")
+            .WithName(nameof(CreateActivityHistorySessionRequest.TodoListItemId));
+
         // ---- records ----------------------------------------------------------------------------------
 
         RuleFor(x => x.Records)

@@ -1256,6 +1256,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("planned_focus_periods");
 
+                    b.Property<int?>("PlannedLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("planned_length");
+
                     b.Property<long>("UserId")
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");

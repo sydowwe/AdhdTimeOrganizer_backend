@@ -57,6 +57,8 @@ ActivityHistorySession : BaseEntityWithUser (→ BaseTableEntity)
   Outcome               TimerSessionOutcome  NOT NULL  (string: Completed / StoppedEarly / RanOutWhileAway)
   PlannedFocusPeriods   int?  NULL   — both set for a Pomodoro, both null for a Timer
   CompletedFocusPeriods int?  NULL   — never more than planned
+  PlannedLength         IntTime?  NULL (int seconds) — the focus time the timer was set for: a countdown's
+                        length, or a Pomodoro's focus length × PlannedFocusPeriods. Optional, positive when sent
   Records               → ActivityHistory (inverse of SessionId)
 ```
 
@@ -64,13 +66,14 @@ ActivityHistorySession : BaseEntityWithUser (→ BaseTableEntity)
 `infrastructure/persistence/configuration/ActivityHistorySessionConfiguration.cs` (the FK itself is on
 `ActivityHistoryConfiguration`) · enums in `domain/model/enum/TimerSession.cs`
 
-One sitting with one timer: a Pomodoro writes one row per phase that ran, a countdown exactly one. The
-stopwatch, manual entries, tracking and embedded timers write no session — their rows have
-`SessionId = null`, as does every row written before sessions existed, and every reader treats a null as a
-session of one.
+One sitting with one timer: a Pomodoro writes one row per phase that ran, a countdown exactly one. That
+includes timers embedded in a planner task or to-do item (the frontend's `TrackTimeDialog`), which save
+through the session endpoint too since OP6. The stopwatch, manual entries and tracking write no session —
+their rows have `SessionId = null`, as does every row written before sessions existed, and every reader
+treats a null as a session of one.
 
-- **Outcome and counts are stored as told, never derived.** A focus period cut short by Stop and one that
-  ran its length look the same once rounded to whole minutes. Editing a row leaves them alone.
+- **Outcome, counts and plan are stored as told, never derived.** A focus period cut short by Stop and one
+  that ran its length look the same once rounded to whole minutes. Editing a row leaves them alone.
 - **Lifetime follows the rows.** Created with its rows in one `SaveChanges`; deleted by
   `DeleteActivityHistoryEndpoint` in the same save as its last row; cascaded with the account. Reads reach a
   session only through a row, so an empty one never appears. The one leak is a hard delete of an activity,

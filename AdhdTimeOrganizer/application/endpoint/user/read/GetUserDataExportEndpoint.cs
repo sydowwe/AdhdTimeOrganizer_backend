@@ -104,6 +104,7 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
                 s.Outcome,
                 s.PlannedFocusPeriods,
                 s.CompletedFocusPeriods,
+                s.PlannedLength,
                 s.CreatedTimestamp
             })
             .ToListAsync(ct);

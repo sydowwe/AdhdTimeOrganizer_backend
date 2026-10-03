@@ -55,7 +55,8 @@ public record ActivityHistoryResponse : WithActivityResponse, IProjectionRespons
                     Kind = e.Session.Kind,
                     Outcome = e.Session.Outcome,
                     PlannedFocusPeriods = e.Session.PlannedFocusPeriods,
-                    CompletedFocusPeriods = e.Session.CompletedFocusPeriods
+                    CompletedFocusPeriods = e.Session.CompletedFocusPeriods,
+                    PlannedLength = e.Session.PlannedLength
                 }
         });
     }

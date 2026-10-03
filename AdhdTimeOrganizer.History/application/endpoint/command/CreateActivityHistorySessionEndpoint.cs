@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.application.dto.request.history;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory;
@@ -42,7 +43,7 @@ public class CreateActivityHistorySessionEndpoint(DbContext dbContext, IReferenc
                             + "recordIds are returned in the order the records were sent.";
             s.Response<CreateActivityHistorySessionResponse>(201, "Created");
             s.Response(400, "Malformed session");
-            s.Response(404, "An activity the caller does not own");
+            s.Response(404, "An activity or linked item the caller does not own");
         });
     }
 
@@ -63,6 +64,16 @@ public class CreateActivityHistorySessionEndpoint(DbContext dbContext, IReferenc
 
             ValidationFailures.Add(new ValidationFailure(
                 $"{nameof(req.Records)}[{i}].{nameof(ActivityHistorySessionRecordRequest.ActivityId)}", "Activity not found."));
+            await Send.ErrorsAsync(404, ct);
+            return;
+        }
+
+        // The item links, checked as ActivityHistoryReferencedIds checks them on the single create: neither carries a
+        // navigation, so nothing else stops a session from crediting its time to a stranger's to-do item.
+        var linkFailure = await FirstUnownedLinkAsync(req, userId, ct);
+        if (linkFailure is not null)
+        {
+            ValidationFailures.Add(linkFailure);
             await Send.ErrorsAsync(404, ct);
             return;
         }
@@ -90,5 +101,18 @@ public class CreateActivityHistorySessionEndpoint(DbContext dbContext, IReferenc
             // ToEntity keeps the request's order, and a List navigation preserves it through the save.
             RecordIds = session.Records.Select(r => r.Id).ToList()
         }, 201, ct);
+    }
+
+    private async Task<ValidationFailure?> FirstUnownedLinkAsync(CreateActivityHistorySessionRequest req, long userId, CancellationToken ct)
+    {
+        if (req.TodoListItemId is { } todoListItemId
+            && !await ownership.OwnsReferenceAsync(dbContext, UserOwnedReferenceKeys.TodoListItem, userId, todoListItemId, ct))
+            return new ValidationFailure(nameof(req.TodoListItemId), "To-do item not found.");
+
+        if (req.RoutineTodoListId is { } routineTodoListId
+            && !await ownership.OwnsReferenceAsync(dbContext, UserOwnedReferenceKeys.RoutineTodoList, userId, routineTodoListId, ct))
+            return new ValidationFailure(nameof(req.RoutineTodoListId), "Routine item not found.");
+
+        return null;
     }
 }

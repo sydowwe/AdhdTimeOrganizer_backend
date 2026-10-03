@@ -60,8 +60,9 @@ A finished Pomodoro or countdown is written through `POST /activity-history/sess
 `ActivityHistorySession` plus one `ActivityHistory` row per phase that ran, each at its real start, in one
 transaction. Before this, a Pomodoro was two summed rows both dated at Start — overlapping on the timeline
 and written by two independent requests. The session carries what the rows cannot: how it ended
-(`Completed` / `StoppedEarly` / `RanOutWhileAway`) and "stopped after N of M" focus periods, stored as the
-client observed them. Rows carry `SessionId` and `Phase`; `ActivityHistoryResponse` repeats the session on
+(`Completed` / `StoppedEarly` / `RanOutWhileAway`), "stopped after N of M" focus periods, and the focus
+time the timer was set for (`PlannedLength`, optional — "stopped at 12m of 25m"), stored as the client
+observed them. Rows carry `SessionId` and `Phase`; `ActivityHistoryResponse` repeats the session on
 each of its rows so the timeline groups without a second request.
 
 What is load-bearing:
@@ -72,8 +73,12 @@ What is load-bearing:
 - **The session is not a second record of time.** Outcome and counts are never recomputed from rows,
   row edits never touch them, and the FK is `SET NULL` so time survives if a session ever goes.
 - **The row delete removes the session with its last row**, in the same save.
-- **Embedded timers stay single linked rows** through `POST /activity-history`; the session request has no
-  to-do link. The stopwatch is not a session.
+- **Embedded timers are sessions too** (frontend OP6): a timer or Pomodoro run from a planner task or to-do
+  item saves through the session endpoint, like the routed views, carrying the item link at session level.
+  The link lands on the **focus rows only** (`IsWorkRecord`) — a break is logged against the rest activity
+  and is not the item's time, so stamping it would credit the item with its rests in the recap. Same rules
+  as the single create's link: positive, never both, ownership-checked in the handler (404).
+  The stopwatch is not a session.
 
 ⚠ **`planning.mv_activity_history_pattern` still counts rows** (`HAVING COUNT(*) >= 3`), so three focus
 phases of one Pomodoro can make a weekday pattern out of a single sitting. It is a hand-installed view in the
@@ -210,8 +215,9 @@ Archived activities pass; archival is not ownership. Guarded by
   `IEntityWithUser` with its FKs and cascades intact.
 - **`ActivityHistory` carries two nullable item links, and they are the source of recap accuracy.**
   `TodoListItemId` / `RoutineTodoListId` record *which task* a recording was saved from, stamped when
-  the user accepts the save-to-history prompt on completing an item (a step's prompt sends the parent
-  item's id). Both are navigation-free and declared **host-side** in
+  the user logs time from an item — a manual log or a timer, on `POST /activity-history` or a session's
+  focus rows (a step's prompt sends the parent item's id). Until frontend OP6 the client sent neither on
+  any path, so rows written before 2026-10-03 are unlinked. Both are navigation-free and declared **host-side** in
   `AppDbContext.ConfigureCrossSliceRelationships` — this slice can see neither TodoLists nor Routines
   — with pinned constraint names and `SetNull`, because `ActivityHistory` is the source of truth for
   recorded time and deleting a task must not delete it. Most rows are null on both: everything the

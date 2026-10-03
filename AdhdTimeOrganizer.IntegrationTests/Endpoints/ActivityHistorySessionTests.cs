@@ -76,7 +76,32 @@ public class ActivityHistorySessionTests(AppDbContextFixture fixture) : Postgres
         session.Outcome.Should().Be(TimerSessionOutcome.StoppedEarly);
         session.PlannedFocusPeriods.Should().Be(8);
         session.CompletedFocusPeriods.Should().Be(2);
+        session.PlannedLength.Should().BeNull("the body did not send one, and it is optional");
         session.UserId.Should().Be(UserId);
+    }
+
+    /// <summary>OP6: without the plan, a countdown stopped early cannot say by how much.</summary>
+    [Fact(DisplayName = "A countdown stopped early keeps its planned length, and the row read returns it")]
+    public async Task StoppedEarlyTimer_KeepsItsPlannedLength()
+    {
+        var (activityId, _) = await SeedTwoActivitiesAsync();
+
+        var body = await ShouldBeCreatedAsync(await PostSessionAsync(
+            SessionBody("Timer", "StoppedEarly", null, null, [Record(activityId, TenAm, 12, null)], plannedMinutes: 85)));
+        var sessionId = body.GetProperty("sessionId").GetInt64();
+
+        await using (var db = CreateDbContext())
+        {
+            var session = await db.Set<ActivityHistorySession>().SingleAsync(s => s.Id == sessionId, CancellationToken);
+            session.PlannedLength.Should().Be(new IntTime(1, 25));
+        }
+
+        var row = (await PostOkAsync("api/activity-history/filter", new { date = Today, from = Midnight, to = Midnight }))
+            .EnumerateArray().Should().ContainSingle().Subject;
+        var planned = row.GetProperty("session").GetProperty("plannedLength");
+        planned.GetProperty("hours").GetInt32().Should().Be(1);
+        planned.GetProperty("minutes").GetInt32().Should().Be(25);
+        row.GetProperty("length").GetProperty("minutes").GetInt32().Should().Be(12, "the row is what ran, not the plan");
     }
 
     [Fact(DisplayName = "A countdown is a one-row Timer session with no phase and no counts")]
@@ -141,7 +166,9 @@ public class ActivityHistorySessionTests(AppDbContextFixture fixture) : Postgres
         "records out of order",
         "pomodoro record without phase",
         "timer record with phase",
-        "start without offset"
+        "start without offset",
+        "zero planned length",
+        "linked to both item kinds"
     ];
 
     [Theory(DisplayName = "A malformed session is a 400 and writes nothing")]
@@ -167,6 +194,12 @@ public class ActivityHistorySessionTests(AppDbContextFixture fixture) : Postgres
             "timer record with phase" => SessionBody("Timer", "Completed", null, null, [Record(focusId, TenAm, 10, "Focus")]),
             "start without offset" => SessionBody("Timer", "Completed", null, null,
                 [new { activityId = focusId, startTimestamp = "2026-09-29T10:00:00", length = new { hours = 0, minutes = 10 }, phase = (string?)null }]),
+            "zero planned length" => SessionBody("Timer", "StoppedEarly", null, null, [Record(focusId, TenAm, 10, null)], plannedMinutes: 0),
+            "linked to both item kinds" => new
+            {
+                kind = "Timer", outcome = "Completed", todoListItemId = 1L, routineTodoListId = 1L,
+                records = new[] { Record(focusId, TenAm, 10, null) }
+            },
             _ => throw new ArgumentOutOfRangeException(nameof(malformed))
         };
 
@@ -200,6 +233,32 @@ public class ActivityHistorySessionTests(AppDbContextFixture fixture) : Postgres
                 "the refusal is keyed on the offending record's field, as the single create keys it on activityId");
 
         (await CountRowsAsync(focusId)).Should().Be(0, "the first record's activity was fine — it still must not land alone");
+        (await CountSessionsAsync()).Should().Be(0);
+    }
+
+    /// <summary>
+    /// The item link has no navigation, so the endpoint is all that stops a session crediting its time to an item
+    /// the caller does not own. "Missing" and "foreign" answer the same.
+    /// </summary>
+    [Fact(DisplayName = "An unowned to-do item link is a 404 on that field, and nothing is written")]
+    public async Task UnownedTodoItemLink_Is404_AndWritesNothing()
+    {
+        var (focusId, _) = await SeedTwoActivitiesAsync();
+
+        var response = await PostSessionAsync(new
+        {
+            kind = "Timer",
+            outcome = "Completed",
+            todoListItemId = long.MaxValue,
+            records = new[] { Record(focusId, TenAm, 10, null) }
+        });
+
+        var text = await response.Content.ReadAsStringAsync(CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound, text);
+        JsonDocument.Parse(text).RootElement.GetProperty("errors").EnumerateObject()
+            .Select(e => e.Name)
+            .Should().Contain(n => n.Equals("todoListItemId", StringComparison.OrdinalIgnoreCase));
+        (await CountRowsAsync(focusId)).Should().Be(0);
         (await CountSessionsAsync()).Should().Be(0);
     }
 
@@ -407,12 +466,14 @@ public class ActivityHistorySessionTests(AppDbContextFixture fixture) : Postgres
             Record(focusId, TenAm.AddMinutes(30), 12, "Focus")
         ]);
 
-    private static object SessionBody(string kind, string outcome, int? planned, int? completed, object[] records) => new
+    private static object SessionBody(string kind, string outcome, int? planned, int? completed, object[] records,
+        int? plannedMinutes = null) => new
     {
         kind,
         outcome,
         plannedFocusPeriods = planned,
         completedFocusPeriods = completed,
+        plannedLength = plannedMinutes is { } m ? new { hours = m / 60, minutes = m % 60 } : null,
         records
     };
 

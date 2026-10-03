@@ -238,6 +238,40 @@ public class TodoListItemDailyRecapTests(AppDbContextFixture fixture) : Postgres
     }
 
     /// <summary>
+    /// A timer run from the item (frontend OP6) is written as a session carrying the item link. The link goes on the
+    /// focus rows only: the break is logged against the rest activity and is not the item's time.
+    /// </summary>
+    [Fact]
+    public async Task PomodoroLinkedToTheItem_CreditsItsFocusRows_NotItsBreak()
+    {
+        var client = CreateUserRoleClient();
+        var id = await CreateItemAsync(client, _writeReportActivityId);
+        await CompleteAsync(client, id);
+
+        var start = DateTime.UtcNow.Date.AddHours(9);
+        var response = await client.PostAsJsonAsync("/api/activity-history/session", new
+        {
+            kind = "Pomodoro",
+            outcome = "StoppedEarly",
+            plannedFocusPeriods = 4,
+            completedFocusPeriods = 1,
+            todoListItemId = id,
+            records = new object[]
+            {
+                new { activityId = _writeReportActivityId, startTimestamp = start, length = new { hours = 0, minutes = 25 }, phase = "Focus" },
+                new { activityId = _tidyDeskActivityId, startTimestamp = start.AddMinutes(25), length = new { hours = 0, minutes = 5 }, phase = "ShortBreak" },
+                new { activityId = _writeReportActivityId, startTimestamp = start.AddMinutes(30), length = new { hours = 0, minutes = 15 }, phase = "Focus" }
+            }
+        }, JsonOpts, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync(CancellationToken));
+
+        var recap = await RecapAsync(client, Today);
+
+        recap.Items.Should().ContainSingle(i => i.Name == "Write the report")
+            .Which.TimeLoggedSeconds.Should().Be(40 * 60, "25 + 15 minutes of focus; the 5-minute break is not the item's");
+    }
+
+    /// <summary>
     /// Declining the save-to-history prompt is an ordinary outcome, not a gap — the item still belongs
     /// in the recap, at zero.
     /// </summary>

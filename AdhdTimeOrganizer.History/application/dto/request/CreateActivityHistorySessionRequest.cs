@@ -9,9 +9,10 @@ namespace AdhdTimeOrganizer.History.application.dto.request.history;
 /// actually ran, each at its real start. Written all-or-nothing.
 /// </summary>
 /// <remarks>
-/// Carries no to-do link, on purpose. When a timer is embedded in a planner task or to-do item it emits one total
-/// and the embedder writes one linked row through <c>POST /activity-history</c>; that path does not become a
-/// session.
+/// A timer embedded in a planner task or to-do item posts here too (frontend OP6), and says which item through
+/// <see cref="TodoListItemId"/> / <see cref="RoutineTodoListId"/> — the same two links, with the same rules, as
+/// <see cref="ActivityHistoryRequest"/>. They are stamped on the session's <b>work</b> rows only; see
+/// <see cref="IsWorkRecord"/>.
 /// </remarks>
 public record CreateActivityHistorySessionRequest
 {
@@ -25,6 +26,21 @@ public record CreateActivityHistorySessionRequest
     /// <summary>Non-null for a Pomodoro, null for a Timer; never more than <see cref="PlannedFocusPeriods"/>.</summary>
     public int? CompletedFocusPeriods { get; init; }
 
+    /// <summary>
+    /// The focus time the timer was set for — a countdown's length, or a Pomodoro's focus length × planned focus
+    /// periods. Optional; positive when sent.
+    /// </summary>
+    public IntTime? PlannedLength { get; init; }
+
+    /// <summary>
+    /// The to-do item the timer was run for, when it was started from one. This is what puts the session's time
+    /// on that item's row in the daily recap (<c>TodoListItemLoggedTimeSource</c>). Null for a timer run on its own.
+    /// </summary>
+    public long? TodoListItemId { get; init; }
+
+    /// <summary>Same as <see cref="TodoListItemId"/>, for a routine item. Never both.</summary>
+    public long? RoutineTodoListId { get; init; }
+
     /// <summary>In start order. At least one; exactly one for a Timer.</summary>
     public required List<ActivityHistorySessionRecordRequest> Records { get; init; }
 
@@ -35,8 +51,25 @@ public record CreateActivityHistorySessionRequest
         Outcome = Outcome,
         PlannedFocusPeriods = PlannedFocusPeriods,
         CompletedFocusPeriods = CompletedFocusPeriods,
-        Records = Records.Select(r => r.ToEntity(userId)).ToList()
+        PlannedLength = PlannedLength,
+        Records = Records.Select(r => ToRecordEntity(r, userId)).ToList()
     };
+
+    /// <summary>
+    /// A countdown's one row, or a Pomodoro's focus row. A break is logged against the rest activity and is not the
+    /// item's time, so it never carries the link — the recap would otherwise credit the item with its rests.
+    /// </summary>
+    private static bool IsWorkRecord(ActivityHistorySessionRecordRequest record) =>
+        record.Phase is null or TimerSessionPhase.Focus;
+
+    private ActivityHistory ToRecordEntity(ActivityHistorySessionRecordRequest record, long userId)
+    {
+        var entity = record.ToEntity(userId);
+        if (!IsWorkRecord(record)) return entity;
+        entity.TodoListItemId = TodoListItemId;
+        entity.RoutineTodoListId = RoutineTodoListId;
+        return entity;
+    }
 }
 
 /// <summary>One phase of the session. Every rule of a single <c>POST /activity-history</c> row applies to it.</summary>

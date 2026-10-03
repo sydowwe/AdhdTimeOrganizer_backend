@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.History.domain.model.@enum;
+using Sydowwe.Framework.domain.valueObject;
 
 namespace AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 
@@ -41,6 +42,14 @@ public class ActivityHistorySession : BaseEntityWithUser
     /// <see cref="PlannedFocusPeriods"/>; null for a <see cref="TimerSessionKind.Timer"/>.
     /// </summary>
     public int? CompletedFocusPeriods { get; set; }
+
+    /// <summary>
+    /// The focus time the timer was set for: a countdown's set length, or a Pomodoro's focus length ×
+    /// <see cref="PlannedFocusPeriods"/> (so one focus period is this ÷ that). Breaks are not in it. Compared
+    /// with the rows' focus total it says by how much a <see cref="TimerSessionOutcome.StoppedEarly"/> fell
+    /// short. Null on sessions written before the client sent it.
+    /// </summary>
+    public IntTime? PlannedLength { get; set; }
 
     public ICollection<ActivityHistory> Records { get; set; } = [];
 }
