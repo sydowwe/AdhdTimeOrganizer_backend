@@ -228,17 +228,17 @@ public class LeisureWeatherFitTests(AppDbContextFixture fixture) : PostgresTestB
     {
         var client = CreateClient();
 
-        (await client.PutAsJsonAsync("/api/user/preferences", new { WeatherLocation = "  Košice, SK  " }, JsonOpts, CancellationToken))
+        (await client.PutAsJsonAsync("/api/user/preferences", new { WeatherLocation = "  Bratislava, Slovakia  " }, JsonOpts, CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         var stored = await client.GetFromJsonAsync<UserData>("/api/user/data", JsonOpts, CancellationToken);
-        stored!.WeatherLocation.Should().Be("Košice, SK", "stored trimmed, and readable back — a settings input needs both");
+        stored!.WeatherLocation.Should().Be("Bratislava, Slovakia","stored trimmed, and readable back — a settings input needs both");
 
         // The base convention is "null leaves it alone", which would otherwise make the field impossible to clear.
         (await client.PutAsJsonAsync("/api/user/preferences", new { FirstDayOfWeek = 0 }, JsonOpts, CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await client.GetFromJsonAsync<UserData>("/api/user/data", JsonOpts, CancellationToken))!
-            .WeatherLocation.Should().Be("Košice, SK", "an unrelated PUT must not wipe it");
+            .WeatherLocation.Should().Be("Bratislava, Slovakia","an unrelated PUT must not wipe it");
 
         (await client.PutAsJsonAsync("/api/user/preferences", new { WeatherLocation = "" }, JsonOpts, CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
