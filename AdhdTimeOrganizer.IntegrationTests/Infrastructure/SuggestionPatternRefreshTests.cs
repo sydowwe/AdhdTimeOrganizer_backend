@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Json;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.IntegrationTests.Endpoints;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
@@ -155,6 +157,30 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
         await SeedActivityHistoryRowAsync(db, activityId, DateTime.UtcNow, CancellationToken);
 
         queue.DrainDirty().Should().BeEquivalentTo([SuggestionPatternView.ActivityHistory]);
+    }
+
+    /// <summary>
+    /// <c>mv_activity_history_pattern</c> reads <c>user.timezone</c>, so a zone change must refresh it — before
+    /// this, the view kept the old zone's weekdays and times until the user next saved a history row. Driven
+    /// through the real <c>PUT /user/preferences</c> because that path is the trap: Identity's
+    /// <c>UpdateAsync</c> marks every user column modified, so the second half — the same zone again, plus an
+    /// unrelated preference — is what proves the check compares values rather than <c>IsModified</c>.
+    /// </summary>
+    [Fact]
+    public async Task UserTimezoneChange_MarksActivityHistoryDirty_AndOtherPreferencesDoNot()
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser);
+        var queue = factory.Services.GetRequiredService<ISuggestionPatternRefreshQueue>();
+        var client = factory.CreateClient();
+        queue.DrainDirty();
+
+        (await client.PutAsJsonAsync("/api/user/preferences", new { Timezone = "Europe/Bratislava" }, JsonOpts, CancellationToken))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+        queue.DrainDirty().Should().BeEquivalentTo([SuggestionPatternView.ActivityHistory]);
+
+        (await client.PutAsJsonAsync("/api/user/preferences", new { Timezone = "Europe/Bratislava", AskBeforeDelete = false }, JsonOpts, CancellationToken))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+        queue.DrainDirty().Should().BeEmpty("the zone did not change, and no other preference feeds a pattern view");
     }
 
     [Fact]

@@ -126,11 +126,77 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     }
 
     /// <summary>
-    /// The mean is rounded to the minute, and a mean in the last half-minute of the day must not round up to
-    /// 24:00 and wrap to 00:00 — that would offer a late-evening habit at the start of the day.
+    /// Time of day is circular. Averaged as plain seconds since midnight, 23:50 / 00:10 / 00:00 came out as
+    /// 08:00 — a habit that straddles midnight suggested for the morning. The views average them as angles on
+    /// the clock instead, so the mean is midnight, as it is for anyone reading the times.
     /// </summary>
-    [Fact(DisplayName = "A mean in the day's last half-minute stays at 23:59 rather than wrapping to 00:00")]
-    public async Task MeanJustBeforeMidnight_ClampsTo2359()
+    [Fact(DisplayName = "Times either side of midnight average to midnight, in both pattern views")]
+    public async Task AverageAcrossMidnight_IsMidnight()
+    {
+        var target = new DateOnly(2027, 7, 19);
+        long plannedActivityId, historyActivityId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            plannedActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-midnight-planned", ct: CancellationToken);
+            historyActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-midnight-history", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+
+            TimeOnly[] starts = [new(23, 50), new(0, 10), new(0, 0)];
+            for (var i = 0; i < starts.Length; i++)
+            {
+                var start = starts[i];
+                var end = start.AddMinutes(30);
+                await SeedSameWeekdayTaskAsync(db, plannedActivityId, target, weeksAgo: i + 1, start, end);
+                var startUtc = target.AddDays(-7 * (i + 1)).ToDateTime(start, DateTimeKind.Utc);
+                await SeedActivityHistoryAsync(db, historyActivityId, startUtc, startUtc.AddMinutes(30));
+            }
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        foreach (var activityId in new[] { plannedActivityId, historyActivityId })
+        {
+            var pattern = suggestions.Should().ContainSingle(s => s.Activity.Id == activityId).Subject;
+            AsTime(pattern.StartTime).Should().Be(new TimeOnly(0, 0), $"{pattern.SourceType}: the mean of 23:50, 00:10 and 00:00 is midnight");
+            AsTime(pattern.EndTime).Should().Be(new TimeOnly(0, 30), $"{pattern.SourceType}: the mean of 00:20, 00:40 and 00:30 is 00:30");
+        }
+    }
+
+    /// <summary>
+    /// 00:00 / 08:00 / 16:00 are evenly spread round the clock, so their angles cancel and there is no circular
+    /// mean — atan2 of the leftover floating-point noise would be an arbitrary time. The views fall back to the
+    /// plain average, 08:00, which is at least stable.
+    /// </summary>
+    [Fact(DisplayName = "Times that cancel out on the clock fall back to the plain average")]
+    public async Task TimesThatCancelOut_FallBackToThePlainAverage()
+    {
+        var target = new DateOnly(2027, 7, 26);
+        long activityId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-mean-cancels", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+            TimeOnly[] starts = [new(0, 0), new(8, 0), new(16, 0)];
+            for (var i = 0; i < starts.Length; i++)
+                await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: i + 1, starts[i], starts[i].AddHours(1));
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var pattern = (await GetSuggestionsAsync(calendarTargetId)).Should().ContainSingle(s => s.Activity.Id == activityId).Subject;
+        AsTime(pattern.StartTime).Should().Be(new TimeOnly(8, 0));
+        AsTime(pattern.EndTime).Should().Be(new TimeOnly(9, 0));
+    }
+
+    /// <summary>
+    /// The mean is rounded to the nearest minute <b>on the clock</b>, so one in the day's last half-minute is
+    /// 00:00, not 24:00 (which <c>make_interval(...)::time</c> would reject) and not a clamped 23:59. A clamp
+    /// read sensibly while the mean was linear, but against a circular one it makes a habit centred exactly
+    /// on midnight land on 23:59 or 00:00 depending on floating-point noise either side of zero.
+    /// </summary>
+    [Fact(DisplayName = "A mean in the day's last half-minute rounds to 00:00, as the clock does")]
+    public async Task MeanJustBeforeMidnight_RoundsToMidnight()
     {
         var target = new DateOnly(2027, 7, 12);
         long activityId, calendarTargetId;
@@ -150,7 +216,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         await RefreshSuggestionViewsAsync();
 
         var pattern = (await GetSuggestionsAsync(calendarTargetId)).Should().ContainSingle(s => s.Activity.Id == activityId).Subject;
-        AsTime(pattern.StartTime).Should().Be(new TimeOnly(23, 59));
+        AsTime(pattern.StartTime).Should().Be(new TimeOnly(0, 0), "23:59:48 is twelve seconds from midnight");
     }
 
     /// <summary>

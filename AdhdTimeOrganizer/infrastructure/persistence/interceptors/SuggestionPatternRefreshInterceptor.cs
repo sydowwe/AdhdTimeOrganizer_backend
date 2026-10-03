@@ -2,13 +2,15 @@ using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Sydowwe.Framework.domain.entity.user;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence.interceptors;
 
 /// <summary>
-/// Detects saves touching <see cref="PlannerTask"/>/<see cref="ActivityHistory"/>/<see cref="Calendar"/> and marks
-/// the matching suggestion-pattern view dirty in <see cref="ISuggestionPatternRefreshQueue"/>. Deliberately does
+/// Detects saves touching <see cref="PlannerTask"/>/<see cref="ActivityHistory"/>/<see cref="Calendar"/> (and a
+/// user's time zone, which the history view reads) and marks the matching suggestion-pattern view dirty in <see cref="ISuggestionPatternRefreshQueue"/>. Deliberately does
 /// <b>not</b> run the `REFRESH MATERIALIZED VIEW CONCURRENTLY` itself — that used to happen synchronously here on
 /// every save, which paid full-view-scan cost on the request thread and serialized concurrent saves against each
 /// other's refresh lock. <see cref="AdhdTimeOrganizer.infrastructure.jobs.SuggestionPatternRefreshJob"/> owns the
@@ -23,13 +25,13 @@ public class SuggestionPatternRefreshInterceptor(ISuggestionPatternRefreshQueue 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData, InterceptionResult<int> result, CancellationToken ct = default)
     {
-        var changed = eventData.Context!.ChangeTracker.Entries()
+        var entries = eventData.Context!.ChangeTracker.Entries()
             .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
-            .Select(e => e.Entity.GetType())
-            .ToHashSet();
+            .ToList();
+        var changed = entries.Select(e => e.Entity.GetType()).ToHashSet();
 
         _refreshPlanner = changed.Contains(typeof(PlannerTask));
-        _refreshHistory = changed.Contains(typeof(ActivityHistory));
+        _refreshHistory = changed.Contains(typeof(ActivityHistory)) || entries.Any(TimezoneChanged);
         _refreshTemplate = changed.Contains(typeof(Calendar));
 
         return ValueTask.FromResult(result);
@@ -59,6 +61,20 @@ public class SuggestionPatternRefreshInterceptor(ISuggestionPatternRefreshQueue 
         ResetFlags();
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// <c>mv_activity_history_pattern</c> takes each sitting's weekday and time of day in the owner's
+    /// <c>user.timezone</c>, so moving zones changes the view as surely as a new history row does.
+    /// </summary>
+    /// <remarks>
+    /// Compared by value, not by <c>IsModified</c>: Identity's <c>UserStore.UpdateAsync</c> calls
+    /// <c>Context.Update(user)</c>, which marks every column modified, so <c>IsModified</c> would refresh the
+    /// view on every theme or locale change too.
+    /// </remarks>
+    private static bool TimezoneChanged(EntityEntry entry) =>
+        entry is { State: EntityState.Modified, Entity: BaseUser }
+        && entry.Property(nameof(BaseUser.Timezone)) is var timezone
+        && (timezone.OriginalValue as TimeZoneInfo)?.Id != (timezone.CurrentValue as TimeZoneInfo)?.Id;
 
     private void ResetFlags()
     {

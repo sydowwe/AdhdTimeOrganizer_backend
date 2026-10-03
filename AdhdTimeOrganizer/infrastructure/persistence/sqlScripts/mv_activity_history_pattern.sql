@@ -2,13 +2,14 @@
 -- the owner's zone (user.timezone), because the planner these suggestions feed is in wall-clock time. Read
 -- straight off the timestamptz they would follow the refreshing session's TimeZone instead — UTC on every
 -- server we run, since Npgsql sets none — so a Bratislava user's 00:30 Tuesday habit surfaced on Mondays at
--- 22:30.
+-- 22:30. A change of user.timezone marks this view dirty (SuggestionPatternRefreshInterceptor).
 --
 -- A stored id Postgres does not know falls back to UTC rather than failing the refresh: the API validates
 -- with TimeZoneInfo.FindSystemTimeZoneById, which also accepts Windows ids ("Central Europe Standard Time"),
 -- and one bad row in an AT TIME ZONE would stop this view refreshing for every user.
 --
--- avg_start_time / avg_end_time are the mean time of day — see mv_planner_task_pattern.sql for the shape.
+-- avg_start_time / avg_end_time are the mean time of day averaged on the clock — see
+-- mv_planner_task_pattern.sql for the method and why.
 CREATE MATERIALIZED VIEW planning.mv_activity_history_pattern AS
 WITH local_history AS (SELECT ah.user_id,
                               ah.activity_id,
@@ -18,30 +19,61 @@ WITH local_history AS (SELECT ah.user_id,
                                 JOIN (SELECT u.id, COALESCE(n.name, 'UTC') AS zone
                                       FROM "user"."user" u
                                                LEFT JOIN pg_timezone_names n ON n.name = u.timezone) tz
-                                     ON tz.id = ah.user_id)
-SELECT lh.user_id,
-       lh.activity_id,
-       0                                                                                         AS pattern_type,
-       EXTRACT(ISODOW FROM lh.local_start)::int                                                  AS pattern_value,
-       COUNT(*)                                                                                  AS occurrence_count,
-       make_interval(mins => LEAST(round(AVG(EXTRACT(EPOCH FROM lh.local_start::time)) / 60), 1439)::int)::time AS avg_start_time,
-       make_interval(mins => LEAST(round(AVG(EXTRACT(EPOCH FROM lh.local_end::time)) / 60), 1439)::int)::time   AS avg_end_time
-FROM local_history lh
-GROUP BY lh.user_id, lh.activity_id, EXTRACT(ISODOW FROM lh.local_start)
-HAVING COUNT(*) >= 3
+                                     ON tz.id = ah.user_id),
+     sitting AS (SELECT user_id,
+                        activity_id,
+                        EXTRACT(ISODOW FROM local_start)::int    AS iso_day_of_week,
+                        EXTRACT(DAY FROM local_start)::int       AS day_of_month,
+                        EXTRACT(EPOCH FROM local_start::time)    AS start_s,
+                        EXTRACT(EPOCH FROM local_end::time)      AS end_s
+                 FROM local_history),
+     pattern AS (SELECT user_id, activity_id,
+                        0                                    AS pattern_type,
+                        iso_day_of_week                      AS pattern_value,
+                        COUNT(*)                             AS occurrence_count,
+                        AVG(start_s)                         AS start_plain,
+                        AVG(sin(2 * pi() * start_s / 86400)) AS start_sin,
+                        AVG(cos(2 * pi() * start_s / 86400)) AS start_cos,
+                        AVG(end_s)                           AS end_plain,
+                        AVG(sin(2 * pi() * end_s / 86400))   AS end_sin,
+                        AVG(cos(2 * pi() * end_s / 86400))   AS end_cos
+                 FROM sitting
+                 GROUP BY user_id, activity_id, iso_day_of_week
+                 HAVING COUNT(*) >= 3
 
-UNION ALL
+                 UNION ALL
 
-SELECT lh.user_id,
-       lh.activity_id,
-       1                                                                                         AS pattern_type,
-       EXTRACT(DAY FROM lh.local_start)::int                                                     AS pattern_value,
-       COUNT(*)                                                                                  AS occurrence_count,
-       make_interval(mins => LEAST(round(AVG(EXTRACT(EPOCH FROM lh.local_start::time)) / 60), 1439)::int)::time AS avg_start_time,
-       make_interval(mins => LEAST(round(AVG(EXTRACT(EPOCH FROM lh.local_end::time)) / 60), 1439)::int)::time   AS avg_end_time
-FROM local_history lh
-GROUP BY lh.user_id, lh.activity_id, EXTRACT(DAY FROM lh.local_start)
-HAVING COUNT(*) >= 3;
+                 SELECT user_id, activity_id,
+                        1                                    AS pattern_type,
+                        day_of_month                         AS pattern_value,
+                        COUNT(*)                             AS occurrence_count,
+                        AVG(start_s)                         AS start_plain,
+                        AVG(sin(2 * pi() * start_s / 86400)) AS start_sin,
+                        AVG(cos(2 * pi() * start_s / 86400)) AS start_cos,
+                        AVG(end_s)                           AS end_plain,
+                        AVG(sin(2 * pi() * end_s / 86400))   AS end_sin,
+                        AVG(cos(2 * pi() * end_s / 86400))   AS end_cos
+                 FROM sitting
+                 GROUP BY user_id, activity_id, day_of_month
+                 HAVING COUNT(*) >= 3),
+     mean_seconds AS (SELECT p.*,
+                             CASE
+                                 WHEN sqrt(start_sin ^ 2 + start_cos ^ 2) < 1e-6 THEN start_plain
+                                 ELSE (atan2(start_sin, start_cos) / (2 * pi()) * 86400 + 86400)::numeric % 86400
+                                 END AS start_mean_s,
+                             CASE
+                                 WHEN sqrt(end_sin ^ 2 + end_cos ^ 2) < 1e-6 THEN end_plain
+                                 ELSE (atan2(end_sin, end_cos) / (2 * pi()) * 86400 + 86400)::numeric % 86400
+                                 END AS end_mean_s
+                      FROM pattern p)
+SELECT user_id,
+       activity_id,
+       pattern_type,
+       pattern_value,
+       occurrence_count,
+       make_interval(mins => round(start_mean_s / 60)::int % 1440)::time AS avg_start_time,
+       make_interval(mins => round(end_mean_s / 60)::int % 1440)::time   AS avg_end_time
+FROM mean_seconds;
 
 CREATE UNIQUE INDEX ux_activity_history_pattern
     ON planning.mv_activity_history_pattern (user_id, activity_id, pattern_type, pattern_value);

@@ -72,7 +72,8 @@ scheduling) — those live in the `framework/` submodule and are consumed throug
   event handlers.
 - **Saving `PlannerTask`, `ActivityHistory` or `Calendar` marks the matching pattern view dirty.**
   `SuggestionPatternRefreshInterceptor` no longer runs `REFRESH MATERIALIZED VIEW CONCURRENTLY`
-  itself — it queues the view name in the singleton `ISuggestionPatternRefreshQueue`, and
+  itself — it queues the view name in the singleton `ISuggestionPatternRefreshQueue` (a change of a
+  user's `Timezone` queues the history view too, since that view reads `user.timezone`), and
   `SuggestionPatternRefreshJobHandler` (a keyed `IScheduledJobHandler` on the Scheduler module's
   substrate, every 10s, `DisallowConcurrent`) drains the queue
   and does the actual refresh off the request thread, coalescing several saves in the same window into
