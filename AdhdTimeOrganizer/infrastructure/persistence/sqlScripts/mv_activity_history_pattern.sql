@@ -10,23 +10,38 @@
 --
 -- avg_start_time / avg_end_time are the mean time of day averaged on the clock — see
 -- mv_planner_task_pattern.sql for the method and why.
+--
+-- Occurrences are sittings, not rows (the rule HistorySittings applies everywhere else). A timer session —
+-- a Pomodoro writes one row per phase — is one sitting per activity, from its first focus period's start to
+-- its last focus period's end. Break rows (ShortBreak / LongBreak) are left out altogether: they say when the
+-- user rested, not when they did the activity, and the rest activity may be a different one or the same one.
+-- A row outside a session is a sitting of its own.
 CREATE MATERIALIZED VIEW planning.mv_activity_history_pattern AS
-WITH local_history AS (SELECT ah.user_id,
+WITH local_history AS (SELECT ah.id,
+                              ah.user_id,
                               ah.activity_id,
+                              ah.session_id,
                               ah.start_timestamp AT TIME ZONE tz.zone AS local_start,
                               ah.end_timestamp AT TIME ZONE tz.zone   AS local_end
                        FROM history.activity_history ah
                                 JOIN (SELECT u.id, COALESCE(n.name, 'UTC') AS zone
                                       FROM "user"."user" u
                                                LEFT JOIN pg_timezone_names n ON n.name = u.timezone) tz
-                                     ON tz.id = ah.user_id),
+                                     ON tz.id = ah.user_id
+                       WHERE ah.phase IS NULL OR ah.phase = 'Focus'),
      sitting AS (SELECT user_id,
                         activity_id,
-                        EXTRACT(ISODOW FROM local_start)::int    AS iso_day_of_week,
-                        EXTRACT(DAY FROM local_start)::int       AS day_of_month,
-                        EXTRACT(EPOCH FROM local_start::time)    AS start_s,
-                        EXTRACT(EPOCH FROM local_end::time)      AS end_s
-                 FROM local_history),
+                        min(local_start) AS local_start,
+                        max(local_end)   AS local_end
+                 FROM local_history
+                 GROUP BY user_id, activity_id, session_id, CASE WHEN session_id IS NULL THEN id END),
+     sitting_time AS (SELECT user_id,
+                             activity_id,
+                             EXTRACT(ISODOW FROM local_start)::int AS iso_day_of_week,
+                             EXTRACT(DAY FROM local_start)::int    AS day_of_month,
+                             EXTRACT(EPOCH FROM local_start::time) AS start_s,
+                             EXTRACT(EPOCH FROM local_end::time)   AS end_s
+                      FROM sitting),
      pattern AS (SELECT user_id, activity_id,
                         0                                    AS pattern_type,
                         iso_day_of_week                      AS pattern_value,
@@ -37,7 +52,7 @@ WITH local_history AS (SELECT ah.user_id,
                         AVG(end_s)                           AS end_plain,
                         AVG(sin(2 * pi() * end_s / 86400))   AS end_sin,
                         AVG(cos(2 * pi() * end_s / 86400))   AS end_cos
-                 FROM sitting
+                 FROM sitting_time
                  GROUP BY user_id, activity_id, iso_day_of_week
                  HAVING COUNT(*) >= 3
 
@@ -53,7 +68,7 @@ WITH local_history AS (SELECT ah.user_id,
                         AVG(end_s)                           AS end_plain,
                         AVG(sin(2 * pi() * end_s / 86400))   AS end_sin,
                         AVG(cos(2 * pi() * end_s / 86400))   AS end_cos
-                 FROM sitting
+                 FROM sitting_time
                  GROUP BY user_id, activity_id, day_of_month
                  HAVING COUNT(*) >= 3),
      mean_seconds AS (SELECT p.*,

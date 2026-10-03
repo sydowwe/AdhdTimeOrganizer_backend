@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.application.dto.response.suggestion;
@@ -161,6 +162,42 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
             AsTime(pattern.StartTime).Should().Be(new TimeOnly(0, 0), $"{pattern.SourceType}: the mean of 23:50, 00:10 and 00:00 is midnight");
             AsTime(pattern.EndTime).Should().Be(new TimeOnly(0, 30), $"{pattern.SourceType}: the mean of 00:20, 00:40 and 00:30 is 00:30");
         }
+    }
+
+    /// <summary>
+    /// A Pomodoro writes one row per phase, all under one <c>ActivityHistorySession</c>. The history view counted
+    /// rows, so a single four-period Pomodoro was already "three occurrences" and made a pattern on its own. It
+    /// now counts sittings — a session is one, from its first focus period's start to its last focus period's
+    /// end — and break rows take no part, whichever activity they were logged against.
+    /// </summary>
+    [Fact(DisplayName = "A Pomodoro is one sitting: counted once, ending at its last focus period, breaks ignored")]
+    public async Task Pomodoro_IsOneSitting_EndingAtItsLastFocusPeriod()
+    {
+        var target = new DateOnly(2027, 8, 2);
+        long focusActivityId, restActivityId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            focusActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-pomodoro-focus", ct: CancellationToken);
+            restActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-pomodoro-rest", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+            await SeedPomodoroAsync(db, focusActivityId, restActivityId, target.AddDays(-7));
+            await SeedPomodoroAsync(db, focusActivityId, restActivityId, target.AddDays(-14));
+        }
+
+        await RefreshSuggestionViewsAsync();
+        (await GetSuggestionsAsync(calendarTargetId)).Should().BeEmpty(
+            "two Pomodoros are two sittings, short of the three a pattern needs, however many rows they wrote");
+
+        await using (var db = CreateDbContext())
+            await SeedPomodoroAsync(db, focusActivityId, restActivityId, target.AddDays(-21));
+        await RefreshSuggestionViewsAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        suggestions.Should().NotContain(s => s.Activity.Id == restActivityId, "breaks are not sittings of the rest activity");
+        var pattern = suggestions.Should().ContainSingle(s => s.Activity.Id == focusActivityId).Subject;
+        pattern.OccurrenceCount.Should().Be(3);
+        AsTime(pattern.StartTime).Should().Be(new TimeOnly(9, 0));
+        AsTime(pattern.EndTime).Should().Be(new TimeOnly(10, 55), "the sitting ends with its last focus period, not the long break after it");
     }
 
     /// <summary>
@@ -481,7 +518,40 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
             date.ToDateTime(new TimeOnly(9, 0), DateTimeKind.Utc), date.ToDateTime(new TimeOnly(10, 0), DateTimeKind.Utc));
     }
 
-    private static async Task SeedActivityHistoryAsync(Microsoft.EntityFrameworkCore.DbContext db, long activityId, DateTime startUtc, DateTime endUtc)
+    /// <summary>
+    /// A completed four-period Pomodoro from 09:00 UTC: 25-minute focus periods on <paramref name="focusActivityId"/>,
+    /// 5-minute short breaks on <paramref name="restActivityId"/>, then a 15-minute long break back on the focus
+    /// activity — the case where only the phase, not the activity, says it is a break.
+    /// </summary>
+    private static async Task SeedPomodoroAsync(Microsoft.EntityFrameworkCore.DbContext db, long focusActivityId, long restActivityId, DateOnly date)
+    {
+        var session = new ActivityHistorySession
+        {
+            UserId = PlanningTestSeedHelper.TestUserId,
+            Kind = TimerSessionKind.Pomodoro,
+            Outcome = TimerSessionOutcome.Completed,
+            PlannedFocusPeriods = 4,
+            CompletedFocusPeriods = 4
+        };
+        db.Set<ActivityHistorySession>().Add(session);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var at = date.ToDateTime(new TimeOnly(9, 0), DateTimeKind.Utc);
+        for (var period = 1; period <= 4; period++)
+        {
+            await SeedActivityHistoryAsync(db, focusActivityId, at, at.AddMinutes(25), session.Id, TimerSessionPhase.Focus);
+            at = at.AddMinutes(25);
+            if (period < 4)
+            {
+                await SeedActivityHistoryAsync(db, restActivityId, at, at.AddMinutes(5), session.Id, TimerSessionPhase.ShortBreak);
+                at = at.AddMinutes(5);
+            }
+        }
+        await SeedActivityHistoryAsync(db, focusActivityId, at, at.AddMinutes(15), session.Id, TimerSessionPhase.LongBreak);
+    }
+
+    private static async Task SeedActivityHistoryAsync(Microsoft.EntityFrameworkCore.DbContext db, long activityId, DateTime startUtc, DateTime endUtc,
+        long? sessionId = null, TimerSessionPhase? phase = null)
     {
         var length = endUtc - startUtc;
         db.Set<ActivityHistory>().Add(new ActivityHistory
@@ -490,7 +560,9 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
             ActivityId = activityId,
             StartTimestamp = startUtc,
             EndTimestamp = endUtc,
-            Length = new IntTime((int)length.TotalHours, length.Minutes)
+            Length = new IntTime((int)length.TotalHours, length.Minutes),
+            SessionId = sessionId,
+            Phase = phase
         });
         await db.SaveChangesAsync(CancellationToken.None);
     }

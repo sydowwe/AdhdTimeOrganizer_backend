@@ -80,8 +80,9 @@ What is load-bearing:
   as the single create's link: positive, never both, ownership-checked in the handler (404).
   The stopwatch is not a session.
 
-⚠ **`planning.mv_activity_history_pattern` still counts rows** (`HAVING COUNT(*) >= 3`), so three focus
-phases of one Pomodoro can make a weekday pattern out of a single sitting. It is a hand-installed view in the
+**`planning.mv_activity_history_pattern` counts sittings too**, in SQL rather than through
+`HistorySittings`: a session's focus rows are one sitting per activity, from the first focus period's start to
+the last one's end, and break rows are left out entirely. It is a hand-installed view in the
 host, outside this slice's counts; changing it is an edit to `sqlScripts/mv_activity_history_pattern.sql`
 and a restart — `SuggestionPatternViewInstaller` re-creates a view whose script changed, no migration. Its
 weekday and time of day are taken in the owner's `user.timezone`, not the database connection's zone.
