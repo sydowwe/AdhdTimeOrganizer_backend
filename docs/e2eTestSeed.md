@@ -175,7 +175,7 @@ body, so a spec may hardcode them or read them.
 | — milestone items, all daily: streak ≥30 / ≥90 / ≥180 / ≥365 | `19004` / `19005` / `19006` / `19007` |
 | routine period completions | **no fixture id** — 16 per period on Daily and Weekly, identity-generated; the freeze action keys on `periodStart` |
 | day-planner templates | `20001` Home Office, `20002` Office Day, `20003` Relaxed Weekend (**pinned**) |
-| template tasks | `20101`–`20112` |
+| template tasks | `20101`–`20112`; `20113` is the one background task (Relaxed Weekend) |
 | desktop mappings | `21001` → activity, `21002` ignore rule |
 | android mappings | `21101` → activity, `21102` ignore rule |
 | notifications | `22001`–`22006` (three unread, then three read) |
@@ -239,7 +239,8 @@ Same rule as the eight above — each was fully built and rendered nothing, beca
    unreachable as an empty list does. This is the one surface of the four a spec *could* create for itself
    (`POST /api/task-planner-day-template` is an ordinary authenticated create) — it is seeded anyway because
    the three views are documented by opening them, and a row that exists only because some spec ran leaves
-   them empty for anyone who opens them by hand.
+   them empty for anyone who opens them by hand. The pinned template carries the fixture's one **background**
+   task, so the background lane and the header's background count render without a spec creating one.
 10. **Seven days of all three tracking ledgers** — 1 050 browser windows, 630 desktop windows, 35 Android
     sessions. Seven because the widest default range a dashboard offers is a week, and a range that outruns
     the data is still the empty state for most of it.
@@ -434,7 +435,7 @@ number instead of assuming.
     "activities": 27, "todoListItems": 15, "overdueTodoListItems": 6,
     "calibrationTodoListItems": 6, "activityHistoryEntries": 26,
     "plannerTasks": 7, "calendars": 730,
-    "dayPlannerTemplates": 3, "templatePlannerTasks": 12,
+    "dayPlannerTemplates": 3, "templatePlannerTasks": 13,
     "webExtensionEntries": 1050, "desktopEntries": 630, "distinctDesktopEntries": 6,
     "androidSessions": 35, "distinctAndroidEntries": 5,
     "notifications": 6, "unreadNotifications": 3,

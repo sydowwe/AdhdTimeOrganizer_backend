@@ -1161,6 +1161,22 @@ public class E2eFixtureSeeder(
                 Location = task.Location
             });
         }
+
+        // One background task, on the pinned template because no spec counts that template's tasks (Home
+        // Office's 5 and Office Day's 4 are both asserted). Without it the background lane and the header's
+        // "(+N background)" suffix render only for a template some spec created and deleted again.
+        // Overlaps the kitchen clean, since a background task is one that runs alongside a foreground one.
+        dbContext.Set<TemplatePlannerTask>().Add(new TemplatePlannerTask
+        {
+            Id = id,
+            UserId = userId,
+            TemplateId = TemplateRelaxedWeekend,
+            ActivityId = ActivityMealPreparation,
+            StartTime = new TimeOnly(11, 0),
+            EndTime = new TimeOnly(14, 0),
+            IsBackground = true,
+            Location = "Home"
+        });
     }
 
     // --- activity tracking ------------------------------------------------------------------------

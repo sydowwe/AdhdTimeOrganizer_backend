@@ -246,7 +246,10 @@ public static class E2eFixtureIds
     /// <summary>Pinned, so the template list's pinned section is not empty either.</summary>
     public const long TemplateRelaxedWeekend = 20_003;
 
-    /// <summary>Template tasks run 20_101–20_112, in the order the three templates are declared.</summary>
+    /// <summary>
+    /// Template tasks run 20_101–20_112, in the order the three templates are declared; 20_113 is the one
+    /// background task, on <see cref="TemplateRelaxedWeekend"/>.
+    /// </summary>
     public const long TemplateTaskFirst = 20_101;
 
     // --- tracking pattern mappings --------------------------------------------------------------
