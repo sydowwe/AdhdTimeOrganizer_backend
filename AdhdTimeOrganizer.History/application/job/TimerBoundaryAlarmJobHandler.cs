@@ -81,7 +81,10 @@ public class TimerBoundaryAlarmJobHandler(
         }
 
         // The table self-drains: one fire, one delete. This is what keeps it free of a retention job.
-        dbContext.Remove(alarm);
-        await dbContext.SaveChangesAsync(ct);
+        // Set-based rather than Remove + SaveChanges, because a cancel landing between the read above and here
+        // has already deleted the row, and the tracked delete would throw a concurrency exception for it.
+        await dbContext.Set<TimerBoundaryAlarm>()
+            .Where(a => a.Id == alarmId)
+            .ExecuteDeleteAsync(ct);
     }
 }

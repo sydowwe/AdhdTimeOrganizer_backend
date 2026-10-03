@@ -99,7 +99,10 @@ public class TimerBoundaryAlarmService(
     /// </summary>
     public async Task CancelSessionAsync(long userId, Guid sessionId, CancellationToken ct = default)
     {
+        // Untracked: CancelAsync deletes by id with ExecuteDeleteAsync, which bypasses the change tracker, so a
+        // tracked copy would linger as Unchanged for a row that no longer exists.
         var alarms = await dbContext.Set<TimerBoundaryAlarm>()
+            .AsNoTracking()
             .Where(a => a.UserId == userId && a.SessionId == sessionId)
             .ToListAsync(ct);
 
@@ -129,8 +132,15 @@ public class TimerBoundaryAlarmService(
                 logger.LogWarning(ex, "Failed to remove the timer-alarm trigger {JobKey}; its row is being deleted anyway", alarm.JobKey);
             }
 
-        dbContext.RemoveRange(alarms);
-        await dbContext.SaveChangesAsync(ct);
+        // A set-based delete, not RemoveRange + SaveChanges. The latter deletes on id + row_version and demands
+        // one affected row per entity, so any row that vanished since the load — a second cancel for the same
+        // session (pause then Stop, or a replace racing a cancel), or the alarm firing and self-deleting —
+        // throws DbUpdateConcurrencyException and 500s a request that is documented as idempotent. Deleting
+        // an already-deleted alarm is exactly the outcome the caller wanted.
+        var ids = alarms.Select(a => a.Id).ToList();
+        await dbContext.Set<TimerBoundaryAlarm>()
+            .Where(a => ids.Contains(a.Id))
+            .ExecuteDeleteAsync(ct);
     }
 
     /// <summary>

@@ -9,6 +9,7 @@ using AdhdTimeOrganizer.History.application.job;
 using AdhdTimeOrganizer.History.application.service;
 using AdhdTimeOrganizer.History.application.validator;
 using AdhdTimeOrganizer.History.domain.model.entity.timerAlarm;
+using AdhdTimeOrganizer.History.domain.serviceContract;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -172,6 +173,36 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
         await using var db = CreateDbContext();
         (await db.Set<TimerBoundaryAlarm>().CountAsync(a => a.SessionId == sessionId, CancellationToken))
             .Should().Be(1, "cancel is scoped to the caller — a guessed session guid must not reach another user's rows");
+    }
+
+    /// <summary>
+    /// The loser of a delete race: two overlapping cancels for one session (pause then Stop, or a replace
+    /// racing a cancel), or a cancel racing the fire, each load the rows before the other deletes them. A
+    /// tracked delete demands one affected row per entity and threw <c>DbUpdateConcurrencyException</c> — a
+    /// 500 from an endpoint documented as idempotent. Deterministic stand-in: hand the service alarms whose
+    /// rows are already gone.
+    /// </summary>
+    [Fact(DisplayName = "Cancelling alarms whose rows were already deleted is a no-op, not a concurrency failure")]
+    public async Task Cancel_OfAlreadyDeletedRows_DoesNotThrow()
+    {
+        var sessionId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        await PostSessionAsync(factory.CreateClient(), sessionId, now.AddMinutes(25), now.AddMinutes(30));
+
+        List<TimerBoundaryAlarm> loaded;
+        await using (var db = CreateDbContext())
+        {
+            loaded = await db.Set<TimerBoundaryAlarm>().AsNoTracking().ToListAsync(CancellationToken);
+            await db.Set<TimerBoundaryAlarm>().ExecuteDeleteAsync(CancellationToken);
+        }
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var service = scope.ServiceProvider.GetRequiredService<ITimerBoundaryAlarmService>();
+
+        var cancel = () => service.CancelAsync(loaded, CancellationToken);
+        await cancel.Should().NotThrowAsync("deleting an already-deleted alarm is exactly what the caller wanted");
     }
 
     // ---- validator ----------------------------------------------------------------------------------
