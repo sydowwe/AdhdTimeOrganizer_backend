@@ -3,10 +3,10 @@
 **Purpose:** the routine domain — recurring to-do items (`RoutineTodoList`) grouped into time periods
 (`RoutineTimePeriod`) with streaks, grace windows, budgeted streak freezes and a completion history
 (`RoutinePeriodCompletion`); the reset/nudge domain logic (`RoutineResetService`) and the freeze logic
-(`RoutineStreakFreezeService`); the two daily scheduled jobs that sweep them (keyed
+(`RoutineStreakFreezeService`); the three scheduled jobs that sweep them (keyed
 `IScheduledJobHandler`s on the Scheduler module's substrate — this slice references no Quartz); and the
-notification producer that turns a reset, a lead-time nudge, or a grace warning into a
-`Sydowwe.Framework.Contracts` notification.
+notification producer that turns a reset, a lead-time nudge, a grace warning, or the morning
+suggested-today digest into a `Sydowwe.Framework.Contracts` notification.
 
 ## Bounded context
 
@@ -61,7 +61,18 @@ has no knowledge of Planning at all.
   write carrying a routine item id, since that one fails closed) — so any consumer needs a behavioural
   test asserting rows, not a route smoke test.
 
+- **One Core seam is consumed here**: `ICalendarDayLookup` (implemented by Planning), read by
+  `RoutineSuggestedTodayJobHandler` for the day's `WakeUpTime`. Single-service resolution, so a missing
+  registration throws at activation rather than silently falling back to 08:00.
+
 ## Gotchas — things that will bite you
+
+- **The suggested-today digest is the one zone-aware sweep.** Resets and the two nudges are UTC end to
+  end and must stay so; `RoutineSuggestedTodayJobHandler` deliberately works in `User.Timezone`, runs
+  every 15 minutes, and marks `SuggestedTodayNotifiedFor` on **all** of a user's periods with an
+  `ExecuteUpdate` straight after a successful send. Its "suggested for a day" rule
+  (`RoutineSuggestedDay`) is duplicated on the client (`routineSuggestedDay.ts`) — change both or
+  neither.
 
 - **Everything here takes a plain `DbContext`, never `AppDbContext`.**
   `ModuleServiceExtensions.AddModuleServices` aliases `DbContext` → `AppDbContext` at runtime (global
@@ -114,8 +125,8 @@ has no knowledge of Planning at all.
   the nudge. Marking on evaluation instead would look like a simplification and would silently drop
   that nudge.
 
-- **Background inserts have no authenticated user.** `RoutineTodoListResetJobHandler` and
-  `RoutinePeriodNudgeJobHandler` both run unauthenticated (the Scheduler dispatcher fires them in a
+- **Background inserts have no authenticated user.** `RoutineTodoListResetJobHandler`,
+  `RoutinePeriodNudgeJobHandler` and `RoutineSuggestedTodayJobHandler` all run unauthenticated (the Scheduler dispatcher fires them in a
   bare background scope) — which is exactly what makes a sweep see every user, since the per-user query
   filter is inert without one. If either ever inserts an `IEntityWithUser` row it must set `UserId`
   explicitly, since `BaseWithUserEntitySaveChangesAsync` only fills it from an authenticated user.

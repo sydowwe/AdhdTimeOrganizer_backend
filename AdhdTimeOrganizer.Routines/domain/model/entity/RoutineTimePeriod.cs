@@ -71,6 +71,20 @@ public class RoutineTimePeriod : BaseEntityWithUser, IEntityWithIsHidden, IBaseT
     /// </summary>
     public DateTime? GraceNotifiedFor { get; set; }
 
+    /// <summary>
+    /// The user-local date a suggested-today digest was last sent for — the sweep's idempotency mark, not user
+    /// data. The digest is <b>per user</b>, not per period, so the mark is stamped on every one of the user's
+    /// periods at once and read as "any of them carries today". That is what keeps a period created later the
+    /// same morning from earning a second digest.
+    /// <para>
+    /// It lives here, not on the per-user <c>UserRoutineSettings</c> row, because that row does not exist until
+    /// the user first saves a setting, and creating it from the sweep would be a background insert racing the
+    /// settings upsert — see the "background inserts" gotcha in this slice's summary. Written only when the
+    /// notification actually went out, like <see cref="EndingSoonNotifiedFor"/>.
+    /// </para>
+    /// </summary>
+    public DateOnly? SuggestedTodayNotifiedFor { get; set; }
+
     public ICollection<RoutineTodoList> RoutineTodoListColl { get; set; } = [];
     public ICollection<RoutinePeriodCompletion> CompletionHistoryColl { get; set; } = [];
 }

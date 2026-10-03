@@ -58,6 +58,16 @@ public class SkPortalNotificationTexts : SkNotificationTexts
         return $"Séria {streak} pre {name} sa preruší, ak ju nedokončíte{until}.";
     }
 
+    public override string RoutineSuggestedTodayTitle => "Na dnes odporúčané";
+    public override string RoutineSuggestedTodayFallbackBody => "Na dnes máte odporúčané úlohy z rutín.";
+
+    // "Posilňovňa", "Posilňovňa a Nájom", "Posilňovňa, Nájom a Zubár", "Posilňovňa, Nájom a ďalšie 2" / "a ďalších 5".
+    public override string RoutineSuggestedTodayBody(IReadOnlyList<string> names, int more)
+    {
+        List<string> parts = more > 0 ? [.. names, $"{Plural(more, "ďalšia", "ďalšie", "ďalších")} {more}"] : [.. names];
+        return parts.Count == 1 ? parts[0] : $"{string.Join(", ", parts[..^1])} a {parts[^1]}";
+    }
+
     public override string TimerEndedTitle => "Časovač skončil";
     public override string FocusEndedTitle => "Sústredenie skončilo";
     public override string ShortBreakEndedTitle => "Krátka prestávka skončila";

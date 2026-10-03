@@ -84,6 +84,9 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
 
             return Task.FromResult(!GraceDispatchFails);
         }
+
+        public Task<bool> NotifySuggestedTodayAsync(long userId, DateOnly date, IReadOnlyList<RoutineTodoList> items, CancellationToken ct = default)
+            => Task.FromResult(false);
     }
 
     /// <summary>

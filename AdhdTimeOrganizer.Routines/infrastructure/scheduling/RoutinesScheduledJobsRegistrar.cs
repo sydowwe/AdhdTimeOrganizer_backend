@@ -4,9 +4,9 @@ using Sydowwe.Framework.Contracts.scheduling;
 namespace AdhdTimeOrganizer.Routines.infrastructure.scheduling;
 
 /// <summary>
-/// Boot reconciliation for the Routines slice: pushes its two recurring jobs onto the Scheduler module
+/// Boot reconciliation for the Routines slice: pushes its three recurring jobs onto the Scheduler module
 /// through the <see cref="IScheduler"/> contract, the same way the Notifications / Reminders / Scheduler
-/// modules do. The slice owns the work (two <see cref="IScheduledJobHandler"/>s) and the cadence; Scheduler
+/// modules do. The slice owns the work (three <see cref="IScheduledJobHandler"/>s) and the cadence; Scheduler
 /// owns the trigger, the run log, retries and failure alerting — which is why this slice references no Quartz.
 /// <para>
 /// <b>Required on every boot:</b> <see cref="IScheduler.RegisterRecurringJobAsync"/> is an idempotent upsert
@@ -44,12 +44,27 @@ public sealed class RoutinesScheduledJobsRegistrar(
         Description = "Sends the lead-time 'period ending soon' nudges and the streak grace-expiry warnings."
     };
 
+    /// <summary>
+    /// The suggested-today digest, every 15 minutes. Frequent not because the digest is — it goes out once per
+    /// user per day — but because each user's morning arrives at a different UTC instant, and a run is how
+    /// the sweep notices it has. 15 minutes also lands on the half-hour and quarter-hour zones.
+    /// </summary>
+    public static RecurringJobRegistration SuggestedTodayRegistration { get; } = new()
+    {
+        JobKey = RoutineSuggestedTodayJobHandler.HandlerKey,
+        HandlerKey = RoutineSuggestedTodayJobHandler.HandlerKey,
+        OwnerModule = "Routines",
+        Schedule = ScheduleSpec.FromCron("0 0/15 * * * ?"),
+        DisallowConcurrent = true,
+        Description = "Sends each user, once their morning arrives, the digest of routine items suggested for today and not done yet."
+    };
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = services.CreateAsyncScope();
 
-        // Registered independently: one job's cadence problem must not keep the other off the schedule.
-        RecurringJobRegistration[] registrations = [ResetRegistration, NudgeRegistration];
+        // Registered independently: one job's cadence problem must not keep the others off the schedule.
+        RecurringJobRegistration[] registrations = [ResetRegistration, NudgeRegistration, SuggestedTodayRegistration];
 
         foreach (var registration in registrations)
             try

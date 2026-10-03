@@ -178,8 +178,8 @@ public static class ModuleServiceExtensions
     }
 
     /// <summary>
-    /// The notification kinds <b>this</b> portal can raise — the ten of <see cref="NotificationType"/>'s
-    /// nineteen that some producer here actually calls <c>NotifyAsync</c> with.
+    /// The notification kinds <b>this</b> portal can raise — the eleven of <see cref="NotificationType"/>'s
+    /// twenty that some producer here actually calls <c>NotifyAsync</c> with.
     /// <para>
     /// Declared in code rather than bound from configuration on purpose: which events an app produces is a
     /// property of its code, not of a deployment's settings, and an appsettings typo would silently drop a
@@ -208,6 +208,7 @@ public static class ModuleServiceExtensions
             NotificationType.RoutinePeriodEndingSoon,
             NotificationType.RoutinePeriodEnded,
             NotificationType.RoutineStreakGraceExpiring,
+            NotificationType.RoutineSuggestedToday,
 
             // Scheduler module: the failure notifier and the overdue sweep.
             NotificationType.ScheduledJobFailed,

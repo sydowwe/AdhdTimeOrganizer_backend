@@ -59,21 +59,41 @@ public class RoutinePeriodNotificationService(
             period.Streak), ct);
     }
 
+    public async Task<bool> NotifySuggestedTodayAsync(
+        long userId, DateOnly date, IReadOnlyList<RoutineTodoList> items, CancellationToken ct = default)
+    {
+        // Nothing qualifies is not a notification — there is no "nothing today" message.
+        if (items.Count == 0)
+            return false;
+
+        var payload = new RoutineSuggestedTodayPayload(
+            date,
+            items.Select(i => new RoutineSuggestedTodayItem(i.Id, i.Activity.Name, i.TimePeriodId)).ToList(),
+            items.Count);
+
+        return await SafeNotifyAsync(userId, payload, ct);
+    }
+
+    private Task<bool> SafeNotifyAsync<TPayload>(RoutineTimePeriod period, TPayload payload, CancellationToken ct)
+        where TPayload : INotificationPayload =>
+        SafeNotifyAsync(period.UserId, payload, ct);
+
     /// <summary>
     /// Best-effort dispatch. A reset that already mutated items and wrote a completion row must not be undone
     /// because SignalR or SMTP had a bad minute, and two of the three call sites are inside a request the user
-    /// is waiting on. Logs the period id only — the period's <c>Text</c> is user-authored and stays out of logs.
+    /// is waiting on. Logs the recipient's user id only — period and item names are user-authored and stay out
+    /// of logs.
     /// <para>
     /// Returns false when the dispatch was swallowed, so a caller that stamps a "notified for" marker off the
     /// result never suppresses a notification that never went out.
     /// </para>
     /// </summary>
-    private async Task<bool> SafeNotifyAsync<TPayload>(RoutineTimePeriod period, TPayload payload, CancellationToken ct)
+    private async Task<bool> SafeNotifyAsync<TPayload>(long userId, TPayload payload, CancellationToken ct)
         where TPayload : INotificationPayload
     {
         try
         {
-            await notificationService.NotifyAsync(NotificationRecipients.User(period.UserId), payload, ct);
+            await notificationService.NotifyAsync(NotificationRecipients.User(userId), payload, ct);
             return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -82,7 +102,7 @@ public class RoutinePeriodNotificationService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Routine notification {Payload} failed for period {PeriodId}", typeof(TPayload).Name, period.Id);
+            logger.LogWarning(ex, "Routine notification {Payload} failed for user {UserId}", typeof(TPayload).Name, userId);
             return false;
         }
     }

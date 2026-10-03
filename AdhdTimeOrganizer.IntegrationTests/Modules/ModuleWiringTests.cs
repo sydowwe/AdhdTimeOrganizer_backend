@@ -167,6 +167,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         // its job fires into nothing.
         Assert.Contains(RoutineTodoListResetJobHandler.HandlerKey, keys);
         Assert.Contains(RoutinePeriodNudgeJobHandler.HandlerKey, keys);
+        Assert.Contains(RoutineSuggestedTodayJobHandler.HandlerKey, keys);
         Assert.Contains(PurgeExpiredActivityTrackingEntriesJobHandler.HandlerKey, keys);
         Assert.Contains(SuggestionPatternRefreshJobHandler.HandlerKey, keys);
     }
@@ -368,6 +369,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         // AddHostedService list is silent: the handler is still in DI, it simply never fires.
         Assert.Contains(RoutinesScheduledJobsRegistrar.ResetRegistration.JobKey, jobKeys);
         Assert.Contains(RoutinesScheduledJobsRegistrar.NudgeRegistration.JobKey, jobKeys);
+        Assert.Contains(RoutinesScheduledJobsRegistrar.SuggestedTodayRegistration.JobKey, jobKeys);
         Assert.Contains(TrackingScheduledJobsRegistrar.RetentionPurgeRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.SuggestionPatternRefreshRegistration.JobKey, jobKeys);
     }

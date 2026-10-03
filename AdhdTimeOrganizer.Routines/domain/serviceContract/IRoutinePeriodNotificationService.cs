@@ -36,4 +36,13 @@ public interface IRoutinePeriodNotificationService
     /// having reached the user.
     /// </summary>
     Task<bool> NotifyGraceExpiringAsync(RoutineTimePeriod period, CancellationToken ct = default);
+
+    /// <summary>
+    /// The once-a-day digest of the items suggested for the user's <paramref name="date"/> and not done yet —
+    /// one notification for all of them, never one per item. <paramref name="items"/> must have
+    /// <c>Activity</c> loaded, since its name is what the body lists. Returns false when nothing was raised
+    /// (an empty list, or a swallowed dispatch), which is the caller's cue to leave the day unmarked so a later
+    /// run that morning can retry.
+    /// </summary>
+    Task<bool> NotifySuggestedTodayAsync(long userId, DateOnly date, IReadOnlyList<RoutineTodoList> items, CancellationToken ct = default);
 }

@@ -115,8 +115,19 @@ notification preference matrix instead. `EvaluateEndingSoon` returns null once `
 itself: from there the reset job owns the period, and "3 days left" racing the reset would be worse
 than silence.
 
-**Time.** Everything is UTC end to end. The sweeps do no zone conversion — two identical UTC periods
-owned by users in different zones must produce identical results.
+**Suggested-today digest (B4).** Once per user per day, at the user's morning, one notification names
+the items suggested for their today and not done yet. "Suggested" is `RoutineSuggestedDay.IsSuggestedOn`:
+weekly (`1 < LengthInDays ≤ 14`) by `SuggestedDays` weekday, monthly+ (`> 14`) by `SuggestedDayOfMonth`
+clamped to the month's last day, daily never — by period length, not by the fields. The client ships the
+same rule (`routineSuggestedDay.ts`); change both or neither. Hidden periods never contribute, an item
+ticked in the still-open cycle is done, a tick from a cycle whose reset is due is not. A missed day is
+never mentioned again. Nothing qualifies → nothing sent, nothing marked.
+
+**Time.** Periods, resets and the two nudges are UTC end to end — those sweeps do no zone conversion, and
+two identical UTC periods owned by users in different zones must produce identical results. **The
+suggested-today digest is the one deliberate exception**: "today" is the date in `User.Timezone` and
+"morning" is that day's `Calendar.WakeUpTime` (08:00 when the day row doesn't exist), because a weekday
+named in UTC is the wrong weekday for most of the world.
 
 ## Glossary
 
@@ -128,6 +139,8 @@ owned by users in different zones must produce identical results.
 | Grace | Time-based leniency: finish late, keep the run | `StreakGraceDays` / `StreakGraceUntil` |
 | Streak freeze | Budgeted leniency: skip a period outright, keep the run | `FreezeBudget` / `FreezesRemaining` |
 | Nudge | The mid-period "n of m done" notification | `EvaluateEndingSoon` / `RoutinePeriodEndingSoonPayload` |
+| Suggested day | The day a weekly/monthly item is meant for | `SuggestedDays` / `SuggestedDayOfMonth`, `RoutineSuggestedDay` |
+| Suggested-today digest | The morning "these are today's" notification, one per user per day | `RoutineSuggestedTodayJobHandler` / `RoutineSuggestedTodayPayload` |
 | Review card | The weekly "fresh start" prompt the user can dismiss | `RoutineReviewDismissedForWeekStart` |
 
 ## Invariants
@@ -193,18 +206,19 @@ transaction that read the period.
 | `RoutineStreakFreezeService.Apply` | Static fn | Spend a freeze; returns `StreakFreezeRejection` — anything but `None` means nothing was written. Refuses a `TotalCount == 0` entry as `NotAMiss`: `RecomputeStreak` skips item-less periods outright, so the run already carries across one for free. Caller must have run `CheckGrace` first | `RoutineStreakFreezeService.cs` |
 | `RoutineStreakFreezeService.RecomputeStreak` | Static fn | Walks the **complete** history oldest-first — a trimmed list under-counts the run | `RoutineStreakFreezeService.cs` |
 | `RoutineStreakFreezeService.IsSuccess` / `NextBudgetReset` | Static fn | Threshold test and the next window boundary | `RoutineStreakFreezeService.cs` |
+| `RoutineSuggestedDay.IsSuggestedOn` | Static fn | Whether an item is suggested for a given (user-local) date — the server half of the client's `routineSuggestedDay.ts`. Decides daily-vs-weekly-vs-monthly by `LengthInDays`, and ignores the field that doesn't belong to that length | `RoutineSuggestedDay.cs` |
 
 ### Notifications — `application/service/`, `domain/serviceContract/`
 
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
-| `IRoutinePeriodNotificationService` | Contract | The three routine notifications. `NotifyEndingSoonAsync` returns `bool` — **that return is the idempotency marker's gate**: the caller marks only when something actually went out | `domain/serviceContract/IRoutinePeriodNotificationService.cs` |
+| `IRoutinePeriodNotificationService` | Contract | The four routine notifications. `NotifyEndingSoonAsync`, `NotifyGraceExpiringAsync` and `NotifySuggestedTodayAsync` return `bool` — **that return is the idempotency marker's gate**: the caller marks only when something actually went out | `domain/serviceContract/IRoutinePeriodNotificationService.cs` |
 | `RoutineTimePeriodReadRefresher` | Static fn | `CheckGrace` + `RefreshFreezeBudget` (persisted) then render through `RoutineTimePeriodResponse.From`, for the four reads that sit on the framework projection bases. Deliberately does **not** reset — a reset needs the period's items, which a flat read never loads | `application/service/RoutineTimePeriodReadRefresher.cs` |
-| `RoutinePeriodNotificationService` | Service | Maps the three events onto `Sydowwe.Framework.Contracts.notification` payloads (`RoutinePeriodEndedPayload`, `RoutinePeriodEndingSoonPayload`, `RoutineStreakGraceExpiringPayload`). Every method is best-effort — catches and logs, never throws — because a notification failure must never roll back a reset that already committed. Does not consult preferences; the Notifications module owns that | `application/service/RoutinePeriodNotificationService.cs` |
+| `RoutinePeriodNotificationService` | Service | Maps the four events onto `Sydowwe.Framework.Contracts.notification` payloads (`RoutinePeriodEndedPayload`, `RoutinePeriodEndingSoonPayload`, `RoutineStreakGraceExpiringPayload`, `RoutineSuggestedTodayPayload`). Every method is best-effort — catches and logs, never throws — because a notification failure must never roll back a reset that already committed. Does not consult preferences; the Notifications module owns that | `application/service/RoutinePeriodNotificationService.cs` |
 
 ### Jobs and scheduling — `infrastructure/jobs/`, `infrastructure/scheduling/`
 
-Both handlers are keyed `IScheduledJobHandler` implementations
+All three handlers are keyed `IScheduledJobHandler` implementations
 (`Sydowwe.Framework.Contracts.scheduling`), **not Quartz `IJob`s** — this slice references no Quartz.
 They are picked up by the `IScopedService` marker scan like any other service, take the scoped
 `DbContext` directly (the dispatcher opens a scope per fire) and run unauthenticated.
@@ -214,8 +228,9 @@ They are picked up by the `IScopedService` marker scan like any other service, t
 |---|---|---|---|
 | `RoutineTodoListResetJobHandler` | Job (`Routines.TodoListReset`) | 02:00 UTC daily. Sweeps every period: `CheckGrace` → `RefreshFreezeBudget` → `TryResetCatchUp`; persists completions (one save per period), then notifies **after** the commit. Walks the table a page of users at a time (`RoutineSweepPaging`) | `infrastructure/jobs/RoutineTodoListResetJobHandler.cs` |
 | `RoutinePeriodNudgeJobHandler` | Job (`Routines.PeriodNudge`) | 09:00 UTC daily — deliberately not alongside the reset, because this one is addressed to a person. Skips hidden periods. Sequential per period, and each period's failure is caught so it can't lose earlier markers or skip later periods. Paged by user (`RoutineSweepPaging`), committing the markers per page; the `NOT is_hidden` filter is on both of its queries and is indexed | `infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
-| `RoutineSweepPaging` | Helper (internal) | Both sweeps' user paging: the distinct user ids, ordered, in pages of `UserPageSize` (100). By user rather than by row — the page is also the commit and change-tracker-release unit, so one user's periods must never straddle two of them | `infrastructure/jobs/RoutineSweepPaging.cs` |
-| `RoutinesScheduledJobsRegistrar` | `IHostedService` | Pushes both schedules through `IScheduler` on **every** boot (idempotent upsert by `JobKey`; the Scheduler's RAM job store drops triggers on restart). Registers each independently so one bad cadence can't keep the other off the schedule, and swallows failures so a scheduling problem never blocks startup | `infrastructure/scheduling/RoutinesScheduledJobsRegistrar.cs` |
+| `RoutineSuggestedTodayJobHandler` | Job (`Routines.SuggestedToday`) | Every 15 minutes, because each user's morning is a different UTC instant; sends each user **one** digest per local day once `Calendar.WakeUpTime` (via Core's `ICalendarDayLookup`) or 08:00 has passed in `User.Timezone` (via `IUserTimeZoneReader`, bulk per page). Composed at send time. Marks `SuggestedTodayNotifiedFor` on **all** the user's periods with one `ExecuteUpdate` right after a successful send — never tracked, never per page, so it can't lose a row_version race and a period created later that day is covered. Reads are `AsNoTracking`; pages by user through `RoutineSweepPaging` | `infrastructure/jobs/RoutineSuggestedTodayJobHandler.cs` |
+| `RoutineSweepPaging` | Helper (internal) | All three sweeps' user paging: the distinct user ids, ordered, in pages of `UserPageSize` (100). By user rather than by row — the page is also the commit and change-tracker-release unit, so one user's periods must never straddle two of them | `infrastructure/jobs/RoutineSweepPaging.cs` |
+| `RoutinesScheduledJobsRegistrar` | `IHostedService` | Pushes all three schedules through `IScheduler` on **every** boot (idempotent upsert by `JobKey`; the Scheduler's RAM job store drops triggers on restart). Registers each independently so one bad cadence can't keep the others off the schedule, and swallows failures so a scheduling problem never blocks startup | `infrastructure/scheduling/RoutinesScheduledJobsRegistrar.cs` |
 
 ### Seams — `application/seam/`
 

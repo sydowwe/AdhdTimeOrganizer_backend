@@ -2380,6 +2380,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("streak_threshold");
 
+                    b.Property<DateOnly?>("SuggestedTodayNotifiedFor")
+                        .HasColumnType("date")
+                        .HasColumnName("suggested_today_notified_for");
+
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -5017,16 +5021,16 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_activity_history_routine_todo_list_routine_todo_list_id");
 
-                    b.HasOne("AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList.TodoListItem", null)
-                        .WithMany()
-                        .HasForeignKey("TodoListItemId")
-                        .OnDelete(DeleteBehavior.SetNull)
                     b.HasOne("AdhdTimeOrganizer.History.domain.model.entity.activityHistory.ActivityHistorySession", "Session")
                         .WithMany("Records")
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_activity_history_activity_history_session_session_id");
 
+                    b.HasOne("AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList.TodoListItem", null)
+                        .WithMany()
+                        .HasForeignKey("TodoListItemId")
+                        .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_activity_history_todo_list_item_todo_list_item_id");
 
                     b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
@@ -5038,10 +5042,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.Navigation("Activity");
 
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("AdhdTimeOrganizer.History.domain.model.entity.timerAlarm.TimerBoundaryAlarm", b =>
                     b.Navigation("Session");
 
                     b.Navigation("User");
@@ -5056,6 +5056,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_activity_history_session_user_user_id");
 
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.History.domain.model.entity.timerAlarm.TimerBoundaryAlarm", b =>
                 {
                     b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
@@ -5835,15 +5839,15 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("RoleList");
                 });
 
-            modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.Calendar", b =>
-                {
-                    b.Navigation("Tasks");
-                });
             modelBuilder.Entity("AdhdTimeOrganizer.History.domain.model.entity.activityHistory.ActivityHistorySession", b =>
                 {
                     b.Navigation("Records");
                 });
 
+            modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.Calendar", b =>
+                {
+                    b.Navigation("Tasks");
+                });
 
             modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning.TaskPlannerDayTemplate", b =>
                 {

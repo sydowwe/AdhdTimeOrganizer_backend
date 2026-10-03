@@ -47,6 +47,16 @@ public class EnPortalNotificationTexts : EnNotificationTexts
         return $"Your streak of {streak} for {name} will break unless you finish it{until}.";
     }
 
+    public override string RoutineSuggestedTodayTitle => "Suggested for today";
+    public override string RoutineSuggestedTodayFallbackBody => "You have routine tasks suggested for today.";
+
+    // "Gym", "Gym and Pay rent", "Gym, Pay rent and Dentist", "Gym, Pay rent and 2 more".
+    public override string RoutineSuggestedTodayBody(IReadOnlyList<string> names, int more)
+    {
+        List<string> parts = more > 0 ? [.. names, $"{more} more"] : [.. names];
+        return parts.Count == 1 ? parts[0] : $"{string.Join(", ", parts[..^1])} and {parts[^1]}";
+    }
+
     public override string TimerEndedTitle => "Timer finished";
     public override string FocusEndedTitle => "Focus finished";
     public override string ShortBreakEndedTitle => "Short break over";
