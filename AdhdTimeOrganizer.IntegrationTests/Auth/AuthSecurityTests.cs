@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.application.dto.request.user;
+using Sydowwe.Framework.application.dto.response.user;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
 using Sydowwe.Framework.domain.helper;
@@ -61,6 +62,97 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
         var response = await client.PostAsync("auth/login/2fa/setup", null, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    /// <summary>
+    /// The bypass this route used to be: the pending cookie is issued after the password alone, and the
+    /// setup service re-renders an <i>existing</i> key. So for an account whose authenticator is already
+    /// provisioned, a password holder could read the secret here and mint the code the next step wants.
+    /// The cookie must have been issued for setup, and there must be nothing set up yet.
+    /// </summary>
+    [Fact]
+    public async Task TwoFaSetup_ForAccountWithAuthenticator_Returns401WithoutTheKey()
+    {
+        const string email = "2fa-setup-bypass@integration.com";
+        const string password = "Test@1234!";
+        var userId = await SeedTwoFactorUserAsync(email, password);
+        string existingKey;
+        using (var scope = Fixture.UnauthenticatedFactory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+            var user = await userManager.FindByIdAsync(userId.ToString());
+            (await userManager.ResetAuthenticatorKeyAsync(user!)).Succeeded.Should().BeTrue();
+            existingKey = (await userManager.GetAuthenticatorKeyAsync(user!))!;
+        }
+
+        using var client = CreateCookieClient();
+        var login = await PostLoginWithClientAsync(client, email, password);
+        login.RequiresTwoFactor.Should().BeTrue();
+        login.RequiresTwoFactorSetup.Should().BeFalse("the authenticator is already provisioned");
+
+        var response = await client.PostAsync("auth/login/2fa/setup", null, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))
+            .Should().NotContain(existingKey, "the existing secret must never leave on a password-only credential");
+    }
+
+    /// <summary>
+    /// A forced-setup cookie buys one enrolment. A second call would otherwise re-render the key the first
+    /// one just provisioned — harmless for the same user, but the rule is "nothing set up yet", not a
+    /// count, so it is pinned here.
+    /// </summary>
+    [Fact]
+    public async Task TwoFaSetup_CalledTwiceOnOnePendingCookie_RefusesTheSecond()
+    {
+        const string email = "2fa-setup-twice@integration.com";
+        const string password = "Test@1234!";
+        await SeedTwoFactorUserAsync(email, password);
+
+        using var client = CreateCookieClient();
+        var login = await PostLoginWithClientAsync(client, email, password);
+        login.RequiresTwoFactorSetup.Should().BeTrue();
+
+        var first = await client.PostAsync("auth/login/2fa/setup", null, TestContext.Current.CancellationToken);
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var second = await client.PostAsync("auth/login/2fa/setup", null, TestContext.Current.CancellationToken);
+        second.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    /// <summary>A confirmed account with <c>TwoFactorEnabled</c> and, as seeded, no authenticator key.</summary>
+    private async Task<long> SeedTwoFactorUserAsync(string email, string password)
+    {
+        await using var db = (AppDbContext)Fixture.CreateDbContext();
+        var user = new User
+        {
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
+            UserName = email,
+            NormalizedUserName = email.ToUpperInvariant(),
+            EmailConfirmed = true,
+            TwoFactorEnabled = true,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            ConcurrencyStamp = Guid.NewGuid().ToString("N"),
+            Locale = AvailableLocales.En,
+            Timezone = TimeZoneInfo.Utc
+        };
+        user.PasswordHash = new PasswordHasher<User>().HashPassword(user, password);
+        db.Users.Add(user);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return user.Id;
+    }
+
+    /// <summary>The password step on <paramref name="client"/>, so its cookie container keeps the pending cookie.</summary>
+    private static async Task<LoginResponse> PostLoginWithClientAsync(HttpClient client, string email, string password)
+    {
+        var payload = new { Email = email, Password = password, StayLoggedIn = false, RecaptchaToken = "test", Timezone = "UTC" };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/login");
+        request.Headers.Add("X-Client-Id", Guid.NewGuid().ToString());
+        request.Content = JsonContent.Create(payload);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return (await response.Content.ReadFromJsonAsync<LoginResponse>(TestContext.Current.CancellationToken))!;
     }
 
     // ── Login ─────────────────────────────────────────────────────────────────
@@ -267,15 +359,27 @@ public class AuthSecurityTests(AppDbContextFixture fixture) : AuthTestBase(fixtu
     [Fact]
     public async Task TwoFa_Extension_ReplayedPendingToken_Returns401()
     {
-        // Generate a real pending token for the shared test user (2FA disabled → TOTP always passes)
-        var userId = FakeLoggedUserService.TestUserId;
+        // A 2FA account and one of its real recovery codes, so the first attempt genuinely succeeds. This
+        // used to lean on the shared test user, whose 2FA is off, because any code then passed — the very
+        // shortcut that let a TwoFactorMode.Required account skip its second factor, now removed.
+        const string email = "2fa-replay@integration.com";
+        var userId = await SeedTwoFactorUserAsync(email);
+        string recoveryCode;
+        using (var scope = Fixture.UnauthenticatedFactory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+            var user = await userManager.FindByIdAsync(userId.ToString());
+            recoveryCode = (await userManager.GenerateNewTwoFactorRecoveryCodesAsync(user!, 1))!.Single();
+        }
         var pendingToken = IssuePendingToken(userId);
 
-        var payload = new { Email = TestEmail, Token = "000000", StayLoggedIn = false, PendingAuthToken = pendingToken };
+        var payload = new { Email = email, Token = recoveryCode, StayLoggedIn = false, PendingAuthToken = pendingToken };
 
         using var client = CreateCookieClient();
 
-        // First request — token consumed (2FA disabled → TOTP passes → tokens issued)
+        // First request — token consumed, the code accepted, tokens issued. The replay below is refused
+        // on the spent token before any code is looked at, so the recovery code's own single use does
+        // not decide its answer.
         using var req1 = new HttpRequestMessage(HttpMethod.Post, "auth/login/2fa/extension");
         req1.Content = JsonContent.Create(payload);
         var res1 = await client.SendAsync(req1, TestContext.Current.CancellationToken);

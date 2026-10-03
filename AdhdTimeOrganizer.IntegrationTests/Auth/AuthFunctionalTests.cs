@@ -170,7 +170,7 @@ public class AuthFunctionalTests(AppDbContextFixture fixture) : AuthTestBase(fix
     /// e2e side. Written out rather than pulled in as a package because the test's claim is precisely
     /// that the bare base32 string is enough to produce a valid code.
     /// </summary>
-    private static string GenerateTotp(string base32Key, DateTimeOffset at)
+    internal static string GenerateTotp(string base32Key, DateTimeOffset at)
     {
         const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
         var bits = 0;
