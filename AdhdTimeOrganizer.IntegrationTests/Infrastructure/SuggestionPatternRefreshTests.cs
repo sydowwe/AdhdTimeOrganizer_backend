@@ -108,7 +108,7 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
         await db.Database.ExecuteSqlRawAsync($"DROP MATERIALIZED VIEW {Qualified(view)}", ct);
 
     // Goes through the real installer rather than re-reading the script here: it already skips views that
-    // still exist, so restoring one dropped view is exactly "install whatever is missing".
+    // still exist and match their script, so restoring one dropped view is exactly "install whatever is missing".
     private async Task RestoreMissingViewsAsync(CancellationToken ct)
     {
         await using var db = fixture.CreateDbContext();
@@ -352,4 +352,34 @@ public class SuggestionPatternRefreshTests(AppDbContextFixture fixture) : Postgr
             exists.Should().BeTrue($"the fixture runs the real SuggestionPatternViewInstaller, so {viewName} must exist in the test schema");
         }
     }
+
+    // ---- a changed script reaches a database that already has the view --------------------------------
+
+    /// <summary>
+    /// The installer used to skip any view that existed, so a corrected script never reached a database that
+    /// had the old one — the pattern-average fix would have shipped to tests and nowhere else. A view whose
+    /// stamp is missing (every view installed before stamping existed) or different is rebuilt; one whose
+    /// stamp matches is not, or every boot would drop and repopulate all three.
+    /// </summary>
+    [Fact]
+    public async Task Installer_RecreatesAViewWhoseScriptChanged_AndLeavesCurrentOnesAlone()
+    {
+        var stale = Qualified(SuggestionPatternView.PlannerTask);
+        var current = Qualified(SuggestionPatternView.TemplateSuggestion);
+
+        await using var db = CreateDbContext();
+        await db.Database.ExecuteSqlRawAsync($"COMMENT ON MATERIALIZED VIEW {stale} IS NULL", CancellationToken);
+        var staleOid = await OidAsync(db, stale);
+        var currentOid = await OidAsync(db, current);
+
+        await RestoreMissingViewsAsync(CancellationToken);
+
+        (await OidAsync(db, stale)).Should().NotBe(staleOid, "an unstamped view predates its current script and must be re-created from it");
+        (await db.Database.SqlQueryRaw<string?>("SELECT obj_description(to_regclass({0}), 'pg_class') AS \"Value\"", stale).SingleAsync(CancellationToken))
+            .Should().StartWith("sqlScripts sha256:");
+        (await OidAsync(db, current)).Should().Be(currentOid, "a view whose stamp matches its script is left alone");
+    }
+
+    private async Task<long> OidAsync(DbContext db, string qualifiedName) =>
+        await db.Database.SqlQueryRaw<long>("SELECT to_regclass({0})::oid::bigint AS \"Value\"", qualifiedName).SingleAsync(CancellationToken);
 }

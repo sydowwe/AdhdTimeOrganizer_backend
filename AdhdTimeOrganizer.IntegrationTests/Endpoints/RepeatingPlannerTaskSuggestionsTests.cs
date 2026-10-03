@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
@@ -7,6 +8,7 @@ using AdhdTimeOrganizer.Planning.application.dto.response.suggestion;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Framework.domain.valueObject;
 using Xunit;
@@ -64,9 +66,8 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         {
             activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-three-occurrences", ct: TestContext.Current.CancellationToken);
             calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: TestContext.Current.CancellationToken);
-            // mv_planner_task_pattern averages hours and minutes SEPARATELY (AVG(EXTRACT(HOUR)), AVG(EXTRACT
-            // (MINUTE)), each truncated to int), not as one combined elapsed-time average -- same hour across
-            // all three occurrences isolates the minute-averaging behaviour cleanly: (0+10+20)/3 = 10.
+            // Same hour on all three, so this pins only that the times are averaged at all; the case where the
+            // hour differs is AverageCrossingAnHour_IsTheMeanTimeOfDay below.
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 1, start: new TimeOnly(9, 0), end: new TimeOnly(10, 0));
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 2, start: new TimeOnly(9, 10), end: new TimeOnly(10, 10));
             await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo: 3, start: new TimeOnly(9, 20), end: new TimeOnly(10, 20));
@@ -83,6 +84,116 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         pattern.StartTime.Minutes.Should().Be(10);
         pattern.EndTime.Hours.Should().Be(10);
         pattern.EndTime.Minutes.Should().Be(10);
+    }
+
+    /// <summary>
+    /// Both views averaged hours and minutes separately, <c>make_time(AVG(hour)::int, AVG(minute)::int, 0)</c>,
+    /// and a numeric cast to <c>int</c> rounds — so 09:50 / 10:10 / 10:00 came out as hour 9.67 → 10 and minute
+    /// 20, i.e. 10:20, for three sittings whose mean is 10:00. The planner view feeds the activity A suggestion
+    /// and the history view feeds B's; two activities because tier 2 suppresses tier 3 for the same one.
+    /// </summary>
+    [Fact(DisplayName = "Times either side of an hour average to the mean time of day, in both pattern views")]
+    public async Task AverageCrossingAnHour_IsTheMeanTimeOfDay()
+    {
+        var target = new DateOnly(2027, 7, 5);
+        long plannedActivityId, historyActivityId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            plannedActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-mean-planned", ct: CancellationToken);
+            historyActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-mean-history", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+
+            (TimeOnly Start, TimeOnly End)[] sittings = [(new(9, 50), new(10, 50)), (new(10, 10), new(11, 10)), (new(10, 0), new(11, 0))];
+            for (var i = 0; i < sittings.Length; i++)
+            {
+                var (start, end) = sittings[i];
+                await SeedSameWeekdayTaskAsync(db, plannedActivityId, target, weeksAgo: i + 1, start, end);
+                var date = target.AddDays(-7 * (i + 1));
+                await SeedActivityHistoryAsync(db, historyActivityId, date.ToDateTime(start, DateTimeKind.Utc), date.ToDateTime(end, DateTimeKind.Utc));
+            }
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        foreach (var (activityId, source) in new[] { (plannedActivityId, SuggestionSourceType.PlannedPattern), (historyActivityId, SuggestionSourceType.HistoryPattern) })
+        {
+            var pattern = suggestions.Should().ContainSingle(s => s.Activity.Id == activityId).Subject;
+            pattern.SourceType.Should().Be(source);
+            AsTime(pattern.StartTime).Should().Be(new TimeOnly(10, 0), $"{source}: the mean of 09:50, 10:10 and 10:00 is 10:00");
+            AsTime(pattern.EndTime).Should().Be(new TimeOnly(11, 0), $"{source}: the mean of 10:50, 11:10 and 11:00 is 11:00");
+        }
+    }
+
+    /// <summary>
+    /// The mean is rounded to the minute, and a mean in the last half-minute of the day must not round up to
+    /// 24:00 and wrap to 00:00 — that would offer a late-evening habit at the start of the day.
+    /// </summary>
+    [Fact(DisplayName = "A mean in the day's last half-minute stays at 23:59 rather than wrapping to 00:00")]
+    public async Task MeanJustBeforeMidnight_ClampsTo2359()
+    {
+        var target = new DateOnly(2027, 7, 12);
+        long activityId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-mean-midnight", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+            // 23:59:40 / :50 / :55 — mean 23:59:48, which rounds to the minute as 24:00.
+            int[] seconds = [40, 50, 55];
+            for (var i = 0; i < seconds.Length; i++)
+            {
+                var start = target.AddDays(-7 * (i + 1)).ToDateTime(new TimeOnly(23, 59, seconds[i]), DateTimeKind.Utc);
+                await SeedActivityHistoryAsync(db, activityId, start, start.AddMinutes(30));
+            }
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var pattern = (await GetSuggestionsAsync(calendarTargetId)).Should().ContainSingle(s => s.Activity.Id == activityId).Subject;
+        AsTime(pattern.StartTime).Should().Be(new TimeOnly(23, 59));
+    }
+
+    /// <summary>
+    /// <c>activity_history</c> stores instants, and the view used to take their weekday and time of day in the
+    /// <b>database session's</b> zone — UTC on every server this runs on, since Npgsql sets none — while the
+    /// planner it feeds is in the user's wall-clock time. A Bratislava user who starts something at 00:30 every
+    /// Tuesday (Monday 22:30 UTC in summer) was offered it on <b>Mondays at 22:30</b>. The view now converts
+    /// through <c>user.timezone</c>.
+    /// </summary>
+    [Fact(DisplayName = "History patterns use the user's zone for both the weekday and the time of day")]
+    public async Task HistoryPattern_IsInTheUsersZone()
+    {
+        var target = new DateOnly(2027, 6, 22); // a Tuesday, in CEST (UTC+2)
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Bratislava");
+        long activityId, calendarTargetId, mondayCalendarId;
+        await using (var db = CreateDbContext())
+        {
+            // Respawn re-creates the fixture user on UTC before the next test, so this does not leak.
+            var user = await db.Set<User>().IgnoreQueryFilters().SingleAsync(u => u.Id == PlanningTestSeedHelper.TestUserId, CancellationToken);
+            user.Timezone = zone;
+            await db.SaveChangesAsync(CancellationToken);
+
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-user-zone", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+            mondayCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target.AddDays(-1), ct: CancellationToken);
+            for (var weeksAgo = 1; weeksAgo <= 3; weeksAgo++)
+            {
+                var localStart = target.AddDays(-7 * weeksAgo).ToDateTime(new TimeOnly(0, 30));
+                var start = TimeZoneInfo.ConvertTimeToUtc(localStart, zone);
+                await SeedActivityHistoryAsync(db, activityId, start, start.AddHours(1));
+            }
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var pattern = (await GetSuggestionsAsync(calendarTargetId)).Should().ContainSingle(s => s.Activity.Id == activityId,
+            "every sitting started on a Tuesday in the user's zone").Subject;
+        pattern.ScheduledDays.Should().Equal("Tuesday");
+        AsTime(pattern.StartTime).Should().Be(new TimeOnly(0, 30));
+        AsTime(pattern.EndTime).Should().Be(new TimeOnly(1, 30));
+
+        (await GetSuggestionsAsync(mondayCalendarId)).Should().NotContain(s => s.Activity.Id == activityId,
+            "Monday is only the UTC weekday of those sittings");
     }
 
     [Fact(DisplayName = "3 occurrences including a cancelled one still fall short of a pattern")]
@@ -300,15 +411,20 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         var date = target.AddDays(-7 * weeksAgo);
         // The DateTimeKind overload is load-bearing: ToDateTime alone yields Kind=Unspecified, and Npgsql
         // refuses to write anything but UTC to a `timestamp with time zone` column.
-        var start = date.ToDateTime(new TimeOnly(9, 0), DateTimeKind.Utc);
-        var end = date.ToDateTime(new TimeOnly(10, 0), DateTimeKind.Utc);
+        await SeedActivityHistoryAsync(db, activityId,
+            date.ToDateTime(new TimeOnly(9, 0), DateTimeKind.Utc), date.ToDateTime(new TimeOnly(10, 0), DateTimeKind.Utc));
+    }
+
+    private static async Task SeedActivityHistoryAsync(Microsoft.EntityFrameworkCore.DbContext db, long activityId, DateTime startUtc, DateTime endUtc)
+    {
+        var length = endUtc - startUtc;
         db.Set<ActivityHistory>().Add(new ActivityHistory
         {
             UserId = PlanningTestSeedHelper.TestUserId,
             ActivityId = activityId,
-            StartTimestamp = start,
-            EndTimestamp = end,
-            Length = new IntTime(1, 0)
+            StartTimestamp = startUtc,
+            EndTimestamp = endUtc,
+            Length = new IntTime((int)length.TotalHours, length.Minutes)
         });
         await db.SaveChangesAsync(CancellationToken.None);
     }
@@ -332,6 +448,8 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         await db.Database.ExecuteSqlRawAsync($"REFRESH MATERIALIZED VIEW CONCURRENTLY {ModuleSchemas.Planning}.mv_activity_history_pattern", CancellationToken);
 #pragma warning restore EF1002
     }
+
+    private static TimeOnly AsTime(TimeDto time) => new(time.Hours, time.Minutes);
 
     private async Task<List<SuggestionResponse>> GetSuggestionsAsync(long calendarId)
     {

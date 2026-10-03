@@ -1,12 +1,23 @@
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdhdTimeOrganizer.infrastructure.persistence;
 
 /// <summary>
-/// Creates the three suggestion-pattern materialized views if the database does not have them yet.
+/// Creates the three suggestion-pattern materialized views if the database does not have them yet, and
+/// re-creates any whose script has changed since it was installed.
 /// </summary>
 /// <remarks>
+/// <b>Changing a script is the whole deploy.</b> Each view carries a <c>COMMENT</c> holding a hash of the
+/// script that created it (<see cref="StampOf"/>). At boot, a missing or different stamp means DROP and
+/// CREATE in one transaction, which also repopulates the view. No migration is involved and none should be
+/// written: it would be a second copy of the SQL, and the test fixture (<c>EnsureCreated</c>) would never
+/// run it. A view installed before the stamp existed has no comment, so it is rebuilt once. Never
+/// hand-edit a view in a real database — the next boot replaces it with the script.
+///
+///
 /// The views are hand-written SQL in <c>infrastructure/persistence/sqlScripts/</c>, mapped with
 /// <c>ToView</c> and therefore never emitted by a migration — so nothing created them in a real
 /// database, only the integration-test fixture did. <see cref="interceptors.SuggestionPatternRefreshInterceptor"/>
@@ -52,20 +63,41 @@ public static class SuggestionPatternViewInstaller
             foreach (var resource in resources)
             {
                 var viewName = ViewNameOf(resource);
-
-                var exists = await db.Database
-                    .SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", QualifiedName(db, viewName))
-                    .SingleAsync(ct);
-
-                if (exists)
-                    continue;
+                var qualifiedName = QualifiedName(db, viewName);
 
                 await using var stream = assembly.GetManifestResourceStream(resource)!;
                 using var reader = new StreamReader(stream);
                 var sql = await reader.ReadToEndAsync(ct);
+                var stamp = StampOf(sql);
 
+                var exists = await db.Database
+                    .SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", qualifiedName)
+                    .SingleAsync(ct);
+                var installedStamp = exists
+                    ? await db.Database
+                        .SqlQueryRaw<string?>("SELECT obj_description(to_regclass({0}), 'pg_class') AS \"Value\"", qualifiedName)
+                        .SingleAsync(ct)
+                    : null;
+
+                if (exists && installedStamp == stamp)
+                    continue;
+
+                // One transaction, so a reader never finds the view missing between the DROP and the CREATE:
+                // it waits on the DROP's lock and then reads the new definition.
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
+#pragma warning disable EF1002
+                // qualifiedName comes from the EF model and stamp is a fixed prefix plus hex, never external input.
+                if (exists)
+                    await db.Database.ExecuteSqlRawAsync($"DROP MATERIALIZED VIEW {qualifiedName}", ct);
                 await db.Database.ExecuteSqlRawAsync(sql, ct);
-                logger.LogInformation("Created missing materialized view {ViewName}.", viewName);
+                await db.Database.ExecuteSqlRawAsync($"COMMENT ON MATERIALIZED VIEW {qualifiedName} IS '{stamp}'", ct);
+#pragma warning restore EF1002
+                await transaction.CommitAsync(ct);
+
+                if (exists)
+                    logger.LogInformation("Re-created materialized view {ViewName}: its script changed since it was installed.", viewName);
+                else
+                    logger.LogInformation("Created missing materialized view {ViewName}.", viewName);
             }
         }
         finally
@@ -98,6 +130,19 @@ public static class SuggestionPatternViewInstaller
                      ?? db.Model.GetDefaultSchema();
 
         return schema is null ? viewName : $"{schema}.{viewName}";
+    }
+
+    /// <summary>
+    /// The marker written to the view's <c>COMMENT</c>: a hash of the script that created it.
+    /// </summary>
+    /// <remarks>
+    /// Line endings are normalised first, so a Windows checkout (CRLF) and a Linux build (LF) of the same
+    /// script stamp alike, and a deploy built on the other one does not rebuild every view for nothing.
+    /// </remarks>
+    internal static string StampOf(string sql)
+    {
+        var normalised = sql.Replace("\r\n", "\n");
+        return $"sqlScripts sha256:{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(normalised)))}";
     }
 
     // "AdhdTimeOrganizer.infrastructure.persistence.sqlScripts.mv_x_pattern.sql" -> "mv_x_pattern"

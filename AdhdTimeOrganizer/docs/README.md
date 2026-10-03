@@ -31,8 +31,10 @@ See [`../../docs/setup.md`](../../docs/setup.md) for the general setup. Portal-s
   submodule. `dotnet ef database update` from this project.
 - **Materialized views are not migrations.** The three suggestion-pattern views in
   `infrastructure/persistence/sqlScripts/` are installed at boot by `SuggestionPatternViewInstaller`
-  (embedded resources, created only when `to_regclass` says they are missing). Without them any save
-  touching `PlannerTask` / `ActivityHistory` / `Calendar` fails with 42P01.
+  (embedded resources). A missing view is created; an existing one is dropped and re-created when its
+  `COMMENT` stamp — a hash of the script — no longer matches, so **editing a script needs a restart,
+  not a migration**. Without them any save touching `PlannerTask` / `ActivityHistory` / `Calendar`
+  fails with 42P01.
 - **Nothing seeds on startup.** All four passes in `Program.SeedDatabase` are commented out; seeding
   is run deliberately. Dev passes truncate — never run them outside a dev environment.
 - **Culture defaults to `sk-SK`** (supported: `sk-SK`, `en-US`).

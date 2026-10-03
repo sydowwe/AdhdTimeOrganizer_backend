@@ -18,8 +18,9 @@ which is a foreign copy). Quick reference:
   `SuggestionPatternRefreshInterceptor` fails with 42P01 on any save touching `PlannerTask`,
   `ActivityHistory` or `Calendar`. Add new scripts to that folder and they are picked up. The running
   app gets the same views from `SuggestionPatternViewInstaller` (called from `Program.cs` just before
-  `SeedDatabase`), which reads them as **embedded resources** and creates only the ones `to_regclass`
-  says are missing — the two paths read the same three files, so a new script is installed both places.
+  `SeedDatabase`), which reads them as **embedded resources**, creates the missing ones and re-creates
+  any whose `COMMENT` stamp (a hash of the script) no longer matches — the two paths read the same
+  three files, so a new or edited script is installed both places.
 - Test bases get HTTP clients via `CreateClient()` (Admin+User), `CreateAdminRoleClient()`,
   `CreateUserRoleClient()`, `CreateRootRoleClient()`, `CreateUnauthenticatedClient()`. For different
   test users, `CreateFactory(roles, userId)` — caller disposes. `CreateDbContext()` for
