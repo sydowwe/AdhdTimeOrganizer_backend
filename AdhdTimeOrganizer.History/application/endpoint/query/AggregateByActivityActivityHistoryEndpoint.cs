@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.History.application.dashboard;
 using AdhdTimeOrganizer.History.application.dto.request.history;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
@@ -41,7 +42,7 @@ public class AggregateByActivityActivityHistoryEndpoint(DbContext db)
         // needs are projected, so the transfer is a pair of ints per row rather than whole entities.
         var rows = await db.Set<ActivityHistory>()
             .Where(ah => ah.UserId == userId && activityIds.Contains(ah.ActivityId))
-            .Select(ah => new { ah.ActivityId, ah.Length })
+            .Select(ah => new { ah.ActivityId, ah.Length, ah.SessionId })
             .ToListAsync(ct);
 
         var aggregates = rows
@@ -50,7 +51,9 @@ public class AggregateByActivityActivityHistoryEndpoint(DbContext db)
             {
                 ActivityId = g.Key,
                 TotalSeconds = g.Sum(r => (long)r.Length.TotalSeconds),
-                EntryCount = g.Count()
+                // Sittings, not rows: the client divides TotalSeconds by this for "you usually take", and a
+                // four-period Pomodoro counted as four entries would quarter it. See HistorySittings.
+                EntryCount = g.CountSittings(r => r.SessionId)
             })
             .OrderByDescending(a => a.TotalSeconds)
             .ToList();

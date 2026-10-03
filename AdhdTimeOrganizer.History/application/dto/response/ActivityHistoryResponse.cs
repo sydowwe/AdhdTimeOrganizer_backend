@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.application.dto.response.extendable;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using Sydowwe.Framework.application.dto.response;
 using Sydowwe.Framework.domain.valueObject;
 
@@ -11,6 +12,12 @@ public record ActivityHistoryResponse : WithActivityResponse, IProjectionRespons
     public required DateTime StartTimestamp { get; init; }
     public required IntTime Length { get; init; }
     public required DateTime EndTimestamp { get; init; }
+
+    /// <summary>Null for a row outside a session and for a countdown's single row.</summary>
+    public TimerSessionPhase? Phase { get; init; }
+
+    /// <summary>Null for every row written outside a session — including all rows written before sessions existed.</summary>
+    public ActivityHistorySessionResponse? Session { get; init; }
 
     public static IQueryable<ActivityHistoryResponse> Projection(IQueryable<ActivityHistory> query)
     {
@@ -36,7 +43,20 @@ public record ActivityHistoryResponse : WithActivityResponse, IProjectionRespons
             },
             StartTimestamp = e.StartTimestamp,
             Length = e.Length,
-            EndTimestamp = e.EndTimestamp
+            EndTimestamp = e.EndTimestamp,
+            Phase = e.Phase,
+            // An optional navigation, so the session's own user filter can only blank it, never drop the row —
+            // and it is always the caller's own anyway, since it was written in the same request as its rows.
+            Session = e.Session == null
+                ? null
+                : new ActivityHistorySessionResponse
+                {
+                    Id = e.Session.Id,
+                    Kind = e.Session.Kind,
+                    Outcome = e.Session.Outcome,
+                    PlannedFocusPeriods = e.Session.PlannedFocusPeriods,
+                    CompletedFocusPeriods = e.Session.CompletedFocusPeriods
+                }
         });
     }
 }

@@ -29,8 +29,13 @@ public sealed class ActivityHistoryTimeAttributionSink : IActivityTimeAttributio
         // A heartbeat window that starts exactly where an existing record ends is the same stretch of
         // activity seen across two heartbeats — extend it rather than emitting a second row, or the
         // ledger fragments into one row per heartbeat interval.
+        //
+        // Never a timer session's row, though: that row is what the timer measured, and its session's outcome
+        // describes it. Growing the last focus phase of a Pomodoro past its own length would make the row
+        // contradict the session it belongs to — the tracked stretch becomes its own row after it instead.
         var existing = await db.Set<ActivityHistory>()
-            .Where(h => h.UserId == userId && h.ActivityId == activityId && h.EndTimestamp == windowStart)
+            .Where(h => h.UserId == userId && h.ActivityId == activityId && h.EndTimestamp == windowStart
+                        && h.SessionId == null)
             .FirstOrDefaultAsync(ct);
 
         if (existing != null)

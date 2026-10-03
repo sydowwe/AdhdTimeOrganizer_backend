@@ -9,7 +9,7 @@ the timer-boundary alarms.
 
 ## Bounded context
 
-Owns: `ActivityHistory` + its EF configuration, 13 endpoints, the history request/response/filter
+Owns: `ActivityHistory` and `ActivityHistorySession` + their EF configurations, 14 endpoints, the history request/response/filter
 DTOs, `ActivityHistoryValidator`, the four `summary/` range validators
 (`HistorySummaryDateRangeValidators.cs` — one concrete class per request type, because FastEndpoints
 resolves validators by exact type and skips validation silently without one), and the dev
@@ -48,10 +48,36 @@ Two rules, both load-bearing:
   the transaction, which is what keeps a tracked entry atomic with its attribution.
 - The contiguous-window extension rule (extend an existing row whose `EndTimestamp` equals the new
   window's start, rather than inserting) is a property of the **ledger's shape**, which is why it
-  belongs here and not in the ingest endpoint it moved out of.
+  belongs here and not in the ingest endpoint it moved out of. It **skips timer-session rows**: growing
+  a Pomodoro's last focus phase would make the row contradict its own session's outcome.
 
 Unlike `IActivityMembershipSource` this is resolved as a **single** service, deliberately: a missing
 registration throws at endpoint activation rather than silently dropping every attribution write.
+
+## Timer sessions (B3)
+
+A finished Pomodoro or countdown is written through `POST /activity-history/session` as one
+`ActivityHistorySession` plus one `ActivityHistory` row per phase that ran, each at its real start, in one
+transaction. Before this, a Pomodoro was two summed rows both dated at Start — overlapping on the timeline
+and written by two independent requests. The session carries what the rows cannot: how it ended
+(`Completed` / `StoppedEarly` / `RanOutWhileAway`) and "stopped after N of M" focus periods, stored as the
+client observed them. Rows carry `SessionId` and `Phase`; `ActivityHistoryResponse` repeats the session on
+each of its rows so the timeline groups without a second request.
+
+What is load-bearing:
+
+- **Every "how many entries" count goes through `HistorySittings.CountSittings`.** Splitting a Pomodoro
+  into rows would otherwise multiply `entryCount`, the pie's `entries`/`totalEntries` and the calendar's
+  `sessionCount` — plausible numbers, all wrong. See `domain-map.md` → *Entry counts are sittings*.
+- **The session is not a second record of time.** Outcome and counts are never recomputed from rows,
+  row edits never touch them, and the FK is `SET NULL` so time survives if a session ever goes.
+- **The row delete removes the session with its last row**, in the same save.
+- **Embedded timers stay single linked rows** through `POST /activity-history`; the session request has no
+  to-do link. The stopwatch is not a session.
+
+⚠ **`planning.mv_activity_history_pattern` still counts rows** (`HAVING COUNT(*) >= 3`), so three focus
+phases of one Pomodoro can make a weekday pattern out of a single sitting. It is a hand-installed view in the
+host, outside this slice's counts; changing it needs a view migration.
 
 ## Timer-boundary alarms
 

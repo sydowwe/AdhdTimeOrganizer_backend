@@ -4,8 +4,9 @@ Navigation index for the slice. Open only what you need.
 
 ## Entities
 
-Two entities, two tables, both in the **`history`** schema (`ModuleSchemas.History`). `ActivityHistory`
-is the ledger; `TimerBoundaryAlarm` is short-lived scheduling state that self-drains.
+Three entities, three tables, all in the **`history`** schema (`ModuleSchemas.History`). `ActivityHistory`
+is the ledger; `ActivityHistorySession` groups the rows one timer sitting wrote; `TimerBoundaryAlarm` is
+short-lived scheduling state that self-drains.
 
 ```
 ActivityHistory : BaseEntityWithActivity (→ BaseEntityWithUser → BaseTableEntity)
@@ -16,6 +17,8 @@ ActivityHistory : BaseEntityWithActivity (→ BaseEntityWithUser → BaseTableEn
   Length         IntTime   NOT NULL  (int seconds via IntTimeConverter)
   TodoListItemId    long?  NULL, FK → todo_list_item, SET NULL     (declared host-side)
   RoutineTodoListId long?  NULL, FK → routine_todo_list, SET NULL  (declared host-side)
+  SessionId         long?  NULL, FK → activity_history_session, SET NULL
+  Phase             TimerSessionPhase?  NULL  (string: Focus / ShortBreak / LongBreak)
 ```
 
 `domain/model/entity/ActivityHistory.cs` ·
@@ -39,10 +42,42 @@ that time was spent on it.
   the scan filters on.
 - `(TodoListItemId)` / `(RoutineTodoListId)` — Postgres does not index a FK for you, and `SET NULL`
   has to find these rows on every task delete. The daily recap reads through the first one too.
+- `(SessionId)` — same FK reason, plus the row delete's "was that the session's last row" probe.
 
 **No inverse collections.** Neither `User.ActivityHistoryList` nor `Activity.ActivityHistoryList`
 exists any more — they were removed so Core stops pointing into the slices. Query
 `dbContext.Set<ActivityHistory>().Where(h => h.ActivityId == …)` instead.
+
+### ActivityHistorySession
+
+```
+ActivityHistorySession : BaseEntityWithUser (→ BaseTableEntity)
+  UserId                long   NOT NULL, FK → user, cascade
+  Kind                  TimerSessionKind     NOT NULL  (string: Pomodoro / Timer)
+  Outcome               TimerSessionOutcome  NOT NULL  (string: Completed / StoppedEarly / RanOutWhileAway)
+  PlannedFocusPeriods   int?  NULL   — both set for a Pomodoro, both null for a Timer
+  CompletedFocusPeriods int?  NULL   — never more than planned
+  Records               → ActivityHistory (inverse of SessionId)
+```
+
+`domain/model/entity/ActivityHistorySession.cs` ·
+`infrastructure/persistence/configuration/ActivityHistorySessionConfiguration.cs` (the FK itself is on
+`ActivityHistoryConfiguration`) · enums in `domain/model/enum/TimerSession.cs`
+
+One sitting with one timer: a Pomodoro writes one row per phase that ran, a countdown exactly one. The
+stopwatch, manual entries, tracking and embedded timers write no session — their rows have
+`SessionId = null`, as does every row written before sessions existed, and every reader treats a null as a
+session of one.
+
+- **Outcome and counts are stored as told, never derived.** A focus period cut short by Stop and one that
+  ran its length look the same once rounded to whole minutes. Editing a row leaves them alone.
+- **Lifetime follows the rows.** Created with its rows in one `SaveChanges`; deleted by
+  `DeleteActivityHistoryEndpoint` in the same save as its last row; cascaded with the account. Reads reach a
+  session only through a row, so an empty one never appears. The one leak is a hard delete of an activity,
+  which cascades the rows in the database and leaves the session behind — invisible, four columns, gone
+  with the account.
+- **`SET NULL` from row to session**, for the reason the item links use it: rows are the record of time,
+  the session is a grouping over them.
 
 ### TimerBoundaryAlarm
 
@@ -76,11 +111,12 @@ recorded time, so a deleted account's pending alarms go with it rather than surv
 nobody. See `summary.md` → *Timer-boundary alarms* for the design constraints; the entity's own XML
 remarks carry the rest.
 
-## Endpoints (18)
+## Endpoints (19)
 
 | Route | Verb | File |
 |---|---|---|
 | `/activity-history` | POST | `command/CreateActivityHistoryEndpoint` |
+| `/activity-history/session` | POST | `command/CreateActivityHistorySessionEndpoint` |
 | `/activity-history/{id}` | PUT | `command/UpdateActivityHistoryEndpoint` |
 | `/activity-history/{id}` | DELETE | `command/DeleteActivityHistoryEndpoint` |
 | `/activity-history/{id}` | GET | `query/GetByIdActivityHistoryEndpoint` |
@@ -97,6 +133,14 @@ Both timer-alarm routes are POST, including cancel: it takes a session id in a b
 on an unknown session, never a 404** — a partially-registered set is the normal outcome of a tab dying
 mid-flight. `schedule` is idempotent by `sessionId` and drops boundaries already in the past rather
 than firing them immediately.
+
+⚠ **`session` is all-or-nothing and answers every row id.** One graph, one `SaveChanges`, one
+transaction: a refused record — an unowned activity (404 keyed `records[i].activityId`, checked for every
+record before anything is written) or a unique-index collision (409) — leaves nothing behind. It answers
+`201 { sessionId, recordIds }` with `recordIds` in request order. Its validator is stricter than the single
+create in two ways, both deliberate: every `startTimestamp` must carry an offset, and records must be in
+strictly increasing start order (which also keeps two records of one activity off the unique index).
+Overlap under a minute is allowed — whole-minute rounding produces it.
 
 ⚠ **There is no grid route.** `/activity-history/grid` was deleted with `CQ-1` — it applied neither
 paging nor sorting, and nothing in the frontend ever called it (the claim that "the SPA calls it that
@@ -149,6 +193,21 @@ response is well-formed and its numbers add up.
 is the one dashboard that reads another slice's entity. It gets the calendar's days through Core's
 **`ICalendarDayLookup`** seam, never by naming Planning's `Calendar`.
 
+### Entry counts are sittings, not rows
+
+Every count a client reads as "how many times" goes through `HistorySittings.CountSittings`: a session is
+one entry however many rows it wrote, a session-less row is one entry. That covers
+`aggregate-by-activity`'s `entryCount` (the client divides `totalSeconds` by it — rows would quarter a
+four-period Pomodoro's typical time), both pie charts' `entries` / `totals.totalEntries`, and the
+calendar's `sessionCount` (a session crossing the user's midnight counts on each day it has a row, like its
+seconds). On a subset of rows a session counts once if any of its rows are in it — so a Pomodoro whose focus
+and rest land in two pie groups is one entry in each, `Σ items[].entries` can exceed `totalEntries`, and the
+`_other` roll-up counts over its rows rather than summing its groups.
+
+Not counted this way, on purpose: `time-of-day`'s per-hour `entries` (row-hour overlaps, documented as not
+a record count), and the host's account-deletion summary, whose `TrackedSessionCount` is documented as
+`ActivityHistory` rows. The summary cards and both stacked-bars endpoints only sum.
+
 ### `summary/time-of-day` is not group-shaped
 
 It folds the range into **24 hour-of-day buckets** and carries no group at all, so nothing above
@@ -176,12 +235,13 @@ rather than an error (`HistoryTimeOfDayDashboardTests` pins all three on values)
 | `HistoryGrouping` | Helper | The one place a dashboard group is resolved to `(Id, Name, Color)` — `HistoryGroupKey`. Every group-shaped response keys off this | `application/dashboard/HistoryGrouping.cs` |
 | `HistoryPieChartBuilder` | Helper | The whole pie-chart response after the query: grouping, the 1% threshold, the `_other` roll-up, the totals. Both `detail/` and `summary/` pie-chart endpoints call it | `application/dashboard/HistoryPieChartBuilder.cs` |
 | `HistorySummaryCardsBuilder` | Helper | The whole summary-cards response after the queries: top-N cards, baseline comparison, period-over-period total. Both `detail/` and `summary/` summary-cards endpoints call it | `application/dashboard/HistorySummaryCardsBuilder.cs` |
+| `HistorySittings` | Helper | `CountSittings` — the one rule for "how many entries": sessions count once, session-less rows once each. See *Entry counts are sittings, not rows* | `application/dashboard/HistorySittings.cs` |
 | `HistoryBaselineWindow` | Helper | Resolves the request's `HistoryBaseline` to the range the baseline query runs over, plus the `sameWeekday` filter and the day count the average divides by. Both switches are **exhaustive and throw** on an unhandled member — there is no fallback-to-`last7days` arm | `application/dashboard/HistoryBaselineWindow.cs` |
 | `TimerBoundaryAlarmService` | Service | `ReplaceSessionAsync` / cancel-by-session / fire; owns the Scheduler `RunOnceAt` registration. Implements `ITimerBoundaryAlarmService` | `application/service/TimerBoundaryAlarmService.cs` |
 | `ITimerBoundaryAlarmService` | Contract | The service's port, so the endpoints and the registrar depend on the shape rather than the class | `domain/serviceContract/ITimerBoundaryAlarmService.cs` |
 | `TimerBoundaryAlarmJobHandler` | Job handler | Fires one alarm: resolves the activity name, pushes the notification, then **deletes the row** (self-drain). No-op if the row is gone | `application/job/TimerBoundaryAlarmJobHandler.cs` |
 | `TimerBoundaryAlarmRegistrar` | `IHostedService` | Re-registers every pending alarm on boot and drops stale ones. **Not optional** — the Quartz store is in-memory; see `summary.md` | `infrastructure/scheduling/TimerBoundaryAlarmRegistrar.cs` |
-| `ActivityHistoryTimeAttributionSink` | Seam impl | Core's `IActivityTimeAttributionSink`: records N seconds against an activity for Tracking. Mutates the caller's `DbContext`, **never** saves; extends a contiguous window instead of inserting. `TotalSecondsOnDayAsync` bounds the day half-open on **UTC** midnights (`[day 00:00Z, day+1 00:00Z)`), like every other day window in this slice — not the user's local day | `application/seam/ActivityHistoryTimeAttributionSink.cs` |
+| `ActivityHistoryTimeAttributionSink` | Seam impl | Core's `IActivityTimeAttributionSink`: records N seconds against an activity for Tracking. Mutates the caller's `DbContext`, **never** saves; extends a contiguous window instead of inserting — but never a timer-session row, which stays what the timer measured. `TotalSecondsOnDayAsync` bounds the day half-open on **UTC** midnights (`[day 00:00Z, day+1 00:00Z)`), like every other day window in this slice — not the user's local day | `application/seam/ActivityHistoryTimeAttributionSink.cs` |
 | `TodoListItemLoggedTimeSource` | Seam impl | Core's `ITodoListItemLoggedTimeSource` for TodoLists' daily recap. Keys on `TodoListItemId` **alone** | `application/seam/TodoListItemLoggedTimeSource.cs` |
 | `ActivityHistoryActivityReferenceSource` | Seam impl | Core's `IActivityReferenceSource`: reports/repoints this slice's references to an activity for merge and delete | `application/seam/ActivityHistoryActivityReferenceSource.cs` |
 | `ActivityHistoryReferencedIds` | Helper | The create/update ownership check over the three client-supplied ids. Needs the request scope and the principal, which is why it is not in the validator | `application/endpoint/command/ActivityHistoryReferencedIds.cs` |
@@ -190,6 +250,7 @@ rather than an error (`HistoryTimeOfDayDashboardTests` pins all three on values)
 | `HistoryDetailSummaryCardsRequestValidator` | Validator | The only validator on a `detail/` request: `Baseline` must be a defined `HistoryBaseline`. It deliberately does not restate the range rules — the `detail/` requests carry a `DateAndTimeRangeDto` and are otherwise unvalidated | `application/validator/HistoryDetailSummaryCardsRequestValidator.cs` |
 | `CalendarActivityRequestValidator` | Validator | The calendar dashboard's range rules. `CalendarActivityRequest` carries no `DateRangeDto`, so it restates ordered ends, the `MaxCustomRangeDays` span cap and a bounded `TopN` itself | `application/validator/CalendarActivityRequestValidator.cs` |
 | `ActivityHistoryAggregateByActivityValidator` · `ScheduleTimerAlarmsValidator` | Validators | The aggregate request; the alarm batch (relative `Url`, boundary sanity) | `application/validator/` |
+| `CreateActivityHistorySessionValidator` | Validator | The session shape: kind/outcome/count consistency, 1..64 records (exactly one for a Timer), phase present iff Pomodoro, strict start order, offset-carrying starts, B17's positive length per record | `application/validator/CreateActivityHistorySessionValidator.cs` |
 | `ActivityHistorySeeder` | Dev seeder | Per-user dev fixture, Order **300**. Seeds 30 days of history; truncates (dev seeders only) | `infrastructure/persistence/seeder/dev/ActivityHistorySeeder.cs` |
 | `HistoryGroupBy` | Enum | The dashboard grouping dimension (activity / role / category) | `application/dto/enum/HistoryGroupBy.cs` |
 | `HistoryBaseline` | Enum | What a summary card is compared against (`Last7Days` / `Last30Days` / `SameWeekday` / `AllTime`). Was a `string` with a silent fallback; an unknown value is now a 400, not a wrong-but-plausible 200 | `application/dto/enum/HistoryBaseline.cs` |

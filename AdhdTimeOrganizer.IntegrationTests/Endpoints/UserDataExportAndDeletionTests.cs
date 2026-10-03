@@ -6,6 +6,7 @@ using AdhdTimeOrganizer.Core.domain.model.entity.timer;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
@@ -93,13 +94,21 @@ file static class Seed
         var timePeriodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, userId, ct: ct);
         var routineTodoListId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, timePeriodId, userId, ct: ct);
 
+        // Inside a timer session, so the session table is exported and erased along with its row.
+        var historySession = new ActivityHistorySession
+        {
+            UserId = userId,
+            Kind = TimerSessionKind.Timer,
+            Outcome = TimerSessionOutcome.Completed
+        };
         var history = new ActivityHistory
         {
             UserId = userId,
             ActivityId = activityId,
             StartTimestamp = DateTime.UtcNow.AddHours(-1),
             EndTimestamp = DateTime.UtcNow.AddMinutes(-30),
-            Length = new IntTime(0, 30)
+            Length = new IntTime(0, 30),
+            Session = historySession
         };
         db.Set<ActivityHistory>().Add(history);
 
@@ -145,7 +154,7 @@ file static class Seed
 
         return new SeededSliceData(
             activityId, calendarId, plannerTaskId, templateId, todoListId, todoListItemId,
-            routineTodoListId, history.Id, timerPresetId, quietHours.Id);
+            routineTodoListId, history.Id, historySession.Id, timerPresetId, quietHours.Id);
     }
 }
 
@@ -158,6 +167,7 @@ file sealed record SeededSliceData(
     long TodoListItemId,
     long RoutineTodoListId,
     long ActivityHistoryId,
+    long ActivityHistorySessionId,
     long TimerPresetId,
     long QuietHoursId);
 
@@ -205,7 +215,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
 
     /// <summary>
     /// The positive half of the portability guarantee: every section the endpoint hand-picks must actually
-    /// come back populated. Dropping one of the nine DbSet walks in
+    /// come back populated. Dropping one of the ten DbSet walks in
     /// <c>GetUserDataExportEndpoint.HandleAsync</c> compiles, still returns 200, and still passes a
     /// route-only test -- the caller just silently stops receiving a slice of their own data (Art. 15).
     /// </summary>
@@ -235,6 +245,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
 
         var tracking = body.GetProperty("activityTracking");
         AssertContainsId(tracking, "activityHistories", seeded.ActivityHistoryId);
+        AssertContainsId(tracking, "activityHistorySessions", seeded.ActivityHistorySessionId);
         tracking.GetProperty("webTracking").GetArrayLength()
             .Should().BeGreaterThan(0, "the web-extension ledger is part of the export");
         tracking.GetProperty("desktopTracking").GetArrayLength()
@@ -405,10 +416,11 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         Exported.Intersect(KnownGaps).Should().BeEmpty("an entity is either exported or it is not");
     }
 
-    /// <summary>The nine entities <c>GetUserDataExportEndpoint</c> actually reads.</summary>
+    /// <summary>The ten entities <c>GetUserDataExportEndpoint</c> actually reads.</summary>
     private static readonly string[] Exported =
     [
         nameof(ActivityHistory),
+        nameof(ActivityHistorySession),
         nameof(Calendar),
         nameof(DesktopActivityEntry),
         nameof(PlannerTask),
@@ -626,6 +638,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
             await AssertNoRowsLeftAsync<RoutineTodoList>(db, userId);
             await AssertNoRowsLeftAsync<RoutineTimePeriod>(db, userId);
             await AssertNoRowsLeftAsync<ActivityHistory>(db, userId);
+            await AssertNoRowsLeftAsync<ActivityHistorySession>(db, userId);
             await AssertNoRowsLeftAsync<WebExtensionActivityEntry>(db, userId);
             await AssertNoRowsLeftAsync<DesktopActivityEntry>(db, userId);
             await AssertNoRowsLeftAsync<TimerPreset>(db, userId);

@@ -17,7 +17,13 @@ public record CalendarActivityDaySummary
     public TimeDto WakeUpTime { get; init; } = null!;
     public TimeDto BedTime { get; init; } = null!;
     public long TotalSeconds { get; init; }
+
+    /// <summary>
+    /// Sittings on this day, not rows: a timer session counts once however many phase rows it wrote, and on each
+    /// day it has a row. See <c>HistorySittings</c>.
+    /// </summary>
     public int SessionCount { get; init; }
+
     public List<CalendarTopRoleItem> TopRoles { get; init; } = [];
 }
 

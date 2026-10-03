@@ -49,6 +49,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<ActivityExpectedCostTier> ActivityExpectedCostTiers { get; set; }
     public DbSet<ActivityExperienceType> ActivityExperienceTypes { get; set; }
     public DbSet<ActivityHistory> ActivityHistories { get; set; }
+    public DbSet<ActivityHistorySession> ActivityHistorySessions { get; set; }
     public DbSet<Calendar> Calendars { get; set; }
     public DbSet<TaskImportance> TaskImportances { get; set; }
     public DbSet<PlannerTask> PlannerTasks { get; set; }

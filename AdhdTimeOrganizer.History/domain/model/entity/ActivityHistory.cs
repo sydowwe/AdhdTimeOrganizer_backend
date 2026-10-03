@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using Sydowwe.Framework.domain.valueObject;
 
 namespace AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
@@ -36,4 +37,16 @@ public class ActivityHistory : BaseEntityWithActivity
     /// <c>ActivityHistoryValidator</c>.
     /// </summary>
     public long? RoutineTodoListId { get; set; }
+
+    /// <summary>
+    /// The timer sitting this row is one part of, or null — which is every row not written through
+    /// <c>POST /activity-history/session</c>: manual entries, the stopwatch, tracking, embedded timers, and
+    /// everything written before sessions existed. Readers treat a null as a session of one.
+    /// </summary>
+    public long? SessionId { get; set; }
+
+    public ActivityHistorySession? Session { get; set; }
+
+    /// <summary>Which Pomodoro phase this row is; null for a countdown row and for rows outside a session.</summary>
+    public TimerSessionPhase? Phase { get; set; }
 }

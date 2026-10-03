@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.History.application.dashboard;
 using AdhdTimeOrganizer.History.application.dto.request.calendar;
 using AdhdTimeOrganizer.History.application.dto.response.calendar;
 using AdhdTimeOrganizer.History.application.service;
@@ -68,7 +69,9 @@ public class CalendarActivityEndpoint(DbContext db, ICalendarDayLookup calendarD
             var dayHistories = historiesByDate.GetValueOrDefault(c.Date, []);
 
             var totalSeconds = dayHistories.Sum(ah => (long)ah.Length.TotalSeconds);
-            var sessionCount = dayHistories.Count;
+            // Sittings, not rows — one Pomodoro morning is one session, not fifteen. A session crossing the
+            // user's midnight counts on each day it has a row, the same way its seconds already land.
+            var sessionCount = dayHistories.CountSittings();
 
             // Grouped by role id, not by the ActivityRole instance: two roles are the same group only when
             // they are the same row, and the frontend needs that id to key the day's roles by.

@@ -40,20 +40,23 @@ public static class HistoryPieChartBuilder
     public static HistoryPieChartResponse Build(
         IReadOnlyCollection<ActivityHistory> records, HistoryGroupBy groupBy, int maxItems)
     {
+        // Each group keeps its rows so the _other roll-up can count sittings over them, not sum the groups'.
+        // Entries are sittings, not rows — see HistorySittings for why, and for why a session split across
+        // two groups counts once in each.
         var allGroups = records
             .GroupBy(ah => ah.ResolveGroupKey(groupBy))
-            .Select(g => new HistoryPieChartItem
+            .Select(g => (Item: new HistoryPieChartItem
             {
                 GroupId = g.Key.Id,
                 Name = g.Key.Name,
                 TotalSeconds = g.Sum(ah => ah.Length.TotalSeconds),
                 Color = g.Key.Color,
-                Entries = g.Count()
-            })
-            .OrderByDescending(i => i.TotalSeconds)
+                Entries = g.CountSittings()
+            }, Rows: g))
+            .OrderByDescending(g => g.Item.TotalSeconds)
             .ToList();
 
-        var grandTotal = allGroups.Sum(i => i.TotalSeconds);
+        var grandTotal = allGroups.Sum(g => g.Item.TotalSeconds);
         var cap = maxItems > 0 ? maxItems : DefaultMaxItems;
 
         var items = new List<HistoryPieChartItem>();
@@ -62,25 +65,26 @@ public static class HistoryPieChartBuilder
         {
             var threshold = grandTotal * MinPercentThreshold / 100.0;
 
-            var aboveThreshold = allGroups.Where(i => i.TotalSeconds >= threshold).ToList();
-            var belowThreshold = allGroups.Where(i => i.TotalSeconds < threshold).ToList();
+            var aboveThreshold = allGroups.Where(g => g.Item.TotalSeconds >= threshold).ToList();
+            var belowThreshold = allGroups.Where(g => g.Item.TotalSeconds < threshold).ToList();
 
             // Take at most (cap - 1) items above threshold to leave room for "other"
-            items = aboveThreshold.Take(cap - 1).ToList();
+            items = aboveThreshold.Take(cap - 1).Select(g => g.Item).ToList();
 
             // Everything that didn't make the final list: the above-threshold tail cut by the cap, then
             // all of the below-threshold groups.
-            var remainingItems = aboveThreshold.Skip(cap - 1).Concat(belowThreshold).ToList();
+            var remaining = aboveThreshold.Skip(cap - 1).Concat(belowThreshold).ToList();
 
-            if (remainingItems.Count > 0)
+            if (remaining.Count > 0)
                 items.Add(new HistoryPieChartItem
                 {
                     // A roll-up of many groups, so it is no single entity: null id, keyed by name.
                     GroupId = null,
                     Name = OtherName,
-                    TotalSeconds = remainingItems.Sum(i => i.TotalSeconds),
+                    TotalSeconds = remaining.Sum(g => g.Item.TotalSeconds),
                     Color = OtherColor,
-                    Entries = remainingItems.Sum(i => i.Entries)
+                    // Counted over the rolled-up rows, so a session spanning two tail groups is one entry here.
+                    Entries = remaining.SelectMany(g => g.Rows).CountSittings()
                 });
         }
 
@@ -90,7 +94,7 @@ public static class HistoryPieChartBuilder
             Totals = new HistoryPieTotals
             {
                 TotalSeconds = grandTotal,
-                TotalEntries = records.Count,
+                TotalEntries = records.CountSittings(),
                 UniqueGroups = allGroups.Count
             }
         };

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
@@ -90,7 +91,21 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
         var activityHistories = await dbContext.ActivityHistories
             .AsNoTracking()
             .Where(a => a.UserId == userId)
-            .Select(a => new { a.Id, a.StartTimestamp, a.Length, a.EndTimestamp, a.CreatedTimestamp })
+            .Select(a => new { a.Id, a.StartTimestamp, a.Length, a.EndTimestamp, a.SessionId, a.Phase, a.CreatedTimestamp })
+            .ToListAsync(ct);
+
+        var activityHistorySessions = await dbContext.ActivityHistorySessions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .Select(s => new
+            {
+                s.Id,
+                s.Kind,
+                s.Outcome,
+                s.PlannedFocusPeriods,
+                s.CompletedFocusPeriods,
+                s.CreatedTimestamp
+            })
             .ToListAsync(ct);
 
         var webTracking = await dbContext.WebExtensionActivityEntries
@@ -135,13 +150,15 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
             routineTodoLists,
             templates,
             calendars,
-            activityTracking = new { activityHistories, webTracking, desktopTracking }
+            activityTracking = new { activityHistories, activityHistorySessions, webTracking, desktopTracking }
         };
 
         var json = JsonSerializer.Serialize(export, new JsonSerializerOptions
         {
             WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            // A portable export names a session's kind and outcome, not an ordinal only this codebase can read.
+            Converters = { new JsonStringEnumConverter() }
         });
 
         // WallClockZone.FromUtc, not DateTime.UtcNow: a user east of Greenwich taking an export late in the

@@ -34,5 +34,21 @@ public class ActivityHistoryConfiguration : IEntityTypeConfiguration<ActivityHis
         // daily recap reads through the first one too (item ids IN (…), then user + day).
         builder.HasIndex(a => a.TodoListItemId);
         builder.HasIndex(a => a.RoutineTodoListId);
+
+        // SetNull, not Cascade — the same call as the two item links: rows are the source of truth for
+        // recorded time, and a session is only a grouping over them. Nothing deletes a session that still has
+        // rows today (the row delete removes it only once empty, the account delete cascades both), but if
+        // anything ever does, the time survives as session-less rows, which is what every pre-session row
+        // already is. Pinned name for the reason every cross-assembly-order FK here is pinned.
+        builder.HasOne(a => a.Session)
+            .WithMany(s => s.Records)
+            .HasForeignKey(a => a.SessionId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_activity_history_activity_history_session_session_id");
+
+        // Also serves the row delete's "was that the session's last row" probe.
+        builder.HasIndex(a => a.SessionId);
+
+        builder.EnumColumn(a => a.Phase).HasMaxLength(20);
     }
 }

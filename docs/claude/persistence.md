@@ -91,7 +91,7 @@ Every module's tables live in their own Postgres schema. `public` holds almost n
 | `user` | `user`, `refresh_token`, `AspNetRoles`, and the five Identity satellites |
 | `activity` | `activity`, `activity_category`, `activity_role` |
 | `todo` | `AdhdTimeOrganizer.TodoLists` (4) |
-| `history` | `AdhdTimeOrganizer.History` (1) |
+| `history` | `AdhdTimeOrganizer.History` (3) |
 | `planning` | `AdhdTimeOrganizer.Planning` (8) **and the three `mv_*` materialized views** |
 | `routines` | `AdhdTimeOrganizer.Routines` (4) |
 | `tracking` | `AdhdTimeOrganizer.Tracking` (5, two partitioned) |
