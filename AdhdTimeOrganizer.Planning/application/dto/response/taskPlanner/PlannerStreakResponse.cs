@@ -1,3 +1,5 @@
+using AdhdTimeOrganizer.Planning.domain.service;
+
 namespace AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 
 /// <summary>
@@ -26,6 +28,15 @@ public record PlannerStreakResponse
     /// showing 4/5 on the ring can still be complete. Read this rather than comparing counts.
     /// </summary>
     public required bool IsTodayComplete { get; init; }
+
+    /// <summary>
+    /// What today does to the streak so far, which <see cref="IsTodayComplete"/> folds into one <c>false</c>:
+    /// <c>Incomplete</c> means today still has to be earned and will break the run at midnight if it is not,
+    /// while <c>Empty</c> means nothing planned today counts (no tasks, or only optional, background or skipped
+    /// ones), so the run neither grows nor breaks. Same rule as <see cref="IsTodayComplete"/>, about the real
+    /// today regardless of the date requested.
+    /// </summary>
+    public required PlannerStreakService.PlannerDayOutcome TodayOutcome { get; init; }
 
     /// <summary>
     /// The date the server treated as "today", and <see cref="Timezone"/> is the zone it used to get there —

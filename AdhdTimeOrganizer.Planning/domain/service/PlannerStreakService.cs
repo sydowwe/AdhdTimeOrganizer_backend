@@ -50,8 +50,14 @@ public static class PlannerStreakService
         Incomplete
     }
 
-    /// <summary>The three numbers the flame chip needs, plus the day they were computed against.</summary>
-    public readonly record struct PlannerStreakSnapshot(int CurrentStreak, int BestStreak, bool IsTodayComplete);
+    /// <summary>
+    /// The numbers the flame chip needs. <paramref name="TodayOutcome"/> is today's <see cref="Evaluate"/> result,
+    /// <see cref="PlannerDayOutcome.Empty"/> when today has no tally at all.
+    /// </summary>
+    public readonly record struct PlannerStreakSnapshot(int CurrentStreak, int BestStreak, PlannerDayOutcome TodayOutcome)
+    {
+        public bool IsTodayComplete => TodayOutcome == PlannerDayOutcome.Complete;
+    }
 
     /// <summary>
     /// What a single day does to the streak. Four product decisions are encoded here, all four settled
@@ -117,7 +123,7 @@ public static class PlannerStreakService
     {
         var current = 0;
         var best = 0;
-        var isTodayComplete = false;
+        var todayOutcome = PlannerDayOutcome.Empty;
 
         foreach (var tally in tallies.Where(t => t.Date <= today).OrderBy(t => t.Date))
         {
@@ -125,7 +131,7 @@ public static class PlannerStreakService
             var isToday = tally.Date == today;
 
             if (isToday)
-                isTodayComplete = outcome == PlannerDayOutcome.Complete;
+                todayOutcome = outcome;
 
             switch (outcome)
             {
@@ -147,6 +153,6 @@ public static class PlannerStreakService
             }
         }
 
-        return new PlannerStreakSnapshot(current, best, isTodayComplete);
+        return new PlannerStreakSnapshot(current, best, todayOutcome);
     }
 }

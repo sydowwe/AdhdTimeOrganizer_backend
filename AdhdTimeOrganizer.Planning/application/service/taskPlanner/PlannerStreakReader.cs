@@ -61,6 +61,7 @@ public class PlannerStreakReader(DbContext dbContext) : IPlannerStreakReader, IS
             CurrentStreak = snapshot.CurrentStreak,
             BestStreak = snapshot.BestStreak,
             IsTodayComplete = snapshot.IsTodayComplete,
+            TodayOutcome = snapshot.TodayOutcome,
             Today = today,
             Timezone = timezone.Id
         };

@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.service;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.domain.@enum;
@@ -50,6 +51,7 @@ public class PlannerStreakTests(AppDbContextFixture fixture) : PostgresTestBase(
         streak.CurrentStreak.Should().Be(3);
         streak.BestStreak.Should().Be(3);
         streak.IsTodayComplete.Should().BeTrue();
+        streak.TodayOutcome.Should().Be(PlannerStreakService.PlannerDayOutcome.Complete);
         streak.Today.Should().Be(today);
         streak.Timezone.Should().NotBeNullOrWhiteSpace("the server must say which day boundary it used");
     }
@@ -92,6 +94,8 @@ public class PlannerStreakTests(AppDbContextFixture fixture) : PostgresTestBase(
 
         streak.CurrentStreak.Should().Be(1, "yesterday still counts; an all-skipped today adds nothing");
         streak.IsTodayComplete.Should().BeFalse();
+        streak.TodayOutcome.Should().Be(PlannerStreakService.PlannerDayOutcome.Empty,
+            "an all-skipped today has nothing left to earn, which the client must not read as 'still to do'");
     }
 
     /// <summary>
@@ -186,6 +190,26 @@ public class PlannerStreakTests(AppDbContextFixture fixture) : PostgresTestBase(
 
         streak.CurrentStreak.Should().Be(1);
         streak.IsTodayComplete.Should().BeFalse();
+        streak.TodayOutcome.Should().Be(PlannerStreakService.PlannerDayOutcome.Incomplete);
+    }
+
+    /// <summary>
+    /// Nothing planned today: the run is safe, and <c>TodayOutcome</c> says so rather than folding into the
+    /// same <c>false</c> as an unfinished day.
+    /// </summary>
+    [Fact]
+    public async Task Streak_WithNothingPlannedToday_ReportsTodayAsEmpty()
+    {
+        var activityId = await SeedActivityAsync("streak-today-empty");
+        var today = await ServerTodayAsync();
+
+        await SeedTaskAsync(activityId, today.AddDays(-1), PlannerTaskStatus.Completed);
+        await SeedTaskAsync(activityId, today, PlannerTaskStatus.NotStarted, isBackground: true);
+
+        var streak = await GetStreakAsync(today);
+
+        streak.CurrentStreak.Should().Be(1);
+        streak.TodayOutcome.Should().Be(PlannerStreakService.PlannerDayOutcome.Empty);
     }
 
     /// <summary>
