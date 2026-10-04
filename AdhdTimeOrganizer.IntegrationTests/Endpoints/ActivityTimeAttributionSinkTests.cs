@@ -32,8 +32,8 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 ///
 /// <para><b>On <c>CQ-5</c>.</b> The finding is fixed (commit <c>e624797</c>): the day is now bounded
 /// half-open on UTC-kinded midnights. The two tests that would have caught it —
-/// <see cref="TotalSecondsOnDayAsync_SumsOnlyThatActivityOnThatUtcDay"/> and
-/// <see cref="TotalSecondsOnDayAsync_CountsTheFinalMicrosecondOfTheDay"/> — are kept as regressions, and they
+/// <see cref="TotalSecondsBetweenAsync_SumsOnlyThatActivityOnThatUtcDay"/> and
+/// <see cref="TotalSecondsBetweenAsync_IsHalfOpenOnTheUpperBound"/> — are kept as regressions, and they
 /// are load-bearing again: the harness used to enable <c>Npgsql.EnableLegacyTimestampBehavior</c>, which
 /// made every kind bug invisible to a round trip (<c>INFRA-1</c>), and the submodule has since dropped
 /// that switch. A round trip here now fails on an <c>Unspecified</c> bound exactly as production would.</para>
@@ -50,6 +50,12 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
     /// <summary>Pinned rather than derived from <c>UtcNow</c>: a run crossing UTC midnight would otherwise
     /// seed one day and query another (a flakiness risk `01-testing.md` calls out for this slice).</summary>
     private static readonly DateOnly Day = new(2026, 3, 1);
+
+    /// <summary>The UTC day the totals below are read over. The sink takes instants since bugs-to-investigate
+    /// #1 — whose day it is belongs to the caller — so a UTC day is just one range among many.</summary>
+    private static readonly DateTime DayStart = Day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+    private static readonly DateTime DayEnd = DayStart.AddDays(1);
 
     private static readonly DateTime TenAm = new(2026, 3, 1, 10, 0, 0, DateTimeKind.Utc);
 
@@ -151,7 +157,7 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
         rows[1].StartTimestamp.Should().Be(TenAm.AddSeconds(360));
     }
 
-    // ---- TotalSecondsOnDayAsync ------------------------------------------------------------------
+    // ---- TotalSecondsBetweenAsync ------------------------------------------------------------------
 
     /// <summary>
     /// Sums one activity on one UTC day and nothing else — proving the day filter and the activity filter
@@ -165,7 +171,7 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
     /// timestamp switch — that switch is gone, so it can now.</para>
     /// </summary>
     [Fact]
-    public async Task TotalSecondsOnDayAsync_SumsOnlyThatActivityOnThatUtcDay()
+    public async Task TotalSecondsBetweenAsync_SumsOnlyThatActivityOnThatUtcDay()
     {
         await using var db = CreateDbContext();
         var activityId = await SeedActivityAsync(db, UserId);
@@ -177,7 +183,7 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
         await SeedHistoryAsync(db, UserId, activityId, TenAm.AddDays(1), 900);
         await SeedHistoryAsync(db, UserId, otherActivityId, TenAm.AddMinutes(30), 1200);
 
-        var total = await Sink.TotalSecondsOnDayAsync(db, UserId, activityId, Day, CancellationToken);
+        var total = await Sink.TotalSecondsBetweenAsync(db, UserId, activityId, DayStart, DayEnd, CancellationToken);
 
         total.Should().Be(540,
             "only the three rows for this activity on this UTC day count -- the next day's 900s and the " +
@@ -185,33 +191,48 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
     }
 
     /// <summary>
-    /// The day is bounded <b>half-open</b> — <c>[day 00:00Z, day+1 00:00Z)</c> — so the last representable
-    /// instant of the day is counted and the next day's midnight is not (<c>CQ-5</c> item 2; the predicate
-    /// was closed on <c>TimeOnly.MaxValue</c> and dropped whatever landed in the final tick).
-    ///
-    /// <para>The boundary row sits at <c>23:59:59.999999Z</c>, the last <i>microsecond</i> rather than the
-    /// last 100ns tick: Postgres stores <c>timestamptz</c> at microsecond resolution, so
-    /// <c>TimeOnly.MaxValue</c>'s <c>.9999999</c> is not representable and rounding it would move the row
-    /// off the day it is meant to probe.</para>
+    /// The range is <b>half-open</b> — <c>[from, to)</c>: a record ending exactly on the upper bound is wholly
+    /// inside, and one starting on it is wholly outside (<c>CQ-5</c> item 2; the predicate was once closed on
+    /// <c>TimeOnly.MaxValue</c> and dropped whatever landed in the final tick).
+    /// <para>
+    /// This used to seed a record starting in the day's last microsecond and running five minutes past midnight,
+    /// and expect all five minutes on the day. Since records count by overlap those minutes belong to the next
+    /// day, so the boundary is now probed by a record that <i>ends</i> on it.
+    /// </para>
     /// </summary>
     [Fact]
-    public async Task TotalSecondsOnDayAsync_CountsTheFinalMicrosecondOfTheDay()
+    public async Task TotalSecondsBetweenAsync_IsHalfOpenOnTheUpperBound()
     {
         await using var db = CreateDbContext();
         var activityId = await SeedActivityAsync(db, UserId);
 
-        var lastMicrosecond = Day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)
-            .AddDays(1)
-            .AddTicks(-10);
-        var nextMidnight = Day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1);
+        await SeedHistoryAsync(db, UserId, activityId, DayEnd.AddSeconds(-300), 300);
+        await SeedHistoryAsync(db, UserId, activityId, DayEnd, 600);
 
-        await SeedHistoryAsync(db, UserId, activityId, lastMicrosecond, 300);
-        await SeedHistoryAsync(db, UserId, activityId, nextMidnight, 600);
-
-        var total = await Sink.TotalSecondsOnDayAsync(db, UserId, activityId, Day, CancellationToken);
+        var total = await Sink.TotalSecondsBetweenAsync(db, UserId, activityId, DayStart, DayEnd, CancellationToken);
 
         total.Should().Be(300,
-            "the range is half-open: the day's last instant is inside it and the next day's midnight is not");
+            "a record ending on the upper bound is inside the range, and one starting on it is not");
+    }
+
+    /// <summary>
+    /// A record straddling a bound counts pro rata. <c>AttributeAsync</c> grows one record across contiguous
+    /// heartbeats, so an hour and a half of unbroken work is a single 09:00–10:30 record; asked for "since
+    /// 09:30" — which is what the completion automation asks once an earlier same-activity block is done — the
+    /// answer is the hour after 09:30, not zero (a start-only predicate) and not the whole 90 minutes.
+    /// </summary>
+    [Fact]
+    public async Task TotalSecondsBetweenAsync_CountsOnlyThePartOfAStraddlingRecordInsideTheRange()
+    {
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, UserId);
+        var nineAm = DayStart.AddHours(9);
+
+        await SeedHistoryAsync(db, UserId, activityId, nineAm, 90 * 60);
+
+        var total = await Sink.TotalSecondsBetweenAsync(db, UserId, activityId, nineAm.AddMinutes(30), DayEnd, CancellationToken);
+
+        total.Should().Be(60 * 60);
     }
 
     // ---- edges on AttributeAsync -----------------------------------------------------------------
@@ -242,7 +263,7 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
     /// <b>New finding, pinned not fixed.</b> <c>AttributeAsync</c> guards nothing, so a negative
     /// <c>activeSeconds</c> writes a row whose <c>EndTimestamp</c> precedes its <c>StartTimestamp</c> and
     /// whose <c>Length</c> is negative — a row no dashboard's arithmetic is prepared for, and one that
-    /// subtracts from the day total <c>TotalSecondsOnDayAsync</c> feeds back to the completion automation.
+    /// subtracts from the day total <c>TotalSecondsBetweenAsync</c> feeds back to the completion automation.
     ///
     /// <para><b>Intended behaviour:</b> reject or clamp a negative <c>activeSeconds</c> at the sink.
     /// Not reachable from the desktop heartbeat today — <c>DesktopActivityHeartbeatValidator</c> applies
@@ -299,7 +320,7 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
     /// <c>Hours</c> and <c>Minutes</c>, so <c>new IntTime(seconds)</c> discards the sub-minute remainder.
     /// A 45-second attribution is therefore recorded as <b>zero</b>: the row exists, its
     /// <c>EndTimestamp</c> is honest, and its <c>Length</c> — the field every dashboard and
-    /// <c>TotalSecondsOnDayAsync</c> read — is 0.
+    /// <c>TotalSecondsBetweenAsync</c> read — is 0.
     ///
     /// <para>This is squarely on the live path. <c>DesktopActivityHeartbeatValidator</c> caps a heartbeat at
     /// 60 active seconds <i>across all entries</i>, so any window split over two applications hands the sink
@@ -326,7 +347,7 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
         row.Length.TotalSeconds.Should().Be(0,
             "pinning today's behaviour: IntTime keeps only whole minutes, so 45 seconds becomes zero");
 
-        var total = await Sink.TotalSecondsOnDayAsync(db, UserId, activityId, Day, CancellationToken);
+        var total = await Sink.TotalSecondsBetweenAsync(db, UserId, activityId, DayStart, DayEnd, CancellationToken);
         total.Should().Be(0, "and the day total the completion automation reads is zero too");
     }
 
@@ -365,7 +386,7 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
             "a sub-minute window never ends on the minute boundary the next one starts at, so the " +
             "contiguous-window extension can only ever fire for a full 60 active seconds");
 
-        var total = await Sink.TotalSecondsOnDayAsync(db, UserId, activityId, Day, CancellationToken);
+        var total = await Sink.TotalSecondsBetweenAsync(db, UserId, activityId, DayStart, DayEnd, CancellationToken);
         total.Should().Be(0, "pinning today's behaviour: 90 seconds of tracked activity totals zero");
     }
 
@@ -382,7 +403,7 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
     /// it authenticated, and the sink must not attribute to whoever happens to be ambient.</para>
     /// </summary>
     [Fact]
-    public async Task TotalSecondsOnDayAsync_IsScopedToTheUserIdPassedIn_NotTheAmbientOne()
+    public async Task TotalSecondsBetweenAsync_IsScopedToTheUserIdPassedIn_NotTheAmbientOne()
     {
         await using var db = CreateDbContext();
 
@@ -393,15 +414,15 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
         await Sink.AttributeAsync(db, UserId, activityA, TenAm, 300, CancellationToken);
         await db.SaveChangesAsync(CancellationToken);
 
-        (await Sink.TotalSecondsOnDayAsync(db, userBId, activityB, Day, CancellationToken))
+        (await Sink.TotalSecondsBetweenAsync(db, userBId, activityB, DayStart, DayEnd, CancellationToken))
             .Should().Be(0, "user B has been attributed nothing");
 
         await Sink.AttributeAsync(db, userBId, activityB, TenAm, 600, CancellationToken);
         await db.SaveChangesAsync(CancellationToken);
 
-        (await Sink.TotalSecondsOnDayAsync(db, UserId, activityA, Day, CancellationToken))
+        (await Sink.TotalSecondsBetweenAsync(db, UserId, activityA, DayStart, DayEnd, CancellationToken))
             .Should().Be(300, "attributing to B must not move or grow A's total");
-        (await Sink.TotalSecondsOnDayAsync(db, userBId, activityB, Day, CancellationToken))
+        (await Sink.TotalSecondsBetweenAsync(db, userBId, activityB, DayStart, DayEnd, CancellationToken))
             .Should().Be(600);
     }
 

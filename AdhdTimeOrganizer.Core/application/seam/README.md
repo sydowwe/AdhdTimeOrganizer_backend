@@ -18,6 +18,7 @@ if the two ever drift apart.
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint`; Routines — `RoutineSuggestedTodayJobHandler`, for the day's `WakeUpTime` |
 | `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint` |
+| `ITodoListItemPlanSource` | read | single | Planning | TodoLists — `GetAllTodoListItemEndpoint`, `GetByIdTodoListItemEndpoint`, through `TodoListItemPlannedSlotFiller`, for `NextPlannedSlot` |
 | `IUserOwnedReferenceVerifier` | read | keyed `IEnumerable<>` | TodoLists (`todoListItem`), Routines (`routineTodoList`) | History — `Create`/`UpdateActivityHistoryEndpoint`; Planning — `Create`/`UpdatePlannerTaskEndpoint` and both apply-template endpoints, for `PlannerTask.TodolistItemId`. Both through Core's `IReferencedIdOwnershipService` |
 
 ## Event seams (`ISeamEvent`)
@@ -114,6 +115,11 @@ None of these break the build, and only one of them throws.
   leisure activity started after the item was done", and that recording carries no item link.
   `TodoListItemDailyRecapTests.RewardTaken_OnlyByARecordingOfThePairedActivity_StartingAfterCompletion`
   guards it. Both methods take the day as UTC instants the caller resolved in the user's zone.
+- **`ITodoListItemPlanSource` fails silently if it answers wrongly.** It is what "this to-do is
+  scheduled" means since the planner stopped stamping `DueDate`; an implementation that dropped the
+  status or the from-date predicate would report every item as scheduled forever (or none ever), and
+  the list's "not scheduled" nudge would go quiet or never clear. `TodoListItemNextPlannedSlotTests`
+  asserts on the returned slots — open blocks only, earliest first, nothing before the user's today.
 - **`IUserOwnedReferenceVerifier` is the one that fails *closed*.** `ReferencedIdOwnershipService`
   looks a verifier up by key and answers `false` when none matches, so a slice dropped from
   `ModuleAssemblies` or a renamed key rejects every write carrying that id instead of waving them all

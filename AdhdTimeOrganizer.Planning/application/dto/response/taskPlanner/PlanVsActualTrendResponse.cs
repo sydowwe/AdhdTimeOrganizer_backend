@@ -50,4 +50,13 @@ public record PlanVsActualTrendResponse
     /// not started, in progress, or on hold.
     /// </summary>
     public required int NeverHappenedCount { get; init; }
+
+    /// <summary>
+    /// How many times tasks first planned for a day in the range were carried over to a later day
+    /// (<c>POST /planner-task/{id}/carry-over</c>) — a task pushed three times counts three. Reported on its own,
+    /// <b>not</b> folded into <see cref="NeverHappenedCount"/>: a carried task left its day, so that day never
+    /// counted it, and adding it there would count one slip twice. Outside <see cref="TaskCount"/>'s population,
+    /// and not a reason to render the card on its own.
+    /// </summary>
+    public int CarriedOverCount { get; init; }
 }

@@ -49,9 +49,17 @@ public record PlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<PlannerTas
     /// </summary>
     public TimeDto? ActualStartTime { get; init; }
 
+    /// <summary>
+    /// <see cref="PlannerTask.AutoCompleteAtEnd"/>. <b>Create-only</b>, for the same reason as
+    /// <see cref="ActualStartTime"/>: every existing PUT caller omits it, and a full update that read the omission
+    /// as <c>false</c> would quietly stop a rest block from closing itself.
+    /// </summary>
+    public bool AutoCompleteAtEnd { get; init; }
+
     public PlannerTask ToEntity => new()
     {
         ActualStartTime = ActualStartTime?.ToTimeOnly(),
+        AutoCompleteAtEnd = AutoCompleteAtEnd,
         UserId = 0,
         StartTime = StartTime.ToTimeOnly(),
         EndTime = EndTime.ToTimeOnly(),

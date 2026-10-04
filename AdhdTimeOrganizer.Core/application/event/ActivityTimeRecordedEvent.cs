@@ -21,15 +21,31 @@ namespace AdhdTimeOrganizer.Core.application.@event;
 /// double-complete an activity that has both a planner task and a to-do item. The host already
 /// references every slice and already hosts the three completion fan-out handlers.
 /// </para>
+/// <para>
+/// ⚠ <b>Every field here is on the user's own clock</b>, which is the clock a <c>Calendar.Date</c> and a
+/// <c>PlannerTask.StartTime</c> are written on. A publisher must resolve the user's zone before building
+/// this; deriving <see cref="Day"/> from a UTC instant is the bug the heartbeat shipped with, and any
+/// future publisher (Android sync, timers) has to follow the same rule.
+/// </para>
 /// </remarks>
 /// <param name="UserId">Owner of the tracked time. Handlers must scope on it explicitly.</param>
-/// <param name="Day">The day the batch's window falls on, in the window's own terms.</param>
+/// <param name="Day">The user's local date the batch's window falls on.</param>
+/// <param name="WindowStart">The window's start, as the user's wall clock reads it.</param>
+/// <param name="WindowEnd">
+/// The window's end, as the user's wall clock reads it. Wraps to <c>00:00</c> for a window that closes at
+/// midnight, which is the same midnight-wrap convention a planner task's own span uses.
+/// </param>
 /// <param name="Totals">
 /// One entry per activity the batch attributed time to, carrying that activity's <em>whole-day</em>
 /// total, not the batch delta — completion thresholds are cumulative.
 /// </param>
-public record ActivityTimeRecordedEvent(long UserId, DateOnly Day, IReadOnlyList<ActivityDayTotal> Totals) : ISeamEvent;
+public record ActivityTimeRecordedEvent(
+    long UserId,
+    DateOnly Day,
+    TimeOnly WindowStart,
+    TimeOnly WindowEnd,
+    IReadOnlyList<ActivityDayTotal> Totals) : ISeamEvent;
 
 /// <param name="ActivityId">The activity a tracker mapping attributed the time to.</param>
-/// <param name="TotalSecondsOnDay">Seconds attributed to it across the whole of <c>Day</c>.</param>
+/// <param name="TotalSecondsOnDay">Seconds attributed to it across the whole of the user's <c>Day</c>.</param>
 public record ActivityDayTotal(long ActivityId, int TotalSecondsOnDay);

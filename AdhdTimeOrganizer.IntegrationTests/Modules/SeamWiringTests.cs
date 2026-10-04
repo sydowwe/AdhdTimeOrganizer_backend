@@ -67,6 +67,7 @@ public class SeamWiringTests(AppDbContextFixture fixture) : PostgresTestBase(fix
         AssertRegisteredOnce<IActivityTimeAttributionSink>(sp);
         AssertRegisteredOnce<ICalendarDayLookup>(sp);
         AssertRegisteredOnce<ITodoListItemLoggedTimeSource>(sp);
+        AssertRegisteredOnce<ITodoListItemPlanSource>(sp);
     }
 
     /// <summary>

@@ -1,4 +1,7 @@
+using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
+using AdhdTimeOrganizer.TodoLists.application.service;
 using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FastEndpoints;
@@ -16,7 +19,10 @@ public class GetAllTodoListItemRequest
     public long TodoListId { get; set; }
 }
 
-public class GetAllTodoListItemEndpoint(DbContext dbContext)
+public class GetAllTodoListItemEndpoint(
+    DbContext dbContext,
+    ITodoListItemPlanSource planSource,
+    IUserTimeZoneResolver timeZones)
     : Endpoint<GetAllTodoListItemRequest, List<TodoListItemResponse>>
 {
     public override void Configure()
@@ -43,6 +49,7 @@ public class GetAllTodoListItemEndpoint(DbContext dbContext)
             .OrderBy(td => td.DisplayOrder);
 
         var items = await TodoListItemResponse.Projection(query).ToListAsync(ct);
+        items = await TodoListItemPlannedSlotFiller.FillAsync(items, dbContext, planSource, timeZones, loggedUserId, ct);
         await Send.OkAsync(items, ct);
     }
 }

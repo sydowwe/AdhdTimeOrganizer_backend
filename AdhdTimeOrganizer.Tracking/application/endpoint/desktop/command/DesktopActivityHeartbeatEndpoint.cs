@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
@@ -9,6 +10,7 @@ using AdhdTimeOrganizer.Tracking.domain.helper.mapping;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.security;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.desktop.command;
@@ -31,7 +33,10 @@ namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.deskt
 /// as this file lives in the host.
 /// </remarks>
 [AllowExtensionClients]
-public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTimeAttributionSink attributionSink)
+public class DesktopActivityHeartbeatEndpoint(
+    DbContext dbContext,
+    IActivityTimeAttributionSink attributionSink,
+    IUserTimeZoneResolver timeZones)
     : Endpoint<DesktopActivityWindowDto>
 {
     public override void Configure()
@@ -163,19 +168,37 @@ public class DesktopActivityHeartbeatEndpoint(DbContext dbContext, IActivityTime
     /// the batch's own seconds are included, and expressed as whole-day totals rather than the batch
     /// delta because every completion threshold downstream is cumulative.
     /// </summary>
+    /// <remarks>
+    /// "The day" is the <b>user's</b> day, bounded on their own midnights. <c>WindowStart</c> is a UTC
+    /// instant, and reading its date directly made every Bratislava user's 00:00–02:00 drive yesterday's
+    /// planner task and summed each day from 01:00/02:00 local — the one "today" in the solution not taken
+    /// on the user's clock (see <c>TaskPlannerHelper.TodayIn</c>).
+    /// </remarks>
     private async Task PublishAttributionAsync(long userId, DateTime windowStart, HashSet<long> attributedActivityIds, CancellationToken ct)
     {
         if (attributedActivityIds.Count == 0)
             return;
 
-        var day = DateOnly.FromDateTime(windowStart);
+        var timeZone = await timeZones.GetAsync(userId, ct);
+        var localWindowStart = WallClockZone.FromUtc(windowStart, timeZone);
+        var day = DateOnly.FromDateTime(localWindowStart);
+        var dayStartUtc = WallClockZone.ToUtc(day, TimeOnly.MinValue, timeZone);
+        var dayEndUtc = WallClockZone.ToUtc(day.AddDays(1), TimeOnly.MinValue, timeZone);
+        // A heartbeat covers exactly one minute (DesktopActivityHeartbeatValidator), so its end is fixed.
+        var localWindowEnd = WallClockZone.FromUtc(windowStart.AddMinutes(1), timeZone);
 
         var totals = new List<ActivityDayTotal>(attributedActivityIds.Count);
         foreach (var activityId in attributedActivityIds)
             totals.Add(new ActivityDayTotal(
                 activityId,
-                await attributionSink.TotalSecondsOnDayAsync(dbContext, userId, activityId, day, ct)));
+                await attributionSink.TotalSecondsBetweenAsync(dbContext, userId, activityId, dayStartUtc, dayEndUtc, ct)));
 
-        await new ActivityTimeRecordedEvent(userId, day, totals).PublishAsync(Mode.WaitForAll, ct);
+        await new ActivityTimeRecordedEvent(
+                userId,
+                day,
+                TimeOnly.FromDateTime(localWindowStart),
+                TimeOnly.FromDateTime(localWindowEnd),
+                totals)
+            .PublishAsync(Mode.WaitForAll, ct);
     }
 }

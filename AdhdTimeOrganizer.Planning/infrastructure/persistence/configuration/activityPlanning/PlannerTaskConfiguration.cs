@@ -42,9 +42,20 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
         // AppDbContext.ConfigureCrossSliceRelationships, where both entity types are visible.
         // Nothing about the column or the constraint changes; only where the model says so.
 
+        builder.Property(p => p.AutoCompleteAtEnd).IsRequired();
+        builder.Property(p => p.CarryOverCount).IsRequired();
+
         builder.HasIndex(p => new { p.UserId, p.CalendarId, p.StartTime });
         // There is deliberately no index on Status alone (PERF-5). Five distinct values and no user prefix, so
         // no read in the slice can use it — every one filters by user and calendar first, which is what the
         // composite above serves. It was pure write amplification.
+        //
+        // The exception is this partial one, for CompleteFinishedPlannerTasksJobHandler's cross-user scan every
+        // five minutes. It holds only the rows that job can act on — auto-closing and InProgress (1, the enum's
+        // ordinal) — so it costs nothing on the ordinary write path. Keyed on the flag, not on calendar_id: an
+        // index leading with an FK column makes EF drop that FK's own (unfiltered) index as redundant.
+        builder.HasIndex(p => p.AutoCompleteAtEnd)
+            .HasDatabaseName("ix_planner_task_auto_complete_in_progress")
+            .HasFilter("auto_complete_at_end AND status = 1");
     }
 }

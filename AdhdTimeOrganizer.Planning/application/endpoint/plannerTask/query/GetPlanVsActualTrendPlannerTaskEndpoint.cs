@@ -108,7 +108,19 @@ public class GetPlanVsActualTrendPlannerTaskEndpoint(DbContext dbContext, IUserT
             new PlanVsActualTrendService.PlanVsActualTaskRow(
                 r.StartTime, r.EndTime, r.Status, r.ActualStartTime, r.ActualEndTime)));
 
-        await Send.OkAsync(Map(trend), ct);
+        // Slips, by the day each task was first planned for — a separate population from the one above, which
+        // is keyed on the day a task is on now. A carried task left its original day, so counting it in
+        // NeverHappenedCount as well would count one slip twice. Wherever it is now, background tasks aside.
+        var carriedOverCount = await dbContext.Set<PlannerTask>()
+            .AsNoTracking()
+            .Where(t => t.UserId == userId
+                        && t.OriginalDate != null
+                        && t.OriginalDate >= req.From
+                        && t.OriginalDate <= lastEligibleDay
+                        && !t.IsBackground)
+            .SumAsync(t => t.CarryOverCount, ct);
+
+        await Send.OkAsync(Map(trend) with { CarriedOverCount = carriedOverCount }, ct);
     }
 
     private static PlanVsActualTrendResponse Map(PlanVsActualTrendService.PlanVsActualTrend trend) =>

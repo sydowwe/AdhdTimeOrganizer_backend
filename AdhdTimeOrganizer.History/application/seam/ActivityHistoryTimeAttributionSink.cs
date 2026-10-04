@@ -55,23 +55,51 @@ public sealed class ActivityHistoryTimeAttributionSink : IActivityTimeAttributio
         });
     }
 
-    public async Task<int> TotalSecondsOnDayAsync(DbContext db, long userId, long activityId, DateOnly day, CancellationToken ct)
+    public async Task<int> TotalSecondsBetweenAsync(DbContext db, long userId, long activityId, DateTime fromUtc, DateTime toUtc, CancellationToken ct)
     {
-        // Half-open UTC range, matching TodoListItemLoggedTimeSource and every History dashboard.
-        // The Kind is not cosmetic: Npgsql rejects an Unspecified DateTime against a timestamptz
-        // column, and this runs on the live heartbeat path. A closed range on TimeOnly.MaxValue would
-        // additionally drop whatever lands in the final tick.
-        var from = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var to = from.AddDays(1);
+        // Half-open on instants the caller chose — the same contract as TodoListItemLoggedTimeSource, which
+        // also leaves "whose day" to its caller. A closed range would count a row starting exactly on the
+        // next day's midnight twice, once for each day. The Kind is pinned because Npgsql rejects an
+        // Unspecified DateTime against a timestamptz column, and this runs on the live heartbeat path.
+        var from = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
+        var to = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc);
 
-        // Summed in memory, as it was before the move: Length is an IntTime value object behind a
-        // converter, so its TotalSeconds is not translatable to SQL.
-        var lengths = await db.Set<ActivityHistory>()
+        // Every row that OVERLAPS the range, not only those starting in it. AttributeAsync grows one row across
+        // contiguous heartbeats, so a single row can run 09:00–10:30; a start-only predicate counted all of it
+        // toward 09:00's range and none toward a range opening at 09:30 — which is exactly the range the
+        // completion automation asks for once a same-activity block is done (bugs-to-investigate #2 follow-up).
+        // Summed in memory, as it was before the move: Length is an IntTime value object behind a converter,
+        // so its TotalSeconds is not translatable to SQL.
+        var rows = await db.Set<ActivityHistory>()
             .Where(h => h.UserId == userId && h.ActivityId == activityId
-                                           && h.StartTimestamp >= from && h.StartTimestamp < to)
-            .Select(h => h.Length)
+                                           && h.StartTimestamp < to
+                                           && (h.EndTimestamp > from || h.StartTimestamp >= from))
+            .Select(h => new { h.StartTimestamp, h.EndTimestamp, h.Length })
             .ToListAsync(ct);
 
-        return lengths.Sum(l => l.TotalSeconds);
+        return rows.Sum(r => SecondsInside(r.StartTimestamp, r.EndTimestamp, r.Length.TotalSeconds, from, to));
+    }
+
+    /// <summary>
+    /// The part of a row's <paramref name="lengthSeconds"/> that falls inside <c>[from, to)</c>, pro rata to the
+    /// span clipped. Pro rata rather than the clipped span itself because <c>Length</c> is the ledger's own
+    /// figure and is not always the span (a timer session pauses) — this keeps a row wholly inside the range
+    /// worth exactly its <c>Length</c>, as it always was. A zero-length row counts where it starts.
+    /// </summary>
+    private static int SecondsInside(DateTime start, DateTime end, int lengthSeconds, DateTime from, DateTime to)
+    {
+        var spanSeconds = (end - start).TotalSeconds;
+        if (spanSeconds <= 0)
+            return start >= from && start < to ? lengthSeconds : 0;
+
+        var clippedStart = start > from ? start : from;
+        var clippedEnd = end < to ? end : to;
+        var insideSeconds = (clippedEnd - clippedStart).TotalSeconds;
+        if (insideSeconds <= 0)
+            return 0;
+
+        return insideSeconds >= spanSeconds
+            ? lengthSeconds
+            : (int)(lengthSeconds * insideSeconds / spanSeconds);
     }
 }

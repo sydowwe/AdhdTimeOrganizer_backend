@@ -130,10 +130,19 @@ composition); since `CQ-5` the three write paths do too — the two `*IsDoneChan
 all. The handlers resolve the zone from the event's `UserId` via `IUserTimeZoneResolver`, which works
 under a background dispatch where there is no `HttpContext` to read.
 
+The tracker-driven path follows the same rule from outside the slice: Tracking's desktop heartbeat
+resolves the user's zone before it publishes `ActivityTimeRecordedEvent`, so the event's `Day` and window
+times are on the user's clock, and the day total it carries is summed between the user's own midnights.
+Until 2026-10 it took the date straight off the UTC `WindowStart`, and time tracked between a Bratislava
+user's midnight and 01:00/02:00 moved yesterday's task. The host handler that consumes it now also goes
+through `ApplyStatus`, records actual times and re-syncs the task's reminder, like
+`PatchPlannerTaskStatusEndpoint`.
+
 Pinned by `CompletionFanOutTests.TogglingTodoItem_UsesTheUsersOwnDayBoundary` /
-`.PatchingStatus_PublishesOnTheUsersToday` and
-`RoutineCompletionFanOutTests.TickingRoutineList_UsesTheUsersOwnDayBoundary`, each moving the test user
-onto a zone that is currently on a different date than UTC.
+`.PatchingStatus_PublishesOnTheUsersToday`,
+`RoutineCompletionFanOutTests.TickingRoutineList_UsesTheUsersOwnDayBoundary` and
+`ExtensionActivityTrackingTests.Heartbeat_AfterTheUsersMidnight_DrivesTheUsersTodayNotUtcs`, each moving
+the test user onto a zone that is on a different date than UTC.
 
 ### Day-plan completion streak
 
@@ -205,6 +214,7 @@ no plan to drift from.
 | A `Completed` task with no actual times? | Counted, its plan summed, **no** actual minutes, and **not** a "never happened" — it is unmeasurable, and inferring the missing end from the plan would fabricate exactly the zero drift the number exists to measure |
 | Nothing eligible? | `200` with six zeroes, never a 404. `taskCount: 0` is the client's signal to render nothing. A range entirely in the future answers this way |
 | Midnight? | Every span and every comparison wraps. A 23:00–00:30 task is 90 minutes; a task planned for 23:50 and started at 00:10 is twenty minutes late, not twenty-three hours early (the near reading wins — see `DriftMinutes`) |
+| A carried-over task? | Counted on the day it is on **now** — it left its original day, so that day never sees it. Slips are reported separately as `carriedOverCount`: the sum of `CarryOverCount` over tasks whose `OriginalDate` is in the range. Never folded into `neverHappenedCount`, which would count one slip twice |
 
 ⚠ **The range is the only thing bounding the scan**, so it is capped at
 `PlannerBatchLimits.MaxSummaryRangeDays` and a backwards one is a 400 — the same two rules
@@ -216,6 +226,29 @@ no plan to drift from.
 | `GetPlanVsActualTrendPlannerTaskEndpoint` | `application/endpoint/plannerTask/query/` — the eligibility predicate + the day boundary |
 | `PlanVsActualTrendRequest` / `…Response` | `application/dto/{request,response}/taskPlanner/` |
 | `PlanVsActualTrendValidator` | `application/validator/PlanVsActualTrendValidator.cs` |
+
+### Carrying a task over (F1-03)
+
+`POST /planner-task/{id}/carry-over { date }` moves an **open** task (not `Completed`, not `Cancelled`) to a
+**later** day and keeps the record that it slipped: `OriginalDate` is set the first time and never again,
+`CarryOverCount` goes up every time. The task arrives `NotStarted` with its actual times cleared — a fresh
+attempt — at the same time of day, and its reminder is re-synced. A day with no calendar row is created.
+
+| Question | Answer |
+|---|---|
+| Why not a copy? | The original stayed open on its day — that day could never count for the streak, and the trend logged it as never happened, so carrying a task over scored worse than skipping it |
+| Why not a plain move (PUT)? | It loses the slip, and "pushed four times" is the cue to split or drop a task. A PUT/drag stays a re-plan: it never touches `OriginalDate` / `CarryOverCount` |
+| Streak? | The task leaves its old day, so that day no longer counts it — the same neutral outcome a skip has |
+| Which tasks does the client offer? | `GET /planner-task/carry-over-candidates`: `NotStarted` / `InProgress`, non-background tasks on the user's previous seven days (their zone), newest day first, each with its date |
+
+### Tasks that close themselves
+
+`PlannerTask.AutoCompleteAtEnd` (create-only) marks a block that does not need a tick to have happened —
+rest booked from the leisure picker's "do it now". `CompleteFinishedPlannerTasksJobHandler` (every five
+minutes, registered by `PlanningScheduledJobsRegistrar`) completes such a task once it is `InProgress` and its
+`EndTime` has passed **on the owner's clock**, recording `ActualEndTime = EndTime`; it re-syncs reminders and
+fans out for tasks on the user's today, like `PatchPlannerTaskStatusEndpoint`. A `NotStarted` task is never
+closed — nothing said it began.
 
 ### Skip summary (B1)
 
@@ -439,6 +472,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `PatchPlannerTaskSpanEndpoint` | Command (`BasePatchEndpoint`) | Drag/resize; re-registers the reminders whose instant just moved | `command/PatchPlannerTaskSpanEndpoint.cs` |
 | `PatchPlannerTaskStatusEndpoint` | Command (custom) | Status + actual times via `ApplyStatus`; re-syncs reminders | `command/PatchPlannerTaskStatusEndpoint.cs` |
 | `CopyToDaysPlannerTaskEndpoint` | Command (custom) | `POST /planner-task/copy-to-days` — one day's plan onto N days, without execution state | `command/CopyToDaysPlannerTaskEndpoint.cs` |
+| `CarryOverPlannerTaskEndpoint` | Command (custom) | `POST /planner-task/{id}/carry-over` — an open task to a later day, keeping `OriginalDate` / `CarryOverCount`; re-syncs reminders | `command/CarryOverPlannerTaskEndpoint.cs` |
 | `ApplyTemplatePlannerTaskEndpoint` | Command (custom) | One template onto one day (by id **or** by date), through `PlannerTemplateApplier` | `command/ApplyTemplatePlannerTaskEndpoint.cs` |
 | `ApplyTemplateBatchPlannerTaskEndpoint` | Command (custom) | `POST /calendar/apply-planner-template/batch` — the same template onto N days | `command/ApplyTemplateBatchPlannerTaskEndpoint.cs` |
 | `GetByIdPlannerTaskEndpoint` | Query (`BaseGetByIdEndpoint`) | One task | `query/GetByIdPlannerTaskEndpoint.cs` |
@@ -446,6 +480,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `FormSelectOptionsPlannerTaskEndpoint` | Query (`BaseActivityFormSelectOptionsEndpoint`) | Activity/role/category options for the task form | `query/FormSelectOptionsPlannerTaskEndpoint.cs` |
 | `GetPlanVsActualTrendPlannerTaskEndpoint` | Query (custom) | `POST /planner-task/plan-vs-actual-trend`; owns the eligibility predicate | `query/GetPlanVsActualTrendPlannerTaskEndpoint.cs` |
 | `GetSkipSummaryPlannerTaskEndpoint` | Query (custom) | `POST /planner-task/skip-summary`; owns the eligibility predicate, shares the trend's request, validator and last eligible day | `query/GetSkipSummaryPlannerTaskEndpoint.cs` |
+| `GetCarryOverCandidatesPlannerTaskEndpoint` | Query (custom) | `GET /planner-task/carry-over-candidates` — the last week's open tasks with their dates | `query/GetCarryOverCandidatesPlannerTaskEndpoint.cs` |
 
 ### Endpoints — repeating tasks, template tasks, day templates, importance, settings
 
@@ -494,6 +529,8 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `PlannerBatchLimits` | Helper (constants) | `MaxCalendarIds` / `MaxSummaryRangeDays`, both 366 | `application/helper/PlannerBatchLimits.cs` |
 | `TaskPlannerHelper` | Helper (extensions) | `WithIncludes` (importance + activity/role/category), `TasksOverlap` (assumes non-wrapping spans), `TodayIn` (the one definition of "today" — the user's, never UTC's) and `InTimeWindow` (the one definition of the day planner's time-of-day filter, shared by both filter endpoints) | `application/helper/TaskPlannerHelper.cs` |
 | `PlannerTaskActivityReferenceSource` | Core seam (keyed) | Publishes and repoints `ActivityId` across **all three** task tables. The suggestion views are deliberately absent — they'd double-count | `application/seam/PlannerTaskActivityReferenceSource.cs` |
+| `TodoListItemPlanSource` | Core seam (by type) | `ITodoListItemPlanSource` — each to-do item's earliest open block from the user's today on, so TodoLists can say "scheduled" without the planner writing the item's `DueDate` | `application/seam/TodoListItemPlanSource.cs` |
+| `CompleteFinishedPlannerTasksJobHandler` | Scheduled job | Completes `AutoCompleteAtEnd` tasks that are in progress and over, every five minutes; registered by `PlanningScheduledJobsRegistrar` (wired in `Program.cs`) | `infrastructure/jobs/`, `infrastructure/scheduling/` |
 | `CalendarDayLookup` | Core seam (by type) | Day metadata for History's calendar dashboard. Reads no-tracking and selects seven columns; `DayIndex` is the eighth and is computed (`Calendar.DayIndexOf`), so that one is projected in memory | `application/seam/CalendarDayLookup.cs` |
 | `RoutineTodoListIsDoneChangedEventHandler` | Event handler | A routine's done state onto today's planner tasks for the same activity, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows, exactly as the to-do handler below does — the two are the same rule and any difference between them is a bug, not a design | `application/eventHandler/` |
 | `TodoListItemIsDoneChangedEventHandler` | Event handler | A to-do item's done state onto today's linked tasks, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows so an unrelated endpoint never 500s | `application/eventHandler/` |

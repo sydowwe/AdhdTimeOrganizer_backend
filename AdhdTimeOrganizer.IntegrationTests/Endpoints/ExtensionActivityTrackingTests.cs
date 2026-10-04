@@ -386,6 +386,102 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
             "NotStarted the event was never published or the handler was never discovered");
     }
 
+    /// <summary>
+    /// bugs-to-investigate #1: the heartbeat's "day" is the user's, not UTC's. The windows below are posted
+    /// at 23:50Z yesterday for a user whose zone is at least two hours ahead — already <i>today</i> on their
+    /// clock. The heartbeat used to take <c>DateOnly.FromDateTime(WindowStart)</c>, which drove the task on
+    /// yesterday's calendar row and left today's open; for a Bratislava user that is every minute tracked
+    /// between their midnight and 01:00/02:00.
+    /// <para>
+    /// Both days carry an open task for the activity, so the assertions tell "the right day moved" from
+    /// "some day moved". The zone is picked at run time, like
+    /// <c>PlanningTestSeedHelper.UseZoneOffsetFromUtcTodayAsync</c>, because zone ids differ by platform.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Heartbeat_AfterTheUsersMidnight_DrivesTheUsersTodayNotUtcs()
+    {
+        var email = "heartbeat-user-day@test.com";
+        await CreateUserWithExtensionAccess(email, true);
+
+        var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
+        var firstWindowStart = utcToday.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddMinutes(-10);
+        var zone = TimeZoneInfo.GetSystemTimeZones()
+            .First(z => z.GetUtcOffset(firstWindowStart) >= TimeSpan.FromHours(2) && z.GetUtcOffset(firstWindowStart) <= TimeSpan.FromHours(12));
+        var localWindowStart = TimeOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(firstWindowStart, zone));
+
+        long userId, userDayTaskId, utcDayTaskId;
+        await using (var db = CreateDbContext())
+        {
+            var user = await db.Set<User>().FirstAsync(u => u.Email == email, CancellationToken);
+            user.Timezone = zone;
+            userId = user.Id;
+            await db.SaveChangesAsync(CancellationToken);
+
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "User-day activity", userId, CancellationToken);
+            db.Set<TrackerDesktopMappingByPattern>().Add(new TrackerDesktopMappingByPattern
+            {
+                UserId = userId,
+                ProcessName = "userday.exe",
+                ProcessNameMatchType = PatternMatchType.Exact,
+                IsActive = true,
+                ActivityId = activityId
+            });
+            await db.SaveChangesAsync(CancellationToken);
+
+            // Today on the user's clock: the five minutes the windows below cover, as they read there.
+            var userDayCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, utcToday, userId, CancellationToken);
+            userDayTaskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
+                db, activityId, userDayCalendarId, localWindowStart, localWindowStart.AddMinutes(5), userId, ct: CancellationToken);
+
+            // Yesterday on the user's clock — but today's date by UTC's reading of the window.
+            var utcDayCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, utcToday.AddDays(-1), userId, CancellationToken);
+            utcDayTaskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
+                db, activityId, utcDayCalendarId, new TimeOnly(23, 50), new TimeOnly(23, 55), userId, ct: CancellationToken);
+        }
+
+        var loginResult = await ExtensionLoginSuccessAsync(email);
+        using var extensionClient = CreateCookieClient();
+        extensionClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
+
+        for (var minute = 0; minute < 5; minute++)
+        {
+            var response = await extensionClient.PostAsJsonAsync("activity-tracking/desktop/heartbeat", new DesktopActivityWindowDto
+            {
+                WindowStart = firstWindowStart.AddMinutes(minute),
+                Entries =
+                [
+                    new DesktopActivityEntryDto
+                    {
+                        ProcessName = "userday.exe",
+                        ProductName = "User day",
+                        WindowTitle = "User day",
+                        ExecutablePath = @"C:\a\userday.exe",
+                        IsFullscreen = false,
+                        ActiveSeconds = 60,
+                        BackgroundSeconds = 0,
+                        IsPlayingSound = false,
+                        ActiveMonitor = 0
+                    }
+                ]
+            }, TestContext.Current.CancellationToken);
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        await using var assertDb = CreateDbContext();
+        var userDayTask = await assertDb.Set<PlannerTask>().IgnoreQueryFilters()
+            .FirstAsync(t => t.Id == userDayTaskId, CancellationToken);
+        userDayTask.Status.Should().Be(PlannerTaskStatus.Completed,
+            "the windows fall on the user's today, and five tracked minutes meet a five-minute block");
+        userDayTask.ActualEndTime.Should().Be(localWindowStart.AddMinutes(5),
+            "actual times are written on the user's clock, the clock the task's own span is on");
+
+        (await assertDb.Set<PlannerTask>().IgnoreQueryFilters().FirstAsync(t => t.Id == utcDayTaskId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.NotStarted,
+                "UTC's date for the window is the user's yesterday, which the tracked time has no business touching");
+    }
+
     private async Task<ExtensionLoginResponse> ExtensionLoginSuccessAsync(string email)
     {
         var response = await ExtensionLoginAsync(email);

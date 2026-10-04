@@ -37,20 +37,26 @@ public interface IActivityTimeAttributionSink : ISeam
     Task AttributeAsync(DbContext db, long userId, long activityId, DateTime windowStart, int activeSeconds, CancellationToken ct);
 
     /// <summary>
-    /// Total seconds already attributed to <paramref name="activityId"/> on <paramref name="day"/>,
-    /// across every source — not just the one that produced the current batch.
+    /// Total seconds already attributed to <paramref name="activityId"/> in the half-open instant range
+    /// <c>[<paramref name="fromUtc"/>, <paramref name="toUtc"/>)</c>, across every source — not just the one
+    /// that produced the current batch.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Read <em>after</em> the caller has saved, otherwise the batch being processed is not counted.
     /// </para>
     /// <para>
-    /// ⚠ <paramref name="day"/> is a <b>UTC</b> calendar day: implementations bound it half-open on UTC
-    /// midnights (<c>[day 00:00Z, day+1 00:00Z)</c>), so callers must derive it from a UTC instant. It
-    /// is <em>not</em> the caller's local day — for a user away from UTC the total therefore covers a
-    /// window shifted from their own midnight. Changing that is a signature change (this takes a bare
-    /// <see cref="DateOnly"/> with no zone), not an implementation detail.
+    /// A record counts by <b>overlap</b>, pro rata: one stretch of activity is a single record however long it
+    /// runs, so a record straddling a bound contributes only the part inside the range. That is what lets a
+    /// caller ask for "time since 09:30" and get the minutes after 09:30 of a record that began at 09:00.
+    /// </para>
+    /// <para>
+    /// The caller supplies the range, because the sink cannot know whose day it is. For "the user's day"
+    /// that means the user's own midnights converted to UTC (<c>WallClockZone.ToUtc</c>) — the same shape
+    /// <see cref="ITodoListItemLoggedTimeSource"/> takes. This used to take a bare <see cref="DateOnly"/>
+    /// bounded on UTC midnights, so for a Bratislava user the heartbeat's "day" ran 01:00/02:00 to
+    /// 01:00/02:00 local, and time tracked just after their midnight drove yesterday's planner task.
     /// </para>
     /// </remarks>
-    Task<int> TotalSecondsOnDayAsync(DbContext db, long userId, long activityId, DateOnly day, CancellationToken ct);
+    Task<int> TotalSecondsBetweenAsync(DbContext db, long userId, long activityId, DateTime fromUtc, DateTime toUtc, CancellationToken ct);
 }

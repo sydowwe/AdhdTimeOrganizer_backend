@@ -17,6 +17,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.persistence.interceptors;
 using AdhdTimeOrganizer.infrastructure.scheduling;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.infrastructure.scheduling;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.infrastructure.scheduling;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
@@ -373,6 +374,7 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     services.AddHostedService<SchedulerScheduledJobsRegistrar>();
     services.AddHostedService<RoutinesScheduledJobsRegistrar>();
     services.AddHostedService<TrackingScheduledJobsRegistrar>();
+    services.AddHostedService<PlanningScheduledJobsRegistrar>();
     services.AddHostedService<PortalScheduledJobsRegistrar>();
 
     // Same contract as the registrars above, but re-pushing per-row one-shot triggers rather than a fixed

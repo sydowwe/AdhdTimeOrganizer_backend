@@ -29,6 +29,15 @@ public record PlannerTaskResponse : BasePlannerTaskResponse, IProjectionResponse
     public required string Color { get; init; }
     public required bool IsDone { get; init; }
 
+    /// <summary>The task completes itself when its slot ends — see <see cref="PlannerTask.AutoCompleteAtEnd"/>.</summary>
+    public bool AutoCompleteAtEnd { get; init; }
+
+    /// <summary>The day the task was first planned for, when it has been carried over; otherwise null.</summary>
+    public DateOnly? OriginalDate { get; init; }
+
+    /// <summary>How many times the task has been carried over to a later day.</summary>
+    public int CarryOverCount { get; init; }
+
     public static IQueryable<PlannerTaskResponse> Projection(IQueryable<PlannerTask> query)
     {
         return query.Select(t => new PlannerTaskResponse
@@ -89,7 +98,10 @@ public record PlannerTaskResponse : BasePlannerTaskResponse, IProjectionResponse
             CalendarId = t.CalendarId,
             TodolistItemId = t.TodolistItemId,
             Color = t.Activity.Role.Color,
-            IsDone = t.IsDone
+            IsDone = t.IsDone,
+            AutoCompleteAtEnd = t.AutoCompleteAtEnd,
+            OriginalDate = t.OriginalDate,
+            CarryOverCount = t.CarryOverCount
         });
     }
 }

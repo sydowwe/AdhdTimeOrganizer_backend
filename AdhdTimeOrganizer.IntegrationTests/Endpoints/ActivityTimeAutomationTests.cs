@@ -3,15 +3,19 @@ using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
+using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Sydowwe.Framework.domain.valueObject;
 using Sydowwe.Framework.Testing;
 using Xunit;
@@ -133,21 +137,175 @@ public class ActivityTimeAutomationTests(AppDbContextFixture fixture) : Postgres
         item.IsDone.Should().BeFalse("a matched planner task must suppress the to-do/routine fallback");
     }
 
+    // ---- the status rules a user-driven change follows (bugs-to-investigate #2) -------------------
+
+    /// <summary>
+    /// A tracker-completed task carries actual times like a hand-completed one, or the plan-vs-actual trend
+    /// counts it as planned with no actual minutes ("unmeasurable"). Completed straight from NotStarted, so
+    /// its span is the planned length ending with the window that crossed the threshold.
+    /// </summary>
+    [Fact]
+    public async Task PlannerTask_CompletedByTracking_RecordsActualTimes()
+    {
+        var activityId = await SeedActivityAsync("planner-actuals-complete");
+        var taskId = await SeedPlannerTaskAsync(activityId, new TimeOnly(9, 0), new TimeOnly(9, 30));
+
+        await RunAsync(activityId, totalSecondsOnDay: 1800, windowStart: new TimeOnly(9, 29));
+
+        await using var db = CreateDbContext();
+        var task = await db.Set<PlannerTask>().FirstAsync(t => t.Id == taskId, CancellationToken);
+        task.Status.Should().Be(PlannerTaskStatus.Completed);
+        task.ActualEndTime.Should().Be(new TimeOnly(9, 30), "the window that crossed the threshold ends the work");
+        task.ActualStartTime.Should().Be(new TimeOnly(9, 0));
+    }
+
+    /// <summary>NotStarted → InProgress records when work began: the start of the window that moved it.</summary>
+    [Fact]
+    public async Task PlannerTask_StartedByTracking_RecordsActualStart()
+    {
+        var activityId = await SeedActivityAsync("planner-actuals-start");
+        var taskId = await SeedPlannerTaskAsync(activityId, new TimeOnly(10, 0), new TimeOnly(11, 0));
+
+        await RunAsync(activityId, totalSecondsOnDay: 60, windowStart: new TimeOnly(10, 7));
+
+        await using var db = CreateDbContext();
+        var task = await db.Set<PlannerTask>().FirstAsync(t => t.Id == taskId, CancellationToken);
+        task.Status.Should().Be(PlannerTaskStatus.InProgress);
+        task.ActualStartTime.Should().Be(new TimeOnly(10, 7));
+        task.ActualEndTime.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Two open blocks for one activity on one day: the one the window falls inside moves, not whichever
+    /// Postgres returns first. The earlier block is seeded first so an unordered read would pick it.
+    /// </summary>
+    [Fact]
+    public async Task TwoOpenTasks_TheOneContainingTheWindowMoves()
+    {
+        var activityId = await SeedActivityAsync("planner-two-containing");
+        var morningId = await SeedPlannerTaskAsync(activityId, new TimeOnly(8, 0), new TimeOnly(8, 30));
+        var afternoonId = await SeedPlannerTaskAsync(activityId, new TimeOnly(14, 0), new TimeOnly(15, 0));
+
+        await RunAsync(activityId, totalSecondsOnDay: 60, windowStart: new TimeOnly(14, 10));
+
+        await using var db = CreateDbContext();
+        (await db.Set<PlannerTask>().FirstAsync(t => t.Id == afternoonId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.InProgress, "the user is inside this block right now");
+        (await db.Set<PlannerTask>().FirstAsync(t => t.Id == morningId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.NotStarted);
+    }
+
+    /// <summary>
+    /// A window outside every block falls back to the earliest open one — seeded <i>second</i> here, so
+    /// insertion order cannot be what picks it.
+    /// </summary>
+    [Fact]
+    public async Task TwoOpenTasks_OutsideBoth_TheEarliestMoves()
+    {
+        var activityId = await SeedActivityAsync("planner-two-earliest");
+        var laterId = await SeedPlannerTaskAsync(activityId, new TimeOnly(16, 0), new TimeOnly(17, 0));
+        var earlierId = await SeedPlannerTaskAsync(activityId, new TimeOnly(9, 0), new TimeOnly(10, 0));
+
+        await RunAsync(activityId, totalSecondsOnDay: 60, windowStart: new TimeOnly(12, 0));
+
+        await using var db = CreateDbContext();
+        (await db.Set<PlannerTask>().FirstAsync(t => t.Id == earlierId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.InProgress);
+        (await db.Set<PlannerTask>().FirstAsync(t => t.Id == laterId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.NotStarted);
+    }
+
+    /// <summary>
+    /// "Any write path that moves a task's time or changes its status must call SyncForPlannerTasksAsync"
+    /// (Planning <c>docs/summary.md</c>). Without it a tracker-completed task's reminder stays registered.
+    /// The registration service is mocked because this pins the call, not the registry's own ruling, which
+    /// <c>ReminderRegistrationTests</c> covers.
+    /// </summary>
+    [Fact]
+    public async Task PlannerTask_StatusChangedByTracking_ResyncsItsReminder()
+    {
+        var activityId = await SeedActivityAsync("planner-reminder-sync");
+        var taskId = await SeedPlannerTaskAsync(activityId, new TimeOnly(9, 0), new TimeOnly(9, 30));
+
+        var reminders = new Mock<IReminderRegistrationService>();
+        await using var factory = CreateFactory(["User"], configureServices: services =>
+        {
+            services.RemoveAll<IReminderRegistrationService>();
+            services.AddScoped(_ => reminders.Object);
+        });
+
+        await RunAsync(activityId, totalSecondsOnDay: 1800, windowStart: new TimeOnly(9, 29),
+            scopeFactory: factory.Services.GetRequiredService<IServiceScopeFactory>());
+
+        reminders.Verify(r => r.SyncForPlannerTasksAsync(
+            It.Is<IReadOnlyCollection<long>>(ids => ids.Count == 1 && ids.Contains(taskId)),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ---- one stretch of tracked time completes one block -----------------
+
+    /// <summary>
+    /// Two blocks of one activity on one day. The first is done and its 30 tracked minutes are spent; the
+    /// second must not complete off those same minutes. It used to: both were measured against the whole-day
+    /// total, so the heartbeat after the first completed promptly completed the second with no further work.
+    /// </summary>
+    [Fact]
+    public async Task SecondBlock_DoesNotReuseTimeTheFirstBlockClaimed()
+    {
+        var activityId = await SeedActivityAsync("pool-no-reuse");
+        await SeedPlannerTaskAsync(activityId, new TimeOnly(9, 0), new TimeOnly(9, 30),
+            PlannerTaskStatus.Completed, new TimeOnly(9, 0), new TimeOnly(9, 30));
+        var secondId = await SeedPlannerTaskAsync(activityId, new TimeOnly(15, 0), new TimeOnly(15, 30));
+        await SeedHistoryAsync(activityId, new TimeOnly(9, 0), 1800);
+
+        await RunAsync(activityId, totalSecondsOnDay: 1800, windowStart: new TimeOnly(15, 0));
+
+        await using var db = CreateDbContext();
+        (await db.Set<PlannerTask>().FirstAsync(t => t.Id == secondId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.InProgress,
+                "the morning's 30 minutes completed the morning block and are not the afternoon block's to use");
+    }
+
+    /// <summary>
+    /// The counterpart: time tracked <i>after</i> the first block's end is the second block's — including the
+    /// tail of one unbroken record that began inside the first block, which is how contiguous heartbeats land.
+    /// </summary>
+    [Fact]
+    public async Task SecondBlock_CompletesOnTimeTrackedAfterTheFirstBlockEnded()
+    {
+        var activityId = await SeedActivityAsync("pool-after-claim");
+        await SeedPlannerTaskAsync(activityId, new TimeOnly(9, 0), new TimeOnly(9, 30),
+            PlannerTaskStatus.Completed, new TimeOnly(9, 0), new TimeOnly(9, 30));
+        var secondId = await SeedPlannerTaskAsync(activityId, new TimeOnly(10, 0), new TimeOnly(10, 30));
+        // One record, 09:00–10:00: half of it claimed by the first block, half free.
+        await SeedHistoryAsync(activityId, new TimeOnly(9, 0), 3600);
+
+        await RunAsync(activityId, totalSecondsOnDay: 3600, windowStart: new TimeOnly(9, 59));
+
+        await using var db = CreateDbContext();
+        (await db.Set<PlannerTask>().FirstAsync(t => t.Id == secondId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.Completed,
+                "the 30 minutes after 09:30 are unclaimed and meet the second block's 30");
+    }
+
     // ---- helpers ---------------------------------------------------------
 
     /// <summary>
     /// Drives the handler the way the event bus would. Built by hand rather than resolved, because
     /// FastEndpoints keeps its handler registry outside DI — the wiring half is covered over HTTP in
-    /// <c>ExtensionActivityTrackingTests</c>.
+    /// <c>ExtensionActivityTrackingTests</c>. The window is one minute, as a heartbeat's always is.
     /// </summary>
-    private async Task RunAsync(long activityId, int totalSecondsOnDay)
+    private async Task RunAsync(
+        long activityId, int totalSecondsOnDay, TimeOnly? windowStart = null, IServiceScopeFactory? scopeFactory = null)
     {
-        var scopeFactory = Fixture.UnauthenticatedFactory.Services.GetRequiredService<IServiceScopeFactory>();
+        scopeFactory ??= Fixture.UnauthenticatedFactory.Services.GetRequiredService<IServiceScopeFactory>();
         var handler = new ActivityTimeRecordedEventHandler(
             scopeFactory, NullLogger<ActivityTimeRecordedEventHandler>.Instance);
 
+        var start = windowStart ?? new TimeOnly(12, 0);
         await handler.HandleAsync(
-            new ActivityTimeRecordedEvent(UserId, Today, [new ActivityDayTotal(activityId, totalSecondsOnDay)]),
+            new ActivityTimeRecordedEvent(UserId, Today, start, start.AddMinutes(1),
+                [new ActivityDayTotal(activityId, totalSecondsOnDay)]),
             CancellationToken);
     }
 
@@ -167,7 +325,25 @@ public class ActivityTimeAutomationTests(AppDbContextFixture fixture) : Postgres
         return activity.Id;
     }
 
-    private async Task<long> SeedPlannerTaskAsync(long activityId, TimeOnly start, TimeOnly end)
+    /// <summary>A ledger row on <see cref="Today"/> (the fixture user is on UTC), written directly.</summary>
+    private async Task SeedHistoryAsync(long activityId, TimeOnly start, int seconds)
+    {
+        await using var db = CreateDbContext();
+        var startUtc = Today.ToDateTime(start, DateTimeKind.Utc);
+        db.Set<ActivityHistory>().Add(new ActivityHistory
+        {
+            UserId = UserId,
+            ActivityId = activityId,
+            StartTimestamp = startUtc,
+            EndTimestamp = startUtc.AddSeconds(seconds),
+            Length = new IntTime(seconds)
+        });
+        await db.SaveChangesAsync(CancellationToken);
+    }
+
+    private async Task<long> SeedPlannerTaskAsync(
+        long activityId, TimeOnly start, TimeOnly end,
+        PlannerTaskStatus status = PlannerTaskStatus.NotStarted, TimeOnly? actualStart = null, TimeOnly? actualEnd = null)
     {
         await using var db = CreateDbContext();
 
@@ -196,7 +372,9 @@ public class ActivityTimeAutomationTests(AppDbContextFixture fixture) : Postgres
             StartTime = start,
             EndTime = end,
             IsBackground = false,
-            Status = PlannerTaskStatus.NotStarted
+            Status = status,
+            ActualStartTime = actualStart,
+            ActualEndTime = actualEnd
         };
         db.Set<PlannerTask>().Add(task);
         await db.SaveChangesAsync(CancellationToken);

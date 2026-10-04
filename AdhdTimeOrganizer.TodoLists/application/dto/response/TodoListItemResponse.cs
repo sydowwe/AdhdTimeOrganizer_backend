@@ -22,6 +22,14 @@ public record TodoListItemResponse : BaseTodoListResponse,
     /// <summary>Activity id of the paired leisure activity, or null when the task is unpaired.</summary>
     public long? PairedLeisureActivityId { get; init; }
 
+    /// <summary>
+    /// The item's next open planner block from the user's today on, or null when none is planned. <b>Not</b>
+    /// projected — the planner is another slice's — so it is filled after the query by
+    /// <c>TodoListItemPlannedSlotFiller</c>, on the reads that call it (get-all and get-by-id). Distinct from
+    /// <see cref="DueDate"/>, which is the user's deadline and is never written by the planner.
+    /// </summary>
+    public PlannedSlotResponse? NextPlannedSlot { get; init; }
+
     public static IQueryable<TodoListItemResponse> Projection(IQueryable<TodoListItem> q)
     {
         return q.Select(e => new TodoListItemResponse

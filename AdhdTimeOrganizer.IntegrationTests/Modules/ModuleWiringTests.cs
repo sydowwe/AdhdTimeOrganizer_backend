@@ -7,6 +7,8 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.scheduling;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Routines.infrastructure.jobs;
+using AdhdTimeOrganizer.Planning.infrastructure.jobs;
+using AdhdTimeOrganizer.Planning.infrastructure.scheduling;
 using AdhdTimeOrganizer.Routines.infrastructure.scheduling;
 using AdhdTimeOrganizer.Tracking.infrastructure.jobs;
 using AdhdTimeOrganizer.Tracking.infrastructure.scheduling;
@@ -169,6 +171,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(RoutinePeriodNudgeJobHandler.HandlerKey, keys);
         Assert.Contains(RoutineSuggestedTodayJobHandler.HandlerKey, keys);
         Assert.Contains(PurgeExpiredActivityTrackingEntriesJobHandler.HandlerKey, keys);
+        Assert.Contains(CompleteFinishedPlannerTasksJobHandler.HandlerKey, keys);
         Assert.Contains(SuggestionPatternRefreshJobHandler.HandlerKey, keys);
     }
 
@@ -371,6 +374,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(RoutinesScheduledJobsRegistrar.NudgeRegistration.JobKey, jobKeys);
         Assert.Contains(RoutinesScheduledJobsRegistrar.SuggestedTodayRegistration.JobKey, jobKeys);
         Assert.Contains(TrackingScheduledJobsRegistrar.RetentionPurgeRegistration.JobKey, jobKeys);
+        Assert.Contains(PlanningScheduledJobsRegistrar.CompleteFinishedTasksRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.SuggestionPatternRefreshRegistration.JobKey, jobKeys);
     }
 

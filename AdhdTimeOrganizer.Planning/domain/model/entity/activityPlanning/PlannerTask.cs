@@ -16,6 +16,31 @@ public class PlannerTask : BasePlannerTask
 
     public string? GoogleEventId { get; set; }
 
+    /// <summary>
+    /// The task closes itself once its slot is over: an <c>InProgress</c> task carrying this is completed by
+    /// <c>CompleteFinishedPlannerTasksJobHandler</c> when its <c>EndTime</c> passes on the user's clock.
+    /// <para>
+    /// For blocks that do not need a tick to have happened — rest booked from the leisure picker's "do it
+    /// now" is the one client today. Without it that block stayed <c>InProgress</c> for good: it held the
+    /// home now-bar for the rest of the day and landed in the plan-vs-actual trend as "never happened".
+    /// Set at creation only; a <c>NotStarted</c> task is never closed, since nobody said it began.
+    /// </para>
+    /// </summary>
+    public bool AutoCompleteAtEnd { get; set; }
+
+    /// <summary>
+    /// The day the task was first planned for, set the first time it is carried over
+    /// (<c>CarryOverPlannerTaskEndpoint</c>) and never changed after; null for a task that never slipped. Moving a
+    /// task by hand (PUT, drag) is a re-plan, not a slip, and leaves this alone.
+    /// </summary>
+    public DateOnly? OriginalDate { get; set; }
+
+    /// <summary>
+    /// How many times the task has been carried over to a later day. "Pushed four times" is the cue to split the
+    /// task, shrink it or drop it — which the plain move the client used to do threw away.
+    /// </summary>
+    public int CarryOverCount { get; set; }
+
     public long CalendarId { get; set; }
 
     /// <summary>

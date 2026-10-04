@@ -1482,9 +1482,17 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("time without time zone")
                         .HasColumnName("actual_start_time");
 
+                    b.Property<bool>("AutoCompleteAtEnd")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_complete_at_end");
+
                     b.Property<long>("CalendarId")
                         .HasColumnType("bigint")
                         .HasColumnName("calendar_id");
+
+                    b.Property<int>("CarryOverCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("carry_over_count");
 
                     b.Property<DateTime>("CreatedTimestamp")
                         .ValueGeneratedOnAdd()
@@ -1524,6 +1532,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("notes");
+
+                    b.Property<DateOnly?>("OriginalDate")
+                        .HasColumnType("date")
+                        .HasColumnName("original_date");
 
                     b.Property<string>("SkipReason")
                         .HasMaxLength(500)
@@ -1566,6 +1578,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.HasIndex("ActivityId")
                         .HasDatabaseName("ix_planner_task_activity_id");
+
+                    b.HasIndex("AutoCompleteAtEnd")
+                        .HasDatabaseName("ix_planner_task_auto_complete_in_progress")
+                        .HasFilter("auto_complete_at_end AND status = 1");
 
                     b.HasIndex("CalendarId")
                         .HasDatabaseName("ix_planner_task_calendar_id");
