@@ -73,11 +73,12 @@ public class RepeatingPlannerTaskValidator : Validator<RepeatingPlannerTaskReque
             .WithMessage("ActiveToDate is required for DateRange recurrence.")
             .When(x => x.RecurrenceType == RecurrenceType.DateRange);
 
+        // Any recurrence type may carry an active window, and the suggestion endpoint bounds every type by it,
+        // so a reversed window on a weekly rule would never match a day. Reject it on every type.
         RuleFor(x => x)
             .Must(x => x.ActiveFromDate!.Value <= x.ActiveToDate!.Value)
             .WithMessage("ActiveFromDate must be on or before ActiveToDate.")
-            .When(x => x.RecurrenceType == RecurrenceType.DateRange
-                       && x.ActiveFromDate.HasValue && x.ActiveToDate.HasValue);
+            .When(x => x.ActiveFromDate.HasValue && x.ActiveToDate.HasValue);
 
         // DayType: ScheduledForDayTypes must be non-empty with valid DayType names
         RuleFor(x => x.ScheduledForDayTypes)

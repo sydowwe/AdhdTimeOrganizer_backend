@@ -67,13 +67,17 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
         // 1. User-set suggestions (RepeatingPlannerTask)
         var tasks = await dbContext.Set<RepeatingPlannerTask>()
             .Where(t => t.UserId == userId && t.IsActive)
-            // What SQL can decide, SQL decides. A DateRange recurrence is a plain column comparison, so it is
+            // What SQL can decide, SQL decides. The active window is a plain column comparison, so it is
             // answered here rather than by loading every active recurrence and discarding most of them. The
-            // other three match against ScheduledDays / ScheduledDates / ScheduledForDayTypes, which are
-            // value-converted collections with no translatable Contains — those stay in memory below.
+            // three day matches use ScheduledDays / ScheduledDates / ScheduledForDayTypes, which are
+            // value-converted collections with no translatable Contains, so those stay in memory below.
+            // The window bounds every recurrence type, not only DateRange: a weekly or monthly rule may carry
+            // one ("every Tue until 30 Nov"), and the planner shows it as the reason for the suggestion. An
+            // unset bound is open. A DateRange rule needs both bounds, because the window is its whole rule.
+            .Where(t => (t.ActiveFromDate == null || t.ActiveFromDate <= date)
+                        && (t.ActiveToDate == null || date <= t.ActiveToDate))
             .Where(t => t.RecurrenceType != RecurrenceType.DateRange
-                        || (t.ActiveFromDate != null && t.ActiveToDate != null
-                            && t.ActiveFromDate <= date && date <= t.ActiveToDate))
+                        || (t.ActiveFromDate != null && t.ActiveToDate != null))
             .Include(t => t.Importance)
             .Include(t => t.Activity).ThenInclude(a => a.Role)
             .Include(t => t.Activity).ThenInclude(a => a.Category)
@@ -84,7 +88,7 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
             RecurrenceType.DayOfWeek => task.ScheduledDays.Contains(date.DayOfWeek.ToString()),
             RecurrenceType.DayOfMonth => task.ScheduledDates.Contains(date.Day),
             RecurrenceType.DayType => task.ScheduledForDayTypes.Contains(calendar.DayType.ToString()),
-            // Already decided by the WHERE above — a DateRange row that got this far is in range.
+            // Already decided by the WHERE above: a DateRange row that got this far is in range.
             RecurrenceType.DateRange => true,
             _ => false
         }).ToList();

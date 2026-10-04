@@ -478,6 +478,49 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     }
 
     /// <summary>
+    /// OP10. A weekly rule may carry an active window, and the planner names it as the suggestion's reason
+    /// ("every Mon · until …"). The endpoint checked the window only for DateRange rules, so a weekly rule kept
+    /// being suggested after its end date. Three weekly rules on the same weekday: one whose window has ended,
+    /// one not started yet, and an open-ended control that must still be suggested.
+    /// </summary>
+    [Fact(DisplayName = "A weekly rule is suggested only inside its active window")]
+    public async Task WeeklyRule_OutsideItsWindow_IsNotSuggested()
+    {
+        var target = new DateOnly(2027, 8, 9);
+        long endedActivityId, futureActivityId, openActivityId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            endedActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-window-ended", ct: CancellationToken);
+            futureActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-window-future", ct: CancellationToken);
+            openActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "suggest-window-open", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+
+            (long ActivityId, DateOnly? From, DateOnly? To)[] rules =
+            [
+                (endedActivityId, target.AddDays(-30), target.AddDays(-1)),
+                (futureActivityId, target.AddDays(1), null),
+                (openActivityId, null, target)
+            ];
+            foreach (var (activityId, from, to) in rules)
+            {
+                var id = await PlanningTestSeedHelper.SeedRepeatingPlannerTaskAsync(db, activityId, ct: CancellationToken);
+                var rule = await db.Set<AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning.RepeatingPlannerTask>()
+                    .SingleAsync(t => t.Id == id, CancellationToken);
+                rule.ScheduledDays.Add(target.DayOfWeek.ToString());
+                rule.ActiveFromDate = from;
+                rule.ActiveToDate = to;
+                await db.SaveChangesAsync(CancellationToken);
+            }
+        }
+
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        suggestions.Should().NotContain(s => s.Activity.Id == endedActivityId, "its window ended the day before");
+        suggestions.Should().NotContain(s => s.Activity.Id == futureActivityId, "its window starts the day after");
+        suggestions.Should().ContainSingle(s => s.Activity.Id == openActivityId, "the end date is inclusive and the start is open")
+            .Which.ActiveToDate.Should().Be(target);
+    }
+
+    /// <summary>
     /// B27 part 5. The handler loads the calendar with <c>FindAsync</c> and never compares its <c>UserId</c> with
     /// the caller's; what keeps another account's calendar out is the per-user global query filter on
     /// <c>Calendar</c>, which <c>FindAsync</c> applies. This pins that the route answers 404, not suggestions
