@@ -9,6 +9,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.dto.response.@base;
 using Sydowwe.Framework.application.dto.response.generic;
+using Sydowwe.Framework.domain;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Xunit;
@@ -692,6 +693,64 @@ public class TodoListUniqueNameTests(AppDbContextFixture fixture) : PostgresTest
         await using var verifyDb = CreateDbContext();
         (await verifyDb.Set<TodoList>().IgnoreQueryFilters().CountAsync(l => l.Name == "Work", CancellationToken)).Should().Be(2);
         (await verifyDb.Set<TodoListCategory>().IgnoreQueryFilters().CountAsync(c => c.Name == "Chores", CancellationToken)).Should().Be(2);
+    }
+}
+
+/// <summary>
+/// OP3 — a list's description travels as <c>text</c> (the shared <c>NameTextIconRequest</c> field), and
+/// the client used to send and read it as <c>description</c>, so it was dropped both ways. These pin the
+/// server half: <c>text</c> round-trips through POST, PUT and GET, and an over-long one is refused by the
+/// validator, keyed to the field, before it reaches the column.
+/// </summary>
+[Collection("Postgres")]
+public class TodoListDescriptionTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
+{
+    [Fact(DisplayName = "OP3: a list's text is stored on create, replaced on update and returned by GET")]
+    public async Task Text_RoundTripsThroughCreateUpdateAndGet()
+    {
+        var client = CreateClient();
+
+        var created = await client.PostAsJsonAsync("api/todo-list",
+            new { Name = "Groceries", Text = "Weekly shop, Saturday morning" }, JsonOpts, CancellationToken);
+        created.StatusCode.Should().Be(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(CancellationToken));
+        var id = await created.Content.ReadFromJsonAsync<long>(JsonOpts, CancellationToken);
+
+        (await GetAsync(client, id)).Text.Should().Be("Weekly shop, Saturday morning");
+
+        var updated = await client.PutAsJsonAsync($"api/todo-list/{id}",
+            new { Name = "Groceries", Text = "Biweekly now" }, JsonOpts, CancellationToken);
+        updated.StatusCode.Should().Be(HttpStatusCode.OK, await updated.Content.ReadAsStringAsync(CancellationToken));
+
+        (await GetAsync(client, id)).Text.Should().Be("Biweekly now");
+    }
+
+    [Fact(DisplayName = "OP3: a text at the column length is accepted, one longer is a 400 naming text")]
+    public async Task Text_LongerThanTheColumn_Returns400NamingText()
+    {
+        var client = CreateClient();
+
+        var atLimit = await client.PostAsJsonAsync("api/todo-list",
+            new { Name = "At limit", Text = new string('x', EntityFieldLengths.Text) }, JsonOpts, CancellationToken);
+        atLimit.StatusCode.Should().Be(HttpStatusCode.Created, await atLimit.Content.ReadAsStringAsync(CancellationToken));
+
+        var tooLong = await client.PostAsJsonAsync("api/todo-list",
+            new { Name = "Too long", Text = new string('x', EntityFieldLengths.Text + 1) }, JsonOpts, CancellationToken);
+        var body = await tooLong.Content.ReadAsStringAsync(CancellationToken);
+        tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest, body);
+        JsonDocument.Parse(body).RootElement.GetProperty("errors").EnumerateObject().Select(e => e.Name)
+            .Should().Contain(n => string.Equals(n, "text", StringComparison.OrdinalIgnoreCase), body);
+
+        await using var verifyDb = CreateDbContext();
+        (await verifyDb.Set<TodoList>().IgnoreQueryFilters().CountAsync(l => l.Name == "Too long", CancellationToken))
+            .Should().Be(0, "a rejected create must not leave a row behind");
+    }
+
+    private async Task<TodoListResponse> GetAsync(HttpClient client, long id)
+    {
+        var response = await client.GetAsync($"api/todo-list/{id}", CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonSerializer.Deserialize<TodoListResponse>(body, JsonOpts)!;
     }
 }
 
