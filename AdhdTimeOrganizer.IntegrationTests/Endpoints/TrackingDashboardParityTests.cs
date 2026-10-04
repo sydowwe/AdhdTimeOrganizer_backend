@@ -165,9 +165,10 @@ public class TrackingDashboardParityTests(AppDbContextFixture fixture) : Postgre
 
     /// <summary>
     /// The desktop totals counted distinct window titles with <c>x.WindowTitle != null</c> on a
-    /// non-nullable column — always true — while the per-process list three lines above it used
-    /// <c>IsNullOrEmpty</c>. An untitled window therefore counted as a title of its own, and the totals
-    /// row printed one more than the slices listed.
+    /// non-nullable column — always true — while the title list used <c>IsNullOrEmpty</c>. An untitled
+    /// window therefore counted as a title of its own, and the totals row printed one more than the
+    /// list showed. The list is the details panel's (the pie row no longer carries one, PERF-5), so the
+    /// count is held against that.
     /// </summary>
     [Fact]
     public async Task DesktopPieChart_DoesNotCountAnUntitledWindowAsADistinctTitle()
@@ -175,9 +176,9 @@ public class TrackingDashboardParityTests(AppDbContextFixture fixture) : Postgre
         await SeedDesktopAsync(("chrome", "GitHub", 60), ("chrome", string.Empty, 60));
 
         var pie = await PostAsync("/api/activity-tracking/desktop/pie-chart", PieRequest(null));
+        var details = await GetAsync($"/api/activity-tracking/desktop/process-details?processName=chrome&{DetailsEnvelope}");
 
-        var listed = pie.GetProperty("processes").EnumerateArray()
-            .Single().GetProperty("windowTitles").GetArrayLength();
+        var listed = details.GetProperty("windowTitles").GetArrayLength();
 
         pie.GetProperty("totals").GetProperty("totalWindowTitles").GetInt32().Should().Be(listed).And.Be(1,
             "an empty title is the absence of one, and the list the number describes already says so");
@@ -193,12 +194,33 @@ public class TrackingDashboardParityTests(AppDbContextFixture fixture) : Postgre
         await SeedWebExtensionAsync(("github.com", "https://github.com/", 60), ("github.com", string.Empty, 60));
 
         var pie = await PostAsync("/api/activity-tracking/web-extension/pie-chart", PieRequest(null));
+        var details = await GetAsync($"/api/activity-tracking/web-extension/domain-details?domain=github.com&{DetailsEnvelope}");
 
-        var listed = pie.GetProperty("domains").EnumerateArray()
-            .Single().GetProperty("pages").GetArrayLength();
+        var listed = details.GetProperty("pages").GetArrayLength();
 
         pie.GetProperty("totals").GetProperty("totalPages").GetInt32().Should().Be(listed).And.Be(1,
             "a row tracked to the domain only carries no page, which is what the pages list already says");
+    }
+
+    /// <summary>
+    /// PERF-5. Each pie row used to carry every distinct URL (web) or window title (desktop) of its item
+    /// over the whole span. No client renders either, and a long span is tens of thousands of strings.
+    /// The details endpoints own the lists, and the totals own the counts. This pins the removal, so a
+    /// list re-added for one screen does not quietly bring back the cost on all of them.
+    /// </summary>
+    [Fact]
+    public async Task PieChartRows_CarryNoPerItemDetailList()
+    {
+        await SeedDesktopAsync(("chrome", "GitHub", 60));
+        await SeedWebExtensionAsync(("github.com", "https://github.com/", 60));
+
+        var desktop = await PostAsync("/api/activity-tracking/desktop/pie-chart", PieRequest(null));
+        var web = await PostAsync("/api/activity-tracking/web-extension/pie-chart", PieRequest(null));
+
+        desktop.GetProperty("processes").EnumerateArray().Single().TryGetProperty("windowTitles", out _)
+            .Should().BeFalse("the titles are the process-details endpoint's to list");
+        web.GetProperty("domains").EnumerateArray().Single().TryGetProperty("pages", out _)
+            .Should().BeFalse("the pages are the domain-details endpoint's to list");
     }
 
     /// <summary>
@@ -365,4 +387,15 @@ public class TrackingDashboardParityTests(AppDbContextFixture fixture) : Postgre
 
         return await response.Content.ReadFromJsonAsync<JsonElement>(Json, CancellationToken);
     }
+
+    private async Task<JsonElement> GetAsync(string route)
+    {
+        var response = await CreateUserRoleClient().GetAsync(route, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        return await response.Content.ReadFromJsonAsync<JsonElement>(Json, CancellationToken);
+    }
+
+    /// <summary>The whole of <see cref="Day"/> as the instant envelope the details endpoints take, with no daily window.</summary>
+    private static string DetailsEnvelope => $"from={Day:yyyy-MM-dd}T00:00:00Z&to={Day.AddDays(1):yyyy-MM-dd}T00:00:00Z";
 }

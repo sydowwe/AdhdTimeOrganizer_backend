@@ -56,11 +56,6 @@ public class DesktopPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
                 ActiveSeconds = g.Sum(x => x.ActiveSeconds),
                 BackgroundSeconds = g.Sum(x => x.BackgroundSeconds),
                 TotalSeconds = g.Sum(x => x.ActiveSeconds + x.BackgroundSeconds),
-                WindowTitles = g
-                    .Where(x => !string.IsNullOrEmpty(x.WindowTitle))
-                    .Select(x => x.WindowTitle)
-                    .Distinct()
-                    .ToList(),
                 Entries = g.Count()
             })
             .OrderByDescending(x => x.TotalSeconds)
@@ -84,7 +79,6 @@ public class DesktopPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
                     ActiveSeconds = below.Sum(x => x.ActiveSeconds),
                     BackgroundSeconds = below.Sum(x => x.BackgroundSeconds),
                     TotalSeconds = below.Sum(x => x.TotalSeconds),
-                    WindowTitles = below.SelectMany(x => x.WindowTitles).Distinct().ToList(),
                     Entries = below.Sum(x => x.Entries)
                 });
         }
@@ -99,7 +93,7 @@ public class DesktopPieChartEndpoint(DbContext db, IUserTimeZoneResolver timeZon
             ActiveSeconds = periodData.Sum(x => x.ActiveSeconds),
             BackgroundSeconds = periodData.Sum(x => x.BackgroundSeconds),
             TotalProcesses = periodData.Select(x => x.ProcessName).Distinct().Count(),
-            // IsNullOrEmpty, matching the per-process WindowTitles list above: the column is non-nullable,
+            // IsNullOrEmpty, matching the window-title list of …/process-details: the column is non-nullable,
             // so a null check is always true and counts "" — an untitled window — as a distinct title.
             TotalWindowTitles = periodData
                 .Where(x => !string.IsNullOrEmpty(x.WindowTitle))

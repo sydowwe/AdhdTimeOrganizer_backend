@@ -177,10 +177,12 @@ side by side.
 bound by all three sources; the unified routes add `sources` on top. Android used to carry its own copy
 of the stacked-bars and timeline requests, differing only in `MinSeconds` being a `long` — a naming
 accident rather than a distinction, since nothing about a bucket width is source-specific. **The
-response shapes are a different matter and stay separate**: each source carries a different secondary
-detail list (`pages` / `windowTitles` / none) with a matching distinct count, and android has no
-background concept at all, so a shared response would have to ship a structurally-always-zero
-`backgroundSeconds` and a `details` list meaning URLs on one source and window titles on another.
+response shapes are a different matter and stay separate**: each source's totals carry a different
+distinct count (`totalPages` / `totalWindowTitles` / none), and android has no background concept at
+all, so a shared response would have to ship a structurally-always-zero `backgroundSeconds` and a count
+meaning URLs on one source and window titles on another. The pie rows themselves carry **no** detail
+list (PERF-5): the ranked lists belong to `…/domain-details` and `…/process-details`, which the client
+calls when an item is selected.
 
 **Every dashboard item also carries a `key`/`label` pair** (`application/dto/response/IDashboardItem.cs`)
 beside its own `domain` / `processName` / `packageName` fields — additive, computed, and the same two

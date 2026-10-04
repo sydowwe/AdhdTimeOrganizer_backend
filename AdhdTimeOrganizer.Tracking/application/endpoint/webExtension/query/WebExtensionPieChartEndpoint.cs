@@ -56,10 +56,6 @@ public class WebExtensionPieChartEndpoint(DbContext db, IUserTimeZoneResolver ti
                 ActiveSeconds = g.Sum(x => x.ActiveSeconds),
                 BackgroundSeconds = g.Sum(x => x.BackgroundSeconds),
                 TotalSeconds = g.Sum(x => x.ActiveSeconds + x.BackgroundSeconds),
-                Pages = g.Where(x => !string.IsNullOrEmpty(x.Url))
-                    .Select(x => x.Url!)
-                    .Distinct()
-                    .ToList(),
                 Entries = g.Count()
             })
             .OrderByDescending(x => x.TotalSeconds)
@@ -90,10 +86,6 @@ public class WebExtensionPieChartEndpoint(DbContext db, IUserTimeZoneResolver ti
                     ActiveSeconds = domainsBelowThreshold.Sum(x => x.ActiveSeconds),
                     BackgroundSeconds = domainsBelowThreshold.Sum(x => x.BackgroundSeconds),
                     TotalSeconds = domainsBelowThreshold.Sum(x => x.TotalSeconds),
-                    Pages = domainsBelowThreshold
-                        .SelectMany(x => x.Pages)
-                        .Distinct()
-                        .ToList(),
                     Entries = domainsBelowThreshold.Sum(x => x.Entries)
                 };
                 result.Add(otherCategory);
@@ -111,7 +103,7 @@ public class WebExtensionPieChartEndpoint(DbContext db, IUserTimeZoneResolver ti
             ActiveSeconds = periodData.Sum(x => x.ActiveSeconds),
             BackgroundSeconds = periodData.Sum(x => x.BackgroundSeconds),
             TotalDomains = periodData.Select(x => x.Domain).Distinct().Count(),
-            // IsNullOrEmpty, matching the per-domain Pages list above — domain-only tracking stores an
+            // IsNullOrEmpty, matching the page list of …/domain-details — domain-only tracking stores an
             // empty Url, and a null check alone counts that as a page.
             TotalPages = periodData
                 .Where(x => !string.IsNullOrEmpty(x.Url))

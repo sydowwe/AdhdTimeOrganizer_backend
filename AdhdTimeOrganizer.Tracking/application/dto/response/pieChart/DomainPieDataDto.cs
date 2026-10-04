@@ -13,6 +13,9 @@ public record DomainPieDataDto : IDashboardItem
     public required int ActiveSeconds { get; init; }
     public required int BackgroundSeconds { get; init; }
     public required int TotalSeconds { get; init; }
-    public required List<string> Pages { get; init; }
+
+    // No page list. It was every distinct URL of the domain over the whole span, which no client renders
+    // (PERF-5). The ranked, timed list is GET …/domain-details, and the count is DayTotalsResponse.TotalPages.
+
     public required int Entries { get; init; }
 }

@@ -14,6 +14,10 @@ public record DesktopPieDataDto : IDashboardItem
     public required int ActiveSeconds { get; init; }
     public required int BackgroundSeconds { get; init; }
     public required int TotalSeconds { get; init; }
-    public required List<string> WindowTitles { get; init; }
+
+    // No window-title list. It was every distinct title of the process over the whole span, which no client
+    // renders (PERF-5). The ranked, timed list is GET …/process-details, and the count is
+    // DesktopDayTotalsResponse.TotalWindowTitles.
+
     public required int Entries { get; init; }
 }
