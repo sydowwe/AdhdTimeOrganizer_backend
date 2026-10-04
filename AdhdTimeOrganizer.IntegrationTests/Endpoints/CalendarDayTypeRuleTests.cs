@@ -105,7 +105,10 @@ public class CalendarDayTypeRuleTests(AppDbContextFixture fixture) : PostgresTes
             "the batch reports a rule violation per day, never as an HTTP failure");
 
         var batchBody = await batchResponse.Content.ReadFromJsonAsync<CalendarBatchResultResponse>(JsonOpts, CancellationToken);
-        batchBody!.Results.Should().Equal([new CalendarBatchResult { CalendarId = batchDay, Succeeded = allowed }],
+        var expected = allowed
+            ? CalendarBatchResult.Ok(batchDay)
+            : CalendarBatchResult.Failed(batchDay, CalendarBatchFailureReason.DayTypeNotAllowed);
+        batchBody!.Results.Should().Equal([expected],
             "both callers share one rule and must agree on the decision, differing only in how they report it");
 
         // ─── the rows ────────────────────────────────────────────────────────

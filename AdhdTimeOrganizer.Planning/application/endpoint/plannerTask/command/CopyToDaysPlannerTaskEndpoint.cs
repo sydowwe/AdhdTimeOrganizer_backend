@@ -90,7 +90,7 @@ public class CopyToDaysPlannerTaskEndpoint(DbContext dbContext)
             {
                 if (!existingTargetIds.Contains(targetCalendarId))
                 {
-                    results.Add(CalendarBatchResult.Failed(targetCalendarId));
+                    results.Add(CalendarBatchResult.Failed(targetCalendarId, CalendarBatchFailureReason.NotFound));
                     continue;
                 }
 
@@ -112,7 +112,7 @@ public class CopyToDaysPlannerTaskEndpoint(DbContext dbContext)
                     req.SourceCalendarId, targetCalendarId);
 
                 dbContext.ChangeTracker.Clear();
-                results.Add(CalendarBatchResult.Failed(targetCalendarId));
+                results.Add(CalendarBatchResult.Failed(targetCalendarId, CalendarBatchFailureReason.Error));
             }
         }
 

@@ -87,7 +87,7 @@ public class ApplyTemplateBatchPlannerTaskEndpoint(
                     .FirstOrDefaultAsync(c => c.Id == calendarId, ct);
                 if (calendar == null)
                 {
-                    results.Add(CalendarBatchResult.Failed(calendarId));
+                    results.Add(CalendarBatchResult.Failed(calendarId, CalendarBatchFailureReason.NotFound));
                     continue;
                 }
 
@@ -121,12 +121,13 @@ public class ApplyTemplateBatchPlannerTaskEndpoint(
                 if (template == null)
                 {
                     // The template went away mid-batch. Every remaining day would fail for that reason too.
-                    results.Add(CalendarBatchResult.Failed(calendarId));
-                    results.AddRange(req.CalendarIds.Skip(results.Count).Select(CalendarBatchResult.Failed));
+                    results.Add(CalendarBatchResult.Failed(calendarId, CalendarBatchFailureReason.Error));
+                    results.AddRange(req.CalendarIds.Skip(results.Count)
+                        .Select(id => CalendarBatchResult.Failed(id, CalendarBatchFailureReason.Error)));
                     break;
                 }
 
-                results.Add(CalendarBatchResult.Failed(calendarId));
+                results.Add(CalendarBatchResult.Failed(calendarId, CalendarBatchFailureReason.Error));
             }
         }
 

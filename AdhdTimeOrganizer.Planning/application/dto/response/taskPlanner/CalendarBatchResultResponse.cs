@@ -25,7 +25,26 @@ public record CalendarBatchResult
 
     public required bool Succeeded { get; init; }
 
+    /// <summary>
+    /// Why this day failed; <c>null</c> when it succeeded. Lets the client name the day <i>and</i> the cause —
+    /// "Workday on a Saturday" is something the user can act on, a bare <c>succeeded: false</c> is not.
+    /// </summary>
+    public CalendarBatchFailureReason? FailureReason { get; init; }
+
     public static CalendarBatchResult Ok(long calendarId) => new() { CalendarId = calendarId, Succeeded = true };
 
-    public static CalendarBatchResult Failed(long calendarId) => new() { CalendarId = calendarId, Succeeded = false };
+    public static CalendarBatchResult Failed(long calendarId, CalendarBatchFailureReason reason) =>
+        new() { CalendarId = calendarId, Succeeded = false, FailureReason = reason };
+}
+
+public enum CalendarBatchFailureReason
+{
+    /// <summary>The id resolves to no day the caller owns — stale, deleted, or another user's.</summary>
+    NotFound,
+
+    /// <summary>The day type is impossible on that weekday (<c>CalendarDayTypeRule</c>). Day-type batch only.</summary>
+    DayTypeNotAllowed,
+
+    /// <summary>The day's write threw and was rolled back; the cause is in the server log, not the response.</summary>
+    Error
 }

@@ -157,7 +157,7 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
         [
             new CalendarBatchResult { CalendarId = emptyDay, Succeeded = true },
             new CalendarBatchResult { CalendarId = dayWithConflict, Succeeded = true },
-            new CalendarBatchResult { CalendarId = theirDay, Succeeded = false }
+            CalendarBatchResult.Failed(theirDay, CalendarBatchFailureReason.NotFound)
         ], "one result per requested id, in request order, and another user's day is unreachable rather than an error for the batch");
 
         await using (var db = CreateDbContext())
@@ -270,7 +270,7 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
         body!.Results.Should().Equal(
         [
             new CalendarBatchResult { CalendarId = firstTarget, Succeeded = true },
-            new CalendarBatchResult { CalendarId = theirDay, Succeeded = false },
+            CalendarBatchResult.Failed(theirDay, CalendarBatchFailureReason.NotFound),
             new CalendarBatchResult { CalendarId = secondTarget, Succeeded = true }
         ], "a failing day in the middle must not stop the days after it");
 
@@ -366,7 +366,7 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
         [
             new CalendarBatchResult { CalendarId = firstDay, Succeeded = true },
             new CalendarBatchResult { CalendarId = secondDay, Succeeded = true },
-            new CalendarBatchResult { CalendarId = theirDay, Succeeded = false }
+            CalendarBatchResult.Failed(theirDay, CalendarBatchFailureReason.NotFound)
         ]);
 
         await using (var db = CreateDbContext())
@@ -412,8 +412,8 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
         body!.Results.Should().Equal(
         [
             new CalendarBatchResult { CalendarId = monday, Succeeded = true },
-            new CalendarBatchResult { CalendarId = saturday, Succeeded = false }
-        ]);
+            CalendarBatchResult.Failed(saturday, CalendarBatchFailureReason.DayTypeNotAllowed)
+        ], "the rule violation is named as such, distinct from a day that does not resolve — the client words the two differently");
 
         await using (var db = CreateDbContext())
         {
@@ -457,7 +457,8 @@ public class CalendarBatchEndpointTests(AppDbContextFixture fixture) : PostgresT
 
         body!.Results.Select(r => r.CalendarId).Should().Equal(ids,
             $"{PlannerBatchLimits.MaxCalendarIds} ids is the ceiling, not one past it — one result per requested id, in request order");
-        body.Results.Should().OnlyContain(r => !r.Succeeded, "none of these days exist");
+        body.Results.Should().OnlyContain(r => !r.Succeeded && r.FailureReason == CalendarBatchFailureReason.NotFound,
+            "none of these days exist");
     }
 
     /// <summary>

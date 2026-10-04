@@ -127,7 +127,7 @@ public class ApplyTemplateEdgeTests(AppDbContextFixture fixture) : PostgresTestB
 
         batch.StatusCode.Should().Be(HttpStatusCode.OK);
         var batchBody = await batch.Content.ReadFromJsonAsync<CalendarBatchResultResponse>(JsonOpts, CancellationToken);
-        batchBody!.Results.Should().Equal([new CalendarBatchResult { CalendarId = theirCalendarId, Succeeded = false }],
+        batchBody!.Results.Should().Equal([CalendarBatchResult.Failed(theirCalendarId, CalendarBatchFailureReason.NotFound)],
             "the batch reports the unreachable day per row rather than failing the whole request");
     }
 

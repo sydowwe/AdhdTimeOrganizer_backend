@@ -56,9 +56,15 @@ public class BatchUpdateDayTypeCalendarEndpoint(DbContext dbContext)
                 // Scoped by the global user filter: another user's id does not resolve, and reads as this
                 // day's succeeded:false exactly like a stale one.
                 var calendar = await dbContext.Set<Calendar>().FirstOrDefaultAsync(c => c.Id == calendarId, ct);
-                if (calendar == null || CalendarDayTypeRule.Violation(calendar, req.DayType) != null)
+                if (calendar == null)
                 {
-                    results.Add(CalendarBatchResult.Failed(calendarId));
+                    results.Add(CalendarBatchResult.Failed(calendarId, CalendarBatchFailureReason.NotFound));
+                    continue;
+                }
+
+                if (CalendarDayTypeRule.Violation(calendar, req.DayType) != null)
+                {
+                    results.Add(CalendarBatchResult.Failed(calendarId, CalendarBatchFailureReason.DayTypeNotAllowed));
                     continue;
                 }
 
@@ -74,7 +80,7 @@ public class BatchUpdateDayTypeCalendarEndpoint(DbContext dbContext)
                 Logger.LogWarning(ex, "Setting the day type on calendar {CalendarId} failed; continuing with the rest of the batch", calendarId);
 
                 dbContext.ChangeTracker.Clear();
-                results.Add(CalendarBatchResult.Failed(calendarId));
+                results.Add(CalendarBatchResult.Failed(calendarId, CalendarBatchFailureReason.Error));
             }
         }
 
