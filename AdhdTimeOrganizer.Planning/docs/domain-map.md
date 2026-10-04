@@ -166,6 +166,8 @@ Two rules exist for the client's sake rather than the domain's, and both are loa
 ⚠ **The streak's denominator is narrower than the progress ring's.** The ring counts every
 non-background task; the streak also drops optional and cancelled ones. A day can read 4/5 on the
 ring and still be complete. Clients must read `IsTodayComplete` rather than comparing counts.
+`TodayOutcome` splits its `false`: `Incomplete` (today still to earn, breaks the run at midnight)
+versus `Empty` (nothing qualifying today, so the run is safe either way).
 
 ⚠ **It rides on `CalendarResponse.Streak` and is null on every calendar read except
 `GetByDateCalendarEndpoint`**, which fills it in after the projection — `Projection` runs per row and
