@@ -36,8 +36,13 @@ public static class E2eFixtureIds
     /// period-level streaks the personal-bests panel reads, and four more daily routines whose item streaks
     /// reach the four milestone tiers above 7 that had never rendered.
     /// </para>
+    /// <para>
+    /// <c>e2e-v5</c> added one orphaned scheduler job and a run of it. Every orphan surface of the scheduler
+    /// views — the grid chip, the detail alert, the disabled Trigger and Replay, the attention list — had
+    /// never rendered, because no registered handler is ever missing in a running host.
+    /// </para>
     /// </remarks>
-    public const string FixtureVersion = "e2e-v4";
+    public const string FixtureVersion = "e2e-v5";
 
     // --- accounts -------------------------------------------------------------------------------
     // Credentials mirror the SPA's e2e/.env.test. The password is stored as a hash written directly by
@@ -323,4 +328,25 @@ public static class E2eFixtureIds
     /// </para>
     /// </summary>
     public const long ReminderDispatchFirst = 23_501;
+
+    // --- scheduler ------------------------------------------------------------------------------
+    // The scheduler schema is operational state the reset leaves alone, so these rows are addressed by
+    // key, not by a fixture id band: their ids are whatever the registry's sequence handed out the first
+    // time, kept stable by upserting in place, and echoed in the response under `scheduler`.
+
+    /// <summary>
+    /// An <c>Active</c> registry row whose handler key resolves to no registered handler — the state a host is
+    /// left in when a module that owned a job is removed or renamed. Nothing the app does can produce it:
+    /// <c>RegisterRecurringJobAsync</c> rejects an unknown handler key.
+    /// </summary>
+    public const string OrphanedJobKey = "E2e.OrphanedFixtureJob";
+
+    /// <summary>Deliberately the name of no handler in any slice or module.</summary>
+    public const string OrphanedJobHandlerKey = "E2e.RemovedHandler";
+
+    /// <summary>
+    /// The one run of the orphaned job, from before its handler went away — what makes the run-detail
+    /// Replay gate reachable. Found again on the next reset by this correlation id.
+    /// </summary>
+    public const string OrphanedJobRunCorrelationId = "e2e-orphaned-job-run";
 }

@@ -28,7 +28,8 @@ Two things it deliberately leaves alone:
   list. Migration state survives.
 - **The `scheduler` schema** (`scheduled_job`, `scheduled_job_run`) — operational state, not fixture
   data. The registrars that repopulate it only run at boot, so truncating it would leave the app with
-  no scheduled jobs until the next restart, silently.
+  no scheduled jobs until the next restart, silently. The fixture does write **two** rows there — the
+  orphaned job and its run (surface 15) — but by upserting them in place, never by truncating.
 
 **Point this at a database you are willing to lose.** The gate below is what stops you doing
 otherwise by accident — and because its database half takes no configuration, there is nothing to
@@ -183,6 +184,7 @@ body, so a spec may hardcode them or read them.
 | — paused / cancelled | `23004` (task-linked) / `23005` |
 | reminder dispatch ledger | `23501`–`23507` (3 sent, 1 skipped, 2 failed, 1 of those reversed) |
 | secondary account's own data | `11101`, `11601`, `12101`–`12102`, `13101`, `14101`–`14102`, `15501`, `22101`–`22102`, `23101` |
+| orphaned scheduler job + its run | **no fixture id** — found by job key `E2e.OrphanedFixtureJob`; ids returned under `scheduler` (surface 15) |
 
 **Ids the fixture does not choose** — task priorities and routine time periods are created by the real
 sign-up path (`IUserDefaultsService`), so they are **resolved and returned** in the response
@@ -357,6 +359,28 @@ that simply counts failures. `counts.reminderFailuresNeedingAttention` is 1 whil
     have caught it. `RoutineTimePeriodResponse.From` now derives both over the `HistoryDepth` window it
     already renders (see the Routines domain map); the fixture rows are what give them a value other than 0.
 
+### The orphaned scheduler job `e2e-v5` added
+
+15. **One `Active` job whose handler no longer exists, and one run of it.** An orphan is a registry row whose
+    `HandlerKey` resolves to no registered `IScheduledJobHandler` — what a host is left with when the module
+    that owned a job is removed or renamed. Every orphan surface of the SPA's scheduler views (the grid chip,
+    the job-detail alert, the disabled *Trigger now*, the run-detail *Replay* gate, the *Orphaned* attention
+    list) had never rendered: a running host has a handler for every row its registrars wrote, and
+    `RegisterRecurringJobAsync` rejects an unknown handler key. Rule 3 exactly.
+
+    - Job key `E2e.OrphanedFixtureJob`, handler key `E2e.RemovedHandler`, owner `E2eFixture`, daily cron.
+      Last run yesterday 03:00 UTC, `Succeeded`; `NextRunAt` **null** — nothing gives an orphan a trigger, and
+      a stale past value would also put it on the overdue list and in front of `OverdueJobSweep`'s alerts.
+      So it is on the orphaned list and on no other.
+    - **Upserted, not inserted.** The reset leaves the `scheduler` schema alone, so the job is found by its
+      key and the run by its correlation id (`e2e-orphaned-job-run`) and both are rewritten in place. Their
+      ids are whatever the registry's sequence handed out the first time — not a fixture band, because that
+      sequence is shared with the registrars and the dispatcher — and stay the same across resets. Read them
+      from `scheduler.orphanedJob` / `scheduler.orphanedJobRun`.
+    - `Seed_LeavesAnOrphanedJob_ThatTheScheduledReadsReportAsOrphaned` checks it through the three reads the
+      SPA renders from (health lists, job by id, run detail), since orphanhood is a fact about the running
+      host's handlers and no row assertion can show it.
+
 ### ⚠ The tracking rows are written as rows, not posted through the heartbeats
 
 `B3` asked for the ingest path. It is not reachable from here, and what it would have added is reproduced
@@ -406,7 +430,7 @@ number instead of assuming.
 
 ```jsonc
 {
-  "fixture": "e2e-v4",
+  "fixture": "e2e-v5",
   "seedDateUtc": "2026-09-10",
   "primaryUser":   { "id": 10001, "email": "test@example.com",  "password": "testpass123", "locale": "EN" },
   "secondaryUser": { "id": 10002, "email": "test2@example.com", "password": "testpass123", "locale": "EN" },
@@ -429,6 +453,8 @@ number instead of assuming.
                            "paused": 23004, "cancelled": 23005, "secondaryPostParcel": 23101 },
   "reminderDefinitions": { "callTheDentist": 23201, "fileTaxReturn": 23202, "payRentRecurring": 23203,
                            "paused": 23204, "cancelled": 23205, "secondaryPostParcel": 23301 },
+  // Resolved, not pinned — see surface 15. Stable across resets, but not the same number on two databases.
+  "scheduler":           { "orphanedJob": 74, "orphanedJobRun": 75010 },
   "taskPriorities":     { "Today": 9, "This week": 10, "This month": 11, "This year": 12 },
   "routineTimePeriods": { "Daily": 5, "Weekly": 6, "Monthly": 7, "Yearly": 8 },
   "counts": {
@@ -446,7 +472,7 @@ number instead of assuming.
 }
 ```
 
-The two lookup maps' values are illustrative — they are auto-generated, which is why they are returned
+The two lookup maps' values and the `scheduler` ids are illustrative — they are auto-generated, which is why they are returned
 rather than documented as constants. Everything else is fixed.
 
 The password is echoed back deliberately: this endpoint only exists where the account it describes is

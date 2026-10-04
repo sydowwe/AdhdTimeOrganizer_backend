@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.application.dto.testSupport;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
@@ -1241,6 +1242,60 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
         daily.Streak.Should().BeGreaterThan(0);
         daily.TotalPeriodsElapsed.Should().Be(daily.CompletionHistory.Count);
         daily.TotalPeriodsCompleted.Should().Be(daily.TotalPeriodsElapsed - 1, "one Daily cycle fell short");
+    }
+
+    // --- scheduler ----------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The orphaned job is only worth seeding if the reads report it as orphaned — that is a fact about the
+    /// handlers the running host resolved, not about any column, so a row assertion alone proves nothing. This
+    /// goes through the three reads the SPA's orphan surfaces render from: the health lists, the job by id, and
+    /// the run detail's replay preconditions.
+    /// </summary>
+    [Fact]
+    public async Task Seed_LeavesAnOrphanedJob_ThatTheScheduledReadsReportAsOrphaned()
+    {
+        var body = await SeedAsync();
+        var jobId = body.Scheduler["orphanedJob"];
+        var runId = body.Scheduler["orphanedJobRun"];
+
+        using var client = CreateUserRoleClient();
+
+        var health = await client.GetFromJsonAsync<JsonElement>("api/scheduler-dashboard/health", JsonOpts, CancellationToken);
+        bool Lists(string list) => health.GetProperty(list).EnumerateArray()
+            .Any(row => row.GetProperty("jobKey").GetString() == OrphanedJobKey);
+
+        Lists("orphanedJobs").Should().BeTrue("its handler key resolves to no registered handler");
+        Lists("overdueJobs").Should().BeFalse("NextRunAt is null — the row is for the orphan list alone");
+        Lists("failedJobs").Should().BeFalse("its last run succeeded");
+
+        var job = await client.GetFromJsonAsync<JsonElement>($"api/scheduled-job/{jobId}", JsonOpts, CancellationToken);
+        job.GetProperty("jobKey").GetString().Should().Be(OrphanedJobKey);
+        job.GetProperty("isOrphaned").GetBoolean().Should().BeTrue("job detail gates Trigger now on this flag");
+
+        var run = await client.GetFromJsonAsync<JsonElement>($"api/scheduler-dashboard/run/{runId}", JsonOpts, CancellationToken);
+        run.GetProperty("isJobOrphaned").GetBoolean().Should().BeTrue("run detail gates Replay on this flag");
+        run.GetProperty("jobStatus").GetString().Should().Be(nameof(JobStatus.Active),
+            "Removed would gate Replay too, and for a different reason the page words differently");
+    }
+
+    /// <summary>
+    /// The scheduler rows are upserted rather than truncated and re-inserted, so a second reset rewrites the same
+    /// two rows — no second orphan, no second run, and the ids a spec read off the first response still hold.
+    /// </summary>
+    [Fact]
+    public async Task Seed_Twice_KeepsOneOrphanedJobAndOneRun_UnderTheSameIds()
+    {
+        var first = await SeedAsync();
+        var second = await SeedAsync();
+
+        second.Scheduler.Should().BeEquivalentTo(first.Scheduler);
+
+        await using var db = Db();
+        (await db.ScheduledJobs.IgnoreQueryFilters().CountAsync(job => job.JobKey == OrphanedJobKey, CancellationToken))
+            .Should().Be(1);
+        (await db.ScheduledJobRuns.CountAsync(run => run.ScheduledJobId == first.Scheduler["orphanedJob"], CancellationToken))
+            .Should().Be(1);
     }
 
     // --- scope ------------------------------------------------------------------------------------

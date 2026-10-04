@@ -24,6 +24,7 @@ using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.Contracts.reminders;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.domain.serviceContract;
@@ -32,6 +33,8 @@ using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
 using Sydowwe.Notifications.domain.entity;
 using Sydowwe.Reminders.domain.entity;
 using Sydowwe.Reminders.domain.@enum;
+using Sydowwe.Scheduler.domain.entity;
+using Sydowwe.Scheduler.domain.@enum;
 using DayTypeEnum = AdhdTimeOrganizer.Core.domain.model.@enum.DayType;
 using LocationEnum = AdhdTimeOrganizer.Core.domain.model.@enum.Location;
 using static AdhdTimeOrganizer.infrastructure.testSupport.E2eFixtureIds;
@@ -219,9 +222,11 @@ public class E2eFixtureSeeder(
         // After both accounts: the reminders span them, and the task-linked one needs its planner task.
         await AddRemindersAsync(today, ct);
 
+        var scheduler = await UpsertOrphanedSchedulerJobAsync(today, ct);
+
         await AdvanceSequencesAsync(ct);
 
-        var response = await BuildResponseAsync(today, ct);
+        var response = await BuildResponseAsync(today, scheduler, ct);
 
         logger.LogInformation(
             "E2e fixture ready: {ActivityCount} activities, {ItemCount} to-do items ({OverdueCount} overdue), " +
@@ -1750,6 +1755,101 @@ public class E2eFixtureSeeder(
         await dbContext.SaveChangesAsync(ct);
     }
 
+    // --- scheduler ------------------------------------------------------------------------------
+
+    /// <summary>
+    /// One orphaned job — an <c>Active</c> registry row whose handler key no registered handler serves — and
+    /// one run of it from before the handler went away. Without them every orphan surface of the scheduler
+    /// views is unreachable: a running host has a handler for every job its registrars wrote, and
+    /// <c>RegisterRecurringJobAsync</c> rejects an unknown handler key, so the app cannot produce this state.
+    ///
+    /// <para><b>An upsert, unlike everything else here.</b> The reset leaves the <c>scheduler</c> schema alone
+    /// (see <see cref="TruncateAsync"/>), so these two rows are found by <see cref="E2eFixtureIds.OrphanedJobKey"/>
+    /// and <see cref="E2eFixtureIds.OrphanedJobRunCorrelationId"/> and rewritten in place. That keeps their ids
+    /// stable across resets without claiming a fixture band in a table whose sequence the registrars and the
+    /// dispatcher have been advancing for as long as the database has existed.</para>
+    ///
+    /// <para><b><c>NextRunAt</c> stays null.</b> Nothing ever gives an orphan a Quartz trigger — the registrar
+    /// skips a row whose handler is gone — so a non-null value would be a stale one, and a stale past value
+    /// puts the row on the overdue list too and in front of <c>OverdueJobSweep</c>'s alerts on every sweep.
+    /// The orphan list is the one this row is for.</para>
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, long>> UpsertOrphanedSchedulerJobAsync(DateOnly today, CancellationToken ct)
+    {
+        var lastRunStartedAt = Utc(today.AddDays(-1), 3);
+        var lastRunFinishedAt = lastRunStartedAt.AddSeconds(2);
+
+        var job = await dbContext.ScheduledJobs.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(row => row.JobKey == OrphanedJobKey, ct);
+
+        if (job is null)
+        {
+            job = new ScheduledJob { JobKey = OrphanedJobKey, HandlerKey = OrphanedJobHandlerKey, OwnerModule = "E2eFixture" };
+            dbContext.ScheduledJobs.Add(job);
+        }
+
+        job.HandlerKey = OrphanedJobHandlerKey;
+        job.OwnerModule = "E2eFixture";
+        job.Description = "Fixture job whose handler no longer exists.";
+        job.ScheduleType = JobScheduleType.Cron;
+        job.Cron = "0 0 3 * * ?";
+        job.IntervalPreset = null;
+        job.IntervalCount = null;
+        job.RunAtUtc = null;
+        job.TimeZoneId = null;
+        job.MisfirePolicy = MisfirePolicy.FireAndProceed;
+        job.DisallowConcurrent = false;
+        job.MaxRetries = 0;
+        job.AlertOnFailure = false;
+        job.PayloadJson = null;
+        job.Status = JobStatus.Active;
+        job.IsActive = true;
+        job.NextRunAt = null;
+        job.LastRunAt = lastRunStartedAt;
+        job.LastOutcome = RunOutcome.Succeeded;
+        job.RunningSince = null;
+
+        await dbContext.SaveChangesAsync(ct);
+
+        var run = await dbContext.ScheduledJobRuns
+            .FirstOrDefaultAsync(row => row.ScheduledJobId == job.Id && row.CorrelationId == OrphanedJobRunCorrelationId, ct);
+
+        if (run is null)
+        {
+            run = new ScheduledJobRun
+            {
+                ScheduledJobId = job.Id,
+                JobKeySnapshot = OrphanedJobKey,
+                HandlerKeySnapshot = OrphanedJobHandlerKey,
+                CorrelationId = OrphanedJobRunCorrelationId
+            };
+            dbContext.ScheduledJobRuns.Add(run);
+        }
+
+        // The run ledger is append-only for the app; this row is the fixture's own, so rewriting it is how it
+        // stays the same row. DurationMs is a stored computed column and follows from the two instants.
+        run.JobKeySnapshot = OrphanedJobKey;
+        run.HandlerKeySnapshot = OrphanedJobHandlerKey;
+        run.ScheduledFireTime = lastRunStartedAt;
+        run.StartedAt = lastRunStartedAt;
+        run.FinishedAt = lastRunFinishedAt;
+        run.Outcome = RunOutcome.Succeeded;
+        run.ErrorMessage = null;
+        run.ErrorType = null;
+        run.TriggerSource = TriggerSource.Scheduled;
+        run.RetryAttempt = 0;
+        run.PayloadSnapshotJson = null;
+        run.ReplaysRunId = null;
+
+        await dbContext.SaveChangesAsync(ct);
+
+        return new Dictionary<string, long>
+        {
+            ["orphanedJob"] = job.Id,
+            ["orphanedJobRun"] = run.Id
+        };
+    }
+
     /// <summary>
     /// The portal recurrence → module preset mapping, for the fixture's one recurring reminder.
     /// <c>ReminderRegistrationService.ToPreset</c> is the authority; this covers only the values the fixture
@@ -1865,7 +1965,8 @@ public class E2eFixtureSeeder(
 
     // --- response -------------------------------------------------------------------------------
 
-    private async Task<TestSeedResponse> BuildResponseAsync(DateOnly today, CancellationToken ct)
+    private async Task<TestSeedResponse> BuildResponseAsync(
+        DateOnly today, IReadOnlyDictionary<string, long> scheduler, CancellationToken ct)
     {
         var activityCount = await dbContext.Activities.IgnoreQueryFilters()
             .CountAsync(activity => activity.UserId == PrimaryUserId, ct);
@@ -2017,6 +2118,7 @@ public class E2eFixtureSeeder(
             Reminders: ReminderIds,
             ReminderDefinitions: ReminderIds.ToDictionary(
                 entry => entry.Key, entry => entry.Value + ReminderDefinitionOffset),
+            Scheduler: scheduler,
             TaskPriorities: await PriorityIdsAsync(PrimaryUserId, ct),
             RoutineTimePeriods: await RoutineTimePeriodIdsAsync(PrimaryUserId, ct),
             Counts: new TestSeedCounts(

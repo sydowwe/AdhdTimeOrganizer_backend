@@ -29,6 +29,7 @@ public sealed record TestSeedResponse(
     IReadOnlyDictionary<string, long> Notifications,
     IReadOnlyDictionary<string, long> Reminders,
     IReadOnlyDictionary<string, long> ReminderDefinitions,
+    IReadOnlyDictionary<string, long> Scheduler,
     IReadOnlyDictionary<string, long> TaskPriorities,
     IReadOnlyDictionary<string, long> RoutineTimePeriods,
     TestSeedCounts Counts);
@@ -40,6 +41,12 @@ public sealed record TestSeedResponse(
 /// The module-side definition for each of those, keyed the same way. These are the ids the admin register
 /// and its detail route take, and they are deliberately not the same numbers as <paramref name="Reminders"/>
 /// so a spec cannot pass one where it means the other and still get a 200.
+/// </param>
+/// <param name="Scheduler">
+/// <c>orphanedJob</c> and <c>orphanedJobRun</c> — the one registry row whose handler no longer exists, and a
+/// run of it. Resolved rather than pinned: the scheduler schema survives the reset, so these ids are whatever
+/// its sequence gave the rows the first time, and they stay put across resets because the rows are rewritten
+/// in place.
 /// </param>
 /// <param name="Password">
 /// Echoed back on purpose: this endpoint only exists where the account it describes is a fixture, and
