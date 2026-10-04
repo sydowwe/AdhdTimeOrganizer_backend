@@ -22,9 +22,8 @@ namespace AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 /// carry: the error off the run log, the in-flight fact, and the missing handler key.
 /// </para>
 /// <para>
-/// The in-flight clause is the load-bearing half of the overdue reason. <c>RunningSince</c> is dispatcher
-/// bookkeeping and is on no response DTO, so "stuck" versus "merely slow" — which is the difference between
-/// paging someone and waiting — is a distinction no client can make for itself.
+/// The in-flight clause is the load-bearing half of the overdue reason: "stuck" versus "merely slow" is the
+/// difference between paging someone and waiting, and the sentence is where that reading is made for the operator.
 /// </para>
 /// </summary>
 [Collection("Postgres")]
@@ -78,7 +77,7 @@ public class SchedulerAttentionDetailTests(AppDbContextFixture fixture) : Postgr
 
         detail.Should().Contain("5 h", "the lateness is the first thing the operator reads");
         detail.Should().Contain("executing",
-            "RunningSince is on no response DTO, so the client cannot tell a slow job from a missed fire");
+            "the sentence must tell a slow job from a missed fire");
     }
 
     [Fact(DisplayName = "An overdue row with nothing in flight says the fire was missed")]

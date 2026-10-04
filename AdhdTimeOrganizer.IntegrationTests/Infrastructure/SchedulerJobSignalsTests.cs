@@ -118,7 +118,33 @@ public class SchedulerJobSignalsTests(AppDbContextFixture fixture) : PostgresTes
             "listing every retired job as a problem buries the rows that actually need acting on");
     }
 
+    [Fact(DisplayName = "A job with a run in flight reports runningSince on the grid and on the by-id read")]
+    public async Task InFlightJobReportsRunningSinceOnBothSurfaces()
+    {
+        var startedAt = DateTime.UtcNow.AddMinutes(-7);
+        var (owner, id) = await SeedCoreAsync(job =>
+        {
+            job.DisallowConcurrent = true;
+            job.RunningSince = startedAt;
+        });
+
+        // The trigger-now confirm warns of a likely veto off this. Dropped from a projection it serializes null,
+        // which reads as "nothing running" — the same confident-wrong shape as the two flags above.
+        RunningSince((await GridAsync(owner)).Single()).Should().BeCloseTo(startedAt, TimeSpan.FromSeconds(1));
+        RunningSince(await ReadJobAsync(id)).Should().BeCloseTo(startedAt, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact(DisplayName = "A job with nothing in flight reports runningSince null")]
+    public async Task IdleJobReportsNoRunningSince()
+    {
+        var owner = await SeedAsync(job => job.RunningSince = null);
+
+        (await GridAsync(owner)).Single().GetProperty("runningSince").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
     // ---- helpers -----------------------------------------------------------------------------------
+
+    private static DateTime RunningSince(JsonElement row) => row.GetProperty("runningSince").GetDateTime().ToUniversalTime();
 
     // Handlers are scoped (IScopedService), so they only resolve inside a scope — the same way an endpoint sees
     // them. Resolving off the root provider throws.
