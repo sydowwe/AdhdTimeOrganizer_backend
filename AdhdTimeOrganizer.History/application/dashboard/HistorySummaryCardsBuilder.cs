@@ -25,7 +25,7 @@ public static class HistorySummaryCardsBuilder
     /// Rows in <paramref name="window"/>'s range, unfiltered — the weekday filter is applied here.
     /// </param>
     /// <param name="window">The resolved baseline, from <see cref="HistoryBaselineWindow.Resolve"/>.</param>
-    /// <param name="dayCount">Days the reported period spans, for the current daily average.</param>
+    /// <param name="dayCount">Days the reported period spans, which the baseline's mean day is scaled to.</param>
     /// <param name="previousPeriodTotalSeconds">
     /// Total of the period of the same length immediately before this one, for the period comparison.
     /// </param>
@@ -60,14 +60,16 @@ public static class HistorySummaryCardsBuilder
                 .Where(ah => ah.ResolveGroupKey(groupBy).Id == g.Key.Id)
                 .Sum(ah => (long)ah.Length.TotalSeconds);
 
-            var baselineDailyAvg = baselineDays > 0 ? baselineTotal / baselineDays : 0;
-            var currentDailyAvg = dayCount > 0 ? g.TotalSeconds / dayCount : g.TotalSeconds;
+            // The baseline's mean day, multiplied back out to the reported period's length, so it sits on the
+            // same scale as TotalSeconds beside it — the same reading the tracking cards' AverageSeconds take.
+            // Multiplied before the divide so a short-but-busy baseline is not rounded away.
+            var baselineForPeriod = baselineDays > 0 ? baselineTotal * Math.Max(dayCount, 1) / baselineDays : 0;
 
             var isNew = baselineTotal == 0 && g.TotalSeconds > 0;
 
             double? percentChange = null;
-            if (!isNew && baselineDailyAvg > 0)
-                percentChange = Math.Round((double)(currentDailyAvg - baselineDailyAvg) / baselineDailyAvg * 100, 1);
+            if (!isNew && baselineForPeriod > 0)
+                percentChange = Math.Round((double)(g.TotalSeconds - baselineForPeriod) / baselineForPeriod * 100, 1);
 
             return new HistorySummaryCard
             {
@@ -75,7 +77,7 @@ public static class HistorySummaryCardsBuilder
                 Name = g.Key.Name,
                 Color = g.Key.Color,
                 TotalSeconds = g.TotalSeconds,
-                AverageSeconds = baselineDailyAvg,
+                AverageSeconds = baselineForPeriod,
                 PercentChange = percentChange,
                 IsNew = isNew
             };

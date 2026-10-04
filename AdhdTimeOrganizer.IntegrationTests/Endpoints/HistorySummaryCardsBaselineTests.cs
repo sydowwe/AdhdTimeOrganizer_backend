@@ -125,6 +125,41 @@ public class HistorySummaryCardsBaselineTests(AppDbContextFixture fixture) : Pos
     }
 
     /// <summary>
+    /// <c>averageSeconds</c> is the baseline on the card's own scale: its mean day multiplied out to the
+    /// reported period, so it reads beside <c>totalSeconds</c> as "usually". It used to be the bare daily
+    /// mean, which on any multi-day range sat next to a period total and made the client's "+40%" look
+    /// like it was computed against a number a quarter of the size.
+    /// </summary>
+    [Fact]
+    public async Task AverageSeconds_IsTheBaselineScaledToTheReportedPeriod()
+    {
+        await using (var db = CreateDbContext())
+        {
+            var role = new ActivityRole { UserId = UserId, Name = "Scale role", Color = "#334455" };
+            db.Set<ActivityRole>().Add(role);
+            await db.SaveChangesAsync(CancellationToken);
+
+            var activity = new Activity { UserId = UserId, Name = "Scale", RoleId = role.Id };
+            db.Set<Activity>().Add(activity);
+            await db.SaveChangesAsync(CancellationToken);
+
+            db.Set<ActivityHistory>().AddRange(
+                // Inside the last7days baseline of a ThreeDays range over 03-09 (03-06..03-09).
+                NewRow(activity.Id, new DateTime(2026, 3, 1, 9, 0, 0, DateTimeKind.Utc), new IntTime(7, 0)),
+                NewRow(activity.Id, CurrentRowStart, new IntTime(2, 0)));
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        var card = await CardOf(SummaryRoute, "last7days");
+
+        // 7h over 7 baseline days is 1h a day; the reported range spans 4 days, so a usual one holds 4h.
+        card.GetProperty("averageSeconds").GetInt64().Should().Be(4 * 3600);
+        card.GetProperty("totalSeconds").GetInt64().Should().Be(2 * 3600);
+        card.GetProperty("percentChange").GetDouble().Should().Be(-50.0,
+            "the percentage is computed against the same number the card now reports as its baseline");
+    }
+
+    /// <summary>
     /// The guard for the sentinel itself, asserted on the resolver rather than over the wire — because the
     /// wire cannot see it here. <see cref="Sydowwe.Framework.Testing.PostgresContainerFixture{TProgram,
     /// TDbContext}"/> sets <c>Npgsql.EnableLegacyTimestampBehavior</c> for every integration test in the

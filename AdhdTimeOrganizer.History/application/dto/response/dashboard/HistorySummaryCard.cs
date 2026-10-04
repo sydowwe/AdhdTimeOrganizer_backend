@@ -12,6 +12,12 @@ public record HistorySummaryCard
     public string Name { get; set; } = string.Empty;
     public string? Color { get; set; }
     public long TotalSeconds { get; set; }
+
+    /// <summary>
+    /// The baseline's mean day scaled to the reported period's length — what <see cref="TotalSeconds"/> would
+    /// be on a usual stretch of the same length, and the number <see cref="PercentChange"/> is computed
+    /// against. On a one-day period it is the baseline's daily average. 0 when the baseline found nothing.
+    /// </summary>
     public long AverageSeconds { get; set; }
     public double? PercentChange { get; set; }
     public bool IsNew { get; set; }
