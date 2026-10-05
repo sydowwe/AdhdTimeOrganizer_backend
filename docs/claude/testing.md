@@ -81,6 +81,11 @@ worth copying the shape of:
   set equality **both ways** against a second copy of the list, checks the registration actually happened,
   and pins that a write for an uncatalogued kind is refused *and leaves no row*. The rules live in
   `BaseNotificationCatalogTests` (the module's testing package); only the list is this host's.
+- `ReminderDisplayLabelTests` — the reminders' `displayLabel`. The owner's `IReminderLabelResolver` is matched
+  by template key over an injected `IEnumerable`, and the label is filled after projection endpoint by
+  endpoint, so a resolver the scan missed, a drifted key or a read that skips the step all return a valid 200
+  with a null label — which the client renders as "Reminder #23001", indistinguishable from "no resolver".
+  It asserts the title on every read that names a reminder, and that `/my-upcoming` still sends no payload.
 - `HistorySummaryCustomRangeTests` — `rangeType: "CustomRange"` is `date`…`endDate` inclusive on all four
   `summary/` endpoints. The range resolver used to fall through to `(date, date)` and a `to <= from` guard
   widened that to two days, so a month-long request was answered for two days — a well-formed 200 the
