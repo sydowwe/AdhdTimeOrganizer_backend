@@ -407,6 +407,106 @@ public class ApplyTemplateEdgeTests(AppDbContextFixture fixture) : PostgresTestB
         definition.NextOccurrenceAt.Should().NotBeNull();
     }
 
+    // ─── H: OP15 — the origin of an applied task ─────────────────────────────
+
+    /// <summary>
+    /// OP15. Until this, no write path ever set <c>PlannerTask.SourceTemplateTaskId</c>: the apply endpoints
+    /// built their tasks from <c>PlannerTaskRequest</c>, which had no such field, so the column was null on every
+    /// row and the client's "from template" mark could never show. Each apply line now names the template line it
+    /// came from, and the server keeps the id only if it is a line of the template being applied. A line the user
+    /// added to the preview (no id), a line of another template, another user's line and a stale id all land as
+    /// null rather than refusing the plan, because the field is provenance and nothing joins on it.
+    /// </summary>
+    [Theory(DisplayName = "OP15: an applied task records the template line it came from, and only a line of that template")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ApplyingATemplate_RecordsEachTasksTemplateLine_AndDropsAForeignOne(bool batched)
+    {
+        var (activityId, template) = await SeedApplyFixtureAsync($"origin-{batched}");
+        var calendarId = await SeedCalendarAsync(new DateOnly(2029, 7, batched ? 10 : 9));
+
+        long ownLineId, otherTemplatesLineId, theirLineId;
+        await using (var db = CreateDbContext())
+        {
+            ownLineId = await PlanningTestSeedHelper.SeedTemplatePlannerTaskAsync(
+                db, template.Id, activityId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+
+            var otherTemplateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, name: $"Other template {batched}", ct: CancellationToken);
+            otherTemplatesLineId = await PlanningTestSeedHelper.SeedTemplatePlannerTaskAsync(
+                db, otherTemplateId, activityId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+
+            await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
+            var theirActivityId = await PlanningTestSeedHelper.SeedActivityAsync(
+                db, $"origin-theirs-{batched}", ReminderSeedHelper.OtherUserId, CancellationToken);
+            var theirTemplateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, ReminderSeedHelper.OtherUserId, $"Their template {batched}", CancellationToken);
+            theirLineId = await PlanningTestSeedHelper.SeedTemplatePlannerTaskAsync(
+                db, theirTemplateId, theirActivityId, new TimeOnly(9, 0), new TimeOnly(10, 0),
+                ReminderSeedHelper.OtherUserId, CancellationToken);
+        }
+
+        object[] lines =
+        [
+            NewTask(activityId, 9, 0, 10, 0, ownLineId),
+            NewTask(activityId, 10, 0, 11, 0), // added to the preview by hand
+            NewTask(activityId, 11, 0, 12, 0, otherTemplatesLineId),
+            NewTask(activityId, 12, 0, 13, 0, theirLineId),
+            NewTask(activityId, 13, 0, 14, 0, long.MaxValue) // a line deleted while the preview was open
+        ];
+
+        var response = batched
+            ? await CreateUserRoleClient().PostAsJsonAsync("api/calendar/apply-planner-template/batch", new
+            {
+                TemplateId = template.Id,
+                CalendarIds = new[] { calendarId },
+                ConflictResolution = "Ignore",
+                TasksFromTemplate = lines
+            }, JsonOpts, CancellationToken)
+            : await ApplyAsync(calendarId, template.Id, "Ignore", lines);
+
+        response.StatusCode.Should().Be(batched ? HttpStatusCode.OK : HttpStatusCode.Created);
+
+        await using (var db = CreateDbContext())
+        {
+            var origins = await db.Set<PlannerTask>()
+                .Where(t => t.CalendarId == calendarId)
+                .OrderBy(t => t.StartTime)
+                .Select(t => t.SourceTemplateTaskId)
+                .ToListAsync(CancellationToken);
+
+            origins.Should().Equal([ownLineId, null, null, null, null],
+                "only a line of the applied template is recorded; everything else is null");
+        }
+
+        // The origin is written by an apply only. A full PUT omits it, and must not read the omission as "none".
+        long appliedTaskId;
+        await using (var db = CreateDbContext())
+            appliedTaskId = await db.Set<PlannerTask>()
+                .Where(t => t.CalendarId == calendarId && t.SourceTemplateTaskId == ownLineId)
+                .Select(t => t.Id)
+                .SingleAsync(CancellationToken);
+
+        var put = await CreateUserRoleClient().PutAsJsonAsync($"api/planner-task/{appliedTaskId}", new
+        {
+            StartTime = new { Hours = 9, Minutes = 15 },
+            EndTime = new { Hours = 10, Minutes = 0 },
+            IsBackground = false,
+            ActivityId = activityId,
+            Status = "NotStarted",
+            CalendarId = calendarId,
+            SourceTemplateTaskId = otherTemplatesLineId // not a field of the plain request: ignored
+        }, JsonOpts, CancellationToken);
+        put.IsSuccessStatusCode.Should().BeTrue(await put.Content.ReadAsStringAsync(CancellationToken));
+
+        await using (var db = CreateDbContext())
+        {
+            var edited = await db.Set<PlannerTask>().SingleAsync(t => t.Id == appliedTaskId, CancellationToken);
+            edited.StartTime.Should().Be(new TimeOnly(9, 15), "the PUT itself went through");
+            edited.SourceTemplateTaskId.Should().Be(ownLineId, "an edit keeps the origin, and cannot rewrite it");
+        }
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private async Task<(long ActivityId, TaskPlannerDayTemplate Template)> SeedApplyFixtureAsync(
@@ -436,13 +536,14 @@ public class ApplyTemplateEdgeTests(AppDbContextFixture fixture) : PostgresTestB
         return await PlanningTestSeedHelper.SeedCalendarAsync(db, date, ct: CancellationToken);
     }
 
-    private static object NewTask(long activityId, int startH, int startM, int endH, int endM) => new
+    private static object NewTask(long activityId, int startH, int startM, int endH, int endM, long? sourceTemplateTaskId = null) => new
     {
         StartTime = new { Hours = startH, Minutes = startM },
         EndTime = new { Hours = endH, Minutes = endM },
         IsBackground = false,
         ActivityId = activityId,
-        Status = "NotStarted"
+        Status = "NotStarted",
+        SourceTemplateTaskId = sourceTemplateTaskId
     };
 
     private Task<HttpResponseMessage> ApplyAsync(long calendarId, long templateId, string conflictResolution, object[] tasksFromTemplate) =>

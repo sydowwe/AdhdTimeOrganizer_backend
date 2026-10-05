@@ -27,5 +27,5 @@ public record ApplyTemplateToCalendarsBatchRequest
     /// on an individual task is ignored: the day comes from <see cref="CalendarIds"/>, and each day gets its
     /// own freshly built copy of this list.
     /// </summary>
-    public required List<PlannerTaskRequest> TasksFromTemplate { get; init; }
+    public required List<TemplateAppliedTaskRequest> TasksFromTemplate { get; init; }
 }

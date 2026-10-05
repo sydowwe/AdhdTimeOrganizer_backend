@@ -24,15 +24,39 @@ public static class PlannerTemplateApplier
     /// Turns the request's tasks into entities for one day. The resolved <paramref name="calendarId"/> wins
     /// over whatever each task carried: the client used to repeat the id per task, which could only ever
     /// agree with the request's own or be a bug.
+    /// <para>
+    /// <c>SourceTemplateTaskId</c> is kept only when it names one of <paramref name="templateLineIds"/>, the lines
+    /// of the template being applied, and is dropped to null otherwise. It is provenance, not a reference anything
+    /// joins on, so a stale id (the line was deleted while the preview was open) is not worth refusing the whole
+    /// plan over. But it must not be able to name another template's line, or another user's.
+    /// </para>
     /// </summary>
-    public static List<PlannerTask> BuildTasks(IEnumerable<PlannerTaskRequest> tasksFromTemplate, long userId, long calendarId) =>
+    public static List<PlannerTask> BuildTasks(
+        IEnumerable<TemplateAppliedTaskRequest> tasksFromTemplate,
+        long userId,
+        long calendarId,
+        IReadOnlySet<long> templateLineIds) =>
         tasksFromTemplate.Select(t =>
         {
             var entity = t.ToEntity;
             entity.UserId = userId;
             entity.CalendarId = calendarId;
+            entity.SourceTemplateTaskId = t.SourceTemplateTaskId is { } lineId && templateLineIds.Contains(lineId)
+                ? lineId
+                : null;
             return entity;
         }).ToList();
+
+    /// <summary>
+    /// The ids of <paramref name="templateId"/>'s own lines, for <see cref="BuildTasks"/>. Call it only after the
+    /// template itself has resolved through the user filter: the lines are scoped by their template, not by user.
+    /// </summary>
+    public static async Task<IReadOnlySet<long>> LoadTemplateLineIdsAsync(DbContext dbContext, long templateId, CancellationToken ct) =>
+        (await dbContext.Set<TemplatePlannerTask>()
+            .Where(t => t.TemplateId == templateId)
+            .Select(t => t.Id)
+            .ToListAsync(ct))
+        .ToHashSet();
 
     /// <summary>
     /// Stamps the template onto the day, resolves the conflicts between <paramref name="newTasks"/> and the

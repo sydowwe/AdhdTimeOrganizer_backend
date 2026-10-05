@@ -74,6 +74,9 @@ public class ApplyTemplateBatchPlannerTaskEndpoint(
             return;
         }
 
+        // Read once: a plain set, so it survives the ChangeTracker.Clear() a failed day triggers below.
+        var templateLineIds = await PlannerTemplateApplier.LoadTemplateLineIdsAsync(dbContext, template.Id, ct);
+
         var results = new List<CalendarBatchResult>(req.CalendarIds.Count);
 
         foreach (var calendarId in req.CalendarIds)
@@ -96,7 +99,7 @@ public class ApplyTemplateBatchPlannerTaskEndpoint(
                     calendar,
                     template,
                     req.ConflictResolution,
-                    PlannerTemplateApplier.BuildTasks(req.TasksFromTemplate, userId, calendar.Id));
+                    PlannerTemplateApplier.BuildTasks(req.TasksFromTemplate, userId, calendar.Id, templateLineIds));
 
                 var orphanedReminderIds = await reminders.GetReminderIdsForPlannerTasksAsync(
                     PlannerTemplateApplier.StagedTaskDeletions(dbContext), ct);

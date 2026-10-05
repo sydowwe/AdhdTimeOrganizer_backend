@@ -18,5 +18,5 @@ public record ApplyTemplateToTaskPlannerRequest
 
     public required ApplyTemplateConflictResolutionEnum ConflictResolution { get; init; }
 
-    public required List<PlannerTaskRequest> TasksFromTemplate { get; init; }
+    public required List<TemplateAppliedTaskRequest> TasksFromTemplate { get; init; }
 }

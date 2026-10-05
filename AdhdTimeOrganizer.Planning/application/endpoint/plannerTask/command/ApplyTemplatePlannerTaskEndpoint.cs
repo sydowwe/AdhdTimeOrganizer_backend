@@ -80,12 +80,14 @@ public class ApplyTemplatePlannerTaskEndpoint(
                 return;
             }
 
+            var templateLineIds = await PlannerTemplateApplier.LoadTemplateLineIdsAsync(dbContext, template.Id, ct);
+
             PlannerTemplateApplier.Stage(
                 dbContext,
                 calendar,
                 template,
                 req.ConflictResolution,
-                PlannerTemplateApplier.BuildTasks(req.TasksFromTemplate, User.GetId(), calendar.Id));
+                PlannerTemplateApplier.BuildTasks(req.TasksFromTemplate, User.GetId(), calendar.Id, templateLineIds));
 
             var orphanedReminderIds = await reminders.GetReminderIdsForPlannerTasksAsync(
                 PlannerTemplateApplier.StagedTaskDeletions(dbContext), ct);

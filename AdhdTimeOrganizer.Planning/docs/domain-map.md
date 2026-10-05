@@ -367,6 +367,13 @@ The stamp itself always runs: `Calendar.AppliedTemplateId` / `AppliedTemplateNam
 `DefaultWakeUpTime` / `DefaultBedTime` when it has them, and `LastUsedAt` / `UsageCount++` on the
 template.
 
+**Each applied task records the template line it came from** (`PlannerTask.SourceTemplateTaskId`, OP15). The
+client sends the lines, so the id arrives on each `TemplateAppliedTaskRequest`, and `BuildTasks` keeps it only
+when it is a line of the template being applied (`LoadTemplateLineIdsAsync`). Anything else (a task added to the
+preview by hand, another template's line, a stale id) lands as null rather than failing the apply: the column is
+provenance with no FK, and nothing joins on it. Only an apply writes it. The plain create and the full-replace
+PUT do not carry the field, so an edit cannot clear or forge it. Before OP15 nothing wrote it at all.
+
 ### Lazy day creation
 
 **A planner task may name its day by `Date` instead of `CalendarId`, and the calendar row is created
