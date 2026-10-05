@@ -74,11 +74,11 @@ public class GetFilterSortTodoListCategoryEndpoint(DbContext dbContext)
 
         var userId = User.GetId();
 
-        var hasUncategorized = await _dbContext.Set<TodoList>()
-            .AnyAsync(tl => tl.UserId == userId && tl.CategoryId == null, ct);
+        var uncategorizedCount = await _dbContext.Set<TodoList>()
+            .CountAsync(tl => tl.UserId == userId && tl.CategoryId == null, ct);
 
-        if (hasUncategorized)
-            items.Add(TodoListCategoryResponse.Uncategorized);
+        if (uncategorizedCount > 0)
+            items.Add(TodoListCategoryResponse.Uncategorized with { ListCount = uncategorizedCount });
 
         return items;
     }

@@ -898,6 +898,39 @@ public class FilterSortTodoListCategoryTests(AppDbContextFixture fixture) : Post
         categories.Select(c => c.Name).Should().BeEquivalentTo(["Mine"]);
     }
 
+    /// <summary>
+    /// OP17 — <c>ListCount</c> is the panel's badge and the figure the delete confirm quotes ("lists in
+    /// this category: 2"), so a wrong number is a wrong promise about what a delete touches. It is
+    /// counted per category, on the "Other" row too, and never includes another user's list: the
+    /// seed lets one point at our category, which is exactly the row a count without its own
+    /// <c>UserId</c> clause would pick up.
+    /// </summary>
+    [Fact(DisplayName = "ListCount counts the caller's lists per category, on 'Other' too, and not another user's")]
+    public async Task ListCount_CountsTheCallersListsPerCategory()
+    {
+        await using (var db = CreateDbContext())
+        {
+            await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
+            var chores = await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Chores", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListCategoryAsync(db, name: "Empty", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "Dishes", categoryId: chores, ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "Laundry", categoryId: chores, ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, ReminderSeedHelper.OtherUserId, "Theirs", chores, CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "Loose 1", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "Loose 2", ct: CancellationToken);
+            await TodoListTestSeedHelper.SeedTodoListAsync(db, name: "Loose 3", ct: CancellationToken);
+        }
+
+        var counts = (await FilterAsync(null)).ToDictionary(c => c.Name, c => c.ListCount);
+
+        counts.Should().BeEquivalentTo(new Dictionary<string, int?>
+        {
+            ["Chores"] = 2,
+            ["Empty"] = 0,
+            [TodoListCategoryResponse.UncategorizedName] = 3
+        });
+    }
+
     [Fact(DisplayName = "Unauthenticated category filter-sort is 401")]
     public async Task Unauthenticated_Returns401()
     {

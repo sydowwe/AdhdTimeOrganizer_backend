@@ -20,6 +20,14 @@ public record TodoListCategoryResponse : NameTextColorIconResponse,
 
     public const string UncategorizedName = "Other";
 
+    /// <summary>
+    /// How many of the caller's lists point at this category: the category panel's badge and the
+    /// delete-confirm's "this category holds N lists". Set by <see cref="Projection"/>, and on the
+    /// "Other" row by <c>GetFilterSortTodoListCategoryEndpoint</c>. It stays null on the copy embedded
+    /// in <c>TodoListResponse.Category</c>, which builds its own projection and has no use for it.
+    /// </summary>
+    public int? ListCount { get; init; }
+
     /// <summary>The synthetic row itself — see <see cref="UncategorizedId"/>.</summary>
     public static TodoListCategoryResponse Uncategorized => new()
     {
@@ -38,7 +46,11 @@ public record TodoListCategoryResponse : NameTextColorIconResponse,
             Name = e.Name,
             Text = e.Text,
             Color = e.Color,
-            Icon = e.Icon
+            Icon = e.Icon,
+            // The UserId clause is the same one HideEmpty's EXISTS carries: it is the leading column of
+            // ix_todo_list_user_id_category_id, and it keeps another user's list that points at this
+            // category out of the count without relying on a query filter being in force.
+            ListCount = e.TodoListColl.Count(tl => tl.UserId == e.UserId)
         });
     }
 
