@@ -30,6 +30,11 @@ Two things it deliberately leaves alone:
   data. The registrars that repopulate it only run at boot, so truncating it would leave the app with
   no scheduled jobs until the next restart, silently. The fixture does write **two** rows there — the
   orphaned job and its run (surface 15) — but by upserting them in place, never by truncating.
+  **One exception: timer-alarm jobs (`History.TimerBoundaryAlarm`) and their runs are deleted.** An alarm's
+  job key is derived from its row id (`history.timer-boundary.{id}`), and the truncate restarts those ids
+  at 1, so a kept job would be re-used by the first alarm a spec schedules — flipped back to Active with
+  another alarm's run history. Their alarm rows are gone and no registrar recreates them, so nothing is
+  lost (`Seed_DeletesTimerAlarmJobs_AndKeepsEveryOtherSchedulerJob`).
 
 **Point this at a database you are willing to lose.** The gate below is what stops you doing
 otherwise by accident — and because its database half takes no configuration, there is nothing to

@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.infrastructure.security;
+using AdhdTimeOrganizer.History.application.job;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.Planning.application.service.reminder;
@@ -284,7 +285,38 @@ public class E2eFixtureSeeder(
         // no longer exist, and the next SaveChanges would try to update them.
         dbContext.ChangeTracker.Clear();
 
-        logger.LogInformation("Truncated {TableCount} tables.", targets.Count);
+        var alarmJobs = await DeleteTimerAlarmJobsAsync(ct);
+
+        logger.LogInformation("Truncated {TableCount} tables and deleted {AlarmJobs} timer-alarm job(s).", targets.Count, alarmJobs);
+    }
+
+    /// <summary>
+    /// Deletes the scheduler jobs (and their runs) of every timer-boundary alarm — the one exception to leaving the
+    /// scheduler schema alone.
+    /// <para>
+    /// An alarm's job key is derived from its row id (<c>history.timer-boundary.{id}</c>), and the truncate above
+    /// restarts that id at 1. Left in place, the old registry row is <i>re-used</i> by the first alarm a spec
+    /// schedules: same key, so the upsert flips a long-retired job back to Active and the new alarm inherits its
+    /// run history. Unlike the recurring jobs the comment above protects, these rows describe alarm rows that no
+    /// longer exist, and no registrar recreates them — there is nothing to lose. A trigger still armed in the
+    /// in-memory store for one of them fires at an unknown key, which the dispatcher logs and skips.
+    /// </para>
+    /// </summary>
+    private async Task<int> DeleteTimerAlarmJobsAsync(CancellationToken ct)
+    {
+        var alarmJobIds = dbContext.ScheduledJobs.IgnoreQueryFilters()
+            .Where(job => job.HandlerKey == TimerBoundaryAlarmJobHandler.HandlerKey)
+            .Select(job => job.Id);
+
+        // Runs first: they hold the FK to the job. Every run of these jobs goes in one statement, so the
+        // replay-lineage self-reference (Restrict) never points outside the deleted set.
+        await dbContext.ScheduledJobRuns
+            .Where(run => alarmJobIds.Contains(run.ScheduledJobId))
+            .ExecuteDeleteAsync(ct);
+
+        return await dbContext.ScheduledJobs.IgnoreQueryFilters()
+            .Where(job => job.HandlerKey == TimerBoundaryAlarmJobHandler.HandlerKey)
+            .ExecuteDeleteAsync(ct);
     }
 
     /// <summary>

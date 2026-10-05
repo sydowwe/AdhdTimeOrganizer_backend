@@ -6,6 +6,7 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.application.dto.testSupport;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.infrastructure.security;
+using AdhdTimeOrganizer.History.application.job;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.testSupport;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
@@ -71,6 +72,63 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
     }
 
     // --- the contract ----------------------------------------------------------------------------
+
+    /// <summary>
+    /// The reset restarts the alarm table's ids at 1, and an alarm's job key is derived from its id — so a kept
+    /// alarm job would be re-used by the first alarm a spec schedules, flipped back to Active with someone
+    /// else's run history. Every other scheduler row must survive: the recurring jobs are re-registered only at boot.
+    /// </summary>
+    [Fact]
+    public async Task Seed_DeletesTimerAlarmJobs_AndKeepsEveryOtherSchedulerJob()
+    {
+        var unique = Guid.NewGuid().ToString("N")[..12];
+        var alarmKey = $"history.timer-boundary.e2e-{unique}";
+        var otherKey = $"tests.seed-keeps.{unique}";
+
+        await using (var db = Db())
+        {
+            foreach (var (key, handler) in new[] { (alarmKey, TimerBoundaryAlarmJobHandler.HandlerKey), (otherKey, "tests.seed-keeps.handler") })
+            {
+                var job = new ScheduledJob
+                {
+                    JobKey = key,
+                    HandlerKey = handler,
+                    OwnerModule = "SeedTest",
+                    ScheduleType = JobScheduleType.Once,
+                    RunAtUtc = DateTime.UtcNow.AddDays(-1),
+                    MisfirePolicy = MisfirePolicy.FireAndProceed,
+                    Status = JobStatus.Removed
+                };
+                db.Set<ScheduledJob>().Add(job);
+                await db.SaveChangesAsync(CancellationToken);
+
+                db.Set<ScheduledJobRun>().Add(new ScheduledJobRun
+                {
+                    ScheduledJobId = job.Id,
+                    JobKeySnapshot = key,
+                    HandlerKeySnapshot = handler,
+                    StartedAt = DateTime.UtcNow.AddDays(-1),
+                    FinishedAt = DateTime.UtcNow.AddDays(-1),
+                    Outcome = RunOutcome.Succeeded,
+                    TriggerSource = TriggerSource.Scheduled,
+                    CorrelationId = Guid.NewGuid().ToString("N")
+                });
+                await db.SaveChangesAsync(CancellationToken);
+            }
+        }
+
+        await SeedAsync();
+
+        await using var verify = Db();
+        (await verify.Set<ScheduledJob>().AnyAsync(j => j.JobKey == alarmKey, CancellationToken))
+            .Should().BeFalse("a timer-alarm job outlives the alarm row its key was derived from");
+        (await verify.Set<ScheduledJobRun>().AnyAsync(r => r.JobKeySnapshot == alarmKey, CancellationToken))
+            .Should().BeFalse("its runs go with it");
+        (await verify.Set<ScheduledJob>().AnyAsync(j => j.JobKey == otherKey, CancellationToken))
+            .Should().BeTrue("the reset leaves every other scheduler job alone");
+        (await verify.Set<ScheduledJobRun>().AnyAsync(r => r.JobKeySnapshot == otherKey, CancellationToken))
+            .Should().BeTrue();
+    }
 
     [Fact]
     public async Task Seed_RunsWithoutAuthentication_AndReturnsTheStableIds()
