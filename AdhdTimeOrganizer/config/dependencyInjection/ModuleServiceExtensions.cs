@@ -196,7 +196,12 @@ public static class ModuleServiceExtensions
     /// </para>
     /// </summary>
     private static void AddNotificationCatalog(IServiceCollection services) =>
-        services.Configure<NotificationCatalogOptions>(o => o.SupportedTypes =
+        services.Configure<NotificationCatalogOptions>(o =>
+        {
+            // Dev/QA probe: only an administrator can raise it (SendTestNotificationEndpoint), so only an
+            // administrator is offered a switch for it.
+            o.AdminOnlyTypes = [NotificationType.Test];
+            o.SupportedTypes =
         [
             // Reminders module: the generic kind any producer can register a reminder under, its batched
             // digest, and the user's own self-set nudge.
@@ -217,9 +222,10 @@ public static class ModuleServiceExtensions
             // History slice: TimerBoundaryAlarmJobHandler, on every pomodoro boundary.
             NotificationType.TimerBoundary,
 
-            // Raised on demand by SendTestNotificationEndpoint, so the user can silence it like any other.
+            // Raised on demand by SendTestNotificationEndpoint (admin-only, see AdminOnlyTypes above).
             NotificationType.Test
-        ]);
+        ];
+        });
 
     /// <summary>
     /// The words for the kinds in the catalog above (B15). The framework's tables word only the kinds its own
