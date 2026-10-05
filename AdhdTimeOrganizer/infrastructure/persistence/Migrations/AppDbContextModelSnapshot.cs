@@ -3710,6 +3710,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("session_id");
 
+                    b.Property<DateTime>("SessionStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("session_started_at");
+
                     b.Property<bool>("StayLoggedIn")
                         .HasColumnType("boolean")
                         .HasColumnName("stay_logged_in");

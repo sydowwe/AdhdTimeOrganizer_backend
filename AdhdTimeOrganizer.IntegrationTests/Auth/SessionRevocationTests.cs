@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -505,6 +506,50 @@ public class SessionRevocationTests(AppDbContextFixture fixture) : AuthTestBase(
         return connection;
     }
 
+    // ── What the list says about a session (OP19) ─────────────────────────────
+
+    /// <summary>
+    /// A session's <c>createdAt</c> is when it was signed in, and survives every refresh. It used to repeat
+    /// <c>lastUsedAt</c>, the live row's own creation, which a refresh moves. The sign-in time travels on each
+    /// row because the session's first row is deleted 30 days after rotation, so it cannot be read off the
+    /// chain. Backdating it is what tells the two apart: without the copy, the refresh resets it to now.
+    /// </summary>
+    [Fact]
+    public async Task SessionList_KeepsEachSessionsSignInTimeAcrossARefresh_AndSaysWhichOneIsRemembered()
+    {
+        var (_, email) = await CreateRealUserAsync(Fixture, "session-started", Password);
+        using var client = CreateRawClient();
+        var older = await SignInAsync(client, email);
+        var remembered = await SignInAsync(client, email, stayLoggedIn: true);
+
+        var signedInAt = DateTime.UtcNow.AddDays(-3);
+        await using (var db = (AppDbContext)Fixture.CreateDbContext())
+            await db.RefreshTokens.IgnoreQueryFilters()
+                .Where(r => r.SessionId == older.SessionId)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.SessionStartedAt, signedInAt), CancellationToken);
+
+        await older.RefreshAsync();
+
+        var sessions = await ListSessionsAsync(remembered);
+        var olderRow = sessions.Single(s => s.Id == older.SessionId);
+        olderRow.CreatedAt.Should().BeCloseTo(signedInAt, TimeSpan.FromSeconds(1),
+            "the refresh started a new row but not a new session");
+        olderRow.LastUsedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1),
+            "last used is the refresh itself");
+        olderRow.StayLoggedIn.Should().BeFalse();
+
+        var rememberedRow = sessions.Single(s => s.Id == remembered.SessionId);
+        rememberedRow.StayLoggedIn.Should().BeTrue();
+        rememberedRow.CreatedAt.Should().BeAfter(signedInAt);
+
+        // The most recent sign-in on any device, asked from the other one.
+        var data = await older.SendAsync(HttpMethod.Get, "user/data");
+        data.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await data.Content.ReadAsStringAsync(CancellationToken));
+        json.RootElement.GetProperty("lastLoginAt").GetDateTime().ToUniversalTime()
+            .Should().BeCloseTo(rememberedRow.CreatedAt, TimeSpan.FromMilliseconds(1));
+    }
+
     // ── Plumbing ──────────────────────────────────────────────────────────────
 
     private static async Task AllLiveAsync(params Session[] sessions)
@@ -527,9 +572,9 @@ public class SessionRevocationTests(AppDbContextFixture fixture) : AuthTestBase(
         return (await response.Content.ReadFromJsonAsync<List<UserSessionResponse>>(CancellationToken))!;
     }
 
-    private static async Task<Session> SignInAsync(HttpClient client, string email)
+    private static async Task<Session> SignInAsync(HttpClient client, string email, bool stayLoggedIn = false)
     {
-        var payload = new { Email = email, Password, StayLoggedIn = false, RecaptchaToken = "test", Timezone = "UTC" };
+        var payload = new { Email = email, Password, StayLoggedIn = stayLoggedIn, RecaptchaToken = "test", Timezone = "UTC" };
         using var request = new HttpRequestMessage(HttpMethod.Post, "auth/login");
         request.Headers.Add("X-Client-Id", Guid.NewGuid().ToString());
         request.Content = JsonContent.Create(payload);
