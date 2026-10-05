@@ -53,14 +53,22 @@ public class HistorySummaryTimeOfDayEndpoint(DbContext db, IUserTimeZoneResolver
         var entries = new int[HoursInDay];
         var touched = new bool[HoursInDay];
         var daysWithActivity = new HashSet<DateOnly>();
+        var hourMasks = new SortedDictionary<DateOnly, int>();
 
         foreach (var record in records)
         {
             daysWithActivity.Add(DateOnly.FromDateTime(WallClockZone.FromUtc(record.StartTimestamp, timeZone)));
 
             Array.Clear(touched);
-            Distribute(record.StartTimestamp, record.Length.TotalSeconds, timeZone, totalSeconds, entries, touched);
+            Distribute(record.StartTimestamp, record.Length.TotalSeconds, timeZone, totalSeconds, entries, touched, hourMasks);
         }
+
+        // A tail past the range's last midnight counts in the hour totals (the pie-chart equality needs it)
+        // but is not a day of the range.
+        var days = hourMasks
+            .Where(day => day.Key >= fromDate && day.Key <= toDate)
+            .Select(day => new HistoryTimeOfDayDay { Date = day.Key, HourMask = day.Value })
+            .ToList();
 
         var response = new HistoryTimeOfDayResponse
         {
@@ -73,7 +81,8 @@ public class HistorySummaryTimeOfDayEndpoint(DbContext db, IUserTimeZoneResolver
                 })
                 .ToList(),
             DaysInRange = toDate.DayNumber - fromDate.DayNumber + 1,
-            DaysWithActivity = daysWithActivity.Count
+            DaysWithActivity = daysWithActivity.Count,
+            Days = days
         };
 
         await Send.ResponseAsync(response, cancellation: ct);
@@ -92,10 +101,13 @@ public class HistorySummaryTimeOfDayEndpoint(DbContext db, IUserTimeZoneResolver
     /// hours the user's clock actually read: on the fall-back night the repeated 02:00 hour is credited
     /// twice, which is what happened. A zero-length record credits its start hour with no seconds and one
     /// entry, so it stays visible to a client counting contributors without moving any total.</para>
+    ///
+    /// <para>Each hour touched also sets its bit in <paramref name="hourMasks"/> under the day that hour fell
+    /// on, so a record crossing midnight marks two days.</para>
     /// </summary>
     private static void Distribute(
         DateTime startUtc, long lengthSeconds, TimeZoneInfo timeZone,
-        long[] totalSeconds, int[] entries, bool[] touched)
+        long[] totalSeconds, int[] entries, bool[] touched, SortedDictionary<DateOnly, int> hourMasks)
     {
         var instant = startUtc;
         var remaining = Math.Max(lengthSeconds, 0);
@@ -108,6 +120,9 @@ public class HistorySummaryTimeOfDayEndpoint(DbContext db, IUserTimeZoneResolver
             var take = Math.Min(remaining, SecondsInHour - (local.Minute * 60 + local.Second));
 
             totalSeconds[hour] += take;
+
+            var date = DateOnly.FromDateTime(local);
+            hourMasks[date] = hourMasks.GetValueOrDefault(date) | (1 << hour);
 
             // Once per hour touched, so a record spanning a boundary is one contributor to each hour it
             // covers — summing Entries across the 24 buckets is therefore not the period's record count.

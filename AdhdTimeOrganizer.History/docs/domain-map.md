@@ -231,6 +231,13 @@ rather than an error (`HistoryTimeOfDayDashboardTests` pins all three on values)
   for the same range. That equality is why rows are selected by `StartTimestamp` and distributed
   whole: a record starting inside the range contributes its tail even past the range's last midnight.
 
+`days` (frontend OP21) carries one 24-bit `hourMask` per day of the range that touched any hour, so the
+client can count the days its chosen band was used ("on 12 of 30 days"). The band is found client-side, so
+the server cannot count those days itself, and the 24 totals cannot: they fold three long days and twelve
+short ones into the same buckets. A bit lands on the day the *hour* fell on, so a record crossing midnight
+marks two days, and days past the range's last midnight are dropped even though the hour totals keep their
+tail. `daysWithActivity` still counts by start, so it can be less than `days.length`.
+
 ## Navigation index — everything that is not an endpoint
 
 | Name | Kind | Responsibility | Path |

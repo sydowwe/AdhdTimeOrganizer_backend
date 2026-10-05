@@ -188,6 +188,45 @@ public class HistoryTimeOfDayDashboardTests(AppDbContextFixture fixture) : Postg
         body.GetProperty("daysInRange").GetInt32().Should().Be(4);
     }
 
+    /// <summary>
+    /// <c>days</c> is what lets the client say "on 3 of 4 days" for a band of hours, which the 24 totals
+    /// cannot: two records in one morning and one record on each of two mornings fold into the same hour.
+    /// Seeded with the three rows most likely to put a bit on the wrong day: two records in the same hour
+    /// of one day (one bit, not two), one crossing the user's midnight (hour 23 on one day, hour 0 on the
+    /// next), and one whose tail runs past the range's last midnight (left out, though the hour totals keep
+    /// it).
+    /// </summary>
+    [Fact]
+    public async Task Days_MarkTheHoursEachUserDayTouched_AndStopAtTheRangesLastMidnight()
+    {
+        var activityId = await SeedActivityAsync("Daily");
+
+        await SeedHistoryAsync(
+            // 2026-07-12 09:00 and 09:30 local: one day, one hour.
+            (activityId, new DateTime(2026, 7, 12, 7, 0, 0, DateTimeKind.Utc), new IntTime(0, 20)),
+            (activityId, new DateTime(2026, 7, 12, 7, 30, 0, DateTimeKind.Utc), new IntTime(0, 20)),
+            // 2026-07-13 23:30 local, an hour: hour 23 on the 13th, hour 0 on the 14th.
+            (activityId, new DateTime(2026, 7, 13, 21, 30, 0, DateTimeKind.Utc), new IntTime(1, 0)),
+            // 2026-07-15 23:40 local, 40 minutes: its tail lands on the 16th, past the range.
+            (activityId, new DateTime(2026, 7, 15, 21, 40, 0, DateTimeKind.Utc), new IntTime(0, 40)));
+
+        var body = await TimeOfDayAsync();
+        var days = body.GetProperty("days").EnumerateArray()
+            .Select(d => (Date: d.GetProperty("date").GetString(), Mask: d.GetProperty("hourMask").GetInt32()))
+            .ToList();
+
+        days.Should().Equal(
+            ("2026-07-12", 1 << 9),
+            ("2026-07-13", 1 << 23),
+            ("2026-07-14", 1 << 0),
+            ("2026-07-15", 1 << 23));
+
+        body.GetProperty("daysWithActivity").GetInt32().Should().Be(3,
+            "it counts by each record's start, so the 14th, reached only by a tail, is not one of them");
+        HourTotals(body)[0].Should().Be(30 * 60 + 20 * 60,
+            "the tail past the range still counts in the hour totals, which must equal the pie chart's");
+    }
+
     // ---- helpers ---------------------------------------------------------
 
     private async Task<JsonElement> TimeOfDayAsync()
