@@ -25,6 +25,9 @@ public record TrackerDesktopMappingResponse : IIdResponse, IProjectionResponse<T
     public ActivityFilterFormResponse? Activity { get; set; }
     public long? RoleId { get; set; }
     public long? CategoryId { get; set; }
+    /// <summary>The role/category target's names, so a client can show the rule's target without a second lookup.</summary>
+    public string? RoleName { get; set; }
+    public string? CategoryName { get; set; }
 
     public static IQueryable<TrackerDesktopMappingResponse> Projection(IQueryable<TrackerDesktopMappingByPattern> q)
     {
@@ -41,7 +44,9 @@ public record TrackerDesktopMappingResponse : IIdResponse, IProjectionResponse<T
             IsIgnored = e.IsIgnored,
             Activity = e.Activity == null ? null : new ActivityFilterFormResponse { Id = e.Activity.Id, Text = e.Activity.Name, RoleId = e.Activity.RoleId, CategoryId = e.Activity.CategoryId },
             RoleId = e.RoleId,
-            CategoryId = e.CategoryId
+            CategoryId = e.CategoryId,
+            RoleName = e.Role == null ? null : e.Role.Name,
+            CategoryName = e.Category == null ? null : e.Category.Name
         });
     }
 }

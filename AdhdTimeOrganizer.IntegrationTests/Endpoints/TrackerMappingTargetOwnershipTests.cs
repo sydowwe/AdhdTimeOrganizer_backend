@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
@@ -353,7 +354,72 @@ public class TrackerMappingTargetOwnershipTests(AppDbContextFixture fixture) : P
             .Should().Contain("Exactly one target", "the 400 has to say which rule the body broke");
     }
 
+    // ---- the read side (OP22) ---------------------------------------------------------------------
+
+    /// <summary>
+    /// A role/category rule carries no activity, so without its target's names the client's Mappings
+    /// table rendered it blank. Both grids project them; the activity rule beside it leaves them null.
+    /// </summary>
+    [Fact(DisplayName = "Both mapping grids name a role/category rule's target")]
+    public async Task MappingGrids_NameTheRoleAndCategoryTarget()
+    {
+        var roleName = $"Grid role {Guid.NewGuid():N}";
+        var categoryName = $"Grid category {Guid.NewGuid():N}";
+        var processName = $"grid-{Guid.NewGuid():N}.exe";
+        var packageName = $"com.grid.{Guid.NewGuid():N}";
+        await using (var db = CreateDbContext())
+        {
+            var role = new ActivityRole { UserId = FakeLoggedUserService.TestUserId, Name = roleName, Color = "#123456" };
+            var category = new ActivityCategory { UserId = FakeLoggedUserService.TestUserId, Name = categoryName, Color = "#654321" };
+            db.Set<ActivityRole>().Add(role);
+            db.Set<ActivityCategory>().Add(category);
+            await db.SaveChangesAsync(CancellationToken);
+
+            db.Set<TrackerDesktopMappingByPattern>().Add(new TrackerDesktopMappingByPattern
+            {
+                UserId = FakeLoggedUserService.TestUserId,
+                ProcessName = processName,
+                ProcessNameMatchType = PatternMatchType.Exact,
+                IsActive = true,
+                RoleId = role.Id,
+                CategoryId = category.Id
+            });
+            db.Set<TrackerAndroidMappingByPattern>().Add(new TrackerAndroidMappingByPattern
+            {
+                UserId = FakeLoggedUserService.TestUserId,
+                PackageName = packageName,
+                PackageNameMatchType = PatternMatchType.Exact,
+                IsActive = true,
+                CategoryId = category.Id
+            });
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        var desktop = await FetchGridRowAsync($"{DesktopRoute}/grid", new { processName, processNameMatchType = "Exact" });
+        desktop.GetProperty("roleName").GetString().Should().Be(roleName);
+        desktop.GetProperty("categoryName").GetString().Should().Be(categoryName);
+
+        var android = await FetchGridRowAsync($"{AndroidRoute}/grid", new { packageName, packageNameMatchType = "Exact" });
+        android.GetProperty("roleName").ValueKind.Should().Be(JsonValueKind.Null, "the rule has no role");
+        android.GetProperty("categoryName").GetString().Should().Be(categoryName);
+    }
+
     // ---- helpers ---------------------------------------------------------------------------------
+
+    private async Task<JsonElement> FetchGridRowAsync(string route, object filter)
+    {
+        var response = await CreateUserRoleClient().PostAsJsonAsync(
+            route,
+            new { page = 1, itemsPerPage = 10, sortBy = Array.Empty<object>(), useFilter = true, filter },
+            JsonOpts,
+            TestContext.Current.CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var items = doc.RootElement.GetProperty("items");
+        items.GetArrayLength().Should().Be(1);
+        return items[0].Clone();
+    }
 
     private async Task<long> SeedOwnDesktopMappingAsync(DbContext db)
     {
