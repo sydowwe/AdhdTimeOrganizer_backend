@@ -25,5 +25,13 @@ public enum StreakOutcome
     /// The period held no items, so completion says nothing about the routine. <c>TryReset</c> leaves the
     /// streak untouched in this case, and the summary notification says nothing about it either.
     /// </summary>
-    NotEvaluated
+    NotEvaluated,
+
+    /// <summary>
+    /// Threshold missed, but at least half of the cycle's days were away days (vacation or sick), so the cycle
+    /// does not count: the streak is held exactly as a freeze holds it, without spending budget, and no grace
+    /// window is opened. Not mapped onto the persisted <c>RoutineStreakOutcome</c> contract: an excused cycle
+    /// sends no end-of-period summary at all.
+    /// </summary>
+    Excused
 }

@@ -35,4 +35,14 @@ public class RoutinePeriodCompletion : BaseEntity
 
     /// <summary>When the freeze was spent. Null whenever <see cref="IsFrozen"/> is false.</summary>
     public DateTime? FrozenAt { get; set; }
+
+    /// <summary>
+    /// The cycle was missed while the user was away: at least half of its days were vacation or sick days
+    /// (<c>RoutineAwayRule</c>). Like a freeze it changes scoring, not the counts, and the streak walk carries the
+    /// run across it — but it costs no budget, and it is set by the server (at reset, or retroactively when the
+    /// user marks the days afterwards), never by the user. Exclusive with <see cref="IsFrozen"/>: an excused
+    /// cycle is not a miss, so there is nothing to freeze. Only ever set, never cleared — un-excusing would cut a
+    /// streak retroactively, the one outcome the feature exists to prevent.
+    /// </summary>
+    public bool IsExcused { get; set; }
 }

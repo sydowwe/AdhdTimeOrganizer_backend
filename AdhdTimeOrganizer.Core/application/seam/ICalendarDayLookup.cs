@@ -17,6 +17,15 @@ namespace AdhdTimeOrganizer.Core.application.seam;
 public interface ICalendarDayLookup : ISeam
 {
     Task<List<CalendarDaySummary>> GetDaysAsync(DbContext db, long userId, DateOnly startDate, DateOnly endDate, CancellationToken ct);
+
+    /// <summary>
+    /// The away days (<see cref="DayTypeExtensions.IsAway"/>) in <c>[startDate, endDate]</c> for each of
+    /// <paramref name="userIds"/>, as user-local dates. A user with no away day in the range is absent from the
+    /// result. Bulk, and filtered on the given ids rather than the ambient query filter, because the main
+    /// callers are Routines' sweeps: they run unauthenticated and page a hundred users at a time.
+    /// </summary>
+    Task<IReadOnlyDictionary<long, IReadOnlySet<DateOnly>>> GetAwayDatesAsync(
+        DbContext db, IReadOnlyCollection<long> userIds, DateOnly startDate, DateOnly endDate, CancellationToken ct);
 }
 
 public sealed record CalendarDaySummary(

@@ -385,6 +385,49 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     }
 
     /// <summary>
+    /// FO1. On an away day only the recurrences the user set apply: the two pattern tiers are weekday statistics
+    /// that workdays dominate, so a vacation Monday would otherwise be offered the office Monday. The same
+    /// weekday a week later, a workday, is the control — a guard that dropped tier 2 everywhere would pass
+    /// without it.
+    /// </summary>
+    [Fact(DisplayName = "FO1: an away day drops both pattern tiers and keeps the user-set recurrences")]
+    public async Task AwayDay_KeepsOnlyUserSetSuggestions()
+    {
+        var target = new DateOnly(2027, 6, 7);
+        long patternActivityId, userSetActivityId, awayCalendarId, workdayCalendarId;
+        await using (var db = CreateDbContext())
+        {
+            patternActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo1-pattern", ct: CancellationToken);
+            userSetActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo1-user-set", ct: CancellationToken);
+            awayCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(
+                db, target, ct: CancellationToken, dayType: AdhdTimeOrganizer.Core.domain.model.@enum.DayType.Vacation);
+            workdayCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target.AddDays(7), ct: CancellationToken);
+
+            await SeedSameWeekdayTaskAsync(db, patternActivityId, target, weeksAgo: 1);
+            await SeedSameWeekdayTaskAsync(db, patternActivityId, target, weeksAgo: 2);
+            await SeedSameWeekdayTaskAsync(db, patternActivityId, target, weeksAgo: 3);
+
+            await PlanningTestSeedHelper.SeedRepeatingPlannerTaskAsync(
+                db, userSetActivityId, recurrenceType: RecurrenceType.DayOfWeek,
+                start: new TimeOnly(8, 0), end: new TimeOnly(8, 15), ct: CancellationToken);
+            var task = await db.Set<AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning.RepeatingPlannerTask>()
+                .SingleAsync(t => t.ActivityId == userSetActivityId, CancellationToken);
+            task.ScheduledDays.Add(target.DayOfWeek.ToString());
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var away = await GetSuggestionsAsync(awayCalendarId);
+        away.Should().ContainSingle().Which.Should().Match<SuggestionResponse>(s =>
+            s.Activity.Id == userSetActivityId && s.SourceType == SuggestionSourceType.UserSet);
+
+        var workday = await GetSuggestionsAsync(workdayCalendarId);
+        workday.Select(s => (s.Activity.Id, s.SourceType)).Should().BeEquivalentTo(
+            [(userSetActivityId, SuggestionSourceType.UserSet), (patternActivityId, SuggestionSourceType.PlannedPattern)]);
+    }
+
+    /// <summary>
     /// An activity that already has a <c>PlannerTask</c> on the day is not suggested for it, from any tier —
     /// the planner's <b>+</b> on such a suggestion created a second task for the same activity. The user-set
     /// row's task is <c>NotStarted</c> and the pattern row's is <c>Cancelled</c>, pinning that every status

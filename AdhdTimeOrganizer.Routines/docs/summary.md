@@ -62,8 +62,13 @@ has no knowledge of Planning at all.
   test asserting rows, not a route smoke test.
 
 - **One Core seam is consumed here**: `ICalendarDayLookup` (implemented by Planning), read by
-  `RoutineSuggestedTodayJobHandler` for the day's `WakeUpTime`. Single-service resolution, so a missing
-  registration throws at activation rather than silently falling back to 08:00.
+  `RoutineSuggestedTodayJobHandler` for the day's `WakeUpTime` and day type, and — through
+  `GetAwayDatesAsync` — by `RoutineAwayDaysReader` (every reset site), the nudge sweep and
+  `CalendarDayTypesChangedEventHandler`, for FO1's away-cycle excusal (see `domain-map.md`, *Away cycles*).
+  Single-service resolution, so a missing registration throws at activation rather than silently falling
+  back to 08:00 or to "never away".
+- **One Core event is consumed here**: `CalendarDayTypesChangedEvent`, published by Planning's two day-type
+  writes. Its handler logs and swallows, so `RoutineAwayExcusalFlowTests` asserts on rows.
 
 ## Gotchas — things that will bite you
 

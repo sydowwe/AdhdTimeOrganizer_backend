@@ -359,6 +359,46 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
         (await GetSuggestionsAsync(calendarId)).Should().BeEmpty();
     }
 
+    // ─── FO1: away days ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// "Office" has been applied on three Tuesdays and "Beach" on two vacation days. On a Tuesday the user marked
+    /// as vacation, every day-type match — history first, then metadata — ranks above every weekday match, even
+    /// though the weekday history has more occurrences. Weekday matches are demoted, not dropped.
+    /// </summary>
+    [Fact(DisplayName = "FO1: on an away day, day-type suggestions rank above weekday ones")]
+    public async Task AwayDay_RanksDayTypeAboveWeekday()
+    {
+        var target = new DateOnly(2028, 4, 4); // Tuesday
+        long officeId, beachId, vacationTagId, tuesdayTagId, calendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            officeId = await SeedHistoryOnlyTemplateAsync(db, "Office");
+            await StampAsync(db, officeId, target.AddDays(-7), DayType.Workday);
+            await StampAsync(db, officeId, target.AddDays(-14), DayType.Workday);
+            await StampAsync(db, officeId, target.AddDays(-21), DayType.Workday);
+
+            beachId = await SeedHistoryOnlyTemplateAsync(db, "Beach");
+            // Two different weekdays, neither a Tuesday, so Beach is a day-type pattern only.
+            await StampAsync(db, beachId, target.AddDays(-3), DayType.Vacation);
+            await StampAsync(db, beachId, target.AddDays(-9), DayType.Vacation);
+
+            vacationTagId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Lazy day", CancellationToken, DayType.Vacation);
+            tuesdayTagId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Tuesdays", CancellationToken, DayType.Special, [DayOfWeek.Tuesday]);
+
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken, DayType.Vacation);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarId);
+        suggestions.Select(s => (s.Template.Id, s.PatternType)).Should().Equal(
+            (beachId, 1), (vacationTagId, 3), (officeId, 0), (tuesdayTagId, 2));
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     /// <summary>

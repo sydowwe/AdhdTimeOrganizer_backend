@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
@@ -31,10 +32,29 @@ public class UpdateCalendarEndpoint(DbContext dbContext)
     protected override async Task<bool> AfterMapping(Calendar entity, CalendarRequest req, CancellationToken ct = default)
     {
         if (CalendarDayTypeRule.Violation(entity, entity.DayType) is not { } violation)
+        {
+            _dayTypeChanged = DbContext.Entry(entity).Property(c => c.DayType).OriginalValue != entity.DayType;
             return true;
+        }
 
         AddError(violation);
         await Send.ErrorsAsync(400, ct);
         return false;
+    }
+
+    /// <summary>Set in <see cref="AfterMapping"/>, read in <see cref="AfterSave"/>. Per-request state.</summary>
+    private bool _dayTypeChanged;
+
+    /// <summary>
+    /// After the commit, and only when the day type actually moved: Routines excuses the closed cycles a newly
+    /// marked vacation or sick day covers (<see cref="CalendarDayTypesChangedEvent"/>). The handler logs and
+    /// swallows, so it cannot fail this request.
+    /// </summary>
+    protected override async Task AfterSave(Calendar entity, CancellationToken ct = default)
+    {
+        if (!_dayTypeChanged)
+            return;
+
+        await new CalendarDayTypesChangedEvent(entity.UserId, [entity.Date]).PublishAsync(Mode.WaitForAll, ct);
     }
 }

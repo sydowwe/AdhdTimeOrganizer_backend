@@ -108,6 +108,20 @@ without hiding the feature. Spending one marks the covered completion row `IsFro
 whole history: a frozen period is *skipped*, so the run carries across it without extending. `Streak` /
 `BestStreak` are only ever raised.
 
+**Away cycles (FO1).** A missed cycle at least half of whose days are away days — Core's
+`DayTypeExtensions.IsAway`: `Vacation` or `SickDay`, never `Special` — is *excused* (`RoutineAwayRule`):
+`StreakOutcome.Excused`, `RoutinePeriodCompletion.IsExcused`, the run carried exactly like a freeze but free,
+no grace window opened, undone items keep their streaks, and no end-of-period summary. A met cycle is never
+excused. Every reset site pre-reads the away days through `IRoutineAwayDaysReader` (Planning's
+`ICalendarDayLookup.GetAwayDatesAsync` underneath) — the job, the grouped read, both toggles and the host's
+`PlannerTaskIsDoneChangedEventHandler`. **Retroactively**, Planning publishes Core's
+`CalendarDayTypesChangedEvent` from both day-type writes, and `CalendarDayTypesChangedEventHandler` excuses
+the closed cycles that now qualify, clears the grace window if the newest one did, and re-walks the streak.
+Excusal is one-way (un-marking a day never un-excuses), and item streaks cannot come back retroactively. The
+cycle's days are UTC boundary dates, the away days user-local; the majority rule absorbs the off-by-one.
+An excused cycle is in the heatmap but not in `TotalPeriodsElapsed`. On a user-local away today, J2 sends no
+nudge or grace warning and J3 no digest, all **unmarked** (J2's away check fails open).
+
 **Nudges.** `ReminderLeadDays` is opt-in per period, not per user — "remind me about my weekly chores"
 and "remind me about my yearly review" are not the same decision. It gates the ending-soon nudge only;
 the end-of-period summary and the grace warning fire on their own conditions and are muted through the
@@ -124,7 +138,8 @@ ticked in the still-open cycle is done, a tick from a cycle whose reset is due i
 never mentioned again. Nothing qualifies → nothing sent, nothing marked.
 
 **Time.** Periods, resets and the two nudges are UTC end to end — those sweeps do no zone conversion, and
-two identical UTC periods owned by users in different zones must produce identical results. **The
+two identical UTC periods owned by users in different zones must produce identical results (the nudge
+sweep's one zone read decides only whether the user's own today is an away day). **The
 suggested-today digest is the one deliberate exception**: "today" is the date in `User.Timezone` and
 "morning" is that day's `Calendar.WakeUpTime` (08:00 when the day row doesn't exist), because a weekday
 named in UTC is the wrong weekday for most of the world.
@@ -138,6 +153,7 @@ named in UTC is the wrong weekday for most of the world.
 | Threshold | % of items that must be done for the period to count as met | `StreakThreshold` |
 | Grace | Time-based leniency: finish late, keep the run | `StreakGraceDays` / `StreakGraceUntil` |
 | Streak freeze | Budgeted leniency: skip a period outright, keep the run | `FreezeBudget` / `FreezesRemaining` |
+| Excused cycle | A miss while the user was away for at least half the cycle: carried like a freeze, free, automatic | `RoutinePeriodCompletion.IsExcused`, `RoutineAwayRule` |
 | Nudge | The mid-period "n of m done" notification | `EvaluateEndingSoon` / `RoutinePeriodEndingSoonPayload` |
 | Suggested day | The day a weekly/monthly item is meant for | `SuggestedDays` / `SuggestedDayOfMonth`, `RoutineSuggestedDay` |
 | Suggested-today digest | The morning "these are today's" notification, one per user per day | `RoutineSuggestedTodayJobHandler` / `RoutineSuggestedTodayPayload` |
@@ -153,6 +169,7 @@ named in UTC is the wrong weekday for most of the world.
 | 4 | `(UserId, Text)` and `(UserId, LengthInDays)` are each unique on a period | **DB** — two unique indexes |
 | 5 | `(TimePeriodId, PeriodStart)` is unique — one completion row per elapsed period | **DB** — unique index |
 | 6 | `IsFrozen` and `FrozenAt` are written together | **DB** — `ck_routine_period_completion_frozen_at_matches_is_frozen` |
+| 6a | A completion is never both frozen and excused | **DB** — `ck_routine_period_completion_not_frozen_and_excused`; `Apply` answers `NotAMiss` on an excused row |
 | 7 | Ranges: anchor day, length, non-negative streaks, threshold, grace, history depth, reminder lead, budget `0..MaxFreezeBudget`, remaining `0..budget` | **DB** — nine CHECKs on `RoutineTimePeriod`, mirrored by `RoutineTimePeriodValidator` for a 400 instead of a 500 |
 | 8 | Both seam sources are resolved by string key | **Nothing** — a rename without updating both sides is silent. `SeamWiringTests` is the only guard |
 | 9 | The freeze budget is refilled by whoever reads it, not by a job — *every* surface that shows or spends `FreezesRemaining`, today: the grouped read, the nightly reset job, `Apply`, and the four flat reads through `RoutineTimePeriodReadRefresher` | **App-enforced by convention only** — forgetting it is silent. `RoutineFlatPeriodReadTests` guards the projection-base surfaces |

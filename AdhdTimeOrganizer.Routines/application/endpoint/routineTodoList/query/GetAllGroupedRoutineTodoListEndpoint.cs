@@ -10,7 +10,8 @@ namespace AdhdTimeOrganizer.Routines.application.endpoint.todoList.routineTodoLi
 
 public class GetAllGroupedRoutineTodoListEndpoint(
     DbContext dbContext,
-    IRoutinePeriodNotificationService notifier) : EndpointWithoutRequest<IEnumerable<RoutineTodoListGroupedResponse>>
+    IRoutinePeriodNotificationService notifier,
+    IRoutineAwayDaysReader awayDaysReader) : EndpointWithoutRequest<IEnumerable<RoutineTodoListGroupedResponse>>
 {
     public override void Configure()
     {
@@ -44,6 +45,9 @@ public class GetAllGroupedRoutineTodoListEndpoint(
         var changed = false;
         var newCompletions = new List<RoutinePeriodCompletion>();
         var reset = new List<(RoutineTimePeriod Period, RoutineResetService.RoutinePeriodReset Result)>();
+        // Read only when something is due. Opening the app after a holiday is exactly when this read closes the
+        // cycles the holiday covered, so it must excuse them here rather than leave it to the nightly job.
+        var awayDays = (await awayDaysReader.ForDueCyclesAsync(dbContext, periods, now, ct)).GetValueOrDefault(loggedUserId);
         foreach (var period in periods)
         {
             var items = period.RoutineTodoListColl.ToList();
@@ -54,7 +58,7 @@ public class GetAllGroupedRoutineTodoListEndpoint(
             changed |= RoutineStreakFreezeService.RefreshFreezeBudget(period, now);
             // Catch-up, not a single cycle: opening the app after a fortnight away must leave the period current,
             // not one cycle less stale than it was.
-            var result = RoutineResetService.TryResetCatchUp(period, items, now);
+            var result = RoutineResetService.TryResetCatchUp(period, items, now, awayDays);
             if (result is { } r)
             {
                 changed = true;

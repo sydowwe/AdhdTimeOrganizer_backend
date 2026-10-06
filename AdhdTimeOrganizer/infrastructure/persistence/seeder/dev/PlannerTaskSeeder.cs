@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using Microsoft.EntityFrameworkCore;
@@ -88,7 +89,8 @@ public class PlannerTaskSeeder(
         {
             var isWeekend = calendar.IsWeekend;
             // Update calendar fields
-            calendar.Label = isWeekend ? null : calendar.Date.Day % 2 == 0 ? "HomeOffice" : "Office";
+            // Where the user works is Location's job, not the free-text label's (F4): the label is an event marker.
+            calendar.Location = isWeekend ? null : calendar.Date.Day % 2 == 0 ? Location.Home : Location.Office;
             calendar.WakeUpTime = isWeekend ? new TimeOnly(9, 0) : new TimeOnly(7, 0);
             calendar.BedTime = new TimeOnly(23, 0);
             calendar.Weather = calendar.Date.Month switch

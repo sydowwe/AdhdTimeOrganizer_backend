@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.IntegrationTests.Endpoints;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.IntegrationTests.Reminders;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
@@ -281,6 +282,50 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
 
         healthyNotifier.EndingSoonCalls.Select(c => c.PeriodId).Should().NotContain(period1Id, "period 1 was already notified in the first sweep");
         healthyNotifier.EndingSoonCalls.Select(c => c.PeriodId).Should().Contain(period2Id, "period 2's marker was never set, so it must retry");
+    }
+
+    // ---- FO1: away days are quiet days ------------------------------------------------------------------
+
+    /// <summary>
+    /// A user whose own today is a vacation day gets no lead-time nudge, and the period is left unmarked so the
+    /// nudge can still go out once they are back. The second user, identical but at work, is the control: a
+    /// guard that silenced the whole sweep would pass without them.
+    /// </summary>
+    [Fact(DisplayName = "FO1: no nudge on a user's away day, and nothing marked")]
+    public async Task NudgeSweep_SkipsAUserWhoseTodayIsAway_WithoutMarking()
+    {
+        long awayPeriodId, homePeriodId;
+        await using (var db = CreateDbContext())
+        {
+            await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
+
+            var away = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            await SeedItemAsync(db, away, isDone: false, UserId, CancellationToken);
+            awayPeriodId = away.Id;
+
+            var home = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            await SeedItemAsync(db, home, isDone: false, ReminderSeedHelper.OtherUserId, CancellationToken);
+            homePeriodId = home.Id;
+
+            // Either side of the UTC date too, so the user's own today is away whatever their zone.
+            var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
+            for (var offset = -1; offset <= 1; offset++)
+            {
+                await PlanningTestSeedHelper.SeedCalendarAsync(
+                    db, utcToday.AddDays(offset), UserId, CancellationToken,
+                    AdhdTimeOrganizer.Core.domain.model.@enum.DayType.Vacation);
+            }
+        }
+
+        var notifier = new RoutinePeriodNotificationServiceDouble();
+        await RunJobWithDoubleAsync(notifier, CancellationToken);
+
+        notifier.EndingSoonCalls.Select(c => c.PeriodId).Should().Equal(homePeriodId);
+
+        await using var verify = CreateDbContext();
+        var awayPeriod = await verify.Set<RoutineTimePeriod>().IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(p => p.Id == awayPeriodId, CancellationToken);
+        awayPeriod.EndingSoonNotifiedFor.Should().BeNull("a skipped nudge is not a sent one, so it may still go out tomorrow");
     }
 
     // ---- B. Idempotent marking ------------------------------------------------------------------------

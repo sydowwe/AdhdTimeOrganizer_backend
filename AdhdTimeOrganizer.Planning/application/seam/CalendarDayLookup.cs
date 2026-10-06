@@ -1,12 +1,13 @@
 using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using Sydowwe.Framework.config.dependencyInjection;
 
 namespace AdhdTimeOrganizer.Planning.application.seam;
 
 /// <summary>
-/// Reads <see cref="Calendar"/> rows through Core's seam, so History's calendar dashboard can join
-/// against day metadata without referencing Planning.
+/// Reads <see cref="Calendar"/> rows through Core's seam, so History's calendar dashboard and Routines' streak
+/// and nudge rules can read day metadata without referencing Planning.
 /// </summary>
 public sealed class CalendarDayLookup : ICalendarDayLookup, IScopedService
 {
@@ -29,5 +30,26 @@ public sealed class CalendarDayLookup : ICalendarDayLookup, IScopedService
                 c.Id, c.Date, c.DayType, Calendar.DayIndexOf(c.Date),
                 c.Label, c.HolidayKey, c.HolidayName, c.WakeUpTime, c.BedTime))
             .ToList();
+    }
+
+    public async Task<IReadOnlyDictionary<long, IReadOnlySet<DateOnly>>> GetAwayDatesAsync(
+        DbContext db, IReadOnlyCollection<long> userIds, DateOnly startDate, DateOnly endDate, CancellationToken ct)
+    {
+        if (userIds.Count == 0 || endDate < startDate)
+            return new Dictionary<long, IReadOnlySet<DateOnly>>();
+
+        // Explicit user predicate, never the ambient filter: the sweeps calling this run unauthenticated, where
+        // the filter is inert, and a request caller passes its own id anyway.
+        var rows = await db.Set<Calendar>()
+            .AsNoTracking()
+            .Where(c => userIds.Contains(c.UserId))
+            .Where(c => c.Date >= startDate && c.Date <= endDate)
+            .Where(c => DayTypeExtensions.AwayTypes.Contains(c.DayType))
+            .Select(c => new { c.UserId, c.Date })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(r => r.UserId)
+            .ToDictionary(g => g.Key, IReadOnlySet<DateOnly> (g) => g.Select(r => r.Date).ToHashSet());
     }
 }

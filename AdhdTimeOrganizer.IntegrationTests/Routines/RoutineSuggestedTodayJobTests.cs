@@ -184,13 +184,14 @@ public class RoutineSuggestedTodayJobTests(AppDbContextFixture fixture) : Postgr
         await db.SaveChangesAsync(ct);
     }
 
-    private static async Task SeedCalendarDayAsync(DbContext db, long userId, DateOnly date, TimeOnly wakeUp, CancellationToken ct)
+    private static async Task SeedCalendarDayAsync(
+        DbContext db, long userId, DateOnly date, TimeOnly wakeUp, CancellationToken ct, DayType dayType = DayType.Workday)
     {
         db.Set<Calendar>().Add(new Calendar
         {
             UserId = userId,
             Date = date,
-            DayType = DayType.Workday,
+            DayType = dayType,
             WakeUpTime = wakeUp,
             BedTime = new TimeOnly(23, 0)
         });
@@ -481,6 +482,40 @@ public class RoutineSuggestedTodayJobTests(AppDbContextFixture fixture) : Postgr
 
         await RunJobAsync(dawn.AddHours(2), notifier);
         notifier.Calls.Should().ContainSingle("09:45 is past the planned wake-up");
+    }
+
+    /// <summary>
+    /// FO1. A vacation or sick day is a quiet day: no digest, and no mark either — so the same items, still open
+    /// the next morning, still get theirs. A workday the next week is the control.
+    /// </summary>
+    [Theory(DisplayName = "FO1: no digest on an away day, and the day is left unmarked")]
+    [InlineData(DayType.Vacation)]
+    [InlineData(DayType.SickDay)]
+    public async Task AwayDay_SendsNothing_AndLeavesTheDayUnmarked(DayType awayType)
+    {
+        await using (var db = CreateDbContext())
+        {
+            var weekly = await SeedPeriodAsync(db, UserId, lengthInDays: 7, ct: CancellationToken);
+            await SeedItemAsync(db, weekly, "Gym", days: [DayOfWeek.Tuesday], ct: CancellationToken);
+            await SeedCalendarDayAsync(db, UserId, Tuesday, new TimeOnly(7, 0), CancellationToken, awayType);
+        }
+
+        var notifier = new NotifierDouble();
+        await RunJobAsync(TuesdayMorning, notifier);
+
+        notifier.Calls.Should().BeEmpty();
+        (await ReadMarksAsync(UserId)).Values.Should().AllSatisfy(mark => mark.Should().BeNull());
+
+        await using (var db = CreateDbContext())
+        {
+            // Back at work the following Tuesday. The period is moved along so its reset is not due there.
+            await SeedCalendarDayAsync(db, UserId, Tuesday.AddDays(7), new TimeOnly(7, 0), CancellationToken);
+            await db.Set<RoutineTimePeriod>().Where(p => p.UserId == UserId)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.LastResetAt, TuesdayMorning.UtcDateTime.AddDays(6)), CancellationToken);
+        }
+
+        await RunJobAsync(TuesdayMorning.AddDays(7), notifier);
+        notifier.Calls.Should().ContainSingle();
     }
 
     /// <summary>Rule 12 — the same contract as <c>EndingSoonNotifiedFor</c> and <c>GraceNotifiedFor</c>.</summary>

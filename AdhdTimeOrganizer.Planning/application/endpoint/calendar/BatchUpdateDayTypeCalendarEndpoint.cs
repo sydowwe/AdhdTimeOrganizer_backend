@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.helper;
@@ -48,6 +49,10 @@ public class BatchUpdateDayTypeCalendarEndpoint(DbContext dbContext)
     public override async Task HandleAsync(BatchUpdateCalendarDayTypeRequest req, CancellationToken ct)
     {
         var results = new List<CalendarBatchResult>(req.CalendarIds.Count);
+        // Days whose type actually moved, for the event below. Every day here belongs to the caller (the filter
+        // scopes the lookup), so one event carries them all.
+        var changedDates = new List<DateOnly>();
+        long? userId = null;
 
         foreach (var calendarId in req.CalendarIds)
         {
@@ -68,8 +73,15 @@ public class BatchUpdateDayTypeCalendarEndpoint(DbContext dbContext)
                     continue;
                 }
 
+                var moved = calendar.DayType != req.DayType;
                 calendar.DayType = req.DayType;
                 await dbContext.SaveChangesAsync(ct);
+
+                if (moved)
+                {
+                    changedDates.Add(calendar.Date);
+                    userId = calendar.UserId;
+                }
 
                 results.Add(CalendarBatchResult.Ok(calendarId));
             }
@@ -83,6 +95,12 @@ public class BatchUpdateDayTypeCalendarEndpoint(DbContext dbContext)
                 results.Add(CalendarBatchResult.Failed(calendarId, CalendarBatchFailureReason.Error));
             }
         }
+
+        // Once for the batch, after every day committed: Routines excuses the closed cycles a newly marked
+        // vacation or sick stretch covers, and a week marked in one go must be judged as a week, not day by day.
+        // The handler logs and swallows, so it cannot turn the batch's 200 into a 500.
+        if (userId is { } owner && changedDates.Count > 0)
+            await new CalendarDayTypesChangedEvent(owner, changedDates).PublishAsync(Mode.WaitForAll, ct);
 
         await Send.OkAsync(new CalendarBatchResultResponse { Results = results }, ct);
     }

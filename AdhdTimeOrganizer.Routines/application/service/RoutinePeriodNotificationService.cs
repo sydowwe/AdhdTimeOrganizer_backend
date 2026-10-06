@@ -24,6 +24,12 @@ public class RoutinePeriodNotificationService(
     public async Task NotifyPeriodEndedAsync(
         RoutineTimePeriod period, RoutinePeriodCompletion completion, StreakOutcome outcome, CancellationToken ct = default)
     {
+        // The user was away for most of the cycle. "2 of 5 done" about a week spent ill is a guilt pile, not
+        // information, and the streak did not move — so the summary is not sent at all, rather than mapped onto
+        // the persisted payload contract, which has no "excused" member and should not grow one for silence.
+        if (outcome == StreakOutcome.Excused)
+            return;
+
         await SafeNotifyAsync(period, new RoutinePeriodEndedPayload(
             period.Id,
             period.Text,

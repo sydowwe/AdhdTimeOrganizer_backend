@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.Routines.domain.serviceContract;
@@ -21,6 +22,10 @@ namespace AdhdTimeOrganizer.Routines.infrastructure.jobs;
 /// <b>The morning</b> is the day's own <c>Calendar.WakeUpTime</c> when the user's day row exists — read through
 /// Core's <see cref="ICalendarDayLookup"/>, since the calendar is Planning's — and
 /// <see cref="DefaultSendAt"/> otherwise, the same 08:00 a lazily created day gets. No per-user setting.
+/// </para>
+/// <para>
+/// <b>Not on an away day.</b> A user-local today marked vacation or sick gets no digest (FO1): a nudge on
+/// holiday is one the user learns to ignore, and the habit outlasts the holiday.
 /// </para>
 /// <para>
 /// <b>Composed at send time, like the nudge sweep</b> (see <see cref="RoutinePeriodNudgeJobHandler"/>): an item
@@ -122,7 +127,14 @@ public class RoutineSuggestedTodayJobHandler(
         if (items.Count == 0)
             return false;
 
-        if (TimeOnly.FromDateTime(localNow) < await SendAtAsync(userId, today, ct))
+        var day = (await calendarDayLookup.GetDaysAsync(dbContext, userId, today, today, ct)).FirstOrDefault();
+
+        // A vacation or sick day is a quiet day. Nothing is sent and nothing is marked — the whole day is away,
+        // so every later run today decides the same, and an un-marked day costs nothing tomorrow.
+        if (day is not null && day.DayType.IsAway())
+            return false;
+
+        if (TimeOnly.FromDateTime(localNow) < (day?.WakeUpTime ?? DefaultSendAt))
             return false;
 
         if (!await notifier.NotifySuggestedTodayAsync(userId, today, items, ct))
@@ -143,10 +155,4 @@ public class RoutineSuggestedTodayJobHandler(
     /// </summary>
     private static bool IsDoneThisCycle(RoutineTimePeriod period, RoutineTodoList item, DateTime now) =>
         item.IsDone && now < RoutineResetService.ComputeNextReset(period, now);
-
-    private async Task<TimeOnly> SendAtAsync(long userId, DateOnly today, CancellationToken ct)
-    {
-        var days = await calendarDayLookup.GetDaysAsync(dbContext, userId, today, today, ct);
-        return days.Count > 0 ? days[0].WakeUpTime : DefaultSendAt;
-    }
 }

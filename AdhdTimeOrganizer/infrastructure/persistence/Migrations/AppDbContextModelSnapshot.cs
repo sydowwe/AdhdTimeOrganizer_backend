@@ -2276,6 +2276,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("frozen_at");
 
+                    b.Property<bool>("IsExcused")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_excused");
+
                     b.Property<bool>("IsFrozen")
                         .HasColumnType("boolean")
                         .HasColumnName("is_frozen");
@@ -2306,6 +2310,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.ToTable("routine_period_completions", "routines", t =>
                         {
                             t.HasCheckConstraint("ck_routine_period_completion_frozen_at_matches_is_frozen", "(\"is_frozen\" AND \"frozen_at\" IS NOT NULL) OR (NOT \"is_frozen\" AND \"frozen_at\" IS NULL)");
+
+                            t.HasCheckConstraint("ck_routine_period_completion_not_frozen_and_excused", "NOT (\"is_frozen\" AND \"is_excused\")");
                         });
                 });
 

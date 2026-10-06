@@ -168,14 +168,21 @@ public static class RoutineResetService
     /// score a cycle the item had in fact missed.
     /// </para>
     /// Use when only one item is in context (e.g. step toggle). Returns true if a reset occurred.
+    /// <para>
+    /// <paramref name="awayDays"/> is the user's away days around the due cycle (see <see cref="RoutineAwayRule"/>):
+    /// a cycle the user was mostly away for does not cost the item its streak, matching what the list overload
+    /// will decide for the same cycle.
+    /// </para>
     /// </summary>
-    public static bool TryReset(RoutineTimePeriod period, RoutineTodoList item, DateTime now)
+    public static bool TryReset(RoutineTimePeriod period, RoutineTodoList item, DateTime now, IReadOnlySet<DateOnly>? awayDays = null)
     {
         var nextReset = ComputeNextReset(period, now);
         if (now < nextReset)
             return false;
 
-        OpenNewCycle(item, DateOnly.FromDateTime(now));
+        var periodEnd = DateOnly.FromDateTime(nextReset);
+        var excused = RoutineAwayRule.IsMostlyAway(awayDays, periodEnd.AddDays(-period.LengthInDays), periodEnd);
+        OpenNewCycle(item, DateOnly.FromDateTime(now), holdStreak: excused);
 
         return true;
     }
@@ -188,10 +195,15 @@ public static class RoutineResetService
     /// all items), and no item-level history a freeze could re-derive from. An item that reaches it done keeps
     /// the streak it earned when it was ticked.
     /// </para>
+    /// <para>
+    /// <paramref name="holdStreak"/> is the one exception: a cycle the user was mostly away for
+    /// (<see cref="RoutineAwayRule"/>) holds an undone item's streak instead of zeroing it. It has to be decided
+    /// at the boundary — with no item-level history, a streak zeroed here cannot be given back later.
+    /// </para>
     /// </summary>
-    private static void OpenNewCycle(RoutineTodoList item, DateOnly today)
+    private static void OpenNewCycle(RoutineTodoList item, DateOnly today, bool holdStreak)
     {
-        if (!item.IsDone)
+        if (!item.IsDone && !holdStreak)
             item.Streak = 0;
 
         item.SetDone(false);
@@ -215,12 +227,23 @@ public static class RoutineResetService
     /// past. Callers reaching a period that has been dormant want <see cref="TryResetCatchUp"/>, which loops
     /// this until the period is current.
     /// </para>
+    /// <para>
+    /// <paramref name="awayDays"/> is the user's away days over the cycle being closed. A missed cycle that is
+    /// mostly away (<see cref="RoutineAwayRule"/>) is <see cref="StreakOutcome.Excused"/>: the streak is held like
+    /// a freeze holds it, without spending budget; no grace window opens (an open one is left to run, because the
+    /// miss that opened it was not excused); undone items keep their streaks; and the row records
+    /// <c>IsExcused</c>. A met cycle is scored normally whatever the calendar says.
+    /// </para>
     /// </summary>
-    public static RoutinePeriodReset? TryReset(RoutineTimePeriod period, IList<RoutineTodoList> items, DateTime now)
+    public static RoutinePeriodReset? TryReset(
+        RoutineTimePeriod period, IList<RoutineTodoList> items, DateTime now, IReadOnlySet<DateOnly>? awayDays = null)
     {
         var nextReset = ComputeNextReset(period, now);
         if (now < nextReset)
             return null;
+
+        var periodEnd = DateOnly.FromDateTime(nextReset);
+        var periodStart = periodEnd.AddDays(-period.LengthInDays);
 
         var completedCount = 0;
         var outcome = StreakOutcome.NotEvaluated;
@@ -237,6 +260,10 @@ public static class RoutineResetService
                 period.StreakGraceUntil = null;
                 outcome = StreakOutcome.Extended;
             }
+            else if (RoutineAwayRule.IsMostlyAway(awayDays, periodStart, periodEnd))
+            {
+                outcome = StreakOutcome.Excused;
+            }
             else if (period.StreakGraceDays > 0)
             {
                 period.StreakGraceUntil = nextReset.AddDays(period.StreakGraceDays);
@@ -250,11 +277,11 @@ public static class RoutineResetService
             }
         }
 
+        var excused = outcome == StreakOutcome.Excused;
         var today = DateOnly.FromDateTime(now);
         foreach (var item in items)
-            OpenNewCycle(item, today);
+            OpenNewCycle(item, today, holdStreak: excused);
 
-        var periodEnd = DateOnly.FromDateTime(nextReset);
         period.LastResetAt = nextReset;
 
         // The window this reset closed is over, so any nudge mark for it is spent — clearing it here is what
@@ -265,11 +292,12 @@ public static class RoutineResetService
             new RoutinePeriodCompletion
             {
                 TimePeriodId = period.Id,
-                PeriodStart = periodEnd.AddDays(-period.LengthInDays),
+                PeriodStart = periodStart,
                 PeriodEnd = periodEnd,
                 CompletedCount = completedCount,
                 TotalCount = items.Count,
-                CreatedAt = now
+                CreatedAt = now,
+                IsExcused = excused
             },
             outcome);
     }
@@ -311,7 +339,8 @@ public static class RoutineResetService
     /// <paramref name="now"/> — so a catch-up breaks the streak at the same cycle a live run would have.
     /// </para>
     /// </summary>
-    public static RoutinePeriodCatchUp? TryResetCatchUp(RoutineTimePeriod period, IList<RoutineTodoList> items, DateTime now)
+    public static RoutinePeriodCatchUp? TryResetCatchUp(
+        RoutineTimePeriod period, IList<RoutineTodoList> items, DateTime now, IReadOnlySet<DateOnly>? awayDays = null)
     {
         var completions = new List<RoutinePeriodCompletion>();
         RoutinePeriodReset? latest = null;
@@ -327,7 +356,7 @@ public static class RoutineResetService
             if (cyclesClosed > 0)
                 CheckGrace(period, boundary);
 
-            if (TryReset(period, items, now) is not { } result)
+            if (TryReset(period, items, now, awayDays) is not { } result)
                 break;
 
             completions.Add(result.Completion);

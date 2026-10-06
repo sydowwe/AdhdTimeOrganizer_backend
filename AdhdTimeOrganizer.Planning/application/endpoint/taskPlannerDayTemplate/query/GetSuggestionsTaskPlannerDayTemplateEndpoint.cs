@@ -34,7 +34,8 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(DbContext dbContext)
             s.Summary = "Get template suggestions for a date";
             s.Description = "Returns active templates suggested for the calendar day, one entry per template: first those " +
                             "applied on this weekday or day type before (by occurrence count), then those whose " +
-                            "ScheduledDays or SuggestedForDayType match the day";
+                            "ScheduledDays or SuggestedForDayType match the day. On an away day (Vacation, SickDay) " +
+                            "every day-type match ranks above every weekday match";
             s.Response<List<TemplateSuggestionResponse>>(200, "Success");
             s.Response(400, "Invalid date format");
         });
@@ -74,51 +75,79 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(DbContext dbContext)
         var result = new List<TemplateSuggestionResponse>();
         var coveredTemplateIds = new HashSet<long>();
 
-        // 1. History: what the user actually applied on this weekday / day type. One entry per template — a
-        // template applied twice on Thursdays that were also Workdays is in the view once per pattern type.
-        foreach (var p in patterns
-                     .OrderByDescending(p => p.OccurrenceCount)
-                     .ThenBy(p => p.PatternType))
+        if (!calendar.DayType.IsAway())
         {
-            if (!templates.TryGetValue(p.TemplateId, out var template) || !coveredTemplateIds.Add(p.TemplateId))
-                continue;
+            // 1. History: what the user actually applied on this weekday / day type, most-applied first.
+            AddHistory(patterns.OrderByDescending(p => p.OccurrenceCount).ThenBy(p => p.PatternType));
 
-            result.Add(new TemplateSuggestionResponse
-            {
-                Template = template,
-                PatternType = p.PatternType,
-                PatternLabel = p.PatternType == HistoryDayOfWeek
-                    ? DayNames[p.PatternValue - 1]
-                    : ((DayType)p.PatternValue).ToString(),
-                OccurrenceCount = p.OccurrenceCount
-            });
+            // 2. What the user set on the template, for templates history has not already suggested. Weaker
+            // evidence than history, so it ranks after it; a template matching both its weekday and its day type
+            // ranks first and reports the weekday match, the more specific of the two.
+            AddMetadata(m => m.MatchesDay || m.MatchesDayType, reportDayType: false);
         }
-
-        // 2. What the user set on the template, for templates history has not already suggested. Weaker evidence
-        // than history, so it ranks after it; a template matching both its weekday and its day type ranks first
-        // and reports the weekday match, the more specific of the two.
-        var metadataMatches = templates.Values
-            .Where(t => !coveredTemplateIds.Contains(t.Id))
-            .Select(t => (Template: t,
-                MatchesDay: t.ScheduledDays.Contains(date.DayOfWeek),
-                MatchesDayType: t.SuggestedForDayType == calendar.DayType))
-            .Where(m => m.MatchesDay || m.MatchesDayType)
-            .OrderByDescending(m => m.MatchesDay && m.MatchesDayType)
-            .ThenByDescending(m => m.Template.UsageCount)
-            .ThenBy(m => m.Template.Id);
-
-        foreach (var m in metadataMatches)
+        else
         {
-            result.Add(new TemplateSuggestionResponse
-            {
-                Template = m.Template,
-                PatternType = m.MatchesDay ? MetadataScheduledDay : MetadataDayType,
-                // Invariant enum member names — the client translates them, so they must never be localized here.
-                PatternLabel = m.MatchesDay ? date.DayOfWeek.ToString() : calendar.DayType.ToString(),
-                OccurrenceCount = 0
-            });
+            // An away day (vacation, sick): what kind of day it is outranks which weekday it is. Twenty Mondays of
+            // "Office" must not bury the "Beach" template on a Monday the user marked as vacation. Weekday matches
+            // are demoted, not dropped — some users keep one template for everything.
+            AddHistory(patterns.Where(p => p.PatternType == HistoryDayType).OrderByDescending(p => p.OccurrenceCount));
+            AddMetadata(m => m.MatchesDayType, reportDayType: true);
+            AddHistory(patterns.Where(p => p.PatternType == HistoryDayOfWeek).OrderByDescending(p => p.OccurrenceCount));
+            AddMetadata(m => m.MatchesDay, reportDayType: false);
         }
 
         await Send.OkAsync(result, ct);
+        return;
+
+        // One entry per template, first tier wins — a template applied on Thursdays that were also Workdays is in
+        // the view once per pattern type.
+        void AddHistory(IEnumerable<PlannerSuggestionFromDayTemplate> ordered)
+        {
+            foreach (var p in ordered)
+            {
+                if (!templates.TryGetValue(p.TemplateId, out var template) || !coveredTemplateIds.Add(p.TemplateId))
+                    continue;
+
+                result.Add(new TemplateSuggestionResponse
+                {
+                    Template = template,
+                    PatternType = p.PatternType,
+                    PatternLabel = p.PatternType == HistoryDayOfWeek
+                        ? DayNames[p.PatternValue - 1]
+                        : ((DayType)p.PatternValue).ToString(),
+                    OccurrenceCount = p.OccurrenceCount
+                });
+            }
+        }
+
+        void AddMetadata(
+            Func<(TaskPlannerDayTemplateResponse Template, bool MatchesDay, bool MatchesDayType), bool> include,
+            bool reportDayType)
+        {
+            var matches = templates.Values
+                .Where(t => !coveredTemplateIds.Contains(t.Id))
+                .Select(t => (Template: t,
+                    MatchesDay: t.ScheduledDays.Contains(date.DayOfWeek),
+                    MatchesDayType: t.SuggestedForDayType == calendar.DayType))
+                .Where(include)
+                .OrderByDescending(m => m.MatchesDay && m.MatchesDayType)
+                .ThenByDescending(m => m.Template.UsageCount)
+                .ThenBy(m => m.Template.Id)
+                .ToList();
+
+            foreach (var m in matches)
+            {
+                coveredTemplateIds.Add(m.Template.Id);
+                var asDayType = reportDayType ? m.MatchesDayType : !m.MatchesDay;
+                result.Add(new TemplateSuggestionResponse
+                {
+                    Template = m.Template,
+                    PatternType = asDayType ? MetadataDayType : MetadataScheduledDay,
+                    // Invariant enum member names — the client translates them, so they must never be localized here.
+                    PatternLabel = asDayType ? calendar.DayType.ToString() : date.DayOfWeek.ToString(),
+                    OccurrenceCount = 0
+                });
+            }
+        }
     }
 }

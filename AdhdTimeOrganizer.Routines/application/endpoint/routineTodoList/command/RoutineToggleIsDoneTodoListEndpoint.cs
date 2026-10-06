@@ -10,7 +10,8 @@ namespace AdhdTimeOrganizer.Routines.application.endpoint.todoList.routineTodoLi
 
 public class RoutineToggleIsDoneTodoListEndpoint(
     DbContext dbContext,
-    IRoutinePeriodNotificationService notifier) : BaseToggleIsDoneTodoListEndpoint<RoutineTodoList>(dbContext)
+    IRoutinePeriodNotificationService notifier,
+    IRoutineAwayDaysReader awayDaysReader) : BaseToggleIsDoneTodoListEndpoint<RoutineTodoList>(dbContext)
 {
     private readonly DbContext _dbContext = dbContext;
 
@@ -38,6 +39,7 @@ public class RoutineToggleIsDoneTodoListEndpoint(
             return [];
 
         var periods = await LoadPeriodsAsync(timePeriodIds, ct);
+        var awayDays = await awayDaysReader.ForDueCyclesAsync(_dbContext, periods, now, ct);
 
         var changed = false;
         foreach (var period in periods)
@@ -45,7 +47,8 @@ public class RoutineToggleIsDoneTodoListEndpoint(
             changed |= RoutineResetService.CheckGrace(period, now);
             // Catch-up, not a single cycle: a toggle can be the first thing to notice a period that rolled over
             // several times, and it must leave that period current.
-            var result = RoutineResetService.TryResetCatchUp(period, period.RoutineTodoListColl.ToList(), now);
+            var result = RoutineResetService.TryResetCatchUp(
+                period, period.RoutineTodoListColl.ToList(), now, awayDays.GetValueOrDefault(period.UserId));
             if (result is { } r)
             {
                 _dbContext.Set<RoutinePeriodCompletion>().AddRange(r.Completions);

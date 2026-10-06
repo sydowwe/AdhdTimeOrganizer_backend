@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Routines.domain.serviceContract;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
@@ -14,10 +15,11 @@ public class PlannerTaskIsDoneChangedEventHandler(IServiceScopeFactory scopeFact
     {
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var awayDaysReader = scope.ServiceProvider.GetRequiredService<IRoutineAwayDaysReader>();
 
         try
         {
-            await SyncRoutineTodoList(dbContext, eventModel, ct);
+            await SyncRoutineTodoList(dbContext, awayDaysReader, eventModel, ct);
             await SyncTodoListItem(dbContext, eventModel, ct);
             await dbContext.SaveChangesAsync(ct);
         }
@@ -30,7 +32,8 @@ public class PlannerTaskIsDoneChangedEventHandler(IServiceScopeFactory scopeFact
         }
     }
 
-    private static async Task SyncRoutineTodoList(AppDbContext dbContext, PlannerTaskIsDoneChangedEvent eventModel, CancellationToken ct)
+    private static async Task SyncRoutineTodoList(
+        AppDbContext dbContext, IRoutineAwayDaysReader awayDaysReader, PlannerTaskIsDoneChangedEvent eventModel, CancellationToken ct)
     {
         var item = await dbContext.Set<RoutineTodoList>()
             .Include(r => r.RoutineTimePeriod)
@@ -46,8 +49,11 @@ public class PlannerTaskIsDoneChangedEventHandler(IServiceScopeFactory scopeFact
         // landing after the period elapsed but before any reset ran would walk back a score that belongs to the
         // closed cycle, and a tick would score a cycle the item had already missed. A lost race against another
         // reset site is a DbUpdateException on save, which the caller's catch logs like any other sync failure.
+        // A cycle the user was mostly away for holds the item's streak, as every other reset site decides.
+        var awayDays = (await awayDaysReader.ForDueCyclesAsync(dbContext, [item.RoutineTimePeriod], now, ct))
+            .GetValueOrDefault(item.UserId);
         RoutineResetService.CheckGrace(item.RoutineTimePeriod, now);
-        RoutineResetService.TryReset(item.RoutineTimePeriod, item, now);
+        RoutineResetService.TryReset(item.RoutineTimePeriod, item, now, awayDays);
 
         // In both directions: un-ticking the planner task is an un-tick of the routine item, and the streak
         // walk-back UpdateItemStreak does for the toggle endpoints has to happen here too.

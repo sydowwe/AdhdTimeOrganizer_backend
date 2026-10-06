@@ -1,8 +1,10 @@
+using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.Routines.domain.serviceContract;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.Contracts.scheduling;
+using Sydowwe.Framework.Contracts.user;
 
 namespace AdhdTimeOrganizer.Routines.infrastructure.jobs;
 
@@ -26,6 +28,8 @@ namespace AdhdTimeOrganizer.Routines.infrastructure.jobs;
 public class RoutinePeriodNudgeJobHandler(
     DbContext dbContext,
     IRoutinePeriodNotificationService notifier,
+    IUserTimeZoneReader timeZoneReader,
+    ICalendarDayLookup calendarDayLookup,
     ILogger<RoutinePeriodNudgeJobHandler> logger,
     // Defaulted, never registered — see RoutineTodoListResetJobHandler's copy of this parameter.
     int userPageSize = RoutineSweepPaging.UserPageSize) : IScheduledJobHandler, IScopedService
@@ -56,6 +60,7 @@ public class RoutinePeriodNudgeJobHandler(
 
             var pageNudged = 0;
             var pageGraceWarned = 0;
+            var awayToday = await UsersAwayTodayAsync(userIds, now, ct);
 
             // Sequential on purpose. Fanning the notify calls out with Task.WhenAll would run them against
             // this scope's single AppDbContext concurrently — INotificationService writes notification rows
@@ -64,6 +69,11 @@ public class RoutinePeriodNudgeJobHandler(
             // which is not worth it for a once-a-day sweep. See PERF-8 in review/portal/02-findings.md.
             foreach (var period in periods)
             {
+                // Away today (vacation or sick, in the user's own calendar): no nudge and no grace warning, and
+                // nothing marked — so a nudge still due tomorrow, once they are back, still goes out.
+                if (awayToday.Contains(period.UserId))
+                    continue;
+
                 try
                 {
                     if (RoutineResetService.EvaluateEndingSoon(period, now) is { } nudge)
@@ -121,5 +131,47 @@ public class RoutinePeriodNudgeJobHandler(
 
         logger.LogInformation(
             "Routine nudge sweep sent {NudgeCount} lead-time nudges and {GraceCount} grace warnings", nudged, graceWarned);
+    }
+
+    /// <summary>
+    /// The users in this page whose <b>own</b> today is an away day. The one zone-aware step in this sweep: the
+    /// periods stay UTC end to end, but "today" in a calendar is the user's local date, as the suggested-today
+    /// digest reads it. One zone read and one calendar read per page.
+    /// <para>
+    /// <b>Fails open.</b> This only ever suppresses a nudge, so if it cannot be answered — a stored zone id that
+    /// no longer materializes throws out of the zone read, for one — the page is nudged exactly as it was before
+    /// away days existed, rather than the whole sweep going down with it.
+    /// </para>
+    /// </summary>
+    private async Task<HashSet<long>> UsersAwayTodayAsync(IReadOnlyCollection<long> userIds, DateTime now, CancellationToken ct)
+    {
+        if (userIds.Count == 0)
+            return [];
+
+        try
+        {
+            var zones = await timeZoneReader.GetTimeZonesAsync(userIds, ct);
+            // A user whose zone no longer resolves is absent from the map; UTC rather than a guess, as everywhere.
+            var todayByUser = userIds.ToDictionary(
+                id => id,
+                id => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(now, zones.GetValueOrDefault(id) ?? TimeZoneInfo.Utc)));
+
+            var away = await calendarDayLookup.GetAwayDatesAsync(
+                dbContext, userIds, todayByUser.Values.Min(), todayByUser.Values.Max(), ct);
+
+            return todayByUser
+                .Where(kv => away.TryGetValue(kv.Key, out var days) && days.Contains(kv.Value))
+                .Select(kv => kv.Key)
+                .ToHashSet();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not read away days for a page of {UserCount} users; nudging them as usual", userIds.Count);
+            return [];
+        }
     }
 }

@@ -43,6 +43,11 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
     /// the personal-bests panel). Counted over the same <see cref="RoutineTimePeriod.HistoryDepth"/> window
     /// the heatmap shows, so the figure beside the heatmap describes the cells in it. Not a column: the ledger
     /// is the source, and a counter beside it is one more thing to keep in step.
+    /// <para>
+    /// An excused cycle (the user was away for most of it) is in the heatmap but <b>not</b> counted here: "away,
+    /// doesn't count against you" has to hold for the consistency figure too, or a sick fortnight drags it down
+    /// for as long as those cycles stay in the window.
+    /// </para>
     /// </summary>
     public int TotalPeriodsElapsed { get; init; }
 
@@ -73,7 +78,7 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
         {
             NextResetAt = RoutineResetService.ComputeNextReset(period, now),
             CompletionHistory = history.Select(PeriodCompletionRecord.From).ToList(),
-            TotalPeriodsElapsed = history.Count,
+            TotalPeriodsElapsed = history.Count(completion => !completion.IsExcused),
             TotalPeriodsCompleted = history.Count(completion =>
                 RoutineStreakFreezeService.IsSuccess(completion, period.StreakThreshold))
         };

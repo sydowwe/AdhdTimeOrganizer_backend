@@ -22,6 +22,7 @@ namespace AdhdTimeOrganizer.Routines.infrastructure.jobs;
 public class RoutineTodoListResetJobHandler(
     DbContext dbContext,
     IRoutinePeriodNotificationService notifier,
+    IRoutineAwayDaysReader awayDaysReader,
     ILogger<RoutineTodoListResetJobHandler> logger,
     // Defaulted, never registered: DI and the Scheduler's dispatcher both take the default, and the tests that
     // need the sweep to actually cross a page boundary pass 1 rather than seeding a hundred users.
@@ -55,6 +56,9 @@ public class RoutineTodoListResetJobHandler(
 
             var reset = new List<(RoutineTimePeriod Period, RoutineResetService.RoutinePeriodReset Result)>();
 
+            // One calendar read for the page: a cycle the user was mostly away for is excused, not missed.
+            var awayDays = await awayDaysReader.ForDueCyclesAsync(dbContext, periods, now, ct);
+
             foreach (var period in periods)
             {
                 // Owner-filtered (SEC-1). TimePeriodId is client-supplied on a routine item and the foreign key
@@ -76,7 +80,7 @@ public class RoutineTodoListResetJobHandler(
                 // Catch-up, not a single cycle: a period nobody opened for two months is closed out in this one
                 // run and announced once, rather than dripping one retroactive miss per nightly run for two
                 // months.
-                var result = RoutineResetService.TryResetCatchUp(period, items, now);
+                var result = RoutineResetService.TryResetCatchUp(period, items, now, awayDays.GetValueOrDefault(period.UserId));
                 if (result is { } r)
                 {
                     dbContext.Set<RoutinePeriodCompletion>().AddRange(r.Completions);

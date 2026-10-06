@@ -88,7 +88,9 @@ public static class RoutineStreakFreezeService
         // An empty period is not a miss either, even though IsSuccess says false for it: RecomputeStreak skips
         // TotalCount == 0 rows outright and TryReset leaves the streak NotEvaluated, so such a period already
         // carries the run for free and a freeze on it would be charged for nothing.
-        if (entry.TotalCount == 0 || IsSuccess(entry, period.StreakThreshold))
+        // An excused cycle (the user was away for most of it) already carries the run for free, exactly like an
+        // empty one, so it is not a miss either — and the CHECK forbids a row being both.
+        if (entry.IsExcused || entry.TotalCount == 0 || IsSuccess(entry, period.StreakThreshold))
             return StreakFreezeRejection.NotAMiss;
 
         RefreshFreezeBudget(period, now);
@@ -117,7 +119,9 @@ public static class RoutineStreakFreezeService
     /// <para>
     /// A frozen period <i>carries</i> the run rather than extending it: the point of a freeze is that the streak
     /// survives, not that a skipped period counts as done. A period that elapsed with no items carries it too,
-    /// matching <see cref="RoutineResetService.TryReset"/>, which leaves the streak untouched in that case.
+    /// matching <see cref="RoutineResetService.TryReset"/>, which leaves the streak untouched in that case — and
+    /// so does an excused one (<see cref="RoutinePeriodCompletion.IsExcused"/>, the user was away), for the same
+    /// reason a freeze does.
     /// </para>
     /// <para>
     /// Both values are only ever raised, never lowered. The walk sees only what the history holds, and history
@@ -133,7 +137,7 @@ public static class RoutineStreakFreezeService
 
         foreach (var completion in historyAsc)
         {
-            if (completion.IsFrozen || completion.TotalCount == 0)
+            if (completion.IsFrozen || completion.IsExcused || completion.TotalCount == 0)
                 continue;
 
             if (IsSuccess(completion, period.StreakThreshold))

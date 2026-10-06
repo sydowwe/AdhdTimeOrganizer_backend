@@ -23,7 +23,12 @@ public class Calendar : BaseEntityWithUser
 
     /// <summary>The holiday's native Slovak name — the fallback for a reader that has no locale table.</summary>
     public string? HolidayName { get; init; }
-    public string? Label { get; set; } // "HomeOffice", "Office", custom labels - independent of holiday
+    /// <summary>
+    /// A free-text marker for the day ("Flight 07:40", "Mum's birthday"), independent of the holiday. Not where the
+    /// user works — that is <see cref="Location"/> — and not what kind of day it is, which is <see cref="DayType"/>.
+    /// Nothing on the server reads it.
+    /// </summary>
+    public string? Label { get; set; }
 
     // Sleep schedule for this day
     public required TimeOnly WakeUpTime { get; set; }

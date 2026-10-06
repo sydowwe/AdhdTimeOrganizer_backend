@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.response.suggestion;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
@@ -29,7 +30,8 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
         Summary(s =>
         {
             s.Summary = "Get task suggestions for a date";
-            s.Description = "Returns user-set and automatic (pattern-based) suggestions for the given date";
+            s.Description = "Returns user-set and automatic (pattern-based) suggestions for the given date. On an away " +
+                            "day (Vacation, SickDay) only the user-set ones";
             s.Response<List<SuggestionResponse>>(200, "Success");
             s.Response(400, "Invalid date format");
         });
@@ -122,6 +124,16 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
                 OccurrenceCount = null
             });
             coveredActivityIds.Add(task.ActivityId);
+        }
+
+        // On an away day (vacation, sick) only the recurrences the user set apply. Tiers 2 and 3 are statistics
+        // over weekdays and days of the month, which workdays dominate — so a vacation Monday would be offered the
+        // office Monday's standup and commute. A user who wants a recurrence off while away already has
+        // RecurrenceType.DayType for it; a daily medication recurrence must still appear, and does, above.
+        if (calendar.DayType.IsAway())
+        {
+            await Send.OkAsync(result, ct);
+            return;
         }
 
         // 2. Planner-pattern suggestions
