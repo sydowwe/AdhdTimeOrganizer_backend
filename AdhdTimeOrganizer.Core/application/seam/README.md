@@ -18,7 +18,7 @@ if the two ever drift apart.
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint`; Routines — `RoutineSuggestedTodayJobHandler`, for the day's `WakeUpTime` |
 | `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint` |
-| `ITodoListItemPlanSource` | read | single | Planning | TodoLists — `GetAllTodoListItemEndpoint`, `GetByIdTodoListItemEndpoint`, through `TodoListItemPlannedSlotFiller`, for `NextPlannedSlot` |
+| `ITodoListItemPlanSource` | read | single | Planning | TodoLists — `GetAllTodoListItemEndpoint`, `GetByIdTodoListItemEndpoint`, through `TodoListItemPlannedSlotFiller`, for `NextPlannedSlot`; the same two plus `GetDashboardTodoListItemEndpoint` for `PlanHelp` (`PlanHistoryAsync`, FO3) |
 | `IUserOwnedReferenceVerifier` | read | keyed `IEnumerable<>` | TodoLists (`todoListItem`), Routines (`routineTodoList`) | History — `Create`/`UpdateActivityHistoryEndpoint`; Planning — `Create`/`UpdatePlannerTaskEndpoint` and both apply-template endpoints, for `PlannerTask.TodolistItemId`. Both through Core's `IReferencedIdOwnershipService` |
 
 ## Event seams (`ISeamEvent`)
@@ -120,6 +120,10 @@ None of these break the build, and only one of them throws.
   status or the from-date predicate would report every item as scheduled forever (or none ever), and
   the list's "not scheduled" nudge would go quiet or never clear. `TodoListItemNextPlannedSlotTests`
   asserts on the returned slots — open blocks only, earliest first, nothing before the user's today.
+  Its second method, `PlanHistoryAsync`, fails the same way in the other direction: a dropped day
+  or background predicate marks items stuck that are not, and the list offers "a smaller first step"
+  on a task planned for this afternoon. `TodoListItemPlanHelpTests` asserts on the token per seeded
+  history (and one built by three real carry-overs). It also asserts the response carries no count.
 - **`IUserOwnedReferenceVerifier` is the one that fails *closed*.** `ReferencedIdOwnershipService`
   looks a verifier up by key and answers `false` when none matches, so a slice dropped from
   `ModuleAssemblies` or a renamed key rejects every write carrying that id instead of waving them all

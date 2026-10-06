@@ -1,5 +1,7 @@
+using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
+using AdhdTimeOrganizer.TodoLists.application.service;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using Microsoft.Extensions.Options;
@@ -20,9 +22,12 @@ namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListItem
 public class GetDashboardTodoListItemEndpoint(
     DbContext dbContext,
     IUserTimeZoneResolver timeZones,
-    IOptions<TodoListSettings> settings)
+    IOptions<TodoListSettings> settings,
+    ITodoListItemPlanSource planSource)
     : BaseGetAllEndpoint<TodoListItem, TodoListItemResponse>(dbContext)
 {
+    private readonly DbContext _dbContext = dbContext;
+
     // Filter is synchronous by contract and resolving the caller's zone is a database read, so the horizon
     // is computed in HandleAsync before the base builds the query. Only ever read on the line after it is
     // written, within one request.
@@ -50,4 +55,8 @@ public class GetDashboardTodoListItemEndpoint(
     {
         return query.OrderBy(e => e.DueDate);
     }
+
+    /// <summary>FO3: the home widget offers the same help on a stuck item as the list does.</summary>
+    protected override Task<List<TodoListItemResponse>> PostProcessItemsAsync(List<TodoListItemResponse> items, CancellationToken ct) =>
+        TodoListItemPlannedSlotFiller.FillPlanHelpAsync(items, _dbContext, planSource, timeZones, User.GetId(), ct);
 }

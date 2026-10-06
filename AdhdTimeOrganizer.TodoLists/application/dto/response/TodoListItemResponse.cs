@@ -30,6 +30,15 @@ public record TodoListItemResponse : BaseTodoListResponse,
     /// </summary>
     public PlannedSlotResponse? NextPlannedSlot { get; init; }
 
+    /// <summary>
+    /// FO3: <c>"smallerStep"</c>, <c>"shorterBlock"</c> or <c>"reconsider"</c> when the item keeps slipping in the
+    /// planner and none of its attempts completed. Null when it is not stuck, or is done. It says what kind of help
+    /// to offer and <b>never how many times</b> the item slipped (see <c>TodoListItemPlanHelp</c>). Like
+    /// <see cref="NextPlannedSlot"/> it is not projected. It is filled after the query on get-all, get-by-id and
+    /// the dashboard widget.
+    /// </summary>
+    public string? PlanHelp { get; init; }
+
     public static IQueryable<TodoListItemResponse> Projection(IQueryable<TodoListItem> q)
     {
         return q.Select(e => new TodoListItemResponse

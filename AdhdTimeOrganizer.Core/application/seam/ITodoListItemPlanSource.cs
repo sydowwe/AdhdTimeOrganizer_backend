@@ -3,8 +3,8 @@ using Microsoft.EntityFrameworkCore;
 namespace AdhdTimeOrganizer.Core.application.seam;
 
 /// <summary>
-/// Answers "when is each of these to-do items next planned?" without the caller naming the slice that owns the
-/// planner.
+/// Answers "when is each of these to-do items next planned?", and "how did its earlier attempts go?", without the
+/// caller naming the slice that owns the planner.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -35,8 +35,59 @@ public interface ITodoListItemPlanSource : ISeam
     /// <param name="fromDate">The user's today, resolved by the caller in the user's own zone.</param>
     Task<IReadOnlyDictionary<long, PlannedSlot>> NextPlannedSlotsAsync(
         DbContext db, long userId, IReadOnlyCollection<long> todoListItemIds, DateOnly fromDate, CancellationToken ct);
+
+    /// <summary>
+    /// For each of <paramref name="todoListItemIds"/>, how its planner attempts went: every block ever linked to
+    /// it, completed or not, sorted into the ways an attempt can fail.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The read side of FO3. The next-slot read above drops everything that already happened, so a to-do whose
+    /// block was skipped or carried over four times looked brand new to the list. This keeps those attempts.
+    /// </para>
+    /// <para>
+    /// Facts, not a verdict: what counts as "stuck", and what help to offer, is the to-do side's decision. The
+    /// counts are for that rule only and must never reach a response — "pushed four times" is a score, and the
+    /// feature exists to offer help instead of one.
+    /// </para>
+    /// <para>
+    /// Items with no linked block at all are <b>absent</b> from the result.
+    /// </para>
+    /// </remarks>
+    /// <param name="db">The ambient context. The query is composed from it.</param>
+    /// <param name="userId">The authenticated caller, filtered on explicitly.</param>
+    /// <param name="todoListItemIds">Items to report on. An empty collection returns an empty map.</param>
+    /// <param name="today">The user's today, resolved by the caller in the user's own zone. A block that was never
+    /// started counts as missed only once its whole day is behind the user.</param>
+    Task<IReadOnlyDictionary<long, PlanHistory>> PlanHistoryAsync(
+        DbContext db, long userId, IReadOnlyCollection<long> todoListItemIds, DateOnly today, CancellationToken ct);
 }
 
 /// <param name="Date">The planner day, on the user's clock.</param>
 /// <param name="StartTime">The block's start on that day.</param>
 public record PlannedSlot(DateOnly Date, TimeOnly StartTime);
+
+/// <summary>
+/// One to-do item's planner attempts, sorted by outcome. Skip reasons are spelled out field by field because
+/// Core cannot see Planning's <c>SkipReasonKey</c>.
+/// </summary>
+/// <param name="Completed">Blocks marked completed, by the user or by a tracker.</param>
+/// <param name="CarriedOver">The sum of every linked block's carry-over count: each carry is one day the item
+/// did not happen on. A carried block that later fails again counts again, under its new outcome.</param>
+/// <param name="Missed">Foreground blocks still <c>NotStarted</c> or <c>OnHold</c> on a day before the user's
+/// today. Today's are not counted: the day is not over.</param>
+/// <param name="SkippedNoTime">Skipped with the built-in "ran out of time" reason.</param>
+/// <param name="SkippedNoEnergy">Skipped with the built-in "no energy" reason.</param>
+/// <param name="SkippedNotRelevant">Skipped with the built-in "not relevant any more" reason.</param>
+/// <param name="SkippedOther">Skipped with a free-text reason or none.</param>
+public record PlanHistory(
+    int Completed,
+    int CarriedOver,
+    int Missed,
+    int SkippedNoTime,
+    int SkippedNoEnergy,
+    int SkippedNotRelevant,
+    int SkippedOther)
+{
+    public int FailedAttempts => CarriedOver + Missed + SkippedNoTime + SkippedNoEnergy + SkippedNotRelevant + SkippedOther;
+}
