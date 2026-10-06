@@ -550,6 +550,37 @@ public class SessionRevocationTests(AppDbContextFixture fixture) : AuthTestBase(
             .Should().BeCloseTo(rememberedRow.CreatedAt, TimeSpan.FromMilliseconds(1));
     }
 
+    /// <summary>
+    /// A tracker's session is listed beside the web ones and says so, which is what lets the settings page
+    /// show trackers apart from browsers (FO7). The revoke needs nothing new: it takes the same session id.
+    /// </summary>
+    [Fact]
+    public async Task SessionList_SaysWhichSessionIsATracker_AndItsRevokeEndsIt()
+    {
+        var (userId, email) = await CreateRealUserAsync(Fixture, "session-tracker", Password);
+        using var client = CreateRawClient();
+        var web = await SignInAsync(client, email);
+
+        string trackerAccessToken;
+        using (var scope = Fixture.UnauthenticatedFactory.Services.CreateScope())
+        {
+            var user = await scope.ServiceProvider.GetRequiredService<UserManager<User>>().FindByIdAsync(userId.ToString());
+            (trackerAccessToken, _) = await scope.ServiceProvider.GetRequiredService<IJwtService<User>>()
+                .GenerateTokensForExtensionAsync(AuthMethodEnum.Password, user!);
+        }
+        var trackerSessionId = SessionIdOf(trackerAccessToken);
+
+        var sessions = await ListSessionsAsync(web);
+        sessions.Single(s => s.Id == trackerSessionId).IsExtensionClient.Should().BeTrue();
+        sessions.Single(s => s.Id == web.SessionId).IsExtensionClient.Should().BeFalse();
+
+        (await web.SendAsync(HttpMethod.Delete, $"user/sessions/{trackerSessionId}")).StatusCode
+            .Should().Be(HttpStatusCode.NoContent);
+        (await BearerGetAsync(client, trackerAccessToken)).Should().Be(HttpStatusCode.Unauthorized,
+            "the revoked tracker's unexpired access token no longer authenticates");
+        (await ListSessionsAsync(web)).Should().NotContain(s => s.Id == trackerSessionId);
+    }
+
     // ── Plumbing ──────────────────────────────────────────────────────────────
 
     private static async Task AllLiveAsync(params Session[] sessions)

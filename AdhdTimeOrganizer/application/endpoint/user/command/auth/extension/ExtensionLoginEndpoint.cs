@@ -10,16 +10,17 @@ namespace AdhdTimeOrganizer.application.endpoint.user.command.auth.extension;
 
 /// <summary>
 /// Extension (token) login. Password check, lockout, email confirmation, the 2FA branch and the token
-/// pair all come from the framework base; the only thing this deployment adds is the per-account
-/// extension gate.
+/// pair all come from the framework base.
+///
+/// <para>There is deliberately no <c>HasExtensionAccess</c> override, so every account may sign a tracker
+/// in (FO7, decided 2026-10-06). The per-account flag added no security: the tracker signs in with the
+/// account's own password through the same flow as the web, and the <c>ActivityTracking</c> role still
+/// comes from the token's client type alone. <c>User.HasExtensionAccess</c> is left in place and unread
+/// until a migration drops it.</para>
 /// </summary>
 public class ExtensionLoginEndpoint(
     UserManager<User> userManager,
     IJwtService<User> jwtService,
     IAuditService auditService,
     IOptions<TwoFactorOptions> twoFactorOptions)
-    : BaseExtensionLoginEndpoint<User>(userManager, jwtService, auditService, twoFactorOptions)
-{
-    // This portal gates extension access per account; the framework default lets everyone in.
-    protected override bool HasExtensionAccess(User user) => user.HasExtensionAccess;
-}
+    : BaseExtensionLoginEndpoint<User>(userManager, jwtService, auditService, twoFactorOptions);

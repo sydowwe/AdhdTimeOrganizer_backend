@@ -46,15 +46,22 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
         result.RequiresTwoFactor.Should().BeFalse();
     }
 
+    /// <summary>
+    /// Every account may sign a tracker in (FO7, 2026-10-06): the host no longer overrides the framework's
+    /// <c>HasExtensionAccess</c>, so the column is not read. It used to be, and only seeders ever set it, so
+    /// every tracker worked for the root admin alone.
+    /// </summary>
     [Fact]
-    public async Task ExtensionLogin_WithoutExtensionAccess_Returns403()
+    public async Task ExtensionLogin_WithoutTheExtensionAccessFlag_StillReturnsTokens()
     {
         var email = "no-extension-user@test.com";
         await CreateUserWithExtensionAccess(email, false);
 
         var response = await ExtensionLoginAsync(email);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<ExtensionLoginResponse>(TestContext.Current.CancellationToken);
+        result!.AccessToken.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
