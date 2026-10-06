@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.History.application.dto.request.history;
 using AdhdTimeOrganizer.History.application.dto.response.activityHistory;
 using AdhdTimeOrganizer.History.application.validator;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.History.domain.serviceContract;
 using FastEndpoints;
 using FluentValidation.Results;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +29,10 @@ namespace AdhdTimeOrganizer.History.application.endpoint.activityHistory.activit
 /// from the session id <i>and</i> every row id.
 /// </para>
 /// </remarks>
-public class CreateActivityHistorySessionEndpoint(DbContext dbContext, IReferencedIdOwnershipService ownership)
+public class CreateActivityHistorySessionEndpoint(
+    DbContext dbContext,
+    IReferencedIdOwnershipService ownership,
+    IActivityTimeRecordedPublisher timeRecorded)
     : Endpoint<CreateActivityHistorySessionRequest, CreateActivityHistorySessionResponse>
 {
     public override void Configure()
@@ -94,6 +98,10 @@ public class CreateActivityHistorySessionEndpoint(DbContext dbContext, IReferenc
             await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
             return;
         }
+
+        // Past the commit, before the 201 — see CreateActivityHistoryEndpoint.AfterSave (FO2). Every row goes,
+        // breaks included: a break is time on the rest activity, and only the work rows carry the item link.
+        await timeRecorded.PublishAsync(dbContext, userId, session.Records.ToList(), ct);
 
         await Send.ResponseAsync(new CreateActivityHistorySessionResponse
         {

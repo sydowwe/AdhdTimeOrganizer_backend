@@ -111,6 +111,14 @@ public class ActivityTimeRecordedEventHandler(
 
         var durationSeconds = (int)(plannerTask.EndTime - plannerTask.StartTime).TotalSeconds;
         var availableSeconds = await UnclaimedSecondsAsync(services, eventModel, total, ct);
+
+        // Every second of the day is already claimed by a completed block, so nothing was observed for this one.
+        // A heartbeat always brings its own fresh minute, but History's paths do not: a timer run from the morning
+        // "Coding" block is completed by the planner (claiming up to now), and the history row it then logs is
+        // inside that claim — it must not flip the afternoon "Coding" block to InProgress (FO2).
+        if (availableSeconds <= 0)
+            return;
+
         var wasCompleted = durationSeconds > 0 && availableSeconds >= durationSeconds;
         var newStatus = wasCompleted ? PlannerTaskStatus.Completed : PlannerTaskStatus.InProgress;
 
@@ -193,11 +201,32 @@ public class ActivityTimeRecordedEventHandler(
         IActivityTimeAttributionSink Sink,
         IUserTimeZoneResolver TimeZones);
 
+    /// <remarks>
+    /// When the time was logged <em>for</em> an item (<see cref="ActivityDayTotal.TodoListItemId"/> /
+    /// <see cref="ActivityDayTotal.RoutineTodoListId"/>), that item is the only candidate, and the other kind is
+    /// not touched. Otherwise the open item for the activity, oldest first: two open items sharing an activity
+    /// used to be settled by whichever Postgres returned first, which is a visible wrong tick once a deliberate
+    /// timer can trigger it rather than only background tracking.
+    /// </remarks>
     private static async Task AutomateWithoutPlannerTaskAsync(AppDbContext dbContext, long userId, ActivityDayTotal total, CancellationToken ct)
     {
-        var todoItem = await dbContext.Set<TodoListItem>()
-            .FirstOrDefaultAsync(i => i.UserId == userId && i.ActivityId == total.ActivityId
-                                                         && !i.IsDone && i.SuggestedTime != null, ct);
+        var isLinked = total.TodoListItemId is not null || total.RoutineTodoListId is not null;
+
+        if (!isLinked || total.TodoListItemId is not null)
+            await CompleteTodoItemAsync(dbContext, userId, total, ct);
+
+        if (!isLinked || total.RoutineTodoListId is not null)
+            await CompleteRoutineItemAsync(dbContext, userId, total, ct);
+    }
+
+    private static async Task CompleteTodoItemAsync(AppDbContext dbContext, long userId, ActivityDayTotal total, CancellationToken ct)
+    {
+        var candidates = dbContext.Set<TodoListItem>()
+            .Where(i => i.UserId == userId && !i.IsDone && i.SuggestedTime != null);
+        var todoItem = await (total.TodoListItemId is { } itemId
+                ? candidates.Where(i => i.Id == itemId)
+                : candidates.Where(i => i.ActivityId == total.ActivityId).OrderBy(i => i.Id))
+            .FirstOrDefaultAsync(ct);
 
         if (todoItem != null && total.TotalSecondsOnDay >= todoItem.SuggestedTime!.TotalSeconds)
         {
@@ -206,10 +235,16 @@ public class ActivityTimeRecordedEventHandler(
                 todoItem.DoneCount = todoItem.TotalCount;
             await dbContext.SaveChangesAsync(ct);
         }
+    }
 
-        var routineItem = await dbContext.Set<RoutineTodoList>()
-            .FirstOrDefaultAsync(r => r.UserId == userId && r.ActivityId == total.ActivityId
-                                                         && !r.IsDone && r.SuggestedTime != null, ct);
+    private static async Task CompleteRoutineItemAsync(AppDbContext dbContext, long userId, ActivityDayTotal total, CancellationToken ct)
+    {
+        var candidates = dbContext.Set<RoutineTodoList>()
+            .Where(r => r.UserId == userId && !r.IsDone && r.SuggestedTime != null);
+        var routineItem = await (total.RoutineTodoListId is { } itemId
+                ? candidates.Where(r => r.Id == itemId)
+                : candidates.Where(r => r.ActivityId == total.ActivityId).OrderBy(r => r.Id))
+            .FirstOrDefaultAsync(ct);
 
         if (routineItem != null && total.TotalSecondsOnDay >= routineItem.SuggestedTime!.TotalSeconds)
         {

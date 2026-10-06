@@ -257,8 +257,11 @@ public class ActivityTimeAutomationTests(AppDbContextFixture fixture) : Postgres
             PlannerTaskStatus.Completed, new TimeOnly(9, 0), new TimeOnly(9, 30));
         var secondId = await SeedPlannerTaskAsync(activityId, new TimeOnly(15, 0), new TimeOnly(15, 30));
         await SeedHistoryAsync(activityId, new TimeOnly(9, 0), 1800);
+        // The heartbeat's own minute. Without any unclaimed time the handler now leaves the block alone (FO2's
+        // guard, pinned by SecondBlock_NoUnclaimedTime_IsLeftNotStarted), so this test needs the realistic minute.
+        await SeedHistoryAsync(activityId, new TimeOnly(15, 0), 60);
 
-        await RunAsync(activityId, totalSecondsOnDay: 1800, windowStart: new TimeOnly(15, 0));
+        await RunAsync(activityId, totalSecondsOnDay: 1860, windowStart: new TimeOnly(15, 0));
 
         await using var db = CreateDbContext();
         (await db.Set<PlannerTask>().FirstAsync(t => t.Id == secondId, CancellationToken))
@@ -288,15 +291,92 @@ public class ActivityTimeAutomationTests(AppDbContextFixture fixture) : Postgres
                 "the 30 minutes after 09:30 are unclaimed and meet the second block's 30");
     }
 
+    /// <summary>
+    /// FO2: a timer run from the morning block is completed by the planner first (claiming everything up to its
+    /// end), then its history row is published. That row is inside the claim, so the afternoon block of the same
+    /// activity must stay NotStarted — it used to flip to InProgress on any event, with zero seconds to show.
+    /// </summary>
+    [Fact]
+    public async Task SecondBlock_NoUnclaimedTime_IsLeftNotStarted()
+    {
+        var activityId = await SeedActivityAsync("pool-nothing-unclaimed");
+        await SeedPlannerTaskAsync(activityId, new TimeOnly(9, 0), new TimeOnly(9, 30),
+            PlannerTaskStatus.Completed, new TimeOnly(9, 0), new TimeOnly(9, 30));
+        var secondId = await SeedPlannerTaskAsync(activityId, new TimeOnly(15, 0), new TimeOnly(15, 30));
+        await SeedHistoryAsync(activityId, new TimeOnly(9, 0), 1800);
+
+        await RunAsync(activityId, totalSecondsOnDay: 1800, windowStart: new TimeOnly(9, 0), windowMinutes: 30);
+
+        await using var db = CreateDbContext();
+        (await db.Set<PlannerTask>().FirstAsync(t => t.Id == secondId, CancellationToken))
+            .Status.Should().Be(PlannerTaskStatus.NotStarted, "every logged second belongs to the completed morning block");
+    }
+
+    // ---- the item link (FO2) -----------------------------------------------
+
+    /// <summary>
+    /// Two open to-do items share an activity. Time logged <i>for</i> the second completes the second, not
+    /// whichever the unlinked fallback would pick (the oldest — seeded first here, so a link that was ignored
+    /// would show).
+    /// </summary>
+    [Fact]
+    public async Task LinkedTodoItem_IsTheOneCompleted()
+    {
+        var activityId = await SeedActivityAsync("todo-linked");
+        var olderId = await SeedTodoItemAsync(activityId, suggestedSeconds: 600);
+        var linkedId = await SeedTodoItemAsync(activityId, suggestedSeconds: 600);
+
+        await RunAsync(activityId, totalSecondsOnDay: 900, todoListItemId: linkedId);
+
+        await using var db = CreateDbContext();
+        (await db.Set<TodoListItem>().FirstAsync(i => i.Id == linkedId, CancellationToken)).IsDone.Should().BeTrue();
+        (await db.Set<TodoListItem>().FirstAsync(i => i.Id == olderId, CancellationToken)).IsDone.Should().BeFalse();
+    }
+
+    /// <summary>Unlinked, the oldest open item for the activity is the one ticked — deterministic, not Postgres' pick.</summary>
+    [Fact]
+    public async Task UnlinkedTodoItems_TheOldestIsCompleted()
+    {
+        var activityId = await SeedActivityAsync("todo-oldest");
+        var olderId = await SeedTodoItemAsync(activityId, suggestedSeconds: 600);
+        var newerId = await SeedTodoItemAsync(activityId, suggestedSeconds: 600);
+
+        await RunAsync(activityId, totalSecondsOnDay: 900);
+
+        await using var db = CreateDbContext();
+        (await db.Set<TodoListItem>().FirstAsync(i => i.Id == olderId, CancellationToken)).IsDone.Should().BeTrue();
+        (await db.Set<TodoListItem>().FirstAsync(i => i.Id == newerId, CancellationToken)).IsDone.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Time logged for a to-do item is that item's; a routine item sharing the activity is not ticked off it,
+    /// which the unlinked fallback (both kinds) would do.
+    /// </summary>
+    [Fact]
+    public async Task LinkedTodoItem_LeavesTheRoutineItemAlone()
+    {
+        var activityId = await SeedActivityAsync("todo-linked-routine");
+        var todoId = await SeedTodoItemAsync(activityId, suggestedSeconds: 300);
+        var routineId = await SeedRoutineItemAsync(activityId, suggestedSeconds: 300);
+
+        await RunAsync(activityId, totalSecondsOnDay: 600, todoListItemId: todoId);
+
+        await using var db = CreateDbContext();
+        (await db.Set<TodoListItem>().FirstAsync(i => i.Id == todoId, CancellationToken)).IsDone.Should().BeTrue();
+        (await db.Set<RoutineTodoList>().FirstAsync(r => r.Id == routineId, CancellationToken)).IsDone.Should().BeFalse();
+    }
+
     // ---- helpers ---------------------------------------------------------
 
     /// <summary>
     /// Drives the handler the way the event bus would. Built by hand rather than resolved, because
     /// FastEndpoints keeps its handler registry outside DI — the wiring half is covered over HTTP in
-    /// <c>ExtensionActivityTrackingTests</c>. The window is one minute, as a heartbeat's always is.
+    /// <c>ExtensionActivityTrackingTests</c> and <c>HistoryTicksOffThePlanTests</c>. The window is one minute by
+    /// default, as a heartbeat's always is.
     /// </summary>
     private async Task RunAsync(
-        long activityId, int totalSecondsOnDay, TimeOnly? windowStart = null, IServiceScopeFactory? scopeFactory = null)
+        long activityId, int totalSecondsOnDay, TimeOnly? windowStart = null, IServiceScopeFactory? scopeFactory = null,
+        int windowMinutes = 1, long? todoListItemId = null)
     {
         scopeFactory ??= Fixture.UnauthenticatedFactory.Services.GetRequiredService<IServiceScopeFactory>();
         var handler = new ActivityTimeRecordedEventHandler(
@@ -304,8 +384,8 @@ public class ActivityTimeAutomationTests(AppDbContextFixture fixture) : Postgres
 
         var start = windowStart ?? new TimeOnly(12, 0);
         await handler.HandleAsync(
-            new ActivityTimeRecordedEvent(UserId, Today, start, start.AddMinutes(1),
-                [new ActivityDayTotal(activityId, totalSecondsOnDay)]),
+            new ActivityTimeRecordedEvent(UserId, Today, start, start.AddMinutes(windowMinutes),
+                [new ActivityDayTotal(activityId, totalSecondsOnDay, todoListItemId)]),
             CancellationToken);
     }
 
@@ -385,9 +465,15 @@ public class ActivityTimeAutomationTests(AppDbContextFixture fixture) : Postgres
     {
         await using var db = CreateDbContext();
 
-        var priority = new TaskPriority { UserId = UserId, Text = $"P{activityId}", Color = "#654321", Priority = (int)activityId };
-        db.Set<TaskPriority>().Add(priority);
-        await db.SaveChangesAsync(CancellationToken);
+        // One priority per activity, reused by a second item on it (the link tests seed two).
+        var priorityText = $"P{activityId}";
+        var priority = await db.Set<TaskPriority>().FirstOrDefaultAsync(p => p.UserId == UserId && p.Text == priorityText, CancellationToken);
+        if (priority == null)
+        {
+            priority = new TaskPriority { UserId = UserId, Text = priorityText, Color = "#654321", Priority = (int)activityId };
+            db.Set<TaskPriority>().Add(priority);
+            await db.SaveChangesAsync(CancellationToken);
+        }
 
         var item = new TodoListItem
         {

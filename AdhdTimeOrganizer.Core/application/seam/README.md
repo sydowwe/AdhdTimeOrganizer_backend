@@ -25,7 +25,7 @@ if the two ever drift apart.
 
 | Event | Published by | Handled by | Handler touches |
 |---|---|---|---|
-| `ActivityTimeRecordedEvent` | Tracking | host `ActivityTimeRecordedEventHandler` | Planning + TodoLists + Routines |
+| `ActivityTimeRecordedEvent` | Tracking (heartbeat), History (both creates, via `IActivityTimeRecordedPublisher` — FO2) | host `ActivityTimeRecordedEventHandler` | Planning + TodoLists + Routines |
 | `PlannerTaskIsDoneChangedEvent` | Planning, and the host handler above | host | TodoLists + Routines |
 | `TodoListItemIsDoneChangedEvent` | TodoLists | **Planning** | Planning only |
 | `RoutineTodoListIsDoneChangedEvent` | Routines | **Planning** | Planning only |

@@ -244,7 +244,7 @@ one fails). Summary:
 
 | Name | Published by | Handled by | Path |
 |---|---|---|---|
-| `ActivityTimeRecordedEvent` (+ `ActivityDayTotal`) | Tracking | host `ActivityTimeRecordedEventHandler` (Planning + TodoLists + Routines; enforces an **exclusive** rule) | `ActivityTimeRecordedEvent.cs` |
+| `ActivityTimeRecordedEvent` (+ `ActivityDayTotal`, which carries an optional item link) | Tracking, History (FO2) | host `ActivityTimeRecordedEventHandler` (Planning + TodoLists + Routines; enforces an **exclusive** rule) | `ActivityTimeRecordedEvent.cs` |
 | `PlannerTaskIsDoneChangedEvent` | Planning, and the host handler above | host (TodoLists + Routines in one `SaveChanges`) | `PlannerTaskIsDoneChangedEvent.cs` |
 | `TodoListItemIsDoneChangedEvent` | TodoLists | Planning | `TodoListItemIsDoneChangedEvent.cs` |
 | `RoutineTodoListIsDoneChangedEvent` | Routines | Planning | `RoutineTodoListIsDoneChangedEvent.cs` |

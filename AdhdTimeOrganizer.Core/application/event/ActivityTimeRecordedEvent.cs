@@ -3,8 +3,11 @@ using AdhdTimeOrganizer.Core.application.seam;
 namespace AdhdTimeOrganizer.Core.application.@event;
 
 /// <summary>
-/// Raised once per heartbeat batch, after the tracked time has been persisted and attributed, naming
-/// every activity the batch touched and how much time that activity now has for the day.
+/// Raised after activity time has been committed to History, naming every activity it touched and how much
+/// time that activity now has for the day. Two publishers: the desktop heartbeat (once per batch), and
+/// History's own create paths — <c>POST /activity-history</c> and <c>POST /activity-history/session</c> — once
+/// per (local day, activity) the new rows touch, so a timer or a hand-logged stretch ticks off the plan the same
+/// way tracked time does (FO2).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -24,8 +27,8 @@ namespace AdhdTimeOrganizer.Core.application.@event;
 /// <para>
 /// ⚠ <b>Every field here is on the user's own clock</b>, which is the clock a <c>Calendar.Date</c> and a
 /// <c>PlannerTask.StartTime</c> are written on. A publisher must resolve the user's zone before building
-/// this; deriving <see cref="Day"/> from a UTC instant is the bug the heartbeat shipped with, and any
-/// future publisher (Android sync, timers) has to follow the same rule.
+/// this; deriving <see cref="Day"/> from a UTC instant is the bug the heartbeat shipped with, and every
+/// publisher (History's creates, and Android sync when it comes) follows the same rule.
 /// </para>
 /// </remarks>
 /// <param name="UserId">Owner of the tracked time. Handlers must scope on it explicitly.</param>
@@ -46,6 +49,16 @@ public record ActivityTimeRecordedEvent(
     TimeOnly WindowEnd,
     IReadOnlyList<ActivityDayTotal> Totals) : ISeamEvent;
 
-/// <param name="ActivityId">The activity a tracker mapping attributed the time to.</param>
+/// <param name="ActivityId">The activity the time was recorded against.</param>
 /// <param name="TotalSecondsOnDay">Seconds attributed to it across the whole of the user's <c>Day</c>.</param>
-public record ActivityDayTotal(long ActivityId, int TotalSecondsOnDay);
+/// <param name="TodoListItemId">
+/// The to-do item the time was recorded <em>for</em>, when the row carries that link (a timer or a log started
+/// from the item). The to-do / routine fallback then completes that item rather than whichever open item shares
+/// the activity. Null from the heartbeat, which only ever knows the activity.
+/// </param>
+/// <param name="RoutineTodoListId">Same as <paramref name="TodoListItemId"/>, for a routine item. Never both.</param>
+public record ActivityDayTotal(
+    long ActivityId,
+    int TotalSecondsOnDay,
+    long? TodoListItemId = null,
+    long? RoutineTodoListId = null);

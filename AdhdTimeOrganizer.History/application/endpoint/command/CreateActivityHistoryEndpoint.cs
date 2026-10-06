@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.History.application.dto.request.history;
 using AdhdTimeOrganizer.History.application.validator;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.History.domain.serviceContract;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.@base.command;
@@ -9,7 +10,10 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.History.application.endpoint.activityHistory.activityHistory.command;
 
-public class CreateActivityHistoryEndpoint(DbContext dbContext, IReferencedIdOwnershipService ownership)
+public class CreateActivityHistoryEndpoint(
+    DbContext dbContext,
+    IReferencedIdOwnershipService ownership,
+    IActivityTimeRecordedPublisher timeRecorded)
     : BaseCreateEndpoint<ActivityHistory, ActivityHistoryRequest>(dbContext)
 {
     public override void Configure()
@@ -33,4 +37,12 @@ public class CreateActivityHistoryEndpoint(DbContext dbContext, IReferencedIdOwn
         await Send.ErrorsAsync(404, ct);
         return false;
     }
+
+    /// <summary>
+    /// Logged time ticks off the plan like tracked time does (FO2). Before the 201, so a client that refetches
+    /// on success already sees the block or item it completed. The publisher swallows its own failures, so
+    /// this cannot reach the base's catch and turn a committed row into an error.
+    /// </summary>
+    protected override Task AfterSave(ActivityHistory entity, CancellationToken ct = default) =>
+        timeRecorded.PublishAsync(DbContext, User.GetId(), [entity], ct);
 }
