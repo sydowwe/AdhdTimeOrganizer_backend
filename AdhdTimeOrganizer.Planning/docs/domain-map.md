@@ -215,6 +215,7 @@ no plan to drift from.
 | Nothing eligible? | `200` with six zeroes, never a 404. `taskCount: 0` is the client's signal to render nothing. A range entirely in the future answers this way |
 | Midnight? | Every span and every comparison wraps. A 23:00–00:30 task is 90 minutes; a task planned for 23:50 and started at 00:10 is twenty minutes late, not twenty-three hours early (the near reading wins — see `DriftMinutes`) |
 | A carried-over task? | Counted on the day it is on **now** — it left its original day, so that day never sees it. Slips are reported separately as `carriedOverCount`: the sum of `CarryOverCount` over tasks whose `OriginalDate` is in the range. Never folded into `neverHappenedCount`, which would count one slip twice |
+| A snoozed task — late from which start? | From the start it was **first planned for**, while it is still on that day (`PlannerTaskPostponeRule.DriftAnchor`, FO3). Snoozed 09:00 → 11:00 and started at 11:00 is two hours late; measuring from the snoozed start made the trend understate exactly what it measures. A task carried to a later day is a fresh attempt and is measured from its current start. The **span** is always the current plan — the snooze moves lateness only |
 
 ⚠ **The range is the only thing bounding the scan**, so it is capped at
 `PlannerBatchLimits.MaxSummaryRangeDays` and a backwards one is a 400 — the same two rules
@@ -230,14 +231,35 @@ no plan to drift from.
 ### Carrying a task over (F1-03)
 
 `POST /planner-task/{id}/carry-over { date }` moves an **open** task (not `Completed`, not `Cancelled`) to a
-**later** day and keeps the record that it slipped: `OriginalDate` is set the first time and never again,
-`CarryOverCount` goes up every time. The task arrives `NotStarted` with its actual times cleared — a fresh
-attempt — at the same time of day, and its reminder is re-synced. A day with no calendar row is created.
+**later** day and keeps the record that it slipped: the original slot (`OriginalDate` + `OriginalStartTime`) is
+set on the first slip and never again, `CarryOverCount` goes up every time. The task arrives `NotStarted` with
+its actual times cleared — a fresh attempt — at the same time of day, and its reminder is re-synced. A day with
+no calendar row is created.
 
 | Question | Answer |
 |---|---|
 | Why not a copy? | The original stayed open on its day — that day could never count for the streak, and the trend logged it as never happened, so carrying a task over scored worse than skipping it |
-| Why not a plain move (PUT)? | It loses the slip, and "pushed four times" is the cue to split or drop a task. A PUT/drag stays a re-plan: it never touches `OriginalDate` / `CarryOverCount` |
+| Why not a plain move (PUT)? | It loses the slip, and "pushed four times" is the cue to split or drop a task. A PUT/drag is recorded as a **postponement** instead when it is one (below), and never touches `CarryOverCount` |
+
+### Postponing a task (FO3 phase 2)
+
+Every other way of pushing a task later — home's *Move later* and the day view's reschedule (both the PUT) and a
+drag (the span patch) — goes through `PlannerTaskMoveRecorder`, which reads the old slot and status off the
+change tracker and hands them to `PlannerTaskPostponeRule`, the one place that decides.
+
+| Question | Answer |
+|---|---|
+| What is a postponement? | The task was `NotStarted`, the new slot (day + start) is later, and the **original** slot has passed on the user's clock. Before the first slip the original slot is the one it is moving from; after it, `OriginalDate` + `OriginalStartTime` |
+| What does it record? | `PostponeCount += 1`; on the first slip, the original slot as a pair. A row carried over before `OriginalStartTime` existed keeps its date and gains no invented time |
+| An early tidy-up of tomorrow? | A re-plan. Nothing is recorded, because the slot has not come yet |
+| Once a task has slipped? | Every later push counts, even one made hours before the new slot — its original slot is behind the user |
+| A running or paused task moved later? | Not a postponement: that is re-arranging work already begun |
+| Carry-over and postponement both? | **Disjoint.** The carry command counts `CarryOverCount` only; the rule counts `PostponeCount` only. A task's slips are the sum, and the to-do seam (`PlanHistory.Postponed` beside `CarriedOver`) relies on never counting one twice |
+| Shown anywhere? | No. Like the carry count on the to-do side, it decides which help an item is offered (`TodoListItemPlanHelp`) and nothing else |
+| A new path that moves a task? | Must call `PlannerTaskMoveRecorder.RecordPostponementAsync` from its mapping step, before the save, or its moves leave no trace — nothing fails. FO4's "apply" (packing tasks into free time) is the next one |
+
+`SourceRepeatingTaskId` (FK to `repeating_planner_task`, `SET NULL`) and `RepeatingPlannerTask.AutoPlace` arrived
+in the same migration for FO6, so `planner_task` is altered once. Nothing reads or writes them yet.
 | Streak? | The task leaves its old day, so that day no longer counts it — the same neutral outcome a skip has |
 | Which tasks does the client offer? | `GET /planner-task/carry-over-candidates`: `NotStarted` / `InProgress`, non-background tasks on the user's previous seven days (their zone), newest day first, each with its date |
 
@@ -473,13 +495,13 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `CreatePlannerTaskEndpoint` | Command (`BaseCreateEndpoint`) | Create; resolves the day via `ICalendarProvisioner` in `BeforeMapping`. **No reminder wiring** — reminders are opt-in | `command/CreatePlannerTaskEndpoint.cs` |
-| `UpdatePlannerTaskEndpoint` | Command (`BaseUpdateEndpoint`) | Edit; a task moved onto an unplanned day creates it | `command/UpdatePlannerTaskEndpoint.cs` |
+| `UpdatePlannerTaskEndpoint` | Command (`BaseUpdateEndpoint`) | Edit; a task moved onto an unplanned day creates it; a later move of a passed task is recorded as a postponement | `command/UpdatePlannerTaskEndpoint.cs` |
 | `DeletePlannerTaskEndpoint` | Command (`BaseDeleteEndpoint`) | Delete; captures reminder ids **before** the cascade, cancels after | `command/DeletePlannerTaskEndpoint.cs` |
 | `BatchDeletePlannerTaskEndpoint` | Command (`BaseBatchDeleteEndpoint`) | Delete several | `command/BatchDeletePlannerTaskEndpoint.cs` |
-| `PatchPlannerTaskSpanEndpoint` | Command (`BasePatchEndpoint`) | Drag/resize; re-registers the reminders whose instant just moved | `command/PatchPlannerTaskSpanEndpoint.cs` |
+| `PatchPlannerTaskSpanEndpoint` | Command (`BasePatchEndpoint`) | Drag/resize; records a postponement like the PUT; re-registers the reminders whose instant just moved | `command/PatchPlannerTaskSpanEndpoint.cs` |
 | `PatchPlannerTaskStatusEndpoint` | Command (custom) | Status + actual times via `ApplyStatus`; re-syncs reminders | `command/PatchPlannerTaskStatusEndpoint.cs` |
 | `CopyToDaysPlannerTaskEndpoint` | Command (custom) | `POST /planner-task/copy-to-days` — one day's plan onto N days, without execution state | `command/CopyToDaysPlannerTaskEndpoint.cs` |
-| `CarryOverPlannerTaskEndpoint` | Command (custom) | `POST /planner-task/{id}/carry-over` — an open task to a later day, keeping `OriginalDate` / `CarryOverCount`; re-syncs reminders | `command/CarryOverPlannerTaskEndpoint.cs` |
+| `CarryOverPlannerTaskEndpoint` | Command (custom) | `POST /planner-task/{id}/carry-over` — an open task to a later day, keeping the original slot / `CarryOverCount`; re-syncs reminders | `command/CarryOverPlannerTaskEndpoint.cs` |
 | `ApplyTemplatePlannerTaskEndpoint` | Command (custom) | One template onto one day (by id **or** by date), through `PlannerTemplateApplier` | `command/ApplyTemplatePlannerTaskEndpoint.cs` |
 | `ApplyTemplateBatchPlannerTaskEndpoint` | Command (custom) | `POST /calendar/apply-planner-template/batch` — the same template onto N days | `command/ApplyTemplateBatchPlannerTaskEndpoint.cs` |
 | `GetByIdPlannerTaskEndpoint` | Query (`BaseGetByIdEndpoint`) | One task | `query/GetByIdPlannerTaskEndpoint.cs` |
@@ -525,6 +547,8 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 |---|---|---|---|
 | `PlannerStreakService` | Domain service (static, pure) | `Evaluate` one day, `Walk` the history. Owns the rules, no SQL | `domain/service/PlannerStreakService.cs` |
 | `PlanVsActualTrendService` | Domain service (static, pure) | `Aggregate`, `SpanMinutes`, `DriftMinutes`. Owns the arithmetic, no SQL | `domain/service/PlanVsActualTrendService.cs` |
+| `PlannerTaskPostponeRule` | Domain service (static, pure) | `Apply` (is this move a postponement, and record it) and `DriftAnchor` (which start lateness is measured from). FO3 phase 2 | `domain/service/PlannerTaskPostponeRule.cs` |
+| `PlannerTaskMoveRecorder` | Helper (static) | Feeds the rule from a tracked task's original values; called from the PUT's and the span patch's `AfterMapping` | `application/helper/PlannerTaskMoveRecorder.cs` |
 | `SkipSummaryService` | Domain service (static, pure) | `Aggregate` — reason groups by exact value, per-hour planned/skipped. No SQL | `domain/service/SkipSummaryService.cs` |
 | `CalendarDayFactory` | Domain service (static) | What an unplanned day *is*. The single definition, shared by both creators | `domain/service/CalendarDayFactory.cs` |
 | `HolidayCalendar` | Domain service (static) | Slovak holiday table + Computus; `Holiday(Key, Name)` per date | `domain/service/HolidayCalendar.cs` |

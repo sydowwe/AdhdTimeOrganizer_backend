@@ -18,6 +18,7 @@ public class RepeatingPlannerTaskConfiguration : IEntityTypeConfiguration<Repeat
         builder.Property(t => t.EndTime).IsRequired();
         builder.Property(t => t.IsBackground).IsRequired();
         builder.Property(t => t.IsActive).HasDefaultValue(true).IsRequired();
+        builder.Property(t => t.AutoPlace).IsRequired();
 
         builder.Property(t => t.Location).HasMaxLength(200);
         builder.Property(t => t.Notes).HasMaxLength(1000);

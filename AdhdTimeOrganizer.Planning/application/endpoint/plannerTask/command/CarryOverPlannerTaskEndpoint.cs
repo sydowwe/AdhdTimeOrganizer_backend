@@ -14,8 +14,10 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 
 /// <summary>
 /// <c>POST /planner-task/{id}/carry-over</c> — moves an unfinished task forward to a later day <b>and keeps the
-/// record that it slipped</b>: <see cref="PlannerTask.OriginalDate"/> is set the first time and
-/// <see cref="PlannerTask.CarryOverCount"/> goes up every time.
+/// record that it slipped</b>: <see cref="PlannerTask.OriginalDate"/> and <see cref="PlannerTask.OriginalStartTime"/>
+/// are set the first time the task slips (here or by a postponement) and <see cref="PlannerTask.CarryOverCount"/>
+/// goes up every time. <see cref="PlannerTask.PostponeCount"/> is not touched: the two counts are disjoint, so a
+/// carry is never counted twice.
 /// <para>
 /// The client's "not completed yesterday" banner used to carry a task over by <i>copying</i> it, which left the
 /// original open on its day — that day could then never count for the streak, and the trend logged it as
@@ -87,7 +89,13 @@ public class CarryOverPlannerTaskEndpoint(
             // Resolved before anything is staged: provisioning commits, and would take a half-made write with it.
             var target = await calendars.EnsureForDateAsync(User.GetId(), req.Date, ct);
 
-            task.OriginalDate ??= fromDate;
+            // The original slot is set as a pair, on the first slip only: a task postponed earlier already holds
+            // one, and a row carried before OriginalStartTime existed must not pair its old date with a later time.
+            if (task.OriginalDate is null)
+            {
+                task.OriginalDate = fromDate;
+                task.OriginalStartTime = task.StartTime;
+            }
             task.CarryOverCount++;
             task.CalendarId = target.Id;
             task.ApplyStatus(PlannerTaskStatus.NotStarted);

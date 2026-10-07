@@ -66,6 +66,17 @@ comes from `Sydowwe.Framework`; the `IsManyWithOneUser` / `IsManyWithOneActivity
 | `TodoListActivityReferenceSource` | Seam impl (keyed) | Counts + repoints both activity columns on an activity merge, including the self-pairing collapse and the `(UserId, ActivityId, TodoListId)` row collapse | `application/seam/TodoListActivityReferenceSource.cs` |
 | `TodoListItemOwnedReferenceVerifier` | Seam impl (keyed) | "Is this `TodoListItem` id the caller's?", so a slice writing `TodoListItemId` can refuse a stranger's. Filters on the supplied user id, **not** the ambient filter | `application/seam/TodoListItemOwnedReferenceVerifier.cs` |
 
+### FO3 rules — `application/service/`
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `TodoListItemPostponeRule` | Rule (static, pure) | Is this due-date move a postponement? The item was open and is pushed later, and its **first** due date (`FirstDueDate`, else the date it moves from) is before the user's today. Records `PostponeCount` and, once, `FirstDueDate`. Setting, clearing or pulling a date earlier is never one. The planner's twin is `PlannerTaskPostponeRule` | `application/service/TodoListItemPostponeRule.cs` |
+| `TodoListItemPlanHelp` | Rule (static, pure) | Stuck = 3+ failed attempts and none completed: the planner's (`PlanHistory`, through `ITodoListItemPlanSource`) plus the item's own `PostponeCount`. Answers the kind of help, **never the count** | `application/service/TodoListItemPlanHelp.cs` |
+| `TodoListItemPlannedSlotFiller` | Helper (static) | Overlays `NextPlannedSlot` and `PlanHelp` on projected items. Reads the item's postpone count off `TodoListItemResponse.PostponeCount`, which is projected but `[JsonIgnore]` | `application/service/TodoListItemPlannedSlotFiller.cs` |
+
+The undo of a bulk reschedule restores the dates with the PUT, which moves them **earlier**, so it does not take
+the postponement back. Accepted: the count is never shown and only tips which help is offered.
+
 ### Shared endpoint bases — `application/endpoint/`
 
 Subclassed by both this slice and Routines. This is the only reason a base sits in a slice rather
@@ -85,7 +96,8 @@ than in Framework: each is typed on `BaseTodoListItem`.
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `CreateTodoListItemEndpoint` | Endpoint | Create | `…/todoListItem/command/CreateTodoListItemEndpoint.cs` |
-| `UpdateTodoListItemEndpoint` | Endpoint | Full update (the frontend round-trips the whole item, pairing included) | `…/todoListItem/command/UpdateTodoListItemEndpoint.cs` |
+| `UpdateTodoListItemEndpoint` | Endpoint | Full update (the frontend round-trips the whole item, pairing included). Pushing an overdue `DueDate` later is recorded through `TodoListItemPostponeRule` (FO3) | `…/todoListItem/command/UpdateTodoListItemEndpoint.cs` |
+| `RescheduleOverdueTodoListItemEndpoint` | Endpoint | `POST …/reschedule-overdue { listId?, days }` — every open item whose due date is before the **user's** today gets today + `days` (0–365), in one save, each through `TodoListItemPostponeRule`. `listId` null means every list; a stranger's list moves nothing. Answers the new date and the moved ids, so the client's undo restores exactly those. The renegotiation banner's call (FO3 phase 2) | `…/todoListItem/command/RescheduleOverdueTodoListItemEndpoint.cs` |
 | `DeleteTodoListItemEndpoint` | Endpoint | Delete | `…/todoListItem/command/DeleteTodoListItemEndpoint.cs` |
 | `MoveTodoListItemEndpoint` | Endpoint | `PATCH …/{id}/move` — verifies the destination list in `BeforeMapping`, moves, recomputes `DisplayOrder` in `AfterMapping`. Everything else, including the 409 on the unique index, comes from `BasePatchEndpoint` | `…/todoListItem/command/MoveTodoListItemEndpoint.cs` |
 | `ChangePriorityTodoListItemEndpoint` | Endpoint | `PATCH …/{id}/priority` — same three-hook shape. **`DisplayOrder` is grouped by `TaskPriorityId`, so the two columns move together**: changing the rank re-orders the item into the destination group | `…/todoListItem/command/ChangePriorityTodoListItemEndpoint.cs` |

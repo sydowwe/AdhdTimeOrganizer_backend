@@ -1537,6 +1537,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("original_date");
 
+                    b.Property<TimeOnly?>("OriginalStartTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("original_start_time");
+
+                    b.Property<int>("PostponeCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("postpone_count");
+
                     b.Property<string>("SkipReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -1546,6 +1554,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("skip_reason_key");
+
+                    b.Property<long?>("SourceRepeatingTaskId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_repeating_task_id");
 
                     b.Property<long?>("SourceTemplateTaskId")
                         .HasColumnType("bigint")
@@ -1589,6 +1601,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("ImportanceId")
                         .HasDatabaseName("ix_planner_task_importance_id");
 
+                    b.HasIndex("SourceRepeatingTaskId")
+                        .HasDatabaseName("ix_planner_task_source_repeating_task_id");
+
                     b.HasIndex("TodolistItemId")
                         .HasDatabaseName("ix_planner_task_todolist_item_id");
 
@@ -1621,6 +1636,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Property<long>("ActivityId")
                         .HasColumnType("bigint")
                         .HasColumnName("activity_id");
+
+                    b.Property<bool>("AutoPlace")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_place");
 
                     b.Property<DateTime>("CreatedTimestamp")
                         .ValueGeneratedOnAdd()
@@ -2881,6 +2900,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("time without time zone")
                         .HasColumnName("due_time");
 
+                    b.Property<DateOnly?>("FirstDueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("first_due_date");
+
                     b.Property<bool>("IsDone")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -2901,6 +2924,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Property<long?>("PairedLeisureActivityId")
                         .HasColumnType("bigint")
                         .HasColumnName("paired_leisure_activity_id");
+
+                    b.Property<int>("PostponeCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("postpone_count");
 
                     b.Property<int?>("SuggestedTime")
                         .HasColumnType("integer")
@@ -5134,6 +5161,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasForeignKey("ImportanceId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_planner_task_task_importances_importance_id");
+
+                    b.HasOne("AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning.RepeatingPlannerTask", null)
+                        .WithMany()
+                        .HasForeignKey("SourceRepeatingTaskId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_planner_task_repeating_planner_tasks_source_repeating_task_");
 
                     b.HasOne("AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList.TodoListItem", null)
                         .WithMany()

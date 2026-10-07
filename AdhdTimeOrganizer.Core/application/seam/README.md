@@ -124,6 +124,8 @@ None of these break the build, and only one of them throws.
   or background predicate marks items stuck that are not, and the list offers "a smaller first step"
   on a task planned for this afternoon. `TodoListItemPlanHelpTests` asserts on the token per seeded
   history (and one built by three real carry-overs). It also asserts the response carries no count.
+  `PlanHistory.Postponed` (FO3 phase 2) sums the planner's `PostponeCount`, which is disjoint from
+  `CarryOverCount` by construction — summing both is correct, and is what `FailedAttempts` does.
 - **`IUserOwnedReferenceVerifier` is the one that fails *closed*.** `ReferencedIdOwnershipService`
   looks a verifier up by key and answers `false` when none matches, so a slice dropped from
   `ModuleAssemblies` or a renamed key rejects every write carrying that id instead of waving them all

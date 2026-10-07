@@ -14,8 +14,25 @@ public class TodoListItemPlanHelpRuleTests
 {
     private static PlanHistory History(
         int completed = 0, int carriedOver = 0, int missed = 0,
-        int noTime = 0, int noEnergy = 0, int notRelevant = 0, int other = 0) =>
-        new(completed, carriedOver, missed, noTime, noEnergy, notRelevant, other);
+        int noTime = 0, int noEnergy = 0, int notRelevant = 0, int other = 0, int postponed = 0) =>
+        new(completed, carriedOver, missed, noTime, noEnergy, notRelevant, other, postponed);
+
+    [Fact(DisplayName = "FO3 phase 2: planner postponements are failed attempts that point to a smaller step")]
+    public void Postponements_CountAndPointToASmallerStep()
+    {
+        TodoListItemPlanHelp.For(History(postponed: 2)).Should().BeNull();
+        TodoListItemPlanHelp.For(History(postponed: 3)).Should().Be(TodoListItemPlanHelp.SmallerStep);
+        TodoListItemPlanHelp.For(History(postponed: 2, noTime: 2)).Should().Be(TodoListItemPlanHelp.SmallerStep);
+    }
+
+    [Fact(DisplayName = "FO3 phase 2: an item only ever renegotiated, never planned, can be stuck too")]
+    public void ItemPostponements_CountWithoutAnyPlannerHistory()
+    {
+        TodoListItemPlanHelp.For(null, itemPostponeCount: 2).Should().BeNull();
+        TodoListItemPlanHelp.For(null, itemPostponeCount: 3).Should().Be(TodoListItemPlanHelp.SmallerStep);
+        TodoListItemPlanHelp.For(History(missed: 1), itemPostponeCount: 2).Should().Be(TodoListItemPlanHelp.SmallerStep);
+        TodoListItemPlanHelp.For(History(completed: 1), itemPostponeCount: 5).Should().BeNull("it has happened once");
+    }
 
     [Fact(DisplayName = "FO3: an item with no planner history is not stuck")]
     public void NoHistory_IsNotStuck() =>

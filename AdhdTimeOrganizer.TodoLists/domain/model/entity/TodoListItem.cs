@@ -8,6 +8,20 @@ public class TodoListItem : BaseTodoListItem
     public DateOnly? DueDate { get; set; }
     public TimeOnly? DueTime { get; set; }
 
+    /// <summary>
+    /// The due date the item had when it was first postponed, and never changed after; null for an item that
+    /// never slipped. Once it is behind the user's today, every later push of the due date is a postponement.
+    /// Written only by <c>TodoListItemPostponeRule</c>.
+    /// </summary>
+    public DateOnly? FirstDueDate { get; set; }
+
+    /// <summary>
+    /// How many times the due date was pushed later after the first one had passed: an overdue edit, or the
+    /// renegotiation banner. Decides which help the item is offered (FO3), and is never shown. Written only by
+    /// <c>TodoListItemPostponeRule</c>.
+    /// </summary>
+    public int PostponeCount { get; set; }
+
     public long? TodoListId { get; set; }
     public TodoList? TodoList { get; set; }
 

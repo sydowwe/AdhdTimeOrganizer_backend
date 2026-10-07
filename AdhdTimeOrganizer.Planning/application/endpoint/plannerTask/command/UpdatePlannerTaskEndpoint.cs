@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.endpoint.extensions;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -13,7 +14,8 @@ public class UpdatePlannerTaskEndpoint(
     DbContext dbContext,
     IReminderRegistrationService reminders,
     ICalendarProvisioner calendars,
-    IReferencedIdOwnershipService ownership)
+    IReferencedIdOwnershipService ownership,
+    IUserTimeZoneResolver timeZones)
     : BaseUpdateEndpoint<PlannerTask, PlannerTaskRequest>(dbContext)
 {
     private readonly DbContext _dbContext = dbContext;
@@ -46,13 +48,19 @@ public class UpdatePlannerTaskEndpoint(
         return true;
     }
 
-    protected override Task<bool> AfterMapping(PlannerTask entity, PlannerTaskRequest req, CancellationToken ct = default)
+    /// <summary>
+    /// Lands the resolved day, then asks whether the move was a postponement (FO3). Home's <i>Move later</i> and
+    /// the day view's reschedule are both this PUT, so this is where most slips are recorded. Must run after the
+    /// calendar id is final.
+    /// </summary>
+    protected override async Task<bool> AfterMapping(PlannerTask entity, PlannerTaskRequest req, CancellationToken ct = default)
     {
         // UpdateEntity leaves CalendarId alone when the caller named a date instead; this is where that lands.
         if (_resolvedCalendarId is { } calendarId)
             entity.CalendarId = calendarId;
 
-        return Task.FromResult(true);
+        await PlannerTaskMoveRecorder.RecordPostponementAsync(_dbContext, entity, timeZones, ct);
+        return true;
     }
 
     /// <summary>

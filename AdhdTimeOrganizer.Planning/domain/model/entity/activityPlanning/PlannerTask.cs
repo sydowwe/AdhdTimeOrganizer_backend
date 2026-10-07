@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.service;
 
 namespace AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 
@@ -29,17 +30,47 @@ public class PlannerTask : BasePlannerTask
     public bool AutoCompleteAtEnd { get; set; }
 
     /// <summary>
-    /// The day the task was first planned for, set the first time it is carried over
-    /// (<c>CarryOverPlannerTaskEndpoint</c>) and never changed after; null for a task that never slipped. Moving a
-    /// task by hand (PUT, drag) is a re-plan, not a slip, and leaves this alone.
+    /// The day the task was first planned for, set the first time it slips — carried over
+    /// (<c>CarryOverPlannerTaskEndpoint</c>) or postponed (<see cref="PlannerTaskPostponeRule"/>) — and never
+    /// changed after; null for a task that never slipped. A move that is not a slip (a re-plan of a block whose
+    /// start has not come yet) leaves it alone.
     /// </summary>
     public DateOnly? OriginalDate { get; set; }
+
+    /// <summary>
+    /// The start time the task had when it first slipped, set alongside <see cref="OriginalDate"/> and never
+    /// changed after; null for a task that never slipped. Rows carried over before this column existed have
+    /// <see cref="OriginalDate"/> without it, and read as their current <c>StartTime</c>.
+    /// <para>
+    /// Together the two are the <b>original slot</b>: once it has passed on the user's clock, every later move is
+    /// a postponement, however far ahead of the new slot it is made. The plan-vs-actual trend measures a block's
+    /// drift from it while the block is still on its original day (<see cref="PlannerTaskPostponeRule.DriftAnchor"/>).
+    /// </para>
+    /// </summary>
+    public TimeOnly? OriginalStartTime { get; set; }
 
     /// <summary>
     /// How many times the task has been carried over to a later day. "Pushed four times" is the cue to split the
     /// task, shrink it or drop it — which the plain move the client used to do threw away.
     /// </summary>
     public int CarryOverCount { get; set; }
+
+    /// <summary>
+    /// How many times a move pushed the task later once its original slot had passed — home's <i>Move later</i>,
+    /// a drag, the day view's reschedule. Counted by <see cref="PlannerTaskPostponeRule"/> and nowhere else.
+    /// <para>
+    /// Disjoint from <see cref="CarryOverCount"/>: the carry-over command counts there and not here, so the
+    /// task's slips are the sum of the two. Like that count, it decides which help to offer and is never shown.
+    /// </para>
+    /// </summary>
+    public int PostponeCount { get; set; }
+
+    /// <summary>
+    /// The repeating rule this task was placed from, if any (FO6). <c>ON DELETE SET NULL</c>: deleting the rule
+    /// leaves its occurrences as ordinary tasks. Added in FO3 phase 2's migration so <c>planner_task</c> is
+    /// migrated once; nothing writes it yet.
+    /// </summary>
+    public long? SourceRepeatingTaskId { get; set; }
 
     public long CalendarId { get; set; }
 

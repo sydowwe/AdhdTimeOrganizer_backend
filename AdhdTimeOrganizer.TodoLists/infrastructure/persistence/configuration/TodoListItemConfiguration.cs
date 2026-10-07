@@ -29,6 +29,8 @@ public class TodoListItemConfiguration : IEntityTypeConfiguration<TodoListItem>
 
         builder.Property(t => t.DueDate).IsRequired(false);
         builder.Property(t => t.DueTime).IsRequired(false);
+        builder.Property(t => t.FirstDueDate).IsRequired(false);
+        builder.Property(t => t.PostponeCount).IsRequired();
 
         // Temptation bundling. Declared without a navigation on either end: nothing reads through it
         // (responses carry the bare id), and a second navigation to Activity would sit beside the

@@ -171,7 +171,9 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
 - **Add an endpoint:** check `framework/Sydowwe.Framework/application/endpoint/base/` first — most of
   what is here is a one-line subclass. Convention is `<Verb><Entity>Endpoint`; mapping lives on the
   DTOs. If it writes a planner task's time or status, call `SyncForPlannerTasksAsync`; if it deletes
-  one, capture the reminder ids first.
+  one, capture the reminder ids first. If it **moves** an existing task to a later day or time, call
+  `PlannerTaskMoveRecorder.RecordPostponementAsync` before the save (FO3 — the PUT and the span patch do);
+  a path that skips it builds and answers 200, and its slips simply vanish from the to-do help.
 - **Add a conflict-resolution mode:** it goes in `PlannerTemplateApplier.Stage` and nowhere else —
   both the single-day and the batched apply route through it, and `StagedTaskDeletions` reads the
   ChangeTracker so a new mode's deletions are captured without threading a list through.

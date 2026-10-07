@@ -38,12 +38,16 @@ public static class PlanVsActualTrendService
     /// <param name="Status">The task's status. Never <see cref="PlannerTaskStatus.Cancelled"/>.</param>
     /// <param name="ActualStart">When it actually started, if it was recorded.</param>
     /// <param name="ActualEnd">When it actually ended, if it was recorded.</param>
+    /// <param name="DriftFrom">The start lateness is measured from, when it is not <paramref name="PlannedStart"/>:
+    /// a block postponed within its day is late against the start it was first planned for
+    /// (<see cref="PlannerTaskPostponeRule.DriftAnchor"/>). The span is still the planned one.</param>
     public readonly record struct PlanVsActualTaskRow(
         TimeOnly PlannedStart,
         TimeOnly PlannedEnd,
         PlannerTaskStatus Status,
         TimeOnly? ActualStart,
-        TimeOnly? ActualEnd);
+        TimeOnly? ActualEnd,
+        TimeOnly? DriftFrom = null);
 
     /// <summary>The six numbers the trend surface renders. All non-negative; all zero when nothing is eligible.</summary>
     public readonly record struct PlanVsActualTrend(
@@ -107,7 +111,7 @@ public static class PlanVsActualTrendService
             var actual = SpanMinutes(actualStart, actualEnd);
             actualMinutes += actual;
 
-            if (DriftMinutes(row.PlannedStart, actualStart) > 0)
+            if (DriftMinutes(row.DriftFrom ?? row.PlannedStart, actualStart) > 0)
                 startedLate++;
 
             if (actual > planned)

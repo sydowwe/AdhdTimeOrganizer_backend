@@ -1,4 +1,6 @@
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -6,7 +8,10 @@ using Sydowwe.Framework.application.endpoint.@base.command;
 
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plannerTask.command;
 
-public class PatchPlannerTaskSpanEndpoint(DbContext dbContext, IReminderRegistrationService reminders)
+public class PatchPlannerTaskSpanEndpoint(
+    DbContext dbContext,
+    IReminderRegistrationService reminders,
+    IUserTimeZoneResolver timeZones)
     : BasePatchEndpoint<PlannerTask, PlannerTaskChangeSpanRequest>(dbContext)
 {
     public override void Configure()
@@ -19,6 +24,13 @@ public class PatchPlannerTaskSpanEndpoint(DbContext dbContext, IReminderRegistra
     {
         entity.StartTime = new TimeOnly(req.StartTime.Hours, req.StartTime.Minutes);
         entity.EndTime = new TimeOnly(req.EndTime.Hours, req.EndTime.Minutes);
+    }
+
+    /// <summary>Dragging an overdue block later in its day is a postponement too (FO3).</summary>
+    protected override async Task<bool> AfterMapping(PlannerTask entity, PlannerTaskChangeSpanRequest req, CancellationToken ct = default)
+    {
+        await PlannerTaskMoveRecorder.RecordPostponementAsync(DbContext, entity, timeZones, ct);
+        return true;
     }
 
     /// <summary>

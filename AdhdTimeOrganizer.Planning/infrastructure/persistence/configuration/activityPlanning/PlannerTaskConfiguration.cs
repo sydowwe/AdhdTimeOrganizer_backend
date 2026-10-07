@@ -44,6 +44,16 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
 
         builder.Property(p => p.AutoCompleteAtEnd).IsRequired();
         builder.Property(p => p.CarryOverCount).IsRequired();
+        builder.Property(p => p.PostponeCount).IsRequired();
+
+        // FO6's occurrence link, in the same migration as FO3 phase 2's columns so this hot table is altered once.
+        // Navigation-free: nothing reads through it yet. SetNull, because deleting a rule must not delete the
+        // days it already put on the plan — those are the user's record of what was planned.
+        builder.HasOne<RepeatingPlannerTask>()
+            .WithMany()
+            .HasForeignKey(p => p.SourceRepeatingTaskId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(p => new { p.UserId, p.CalendarId, p.StartTime });
         // There is deliberately no index on Status alone (PERF-5). Five distinct values and no user prefix, so

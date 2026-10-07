@@ -2,13 +2,19 @@ using AdhdTimeOrganizer.Core.application.endpoint.extensions;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
 using AdhdTimeOrganizer.TodoLists.application.endpoint.extensions;
+using AdhdTimeOrganizer.TodoLists.application.service;
 using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using Sydowwe.Framework.application.endpoint.@base.command;
+using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListItem.command;
 
-public class UpdateTodoListItemEndpoint(DbContext dbContext, IReferencedIdOwnershipService ownership)
+public class UpdateTodoListItemEndpoint(
+    DbContext dbContext,
+    IReferencedIdOwnershipService ownership,
+    IUserTimeZoneResolver timeZones)
     : BaseUpdateEndpoint<TodoListItem, UpdateTodoListItemRequest>(dbContext)
 {
     public override void Configure()
@@ -39,8 +45,13 @@ public class UpdateTodoListItemEndpoint(DbContext dbContext, IReferencedIdOwners
     /// Everything the PUT owns but does not take from the body, in the one order that works: the steps have
     /// to be in their final shape before the completion state can be snapped across them.
     /// </summary>
-    protected override Task<bool> AfterMapping(TodoListItem entity, UpdateTodoListItemRequest req, CancellationToken ct = default)
+    protected override async Task<bool> AfterMapping(TodoListItem entity, UpdateTodoListItemRequest req, CancellationToken ct = default)
     {
+        // Read off the change tracker before SetDone below can touch anything: the values as loaded.
+        var entry = DbContext.Entry(entity);
+        var dueDateBefore = entry.Property(e => e.DueDate).OriginalValue;
+        var wasDone = entry.Property(e => e.IsDone).OriginalValue;
+
         if (req.Steps is not null)
             entity.ReconcileStepsFrom(req.Steps);
 
@@ -58,6 +69,14 @@ public class UpdateTodoListItemEndpoint(DbContext dbContext, IReferencedIdOwners
         if (entity.IsDone != req.IsDone)
             entity.SetDone(req.IsDone);
 
-        return Task.FromResult(true);
+        // FO3: pushing an overdue due date later is a postponement. The zone is read only when the date moved
+        // later at all, so an ordinary edit costs nothing extra. An edit that also ticks the item off is not one.
+        if (entity.DueDate > dueDateBefore)
+        {
+            var today = DateOnly.FromDateTime(WallClockZone.FromUtc(DateTime.UtcNow, await timeZones.GetAsync(User.GetId(), ct)));
+            TodoListItemPostponeRule.Apply(entity, wasDone || entity.IsDone, dueDateBefore, entity.DueDate, today);
+        }
+
+        return true;
     }
 }

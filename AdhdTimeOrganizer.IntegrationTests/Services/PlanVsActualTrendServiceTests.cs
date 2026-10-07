@@ -54,6 +54,22 @@ public class PlanVsActualTrendServiceTests
     }
 
     /// <summary>
+    /// FO3: a block snoozed from 09:00 to 11:00 and started at 11:00 was started two hours late. Its span is still
+    /// the planned one, so the snooze changes the lateness and nothing else.
+    /// </summary>
+    [Fact]
+    public void Aggregate_SnoozedTask_IsLateAgainstItsOriginalStart_AndKeepsItsPlannedSpan()
+    {
+        var snoozed = Row("11:00", "12:00", actualStart: "11:00", actualEnd: "12:00") with { DriftFrom = Time("09:00") };
+
+        var trend = Aggregate(snoozed);
+
+        trend.StartedLateCount.Should().Be(1);
+        trend.PlannedMinutes.Should().Be(60);
+        trend.RanLongerCount.Should().Be(0);
+    }
+
+    /// <summary>
     /// Late and long are independent questions. A task started an hour early and still run over is long but
     /// not late — counting them together would let one number stand in for the other and hide the shape of
     /// the drift the trend exists to describe.

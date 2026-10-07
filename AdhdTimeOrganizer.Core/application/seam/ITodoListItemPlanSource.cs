@@ -80,6 +80,9 @@ public record PlannedSlot(DateOnly Date, TimeOnly StartTime);
 /// <param name="SkippedNoEnergy">Skipped with the built-in "no energy" reason.</param>
 /// <param name="SkippedNotRelevant">Skipped with the built-in "not relevant any more" reason.</param>
 /// <param name="SkippedOther">Skipped with a free-text reason or none.</param>
+/// <param name="Postponed">The sum of every linked block's postpone count: each time a block whose slot had
+/// passed was pushed later instead of started. Disjoint from <paramref name="CarriedOver"/> — the planner counts a
+/// carry in one and a postponement in the other, never both.</param>
 public record PlanHistory(
     int Completed,
     int CarriedOver,
@@ -87,7 +90,9 @@ public record PlanHistory(
     int SkippedNoTime,
     int SkippedNoEnergy,
     int SkippedNotRelevant,
-    int SkippedOther)
+    int SkippedOther,
+    int Postponed = 0)
 {
-    public int FailedAttempts => CarriedOver + Missed + SkippedNoTime + SkippedNoEnergy + SkippedNotRelevant + SkippedOther;
+    public int FailedAttempts =>
+        CarriedOver + Postponed + Missed + SkippedNoTime + SkippedNoEnergy + SkippedNotRelevant + SkippedOther;
 }

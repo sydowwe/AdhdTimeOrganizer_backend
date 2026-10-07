@@ -144,6 +144,19 @@ public class TodoListItemPlanHelpTests(AppDbContextFixture fixture) : PostgresTe
                 "the help is offered without the score that led to it");
     }
 
+    /// <summary>
+    /// The seam's FO3 phase 2 column. Today's block is not missed yet and was carried nowhere, so without the
+    /// postpone count this item has no failed attempt at all.
+    /// </summary>
+    [Fact(DisplayName = "FO3 phase 2: a block snoozed three times makes its item stuck")]
+    public async Task ListRead_CountsPlannerPostponements()
+    {
+        var (item, activity) = await SeedItemAsync("snoozed-thrice");
+        await SeedLinkedTaskAsync(activity, item, Today, postponeCount: 3);
+
+        (await ReadListAsync()).Single(i => i.Id == item).PlanHelp.Should().Be(TodoListItemPlanHelp.SmallerStep);
+    }
+
     [Fact(DisplayName = "FO3: the home widget's rows carry the same help as the list")]
     public async Task DashboardWidget_CarriesPlanHelp()
     {
@@ -177,7 +190,7 @@ public class TodoListItemPlanHelpTests(AppDbContextFixture fixture) : PostgresTe
     private async Task<long> SeedLinkedTaskAsync(
         long activityId, long todoListItemId, DateOnly date,
         PlannerTaskStatus status = PlannerTaskStatus.NotStarted, SkipReasonKey? skipReasonKey = null,
-        int carryOverCount = 0, bool isBackground = false)
+        int carryOverCount = 0, bool isBackground = false, int postponeCount = 0)
     {
         await using var db = CreateDbContext();
         var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, date, UserId, CancellationToken);
@@ -188,6 +201,7 @@ public class TodoListItemPlanHelpTests(AppDbContextFixture fixture) : PostgresTe
         task.TodolistItemId = todoListItemId;
         task.SkipReasonKey = skipReasonKey;
         task.CarryOverCount = carryOverCount;
+        task.PostponeCount = postponeCount;
         task.IsBackground = isBackground;
         await db.SaveChangesAsync(CancellationToken);
         return taskId;

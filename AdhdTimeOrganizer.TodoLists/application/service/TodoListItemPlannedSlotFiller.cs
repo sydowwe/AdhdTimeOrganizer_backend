@@ -69,7 +69,7 @@ public static class TodoListItemPlannedSlotFiller
 
     /// <summary>A done item needs no help starting, whatever its blocks did.</summary>
     private static string? PlanHelpFor(TodoListItemResponse item, IReadOnlyDictionary<long, PlanHistory> histories) =>
-        item.IsDone ? null : TodoListItemPlanHelp.For(histories.GetValueOrDefault(item.Id));
+        item.IsDone ? null : TodoListItemPlanHelp.For(histories.GetValueOrDefault(item.Id), item.PostponeCount);
 
     private static async Task<DateOnly> UserTodayAsync(IUserTimeZoneResolver timeZones, long userId, CancellationToken ct) =>
         DateOnly.FromDateTime(WallClockZone.FromUtc(DateTime.UtcNow, await timeZones.GetAsync(userId, ct)));

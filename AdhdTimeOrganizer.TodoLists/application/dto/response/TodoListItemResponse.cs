@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
@@ -38,6 +39,13 @@ public record TodoListItemResponse : BaseTodoListResponse,
     /// the dashboard widget.
     /// </summary>
     public string? PlanHelp { get; init; }
+
+    /// <summary>
+    /// The item's own postpone count, projected only so <see cref="PlanHelp"/> can be decided without a second
+    /// query. <b>Server-side, never on the wire</b>: the feature offers help, and a count would make it a score.
+    /// </summary>
+    [JsonIgnore]
+    public int PostponeCount { get; init; }
 
     public static IQueryable<TodoListItemResponse> Projection(IQueryable<TodoListItem> q)
     {
@@ -94,7 +102,8 @@ public record TodoListItemResponse : BaseTodoListResponse,
             // Inlined rather than TimeOnly.ToDto: extension properties can't appear in an expression
             // tree (CS9296) — the same note TemplatePlannerTaskResponse carries.
             DueTime = e.DueTime != null ? new TimeDto(e.DueTime.Value.Hour, e.DueTime.Value.Minute) : null,
-            PairedLeisureActivityId = e.PairedLeisureActivityId
+            PairedLeisureActivityId = e.PairedLeisureActivityId,
+            PostponeCount = e.PostponeCount
         });
     }
 }

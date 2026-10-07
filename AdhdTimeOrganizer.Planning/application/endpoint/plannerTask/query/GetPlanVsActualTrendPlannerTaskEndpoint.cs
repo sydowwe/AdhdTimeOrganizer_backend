@@ -92,21 +92,27 @@ public class GetPlanVsActualTrendPlannerTaskEndpoint(DbContext dbContext, IUserT
                         // happened. The app already offers skipping as a legitimate way to close a task; the
                         // streak makes the same call, and the two must not diverge.
                         && t.Status != PlannerTaskStatus.Cancelled)
-            // Five columns, no navigations and no entity materialisation: a year of a heavy user's planning is
-            // a few thousand of these, which is why the aggregate can afford to be derived on every read.
+            // A handful of scalar columns, no entity materialisation: a year of a heavy user's planning is a few
+            // thousand of these, which is why the aggregate can afford to be derived on every read.
             .Select(t => new
             {
                 t.StartTime,
                 t.EndTime,
                 t.Status,
                 t.ActualStartTime,
-                t.ActualEndTime
+                t.ActualEndTime,
+                t.Calendar.Date,
+                t.OriginalDate,
+                t.OriginalStartTime
             })
             .ToListAsync(ct);
 
+        // Lateness is measured from the start the block was first planned for while it is still on that day, so
+        // snoozing an overdue block does not make starting it at the snoozed time read as on time (FO3).
         var trend = PlanVsActualTrendService.Aggregate(rows.Select(r =>
             new PlanVsActualTrendService.PlanVsActualTaskRow(
-                r.StartTime, r.EndTime, r.Status, r.ActualStartTime, r.ActualEndTime)));
+                r.StartTime, r.EndTime, r.Status, r.ActualStartTime, r.ActualEndTime,
+                PlannerTaskPostponeRule.DriftAnchor(r.Date, r.StartTime, r.OriginalDate, r.OriginalStartTime))));
 
         // Slips, by the day each task was first planned for — a separate population from the one above, which
         // is keyed on the day a task is on now. A carried task left its original day, so counting it in

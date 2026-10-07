@@ -61,6 +61,7 @@ public sealed class TodoListItemPlanSource : ITodoListItemPlanSource, IScopedSer
                 t.Status,
                 t.SkipReasonKey,
                 t.CarryOverCount,
+                t.PostponeCount,
                 t.IsBackground,
                 t.Calendar.Date
             })
@@ -82,7 +83,8 @@ public sealed class TodoListItemPlanSource : ITodoListItemPlanSource, IScopedSer
                     SkippedNoTime: cancelled.Count(r => r.SkipReasonKey == SkipReasonKey.NoTime),
                     SkippedNoEnergy: cancelled.Count(r => r.SkipReasonKey == SkipReasonKey.NoEnergy),
                     SkippedNotRelevant: cancelled.Count(r => r.SkipReasonKey == SkipReasonKey.NotRelevant),
-                    SkippedOther: cancelled.Count(r => r.SkipReasonKey == null));
+                    SkippedOther: cancelled.Count(r => r.SkipReasonKey == null),
+                    Postponed: g.Sum(r => r.PostponeCount));
             });
     }
 }
