@@ -25,6 +25,9 @@ public record RepeatingPlannerTaskResponse : IdResponse, IProjectionResponse<Rep
     public DateOnly? ActiveToDate { get; init; }
     public required IEnumerable<string> ScheduledForDayTypes { get; init; }
 
+    /// <summary>FO6: the rule places its own occurrences on today's and tomorrow's plan.</summary>
+    public required bool AutoPlace { get; init; }
+
     public static IQueryable<RepeatingPlannerTaskResponse> Projection(IQueryable<RepeatingPlannerTask> query)
     {
         return query.Select(t => new RepeatingPlannerTaskResponse
@@ -78,7 +81,8 @@ public record RepeatingPlannerTaskResponse : IdResponse, IProjectionResponse<Rep
             ScheduledDates = t.ScheduledDates,
             ActiveFromDate = t.ActiveFromDate,
             ActiveToDate = t.ActiveToDate,
-            ScheduledForDayTypes = t.ScheduledForDayTypes
+            ScheduledForDayTypes = t.ScheduledForDayTypes,
+            AutoPlace = t.AutoPlace
         });
     }
 }

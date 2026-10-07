@@ -20,8 +20,17 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.calen
 /// <para>
 /// <b>No 404.</b> See <see cref="DayPlanResponse"/> for why absence is modelled as a successful empty result.
 /// </para>
+/// <para>
+/// <b>A GET that writes (FO6).</b> For the user's today and tomorrow, auto-placing repeating rules are
+/// materialised onto the plan first (<see cref="IRepeatingTaskMaterialiser"/>), which can create the calendar
+/// row and the occurrences. Precedent: <c>GET /planner/settings</c> creates its row on first read. The write never
+/// fails the read, and once a day is decided it costs one indexed probe.
+/// </para>
 /// </summary>
-public class GetDayPlanCalendarEndpoint(DbContext dbContext, IPlannerStreakReader streakReader)
+public class GetDayPlanCalendarEndpoint(
+    DbContext dbContext,
+    IPlannerStreakReader streakReader,
+    IRepeatingTaskMaterialiser materialiser)
     : EndpointWithoutRequest<DayPlanResponse>
 {
     /// <summary>
@@ -43,7 +52,9 @@ public class GetDayPlanCalendarEndpoint(DbContext dbContext, IPlannerStreakReade
             s.Description =
                 "Returns the calendar row for the given date, every planner task on it ordered by start time, "
                 + "and the user's completion streak. A date with no calendar row is a 200 with a null calendar "
-                + "and no tasks — not a 404. Date is yyyy-MM-dd (dd-MM-yyyy also accepted).";
+                + "and no tasks — not a 404. Date is yyyy-MM-dd (dd-MM-yyyy also accepted). For the "
+                + "user's today and tomorrow, auto-placing repeating tasks are put on the plan first, which may "
+                + "create the calendar row and the occurrences.";
             s.Response<DayPlanResponse>(200, "Success — including for an unplanned day");
         });
     }
@@ -57,6 +68,9 @@ public class GetDayPlanCalendarEndpoint(DbContext dbContext, IPlannerStreakReade
             await Send.ErrorsAsync(cancellation: ct);
             return;
         }
+
+        // Before the reads below, since it commits and its occurrences are part of the day being returned.
+        await materialiser.PlaceForReadAsync(User.GetId(), date, ct);
 
         // Both sets are IEntityWithUser, so the host's global query filter scopes them to the signed-in user;
         // the calendar id below therefore cannot be another user's, and the task read cannot reach across.

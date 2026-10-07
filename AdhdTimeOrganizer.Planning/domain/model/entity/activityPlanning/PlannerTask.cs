@@ -67,8 +67,9 @@ public class PlannerTask : BasePlannerTask
 
     /// <summary>
     /// The repeating rule this task was placed from, if any (FO6). <c>ON DELETE SET NULL</c>: deleting the rule
-    /// leaves its occurrences as ordinary tasks. Added in FO3 phase 2's migration so <c>planner_task</c> is
-    /// migrated once; nothing writes it yet.
+    /// leaves its occurrences as ordinary tasks. Written by <c>RepeatingTaskMaterialiser</c> and carried by the
+    /// template carving; a copy (<c>CopyToDaysPlannerTaskEndpoint</c>) does not carry it, because a copy is a new
+    /// plan rather than the rule's occurrence.
     /// </summary>
     public long? SourceRepeatingTaskId { get; set; }
 

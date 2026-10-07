@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.application.validator;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using FastEndpoints;
@@ -87,5 +88,20 @@ public class RepeatingPlannerTaskValidator : Validator<RepeatingPlannerTaskReque
             .Must(types => types.All(t => ValidDayTypes.Contains(t)))
             .WithMessage($"ScheduledForDayTypes must only contain valid day types: {string.Join(", ", ValidDayTypes)}.")
             .When(x => x.RecurrenceType == RecurrenceType.DayType);
+
+        // FO6: the materialiser passes over away days (Vacation, SickDay), so an auto-placing rule scheduled for
+        // nothing else would be switched on and never place a block — refuse that rather than let the switch lie.
+        // A rule that also names a non-away type is fine: it places on those. AutoPlace needs no other rule; the
+        // ordering rule above is what keeps every block it places well-formed.
+        RuleFor(x => x.AutoPlace)
+            .Equal(false)
+            .WithMessage("A rule scheduled only for vacation or sick days cannot be placed on the plan automatically: " +
+                         "those days get no automatic blocks.")
+            .When(x => x.RecurrenceType == RecurrenceType.DayType
+                       && x.ScheduledForDayTypes.Any()
+                       && x.ScheduledForDayTypes.All(t => AwayDayTypes.Contains(t)));
     }
+
+    private static readonly string[] AwayDayTypes =
+        DayTypeExtensions.AwayTypes.Select(t => t.ToString()).ToArray();
 }

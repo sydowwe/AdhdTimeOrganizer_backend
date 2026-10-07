@@ -18,6 +18,12 @@ public record RepeatingPlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<R
     public DateOnly? ActiveToDate { get; init; }
     public IEnumerable<string> ScheduledForDayTypes { get; init; } = [];
 
+    /// <summary>
+    /// FO6: put this rule's occurrences on today's and tomorrow's plan. Optional and off by default, so a client
+    /// that predates the switch keeps sending rules that only suggest.
+    /// </summary>
+    public bool AutoPlace { get; init; }
+
     public RepeatingPlannerTask ToEntity => new()
     {
         UserId = 0,
@@ -34,7 +40,8 @@ public record RepeatingPlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<R
         ScheduledDates = ScheduledDates.ToList(),
         ActiveFromDate = ActiveFromDate,
         ActiveToDate = ActiveToDate,
-        ScheduledForDayTypes = ScheduledForDayTypes.ToList()
+        ScheduledForDayTypes = ScheduledForDayTypes.ToList(),
+        AutoPlace = AutoPlace
     };
 
     public void UpdateEntity(RepeatingPlannerTask entity)
@@ -53,5 +60,6 @@ public record RepeatingPlannerTaskRequest : BasePlannerTaskRequest, IMyRequest<R
         entity.ActiveFromDate = ActiveFromDate;
         entity.ActiveToDate = ActiveToDate;
         entity.ScheduledForDayTypes = ScheduledForDayTypes.ToList();
+        entity.AutoPlace = AutoPlace;
     }
 }

@@ -47,8 +47,10 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
         builder.Property(p => p.PostponeCount).IsRequired();
 
         // FO6's occurrence link, in the same migration as FO3 phase 2's columns so this hot table is altered once.
-        // Navigation-free: nothing reads through it yet. SetNull, because deleting a rule must not delete the
+        // Navigation-free: the materialiser reads the bare id. SetNull, because deleting a rule must not delete the
         // days it already put on the plan — those are the user's record of what was planned.
+        // Deliberately no unique (source_repeating_task_id, calendar_id): moving an occurrence onto a day that
+        // already holds one would turn the user's PUT into a 409. RepeatingTaskMaterialiser dedupes instead.
         builder.HasOne<RepeatingPlannerTask>()
             .WithMany()
             .HasForeignKey(p => p.SourceRepeatingTaskId)

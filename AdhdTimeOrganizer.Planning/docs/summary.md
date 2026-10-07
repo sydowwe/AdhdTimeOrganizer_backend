@@ -13,8 +13,8 @@ Owns: `Calendar`, `BasePlannerTask` and its three concrete shapes (`PlannerTask`
 configurations, ~59 endpoints, their DTOs and 14 validator files, the five domain services
 (`PlannerStreakService`, `PlanVsActualTrendService`, `SkipSummaryService`, `CalendarDayFactory`,
 `HolidayCalendar`), the
-three application services (`CalendarProvisioner`, `PlannerStreakReader`,
-`ReminderRegistrationService`), the two Core seam implementations, the two cross-slice event
+four application services (`CalendarProvisioner`, `PlannerStreakReader`,
+`ReminderRegistrationService`, `RepeatingTaskMaterialiser`), the two Core seam implementations, the two cross-slice event
 handlers, and five seeders.
 
 Tables live in the **`planning`** schema (`ModuleSchemas.cs`, keyed on this assembly).
@@ -97,6 +97,26 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   and for the same reason: it is told which user to act for, and filtered it would read no row and
   try to insert a duplicate onto the unique `(user_id, date)`.
 
+- **`GET /calendar/day-plan/{date}` and `GET /calendar/by-Date/{date}` write (FO6).** For the user's today and
+  tomorrow each first runs
+  `RepeatingTaskMaterialiser`, which puts every active `AutoPlace` rule's occurrence on the plan
+  (`PlannerTask.SourceRepeatingTaskId`). The rule's create/update run it too, after their own save. What keeps it
+  honest:
+  - **`RepeatingPlannerTask.MaterialisedThrough` is the "never twice" record**, not the `planner_task` rows — a
+    deleted occurrence takes its own evidence with it. Every day the materialiser looks at is decided (placed,
+    already there, no match, away day, dropped by the conflict mode) and the watermark passes it.
+  - **No unique `(source_repeating_task_id, calendar_id)`** on purpose: it would 409 a user's PUT that moves an
+    occurrence onto a day already holding one. The materialiser dedupes per day instead, and the rule's
+    `row_version` serialises two racing reads.
+  - **Conflicts go through `PlannerTemplateApplier.StageAgainstDay`** with the user's `DefaultConflictResolution`.
+  - **A rule edit reconciles** (`ReconcileAfterEditAsync`): *untouched* occurrences from today on (still
+    `NotStarted`, no original slot, still the old rule's exact plan, no to-do/Google/reminder link) follow the edit,
+    or are removed when the rule stops placing there; a decided day the edit newly matches gets its block.
+  - **It never fails its caller** and clears the tracker on failure; it **commits**, so the same ordering rule as
+    `EnsureForDateAsync` applies.
+  - **Day matching is `RepeatingPlannerTaskSchedule.FallsOn`**, shared with the suggestion endpoint, so the
+    panel never offers a rule on a day the plan would not receive it.
+
 - **`GetPlanVsActualTrendPlannerTaskEndpoint` and `GetSkipSummaryPlannerTaskEndpoint` filter `UserId`
   by hand**, not through the host's
   global `IEntityWithUser` filter — the slice compiles against a plain `DbContext` and cannot see it,
@@ -174,8 +194,8 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   one, capture the reminder ids first. If it **moves** an existing task to a later day or time, call
   `PlannerTaskMoveRecorder.RecordPostponementAsync` before the save (FO3 — the PUT and the span patch do);
   a path that skips it builds and answers 200, and its slips simply vanish from the to-do help.
-- **Add a conflict-resolution mode:** it goes in `PlannerTemplateApplier.Stage` and nowhere else —
-  both the single-day and the batched apply route through it, and `StagedTaskDeletions` reads the
+- **Add a conflict-resolution mode:** it goes in `PlannerTemplateApplier.StageAgainstDay` and nowhere else —
+  the single-day and the batched apply route through it (via `Stage`), and so does FO6's materialiser, and `StagedTaskDeletions` reads the
   ChangeTracker so a new mode's deletions are captured without threading a list through.
 - **Add a per-user default:** subclass `BasePerUserDefaultSeeder<T>`, pick an `Order` in 400–499, and
   make `Collides` match the entity's **unique index**, not its display text.

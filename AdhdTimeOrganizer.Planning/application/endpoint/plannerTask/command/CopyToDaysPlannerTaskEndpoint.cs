@@ -27,6 +27,11 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 /// reason in the other direction: a to-do item pairs with the one planner task it was planned as, and copying
 /// the id would point several tasks at it and fan every done-toggle out across all of them.
 /// </para>
+/// <para>
+/// <c>SourceRepeatingTaskId</c> is dropped too (FO6): a copy is a new plan, not the rule's occurrence. Carried,
+/// it would show the repeat mark on a block the rule never placed, follow the rule's edits as if untouched, and
+/// stop the rule placing its own occurrence on the target day.
+/// </para>
 /// </summary>
 public class CopyToDaysPlannerTaskEndpoint(DbContext dbContext)
     : Endpoint<CopyPlannerTasksToDaysRequest, CalendarBatchResultResponse>

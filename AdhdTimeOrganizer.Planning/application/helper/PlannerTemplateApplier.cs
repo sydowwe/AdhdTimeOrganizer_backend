@@ -71,7 +71,25 @@ public static class PlannerTemplateApplier
         List<PlannerTask> newTasks)
     {
         StampTemplate(template, calendar);
+        StageAgainstDay(dbContext, calendar, conflictResolution, newTasks);
+    }
 
+    /// <summary>
+    /// The conflict-resolution half of <see cref="Stage"/>, without the template stamp: resolves
+    /// <paramref name="newTasks"/> against the day's existing tasks and stages the adds/removes.
+    /// <paramref name="calendar"/> must be loaded with its <c>Tasks</c>.
+    /// <para>
+    /// Public for <c>RepeatingTaskMaterialiser</c> (FO6), whose auto-placed occurrences follow the user's
+    /// <c>DefaultConflictResolution</c> exactly as a template apply does. Everything said about
+    /// <see cref="StagedTaskDeletions"/> holds for it too.
+    /// </para>
+    /// </summary>
+    public static void StageAgainstDay(
+        DbContext dbContext,
+        Calendar calendar,
+        ApplyTemplateConflictResolutionEnum conflictResolution,
+        List<PlannerTask> newTasks)
+    {
         var existingTasks = calendar.Tasks.ToList();
 
         switch (conflictResolution)
@@ -240,7 +258,9 @@ public static class PlannerTemplateApplier
     /// </para>
     /// <para>
     /// <c>SourceTemplateTaskId</c> <i>is</i> carried: it records which template line the block came from, which
-    /// is still true of every segment.
+    /// is still true of every segment. <c>SourceRepeatingTaskId</c> is carried for the same reason, and because it
+    /// is the materialiser's "already placed here" evidence — a segment without it would let the rule place a
+    /// second, overlapping occurrence on the same day.
     /// </para>
     /// <para>
     /// This applies to both merge modes, so a <i>new</i> task that <c>MergeIgnore</c> splits also comes out
@@ -262,6 +282,7 @@ public static class PlannerTemplateApplier
             CalendarId = original.CalendarId,
             Status = PlannerTaskStatus.NotStarted,
             SourceTemplateTaskId = original.SourceTemplateTaskId,
+            SourceRepeatingTaskId = original.SourceRepeatingTaskId,
             UserId = original.UserId
         };
 }

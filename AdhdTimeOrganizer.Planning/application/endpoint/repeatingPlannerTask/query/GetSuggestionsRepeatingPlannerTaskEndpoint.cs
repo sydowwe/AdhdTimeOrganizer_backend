@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.entity.suggestion;
+using AdhdTimeOrganizer.Planning.domain.service;
 using FastEndpoints;
 using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.extensions;
@@ -85,15 +86,12 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
             .Include(t => t.Activity).ThenInclude(a => a.Category)
             .ToListAsync(ct);
 
-        var matchedTasks = tasks.Where(task => !coveredActivityIds.Contains(task.ActivityId) && task.RecurrenceType switch
-        {
-            RecurrenceType.DayOfWeek => task.ScheduledDays.Contains(date.DayOfWeek.ToString()),
-            RecurrenceType.DayOfMonth => task.ScheduledDates.Contains(date.Day),
-            RecurrenceType.DayType => task.ScheduledForDayTypes.Contains(calendar.DayType.ToString()),
-            // Already decided by the WHERE above: a DateRange row that got this far is in range.
-            RecurrenceType.DateRange => true,
-            _ => false
-        }).ToList();
+        // The day match is RepeatingPlannerTaskSchedule's, shared with the FO6 materialiser so the panel never
+        // offers a rule on a day the plan would not receive it. Its window check repeats the WHERE above, which
+        // costs nothing in memory and keeps the rule whole in one place.
+        var matchedTasks = tasks.Where(task => !coveredActivityIds.Contains(task.ActivityId)
+                                               && RepeatingPlannerTaskSchedule.FallsOn(task, date, calendar.DayType))
+            .ToList();
 
         // One projection for the whole matched set. Projecting per match — Projection(new[] { task }
         // .AsQueryable()).Single() — built and compiled an expression tree per suggestion.

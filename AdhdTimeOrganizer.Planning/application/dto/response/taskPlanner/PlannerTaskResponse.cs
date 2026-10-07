@@ -15,6 +15,9 @@ public record PlannerTaskResponse : BasePlannerTaskResponse, IProjectionResponse
 
     public long? SourceTemplateTaskId { get; init; }
 
+    /// <summary>The repeating rule that put this task on the plan by itself (FO6), or null — the client's repeat mark.</summary>
+    public long? SourceRepeatingTaskId { get; init; }
+
     public string? SkipReason { get; init; }
 
     /// <summary><c>"noTime" | "notRelevant" | "noEnergy"</c>, or null. At most one of this and <see cref="SkipReason"/> is non-null.</summary>
@@ -88,6 +91,7 @@ public record PlannerTaskResponse : BasePlannerTaskResponse, IProjectionResponse
             ActualStartTime = t.ActualStartTime != null ? new TimeDto(t.ActualStartTime.Value.Hour, t.ActualStartTime.Value.Minute) : null,
             ActualEndTime = t.ActualEndTime != null ? new TimeDto(t.ActualEndTime.Value.Hour, t.ActualEndTime.Value.Minute) : null,
             SourceTemplateTaskId = t.SourceTemplateTaskId,
+            SourceRepeatingTaskId = t.SourceRepeatingTaskId,
             SkipReason = t.SkipReason,
             // Inline rather than SkipReasonKeyTokens.Token(...) so it stays translatable if a caller composes on
             // the projection (BaseSortEndpoint sorts after it).

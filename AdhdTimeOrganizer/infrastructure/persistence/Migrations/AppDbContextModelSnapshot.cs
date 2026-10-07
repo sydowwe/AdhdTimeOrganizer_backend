@@ -1670,6 +1670,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("location");
 
+                    b.Property<DateOnly?>("MaterialisedThrough")
+                        .HasColumnType("date")
+                        .HasColumnName("materialised_through");
+
                     b.Property<DateTime>("ModifiedTimestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
