@@ -256,12 +256,41 @@ change tracker and hands them to `PlannerTaskPostponeRule`, the one place that d
 | A running or paused task moved later? | Not a postponement: that is re-arranging work already begun |
 | Carry-over and postponement both? | **Disjoint.** The carry command counts `CarryOverCount` only; the rule counts `PostponeCount` only. A task's slips are the sum, and the to-do seam (`PlanHistory.Postponed` beside `CarriedOver`) relies on never counting one twice |
 | Shown anywhere? | No. Like the carry count on the to-do side, it decides which help an item is offered (`TodoListItemPlanHelp`) and nothing else |
-| A new path that moves a task? | Must call `PlannerTaskMoveRecorder.RecordPostponementAsync` from its mapping step, before the save, or its moves leave no trace — nothing fails. FO4's "apply" (packing tasks into free time) is the next one |
+| A new path that moves a task? | Must call `PlannerTaskMoveRecorder.RecordPostponementAsync` from its mapping step, before the save, or its moves leave no trace — nothing fails. FO4's re-plan apply does, for every block it moves (the `utcNow` overload, so the whole set is judged against the request's one injected clock) |
 
 `SourceRepeatingTaskId` (FK to `repeating_planner_task`, `SET NULL`) and `RepeatingPlannerTask.AutoPlace` arrived
 in the same migration for FO6, so `planner_task` is altered once. Nothing reads or writes them yet.
 | Streak? | The task leaves its old day, so that day no longer counts it — the same neutral outcome a skip has |
 | Which tasks does the client offer? | `GET /planner-task/carry-over-candidates`: `NotStarted` / `InProgress`, non-background tasks on the user's previous seven days (their zone), newest day first, each with its date |
+
+### Re-planning the rest of today (FO4)
+
+At 11:30, with the 10:00 and 11:00 blocks slipped, one tap packs what slipped into the time that is left. Three
+routes off `/calendar/day-plan/{date}`, one rule (`DayPacking`, fed by `DayReplanPlanner`), and one definition of
+**missed** (`PlannerTaskMissedRule`): `NotStarted`, not background, end passed on the user's clock — derived, never
+stored, and meant to be what audit N5's nudge reads too.
+
+| Route | What it does |
+|---|---|
+| `POST …/replan` | The preview. Writes no planner task. Only the user's today (their zone, `TimeProvider`'s clock); any other date is a 400 |
+| `POST …/replan/apply` `{ previewToken, wontFit: [{ taskId, resolution: "Tomorrow" \| "Skip" }] }` | Recomputes and applies in one `SaveChanges`, then one `SyncForPlannerTasksAsync` for every touched task |
+| `GET …/next-free-slot?minutes=&notBeforeMinute=&excludeTaskId=` | The same rule for one block, with nothing moving — snooze, leisure "do it now", the to-do handoff. Today or later; a past day is a 400 |
+
+| Question | Answer |
+|---|---|
+| What moves? | Every `NotStarted` foreground block whose activity is not `IsUnavoidable` — missed, **late** (start passed, end not) or upcoming. An upcoming block starting at or past the window's end is left alone |
+| What stays and holds its time? | `InProgress`, `OnHold`, `Completed`, and any unavoidable block (missed or not), at their planned slots |
+| Background blocks? | Neither move nor hold time — they run alongside the day, the reading the day view's own conflict check takes (`checkConflict` skips them) |
+| The window? | From *packed-from* (the user's now, rounded up to the minute) to bed time. `BedTime` 00:00 — every day's default until FO10 — or any bed time at or before wake-up means the end of the day, **23:59**: a block cannot cross midnight and a `TimeDto` cannot say 24:00 |
+| The order? | The blocks' current one (start, end, id), as a priority. **First fit**: each takes the earliest free stretch long enough, so a short later block may back-fill a gap a longer earlier one could not use. Missed/late blocks may start from packed-from; an upcoming one never earlier than it is planned, and it may keep its own slot past bed time. Lengths are kept; nothing is split |
+| When time runs out? | If a required block misses out, the day is packed again with required blocks ahead of optional ones (importance = `OptionalMarkerValue`), and that wins if it places more required blocks. What still has no room is `wontFit`, optional first, then in order |
+| Nothing slipped? | An empty 200 (`hasChanges: false`), even if upcoming blocks overlap — a re-plan answers a slip, it does not tidy the day |
+| Why recompute rather than accept the client's placements? | The client never sends any. The preview's `previewToken` is `{packedFrom}.{hash}`, the hash over every fact the packing reads (calendar id + sleep window; per task id, status, span, background, optional, unavoidable). The apply recomputes from the token's packed-from against the day as it now stands: a different token is a **409 `Conflict`**, nothing written. Validating posted slots instead would re-prove every packing rule at a second site |
+| Other ways it fails safely | A token older than `PreviewLifetime` (10 min) is a 409 `Conflict`. The tasks are loaded tracked, so a write landing between recompute and save loses the `row_version` race as a 409 `DbConcurrencyError` and the one `SaveChanges` rolls back. A double submit no longer matches its token: 409, counted once |
+| `wontFit` resolutions? | Must decide exactly the recomputed `wontFit` set (400 otherwise). `Tomorrow` moves the block to the next day at the same time of day (creating the day before anything is loaded — it commits); `Skip` is `Cancelled` with `SkipReasonKey.NoTime` and publishes no completion fan-out (it was not done before or after) |
+| Postponements? | Every move, within today and to tomorrow, goes through `PlannerTaskMoveRecorder` — exactly as a manual move. A move to tomorrow is a postponement, never a carry-over. An upcoming block pushed before its slot came is a re-plan and counts nothing |
+| Repeating blocks? | The preview and the next-free-slot read let FO6's materialiser place today's auto-placing blocks first, like `GET /calendar/day-plan`. The apply does not: the token already says whether the day changed |
+| Archived activities? | A block whose activity is archived is absent from the day-plan read (the archived filter reaches it through the required navigation), and absent here too — the re-plan sees the day the user sees |
 
 ### Tasks that close themselves
 
@@ -473,6 +502,8 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | Streak | Consecutive days where every qualifying task was completed | `PlannerStreakResponse.CurrentStreak` |
 | Stamp | Writing a template's identity and defaults onto a day | `PlannerTemplateApplier.StampTemplate` |
 | Carve | Splitting a task around an overlapping one instead of dropping either | `PlannerTemplateApplier.CarveTaskAroundBlockers` |
+| Missed / late | A `NotStarted` foreground block whose end / start (strictly) has passed on the user's clock. Derived, never stored | `PlannerTaskMissedRule`, `PlannerTaskSlipState` |
+| Packed-from | Where a re-plan's window starts: the user's now, rounded up to the minute; carried in the preview token | `DayReplanPlanner.PackedFromNow` |
 | Reminder (portal) | The user's intent: title + instant + what it's attached to | `Reminder` |
 | Reminder definition (module) | The schedule and its dispatch history | `Sydowwe.Reminders.ReminderDefinition` |
 
@@ -485,6 +516,9 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `GetByIdCalendarEndpoint` | Query (`BaseGetByIdEndpoint`) | One day by id | `GetByIdCalendarEndpoint.cs` |
 | `GetByDateCalendarEndpoint` | Query (`BaseGetByFieldEndpoint`) | One day by date; **404s** when absent. Fills `CalendarResponse.Streak` after the projection | `GetByDateCalendarEndpoint.cs` |
 | `GetDayPlanCalendarEndpoint` | Query (custom) | `GET /calendar/day-plan/{date}` — calendar + tasks + streak in one hop; **200** on an unplanned day | `GetDayPlanCalendarEndpoint.cs` |
+| `PreviewReplanCalendarEndpoint` | Query (custom, POST) | `POST /calendar/day-plan/{date}/replan` — FO4's preview; today only; writes no task | `PreviewReplanCalendarEndpoint.cs` |
+| `ApplyReplanCalendarEndpoint` | Command (custom) | `POST /calendar/day-plan/{date}/replan/apply` — recompute-and-compare against the token, one save, one reminder sync; stale → 409 | `ApplyReplanCalendarEndpoint.cs` |
+| `GetNextFreeSlotCalendarEndpoint` | Query (custom) | `GET /calendar/day-plan/{date}/next-free-slot?minutes=` — FO4's rule for one block; `found: false` when nothing fits | `GetNextFreeSlotCalendarEndpoint.cs` |
 | `FilterCalendarEndpoint` | Query (`BaseFilterEndpoint`) | Filter/sort over days | `GetFilteredSortedCalendar.cs` |
 | `GetTaskSummariesCalendarEndpoint` | Query (custom) | `POST /calendar/task-summaries` — a date range grouped by day, reduced shape, empty days omitted | `GetTaskSummariesCalendarEndpoint.cs` |
 | `UpdateCalendarEndpoint` | Command (`BaseUpdateEndpoint`) | Edit a day; turns a `CalendarDayTypeRule` violation into a 400 | `UpdateCalendarEndpoint.cs` |
@@ -548,7 +582,10 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `PlannerStreakService` | Domain service (static, pure) | `Evaluate` one day, `Walk` the history. Owns the rules, no SQL | `domain/service/PlannerStreakService.cs` |
 | `PlanVsActualTrendService` | Domain service (static, pure) | `Aggregate`, `SpanMinutes`, `DriftMinutes`. Owns the arithmetic, no SQL | `domain/service/PlanVsActualTrendService.cs` |
 | `PlannerTaskPostponeRule` | Domain service (static, pure) | `Apply` (is this move a postponement, and record it) and `DriftAnchor` (which start lateness is measured from). FO3 phase 2 | `domain/service/PlannerTaskPostponeRule.cs` |
-| `PlannerTaskMoveRecorder` | Helper (static) | Feeds the rule from a tracked task's original values; called from the PUT's and the span patch's `AfterMapping` | `application/helper/PlannerTaskMoveRecorder.cs` |
+| `PlannerTaskMoveRecorder` | Helper (static) | Feeds the rule from a tracked task's original values; called from the PUT's and the span patch's `AfterMapping`, and for every block FO4's re-plan apply moves (the `utcNow` overload) | `application/helper/PlannerTaskMoveRecorder.cs` |
+| `PlannerTaskMissedRule` | Domain service (static, pure) | FO4's one definition of **missed** (and late / upcoming beside it). Derived, never stored | `domain/service/PlannerTaskMissedRule.cs` |
+| `DayPacking` | Domain service (static, pure) | FO4's placement rule on minutes of one day: first fit in priority order, optional blocks give way first, the window's end. No SQL | `domain/service/DayPacking.cs` |
+| `DayReplanPlanner` | Helper (static) | Loads a day and turns it into FO4's plan: what moves, what holds time, each block's earliest start / latest end, and the preview token. Shared by all three FO4 routes | `application/helper/DayReplanPlanner.cs` |
 | `SkipSummaryService` | Domain service (static, pure) | `Aggregate` — reason groups by exact value, per-hour planned/skipped. No SQL | `domain/service/SkipSummaryService.cs` |
 | `CalendarDayFactory` | Domain service (static) | What an unplanned day *is*. The single definition, shared by both creators | `domain/service/CalendarDayFactory.cs` |
 | `HolidayCalendar` | Domain service (static) | Slovak holiday table + Computus; `Holiday(Key, Name)` per date | `domain/service/HolidayCalendar.cs` |
@@ -583,6 +620,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 ### Validators (`application/validator/`)
 
 `ApplyTemplateToTaskPlannerValidator` · `CalendarBatchValidators` · `CalendarRequestValidator` ·
+`DayReplanValidators` (`ApplyDayReplanValidator`, `NextFreeSlotValidator`) ·
 `GetByDateCalendarValidator` · `PatchPlannerTaskStatusValidator` · `PlannerTaskChangeSpanValidator` ·
 `PlannerTaskValidator` · `PlanVsActualTrendValidator` · `ReminderValidator` ·
 `RepeatingPlannerTaskValidator` · `TaskImportanceValidator` · `TaskPlannerDayTemplateValidator` ·

@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -33,13 +34,6 @@ public class GetDayPlanCalendarEndpoint(
     IRepeatingTaskMaterialiser materialiser)
     : EndpointWithoutRequest<DayPlanResponse>
 {
-    /// <summary>
-    /// The date formats accepted on the route. ISO first because that is what a client holding a local date
-    /// already has; <c>dd-MM-yyyy</c> second only so this route cannot be the one that breaks when someone
-    /// copies a URL over from the sibling <c>by-Date</c> route, which speaks that format alone.
-    /// </summary>
-    private static readonly string[] DateFormats = ["yyyy-MM-dd", "dd-MM-yyyy"];
-
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
     public override void Configure()
@@ -61,8 +55,8 @@ public class GetDayPlanCalendarEndpoint(
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var raw = Route<string>("date");
-        if (!DateOnly.TryParseExact(raw, DateFormats, out var date))
+        // The formats are shared with the FO4 routes hanging off this one (TaskPlannerHelper).
+        if (!TaskPlannerHelper.TryParseDayPlanRouteDate(Route<string>("date"), out var date))
         {
             AddError("date", "Date must be in yyyy-MM-dd format.");
             await Send.ErrorsAsync(cancellation: ct);

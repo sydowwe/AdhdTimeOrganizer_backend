@@ -18,8 +18,19 @@ namespace AdhdTimeOrganizer.Planning.application.helper;
 /// </summary>
 public static class PlannerTaskMoveRecorder
 {
+    public static Task RecordPostponementAsync(
+        DbContext dbContext, PlannerTask task, IUserTimeZoneResolver timeZones, CancellationToken ct) =>
+        RecordPostponementAsync(dbContext, task, timeZones, DateTime.UtcNow, ct);
+
+    /// <inheritdoc cref="RecordPostponementAsync(DbContext,PlannerTask,IUserTimeZoneResolver,CancellationToken)"/>
+    /// <param name="dbContext">The context the task is tracked on.</param>
+    /// <param name="task">The tracked task, already carrying its new slot.</param>
+    /// <param name="timeZones">Resolves the user's zone.</param>
+    /// <param name="utcNow">The instant of the write, for a caller holding an injected <c>TimeProvider</c> — FO4's
+    /// re-plan apply, which moves many tasks and must judge every one of them against the same clock.</param>
+    /// <param name="ct">Cancellation.</param>
     public static async Task RecordPostponementAsync(
-        DbContext dbContext, PlannerTask task, IUserTimeZoneResolver timeZones, CancellationToken ct)
+        DbContext dbContext, PlannerTask task, IUserTimeZoneResolver timeZones, DateTime utcNow, CancellationToken ct)
     {
         var entry = dbContext.Entry(task);
         var statusBefore = entry.Property(t => t.Status).OriginalValue;
@@ -42,7 +53,7 @@ public static class PlannerTaskMoveRecorder
         if (!dates.TryGetValue(fromCalendarId, out var fromDate) || !dates.TryGetValue(task.CalendarId, out var toDate))
             return;
 
-        var userNow = WallClockZone.FromUtc(DateTime.UtcNow, await timeZones.GetAsync(task.UserId, ct));
+        var userNow = WallClockZone.FromUtc(utcNow, await timeZones.GetAsync(task.UserId, ct));
         PlannerTaskPostponeRule.Apply(task, statusBefore, fromDate, fromStart, toDate, task.StartTime, userNow);
     }
 }

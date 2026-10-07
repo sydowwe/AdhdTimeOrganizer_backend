@@ -18,6 +18,11 @@ flame on the home page — consecutive days where everything that mattered got d
 **plan-vs-actual trend** (how the user's estimates compared with their logged time over a range).
 Neither has a column, a migration, or a repair path.
 
+When a morning slips, **re-planning the rest of today** packs the missed and not-yet-started blocks
+into the time left before bed, around whatever is fixed — previewed first, applied only on a tap, and
+anything that will not fit goes to tomorrow or is skipped. The same rule answers "where is the next
+free slot?" for a single block.
+
 **Reminders** live here too rather than in a project of their own, because a reminder attached to a
 planner task derives its instant from that task and has to be re-registered every time the task
 moves. The actual scheduling — occurrences, dispatch, retries — belongs to the `Sydowwe.Reminders`

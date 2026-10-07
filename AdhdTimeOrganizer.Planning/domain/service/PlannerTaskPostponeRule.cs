@@ -6,8 +6,9 @@ namespace AdhdTimeOrganizer.Planning.domain.service;
 /// <summary>
 /// FO3 phase 2: the one rule that decides whether moving a planner task was a <b>postponement</b>, and records it
 /// on the task. Every write path that moves a task's day or start time goes through
-/// <c>PlannerTaskMoveRecorder</c>, which calls this: the PUT (home's <i>Move later</i>, the day view's reschedule)
-/// and the span patch (a drag). A future replan path must call it too, or its moves leave no trace.
+/// <c>PlannerTaskMoveRecorder</c>, which calls this: the PUT (home's <i>Move later</i>, the day view's reschedule),
+/// the span patch (a drag) and FO4's re-plan apply (<c>ApplyReplanCalendarEndpoint</c>), for every block it moves
+/// within the day or to tomorrow. A new path that moves a task must call it too, or its moves leave no trace.
 /// <para>
 /// <b>A move is a postponement</b> when all three hold:
 /// <list type="number">

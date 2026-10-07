@@ -10,9 +10,10 @@ rather than a project of their own.
 Owns: `Calendar`, `BasePlannerTask` and its three concrete shapes (`PlannerTask`,
 `RepeatingPlannerTask`, `TemplatePlannerTask`), `TaskPlannerDayTemplate`, `TaskImportance`,
 `UserPlannerSettings`, `Reminder`, the three `PlannerSuggestionFrom*` read-models, their EF
-configurations, ~59 endpoints, their DTOs and 14 validator files, the five domain services
+configurations, ~62 endpoints, their DTOs and 16 validator files, the domain services
 (`PlannerStreakService`, `PlanVsActualTrendService`, `SkipSummaryService`, `CalendarDayFactory`,
-`HolidayCalendar`), the
+`HolidayCalendar`, `PlannerTaskPostponeRule`, `RepeatingPlannerTaskSchedule`, and FO4's `PlannerTaskMissedRule` +
+`DayPacking`), the
 four application services (`CalendarProvisioner`, `PlannerStreakReader`,
 `ReminderRegistrationService`, `RepeatingTaskMaterialiser`), the two Core seam implementations, the two cross-slice event
 handlers, and five seeders.
@@ -117,6 +118,21 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   - **Day matching is `RepeatingPlannerTaskSchedule.FallsOn`**, shared with the suggestion endpoint, so the
     panel never offers a rule on a day the plan would not receive it.
 
+- **FO4's re-plan never trusts a client placement — it never receives one.** `POST /calendar/day-plan/{date}/replan`
+  previews (writes no task), `…/replan/apply` takes back only the preview's `previewToken` plus a decision per
+  `wontFit` block, and **recomputes** the plan from the token's packed-from against the day as it now stands; a
+  different token (the day changed, or it was already applied) or one older than ten minutes is a 409 `Conflict` with
+  nothing written. `GET …/next-free-slot` is the same rule for one block. Details in `domain-map.md`
+  § *Re-planning the rest of today*. What keeps it honest:
+  - **One "missed"** — `PlannerTaskMissedRule` (`NotStarted`, foreground, end passed on the user's clock). Derived,
+    never stored; N5's nudge should read it, not re-derive it.
+  - **One placement rule** — `DayPacking`, pure, behind all three routes via `DayReplanPlanner`. Background blocks
+    neither move nor hold time; `InProgress` / `OnHold` / `Completed` / unavoidable blocks hold their slots.
+  - **"Now" is the injected `TimeProvider`**, and the apply feeds the same instant to `PlannerTaskMoveRecorder`'s
+    `utcNow` overload, so every move is judged against one clock — and the tests can fix it.
+  - **Bed time 00:00 (or after midnight) means 23:59**, the last end a block can have. FO10 will change only the
+    input, not this rule.
+
 - **`GetPlanVsActualTrendPlannerTaskEndpoint` and `GetSkipSummaryPlannerTaskEndpoint` filter `UserId`
   by hand**, not through the host's
   global `IEntityWithUser` filter — the slice compiles against a plain `DbContext` and cannot see it,
@@ -192,8 +208,10 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   what is here is a one-line subclass. Convention is `<Verb><Entity>Endpoint`; mapping lives on the
   DTOs. If it writes a planner task's time or status, call `SyncForPlannerTasksAsync`; if it deletes
   one, capture the reminder ids first. If it **moves** an existing task to a later day or time, call
-  `PlannerTaskMoveRecorder.RecordPostponementAsync` before the save (FO3 — the PUT and the span patch do);
-  a path that skips it builds and answers 200, and its slips simply vanish from the to-do help.
+  `PlannerTaskMoveRecorder.RecordPostponementAsync` before the save (FO3 — the PUT, the span patch and FO4's
+  re-plan apply do); a path that skips it builds and answers 200, and its slips simply vanish from the to-do help.
+  If it needs "is this block missed?" or "where is the next free slot?", call `PlannerTaskMissedRule` /
+  `DayPacking` (through `DayReplanPlanner`) rather than writing a second copy.
 - **Add a conflict-resolution mode:** it goes in `PlannerTemplateApplier.StageAgainstDay` and nowhere else —
   the single-day and the batched apply route through it (via `Stage`), and so does FO6's materialiser, and `StagedTaskDeletions` reads the
   ChangeTracker so a new mode's deletions are captured without threading a list through.

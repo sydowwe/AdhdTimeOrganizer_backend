@@ -16,7 +16,24 @@ public static class TaskPlannerHelper
     /// zone first; this exists so the write paths cannot answer the question differently.</para>
     /// </summary>
     public static DateOnly TodayIn(TimeZoneInfo timeZone)
-        => DateOnly.FromDateTime(WallClockZone.FromUtc(DateTime.UtcNow, timeZone));
+        => TodayIn(timeZone, DateTime.UtcNow);
+
+    /// <inheritdoc cref="TodayIn(TimeZoneInfo)"/>
+    /// <param name="timeZone">The user's zone.</param>
+    /// <param name="utcNow">The current instant, for a caller holding an injected <c>TimeProvider</c> (FO4's re-plan).</param>
+    public static DateOnly TodayIn(TimeZoneInfo timeZone, DateTime utcNow)
+        => DateOnly.FromDateTime(WallClockZone.FromUtc(utcNow, timeZone));
+
+    /// <summary>
+    /// The date formats a <c>/calendar/day-plan/{date}</c> route accepts. ISO first because that is what a client
+    /// holding a local date already has; <c>dd-MM-yyyy</c> second only so these routes cannot be the ones that
+    /// break when someone copies a URL over from the sibling <c>by-Date</c> route, which speaks that format alone.
+    /// </summary>
+    private static readonly string[] DayPlanRouteDateFormats = ["yyyy-MM-dd", "dd-MM-yyyy"];
+
+    /// <summary>Parses the <c>{date}</c> segment of a <c>/calendar/day-plan/{date}…</c> route.</summary>
+    public static bool TryParseDayPlanRouteDate(string? raw, out DateOnly date)
+        => DateOnly.TryParseExact(raw, DayPlanRouteDateFormats, out date);
 
     /// <summary>
     /// The last day of a range-aggregate window that is <b>materially over</b>: <paramref name="until"/>, capped at
