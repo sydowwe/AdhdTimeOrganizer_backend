@@ -651,7 +651,11 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
 
     // Live notification channel for the Notifications module. The hub itself is [Authorize]d and targets
     // individual users via Clients.User(userId) keyed on the NameIdentifier claim.
-    app.MapHub<NotificationHub>("/hubs/notifications");
+    // The hub is not a FastEndpoints route, so the configurator's DenyExtensionClients above never reaches
+    // it, and its own [Authorize] keeps the fallback policy off it too. A tracker token may only write
+    // tracking data; live notifications are user data, so the deny is attached here by hand.
+    app.MapHub<NotificationHub>("/hubs/notifications")
+        .RequireAuthorization(ExtensionClientPolicies.DenyExtensionClients);
 }
 
 static void LoadSettingsFromConfiguration(IConfiguration configuration, IServiceCollection services)

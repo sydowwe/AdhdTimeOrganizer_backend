@@ -14,7 +14,10 @@ using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.deskto
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.heartbeat;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.application.dto.request.user;
@@ -259,6 +262,44 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
         var response = await extensionClient.GetAsync("user/sessions", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    /// <summary>
+    /// A tracker token may only write tracking data, and the notification hub reads user data: every live
+    /// notification's title and body. The hub is not a FastEndpoints route, so the configurator's blanket
+    /// <c>DenyExtensionClients</c> never reaches it, and its own <c>[Authorize]</c> keeps the fallback policy
+    /// off it too. Until <c>Program.cs</c> attached the deny to the hub mapping, a tracker token connected.
+    /// 403 rather than 401: the token authenticates, and is refused for being a tracker's.
+    /// </summary>
+    [Fact]
+    public async Task ExtensionJwt_CannotOpen_TheNotificationHub()
+    {
+        var email = "extension-hub@test.com";
+        await CreateUserWithExtensionAccess(email, true);
+        var loginResult = await ExtensionLoginSuccessAsync(email);
+
+        var server = ((WebApplicationFactory<Program>)Fixture.UnauthenticatedFactory).Server;
+        await using var connection = new HubConnectionBuilder()
+            .WithUrl(new Uri(server.BaseAddress, "/hubs/notifications"), options =>
+            {
+                options.Transports = HttpTransportType.WebSockets;
+                options.SkipNegotiation = true;
+                options.HttpMessageHandlerFactory = _ => server.CreateHandler();
+                options.WebSocketFactory = async (context, ct) =>
+                {
+                    var handshakeUri = new UriBuilder(context.Uri) { Scheme = Uri.UriSchemeHttp }.Uri;
+                    var webSocketClient = server.CreateWebSocketClient();
+                    // How a tracker authenticates: its access token as a bearer header.
+                    webSocketClient.ConfigureRequest = request =>
+                        request.Headers.Authorization = $"Bearer {loginResult.AccessToken}";
+                    return await webSocketClient.ConnectAsync(handshakeUri, ct);
+                };
+            })
+            .Build();
+
+        var start = () => connection.StartAsync(CancellationToken);
+
+        (await start.Should().ThrowAsync<Exception>()).Which.Message.Should().Contain("403");
     }
 
     /// <summary>
