@@ -55,6 +55,87 @@ public sealed class ActivityHistoryTimeAttributionSink : IActivityTimeAttributio
         });
     }
 
+    public async Task<int> AttributeSpanAsync(DbContext db, long userId, long activityId, DateTime startUtc, DateTime endUtc, CancellationToken ct)
+    {
+        var start = DateTime.SpecifyKind(startUtc, DateTimeKind.Utc);
+        var end = DateTime.SpecifyKind(endUtc, DateTimeKind.Utc);
+        if (end <= start)
+            return 0;
+
+        // Saved rows that overlap the span or end exactly on its start (the extension candidate), and whatever the
+        // context already tracks for this activity — this batch's own unsaved rows, and rows an earlier call in the
+        // batch extended in memory, whose stored end the SQL predicate would read stale. Re-filtered in memory on
+        // the current values for that reason.
+        var stored = await db.Set<ActivityHistory>()
+            .Where(h => h.UserId == userId && h.ActivityId == activityId
+                                           && h.StartTimestamp < end && h.EndTimestamp >= start)
+            .ToListAsync(ct);
+        var rows = stored
+            .Concat(db.Set<ActivityHistory>().Local.Where(h => h.UserId == userId && h.ActivityId == activityId))
+            .Distinct<ActivityHistory>(ReferenceEqualityComparer.Instance)
+            .Where(h => db.Entry(h).State != EntityState.Deleted && h.StartTimestamp < end && h.EndTimestamp >= start)
+            .ToList();
+
+        var attributed = 0;
+        foreach (var (pieceStart, pieceEnd) in Uncovered(start, end, rows).ToList())
+        {
+            var seconds = (int)(pieceEnd - pieceStart).TotalSeconds;
+            var contiguous = rows.FirstOrDefault(h => h.EndTimestamp == pieceStart && h.SessionId == null);
+
+            if (contiguous != null)
+            {
+                contiguous.EndTimestamp = pieceEnd;
+                contiguous.Length = new IntTime(contiguous.Length.TotalSeconds + seconds);
+            }
+            // The start check only bites on a zero-length timer row sitting exactly on the piece's start: it
+            // covers nothing and may not be extended, and a second row on its instant would fail the unique index
+            // and with it the whole sync.
+            else if (seconds >= 60 && rows.All(h => h.StartTimestamp != pieceStart))
+            {
+                var row = new ActivityHistory
+                {
+                    UserId = userId,
+                    ActivityId = activityId,
+                    StartTimestamp = pieceStart,
+                    EndTimestamp = pieceEnd,
+                    Length = new IntTime(seconds)
+                };
+                db.Set<ActivityHistory>().Add(row);
+                rows.Add(row);
+            }
+            else
+            {
+                continue;
+            }
+
+            attributed += seconds;
+        }
+
+        return attributed;
+    }
+
+    /// <summary>
+    /// The pieces of <c>[start, end)</c> no row's span covers, in order. A zero-length row covers nothing, so the
+    /// piece after it still finds it as the contiguous row to extend — which is also what keeps a new row from
+    /// landing on that row's start and the <c>(UserId, ActivityId, StartTimestamp)</c> unique index.
+    /// </summary>
+    private static IEnumerable<(DateTime Start, DateTime End)> Uncovered(DateTime start, DateTime end, IEnumerable<ActivityHistory> rows)
+    {
+        var cursor = start;
+        foreach (var row in rows.Where(r => r.EndTimestamp > r.StartTimestamp).OrderBy(r => r.StartTimestamp))
+        {
+            if (row.StartTimestamp > cursor)
+                yield return (cursor, row.StartTimestamp < end ? row.StartTimestamp : end);
+            if (row.EndTimestamp > cursor)
+                cursor = row.EndTimestamp;
+            if (cursor >= end)
+                yield break;
+        }
+
+        if (cursor < end)
+            yield return (cursor, end);
+    }
+
     public async Task<int> TotalSecondsBetweenAsync(DbContext db, long userId, long activityId, DateTime fromUtc, DateTime toUtc, CancellationToken ct)
     {
         // Half-open on instants the caller chose — the same contract as TodoListItemLoggedTimeSource, which

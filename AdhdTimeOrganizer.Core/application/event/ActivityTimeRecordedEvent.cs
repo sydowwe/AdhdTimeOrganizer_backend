@@ -4,10 +4,11 @@ namespace AdhdTimeOrganizer.Core.application.@event;
 
 /// <summary>
 /// Raised after activity time has been committed to History, naming every activity it touched and how much
-/// time that activity now has for the day. Two publishers: the desktop heartbeat (once per batch), and
-/// History's own create paths — <c>POST /activity-history</c> and <c>POST /activity-history/session</c> — once
-/// per (local day, activity) the new rows touch, so a timer or a hand-logged stretch ticks off the plan the same
-/// way tracked time does (FO2).
+/// time that activity now has for the day. Three publishers: the desktop heartbeat (once per batch); History's
+/// own create paths — <c>POST /activity-history</c> and <c>POST /activity-history/session</c> — once per (local
+/// day, activity) the new rows touch, so a timer or a hand-logged stretch ticks off the plan the same way
+/// tracked time does (FO2); and the Android sync, once per activity with newly attributed time on the user's
+/// <em>today</em> only, because a sync is a backlog upload and the to-do / routine fallback has no day (FO9).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,7 +29,7 @@ namespace AdhdTimeOrganizer.Core.application.@event;
 /// ⚠ <b>Every field here is on the user's own clock</b>, which is the clock a <c>Calendar.Date</c> and a
 /// <c>PlannerTask.StartTime</c> are written on. A publisher must resolve the user's zone before building
 /// this; deriving <see cref="Day"/> from a UTC instant is the bug the heartbeat shipped with, and every
-/// publisher (History's creates, and Android sync when it comes) follows the same rule.
+/// publisher (History's creates, and the Android sync) follows the same rule.
 /// </para>
 /// </remarks>
 /// <param name="UserId">Owner of the tracked time. Handlers must scope on it explicitly.</param>

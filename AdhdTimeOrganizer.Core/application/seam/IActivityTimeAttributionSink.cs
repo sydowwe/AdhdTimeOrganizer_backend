@@ -37,6 +37,31 @@ public interface IActivityTimeAttributionSink : ISeam
     Task AttributeAsync(DbContext db, long userId, long activityId, DateTime windowStart, int activeSeconds, CancellationToken ct);
 
     /// <summary>
+    /// Attributes the part of <c>[<paramref name="startUtc"/>, <paramref name="endUtc"/>)</c> that no record of
+    /// <paramref name="activityId"/> already covers, and returns how many seconds that was. The Android sync's
+    /// entry point (FO9): a phone session is a span, not a one-minute window, and it usually arrives after the
+    /// desktop heartbeat or a timer has already recorded some of the same stretch.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The same activity is never counted twice for the same second.</b> Phone reading mapped to
+    /// <i>Thesis</i> during a <i>Thesis</i> pomodoro adds only what the pomodoro did not cover, so the day total
+    /// the completion automation reads stays the time the user actually spent. Records of <em>other</em>
+    /// activities are not subtracted: overlapping rows of different activities are already a shape the ledger
+    /// holds (hand-logged rows), and choosing between two sources' verdicts is the unified dashboards' job.
+    /// </para>
+    /// <para>
+    /// Records still unsaved on <paramref name="db"/> count as covering, so two sessions of one batch that
+    /// overlap (two devices, or two packages mapped to one activity) are attributed once. A remaining piece that
+    /// starts where a non-timer record ends extends that record, as <see cref="AttributeAsync"/> does. A piece
+    /// that extends nothing and is shorter than a minute is dropped, because the ledger would store it as a
+    /// zero-length row (<c>IntTime</c> keeps whole minutes, a pinned <c>KnownGap</c>).
+    /// </para>
+    /// <para>The no-<c>SaveChanges</c> contract above applies unchanged.</para>
+    /// </remarks>
+    Task<int> AttributeSpanAsync(DbContext db, long userId, long activityId, DateTime startUtc, DateTime endUtc, CancellationToken ct);
+
+    /// <summary>
     /// Total seconds already attributed to <paramref name="activityId"/> in the half-open instant range
     /// <c>[<paramref name="fromUtc"/>, <paramref name="toUtc"/>)</c>, across every source — not just the one
     /// that produced the current batch.

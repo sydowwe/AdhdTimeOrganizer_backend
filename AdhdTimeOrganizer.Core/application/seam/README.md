@@ -15,8 +15,9 @@ if the two ever drift apart.
 |---|---|---|---|---|
 | `IActivityMembershipSource` | read | keyed `IEnumerable<>` | TodoLists (`todoList`), Routines (`routineTodoList`) | **nobody** — its one consumer, History's `grid` grid, was deleted with `CQ-1`. Kept for the next one |
 | `IActivityReferenceSource` | read **+ write**, in the caller's transaction | keyed `IEnumerable<>` | Core (`timerPreset`), History (`activityHistory`), TodoLists (`todoList`), Routines (`routineTodoList`), Planning (`plannerTask`), Tracking (`trackerMapping`), ActivityProfiles (`activityProfile`) | Core — `GridActivityEndpoint`, `GetByIdActivityEndpoint`, `MergeActivityEndpoint`, all through `IActivityReferenceService` |
-| `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` |
+| `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` (`AttributeAsync`), `AndroidSyncEndpoint` (`AttributeSpanAsync`, FO9) |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint`; Routines — `RoutineSuggestedTodayJobHandler`, for the day's `WakeUpTime` |
+| `IFocusIntervalSource` | read | single | History | Tracking — `DesktopMappingSuggestionsEndpoint` (FO9), which learns process → activity from timer focus phases |
 | `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint` |
 | `ITodoListItemPlanSource` | read | single | Planning | TodoLists — `GetAllTodoListItemEndpoint`, `GetByIdTodoListItemEndpoint`, through `TodoListItemPlannedSlotFiller`, for `NextPlannedSlot`; the same two plus `GetDashboardTodoListItemEndpoint` for `PlanHelp` (`PlanHistoryAsync`, FO3) |
 | `IUserOwnedReferenceVerifier` | read | keyed `IEnumerable<>` | TodoLists (`todoListItem`), Routines (`routineTodoList`) | History — `Create`/`UpdateActivityHistoryEndpoint`; Planning — `Create`/`UpdatePlannerTaskEndpoint` and both apply-template endpoints, for `PlannerTask.TodolistItemId`. Both through Core's `IReferencedIdOwnershipService` |
@@ -25,7 +26,7 @@ if the two ever drift apart.
 
 | Event | Published by | Handled by | Handler touches |
 |---|---|---|---|
-| `ActivityTimeRecordedEvent` | Tracking (heartbeat), History (both creates, via `IActivityTimeRecordedPublisher` — FO2) | host `ActivityTimeRecordedEventHandler` | Planning + TodoLists + Routines |
+| `ActivityTimeRecordedEvent` | Tracking (heartbeat; Android sync for the user's today — FO9), History (both creates, via `IActivityTimeRecordedPublisher` — FO2) | host `ActivityTimeRecordedEventHandler` | Planning + TodoLists + Routines |
 | `PlannerTaskIsDoneChangedEvent` | Planning, and the host handler above | host | TodoLists + Routines |
 | `TodoListItemIsDoneChangedEvent` | TodoLists | **Planning** | Planning only |
 | `RoutineTodoListIsDoneChangedEvent` | Routines | **Planning** | Planning only |
@@ -101,7 +102,11 @@ None of these break the build, and only one of them throws.
   an entire merge on a unique index. The rule is on `ReferencingActivityIds` and each implementation
   applies it; it cannot be centralised, because by the time `ActivityReferenceService` sees the
   queryable it is an `IQueryable<long>` and `IgnoreQueryFilters` needs an entity type.
-- **The three single seams throw at endpoint activation** if unregistered. That is the point of
+- **`IFocusIntervalSource` fails silently if it widens.** Admitting stopwatch, manual or tracker-attributed
+  rows looks like "more data", but tracker rows were produced by the very rules a suggestion creates, so the
+  suggestions would start confirming themselves. `DesktopMappingSuggestionsTests` seeds a non-timer row and
+  asserts it suggests nothing.
+- **The single seams throw at endpoint activation** if unregistered. That is the point of
   resolving them as a single service rather than an `IEnumerable<>`. `IActivityReferenceService` —
   the one face Core's endpoints inject over the keyed sources — is registered the same way and for the
   same reason.

@@ -1,21 +1,52 @@
 using System.Globalization;
+using AdhdTimeOrganizer.Core.application.@event;
+using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper.mapping;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.Tracking.infrastructure.persistence.retention;
 using FastEndpoints;
 using Microsoft.Extensions.Options;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.infrastructure.security;
 
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.android.command;
 
+/// <summary>
+/// Stores a phone's usage sessions, and — since FO9 — attributes each newly stored session that an active
+/// android mapping rule resolves to an activity, then tells the completion automation about today's.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Only newly inserted sessions are attributed.</b> A re-sent session is skipped by the
+/// <c>(device, package, start)</c> dedup before it reaches the rules, so a phone re-posting its buffer cannot
+/// count the same time twice — the same reasoning as the desktop heartbeat's <c>seenKeys</c>.
+/// </para>
+/// <para>
+/// <b>Attribution goes through <see cref="IActivityTimeAttributionSink.AttributeSpanAsync"/></b>, which adds
+/// only what no record of the same activity already covers: the phone usually reports a stretch after the
+/// desktop heartbeat or a timer has recorded part of it. An <c>IsIgnored</c> rule attributes nothing, but the
+/// session is still stored — the android ledger has never filtered on rules, and its dashboards read it whole.
+/// </para>
+/// <para>
+/// <b>Only the user's today drives completion.</b> A sync is a backlog upload — the first one after install
+/// carries days of history — and the handler's to-do / routine fallback has no day: last Tuesday's forty
+/// minutes would tick off <i>today's</i> routine item. Past days are attributed to History and stop there.
+/// </para>
+/// </remarks>
 [AllowExtensionClients]
-public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingRetentionOptions> retentionOptions)
+public class AndroidSyncEndpoint(
+    DbContext dbContext,
+    IOptions<ActivityTrackingRetentionOptions> retentionOptions,
+    IActivityTimeAttributionSink attributionSink,
+    IUserTimeZoneResolver timeZones)
     : Endpoint<AndroidSyncRequest, AndroidSyncResponse>
 {
     public override void Configure()
@@ -159,16 +190,22 @@ public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingR
             accepted++;
         }
 
+        var attributed = new List<AttributedSpan>();
         if (toInsert.Count > 0)
         {
             dbContext.Set<AndroidSessionData>().AddRange(toInsert);
+            attributed = await AttributeAsync(userId, toInsert, ct);
 
             // CQ-11: seenKeys closes the in-batch and already-stored cases, but two syncs from the same
             // device in flight together can still both pass the read above. That last race is a 409 rather
             // than a 500 the phone re-posts unchanged — on the retry the rows are stored and skipped.
+            // One save for the sessions and their attribution, the sink's contract: a retry after a failed
+            // save re-attributes nothing that was not stored.
             if (!await this.TrySaveIngestBatchAsync(dbContext, ct))
                 return;
         }
+
+        await PublishTodayAsync(userId, attributed, ct);
 
         await Send.ResponseAsync(new AndroidSyncResponse
         {
@@ -177,4 +214,69 @@ public class AndroidSyncEndpoint(DbContext dbContext, IOptions<ActivityTrackingR
             SyncedUpToUtc = req.SyncedUpToUtc.ToString("O")
         }, cancellation: ct);
     }
+
+    /// <summary>
+    /// Resolves each new session through the one android matcher — the class the distinct-entries grid's
+    /// <c>coveredBy</c> chip also uses, so what the grid shows is what happens here — and attributes the matched
+    /// ones in start order, so a session that begins where the previous one ended extends its row.
+    /// </summary>
+    private async Task<List<AttributedSpan>> AttributeAsync(long userId, List<AndroidSessionData> sessions, CancellationToken ct)
+    {
+        var rules = new AndroidMappingRuleSet(await AndroidMappingRuleSet.ActiveFor(dbContext, userId).ToListAsync(ct));
+        var attributed = new List<AttributedSpan>();
+
+        foreach (var session in sessions.OrderBy(s => s.SessionStartUtc))
+        {
+            var match = rules.Resolve(session.PackageName, session.AppLabel);
+            if (match is not { IsIgnored: not true, ActivityId: { } activityId })
+                continue;
+
+            var seconds = await attributionSink.AttributeSpanAsync(
+                dbContext, userId, activityId, session.SessionStartUtc, session.SessionEndUtc, ct);
+            if (seconds > 0)
+                attributed.Add(new AttributedSpan(activityId, session.SessionStartUtc, session.SessionEndUtc));
+        }
+
+        return attributed;
+    }
+
+    /// <summary>
+    /// One <see cref="ActivityTimeRecordedEvent"/> per activity with time on the user's today, the FO2 rule:
+    /// the window is the attributed sessions' extent clipped to today on the user's clock, and the total is the
+    /// whole day's, read back after the save through the same sink every other publisher reads. See the type
+    /// remarks for why other days publish nothing.
+    /// </summary>
+    private async Task PublishTodayAsync(long userId, List<AttributedSpan> attributed, CancellationToken ct)
+    {
+        if (attributed.Count == 0)
+            return;
+
+        var timeZone = await timeZones.GetAsync(userId, ct);
+        var today = DateOnly.FromDateTime(WallClockZone.FromUtc(DateTime.UtcNow, timeZone));
+        var dayStartUtc = WallClockZone.ToUtc(today, TimeOnly.MinValue, timeZone);
+        var dayEndUtc = WallClockZone.ToUtc(today.AddDays(1), TimeOnly.MinValue, timeZone);
+
+        var todays = attributed
+            .Where(s => s.StartUtc < dayEndUtc && s.EndUtc > dayStartUtc)
+            .GroupBy(s => s.ActivityId)
+            .OrderBy(g => g.Min(s => s.StartUtc));
+
+        foreach (var group in todays)
+        {
+            var windowStartUtc = group.Min(s => s.StartUtc) is var first && first > dayStartUtc ? first : dayStartUtc;
+            var windowEndUtc = group.Max(s => s.EndUtc) is var last && last < dayEndUtc ? last : dayEndUtc;
+            var total = await attributionSink.TotalSecondsBetweenAsync(dbContext, userId, group.Key, dayStartUtc, dayEndUtc, ct);
+
+            // A window closing on the next midnight reads 00:00, the event's documented wrap.
+            await new ActivityTimeRecordedEvent(
+                    userId,
+                    today,
+                    TimeOnly.FromDateTime(WallClockZone.FromUtc(windowStartUtc, timeZone)),
+                    TimeOnly.FromDateTime(WallClockZone.FromUtc(windowEndUtc, timeZone)),
+                    [new ActivityDayTotal(group.Key, total)])
+                .PublishAsync(Mode.WaitForAll, ct);
+        }
+    }
+
+    private sealed record AttributedSpan(long ActivityId, DateTime StartUtc, DateTime EndUtc);
 }

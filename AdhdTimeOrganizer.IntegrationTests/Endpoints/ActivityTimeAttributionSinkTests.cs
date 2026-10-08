@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
@@ -388,6 +389,123 @@ public class ActivityTimeAttributionSinkTests(AppDbContextFixture fixture) : Pos
 
         var total = await Sink.TotalSecondsBetweenAsync(db, UserId, activityId, DayStart, DayEnd, CancellationToken);
         total.Should().Be(0, "pinning today's behaviour: 90 seconds of tracked activity totals zero");
+    }
+
+    // ---- AttributeSpanAsync: the Android sync's entry point (FO9) ----------------------------------
+
+    /// <summary>
+    /// The double-count rule: the part of a phone session a record of the same activity already covers is not
+    /// added again, and what is left starts where that record ends, so it extends it.
+    /// </summary>
+    [Fact]
+    public async Task AttributeSpanAsync_AddsOnlyWhatTheSameActivityDoesNotCover()
+    {
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, UserId);
+        await SeedHistoryAsync(db, UserId, activityId, TenAm, 20 * 60);
+
+        var added = await Sink.AttributeSpanAsync(db, UserId, activityId, TenAm.AddMinutes(10), TenAm.AddMinutes(40), CancellationToken);
+        await db.SaveChangesAsync(CancellationToken);
+
+        added.Should().Be(20 * 60, "the first ten minutes of the session were already on the ledger");
+        var row = await SingleRowAsync(activityId);
+        row.StartTimestamp.Should().Be(TenAm);
+        row.EndTimestamp.Should().Be(TenAm.AddMinutes(40));
+        row.Length.TotalSeconds.Should().Be(40 * 60, "forty minutes happened, not fifty");
+    }
+
+    /// <summary>
+    /// Only the same activity is subtracted. A stretch already on another activity is a second verdict about the
+    /// same minutes — the ledger has always held that shape for hand-logged rows — and is left alone.
+    /// </summary>
+    [Fact]
+    public async Task AttributeSpanAsync_DoesNotSubtractAnotherActivitysRecord()
+    {
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, UserId);
+        var otherActivityId = await SeedActivityAsync(db, UserId);
+        await SeedHistoryAsync(db, UserId, otherActivityId, TenAm, 30 * 60);
+
+        var added = await Sink.AttributeSpanAsync(db, UserId, activityId, TenAm, TenAm.AddMinutes(30), CancellationToken);
+        await db.SaveChangesAsync(CancellationToken);
+
+        added.Should().Be(30 * 60);
+        (await SingleRowAsync(activityId)).Length.TotalSeconds.Should().Be(30 * 60);
+    }
+
+    /// <summary>
+    /// Two overlapping spans in one batch — two phones, or two packages mapped to one activity — are attributed
+    /// once. The first is still unsaved when the second arrives, so this only holds because the sink reads the
+    /// change tracker as well as the table; without it the second call would also add a row on its own start.
+    /// </summary>
+    [Fact]
+    public async Task AttributeSpanAsync_CountsTwoOverlappingUnsavedSpansOnce()
+    {
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, UserId);
+
+        var first = await Sink.AttributeSpanAsync(db, UserId, activityId, TenAm, TenAm.AddMinutes(30), CancellationToken);
+        var second = await Sink.AttributeSpanAsync(db, UserId, activityId, TenAm.AddMinutes(15), TenAm.AddMinutes(45), CancellationToken);
+        await db.SaveChangesAsync(CancellationToken);
+
+        first.Should().Be(30 * 60);
+        second.Should().Be(15 * 60);
+        var row = await SingleRowAsync(activityId);
+        row.EndTimestamp.Should().Be(TenAm.AddMinutes(45));
+        row.Length.TotalSeconds.Should().Be(45 * 60);
+    }
+
+    /// <summary>
+    /// A timer's row describes what the timer measured, so it is never extended (the same rule as
+    /// <c>AttributeAsync</c>): phone time after a countdown becomes its own row, starting where the timer stopped.
+    /// </summary>
+    [Fact]
+    public async Task AttributeSpanAsync_StartsANewRowAfterATimerRow_RatherThanExtendingIt()
+    {
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, UserId);
+        var session = new ActivityHistorySession { UserId = UserId, Kind = TimerSessionKind.Timer, Outcome = TimerSessionOutcome.Completed };
+        db.Set<ActivityHistorySession>().Add(session);
+        db.Set<ActivityHistory>().Add(new ActivityHistory
+        {
+            UserId = UserId,
+            ActivityId = activityId,
+            StartTimestamp = TenAm,
+            EndTimestamp = TenAm.AddMinutes(25),
+            Length = new IntTime(25 * 60),
+            Session = session
+        });
+        await db.SaveChangesAsync(CancellationToken);
+
+        var added = await Sink.AttributeSpanAsync(db, UserId, activityId, TenAm.AddMinutes(20), TenAm.AddMinutes(40), CancellationToken);
+        await db.SaveChangesAsync(CancellationToken);
+
+        added.Should().Be(15 * 60);
+        await using var read = CreateDbContext();
+        var rows = await read.Set<ActivityHistory>().Where(h => h.ActivityId == activityId)
+            .OrderBy(h => h.StartTimestamp).ToListAsync(CancellationToken);
+        rows.Should().HaveCount(2);
+        rows[0].EndTimestamp.Should().Be(TenAm.AddMinutes(25), "the timer's own row is left as the timer measured it");
+        rows[1].StartTimestamp.Should().Be(TenAm.AddMinutes(25));
+        rows[1].Length.TotalSeconds.Should().Be(15 * 60);
+    }
+
+    /// <summary>
+    /// A leftover under a minute that extends nothing would be stored as a zero-length row (the <c>IntTime</c>
+    /// gap above), which is noise in History's list and nothing in any total — so it is not written.
+    /// </summary>
+    [Fact]
+    public async Task AttributeSpanAsync_DropsASubMinutePieceThatExtendsNothing()
+    {
+        await using var db = CreateDbContext();
+        var activityId = await SeedActivityAsync(db, UserId);
+        await SeedHistoryAsync(db, UserId, activityId, TenAm, 30 * 60);
+
+        var added = await Sink.AttributeSpanAsync(db, UserId, activityId, TenAm.AddSeconds(-30), TenAm.AddMinutes(30), CancellationToken);
+        await db.SaveChangesAsync(CancellationToken);
+
+        added.Should().Be(0);
+        (await SingleRowAsync(activityId)).StartTimestamp.Should().Be(TenAm, "no row was added in front of it");
     }
 
     // ---- isolation -------------------------------------------------------------------------------

@@ -75,6 +75,9 @@ Both directions are now Core seams, built and committed **before** any file move
 | `IActivityTimeAttributionSink` | Tracking → *the ledger owner* | `ActivityHistoryTimeAttributionSink` (History) | **Loud** — single service, so a missing registration throws at endpoint activation |
 | `ActivityTimeRecordedEvent` | Tracking → *whoever automates completion* | `ActivityTimeRecordedEventHandler` (host) | **Silent** — an undiscovered handler leaves a 200 on the wire and nothing completed |
 
+A third, read-only seam came later: `IFocusIntervalSource` (History implements it), which the mapping
+suggestions read timer focus phases through (FO9). It is a read, so it does not change the argument above.
+
 The sink is resolved as a **single** service rather than a keyed `IEnumerable` (unlike
 `IActivityMembershipSource`) precisely so that failure is loud: dropping every attribution write
 silently would be far worse than a 500.
@@ -151,11 +154,24 @@ would only make the agent re-send the window. That makes a break here silent;
   it must not be re-implemented at a second call site: the grid's only job is to say what the ingest
   would do with a tuple today.
 
-- **The android rules are applied by nothing.** `AndroidSyncEndpoint` stores sessions without reading
-  `TrackerAndroidMappingByPattern`; the only readers are the android distinct-entries grid's
-  `coveredBy` chip (B24) and the `canDelete` scan. On that source the chip means "an active rule exists
-  that would match", with no attribution behind it. `AndroidMappingRuleSet` is where the sync should
-  resolve from when it starts to, so the grid and the ingest agree from day one.
+- **The android rules apply since FO9, to new sessions only.** `AndroidSyncEndpoint` resolves each
+  *newly stored* session through `AndroidMappingRuleSet` (the class the grid's `coveredBy` chip also
+  uses) and attributes it with `IActivityTimeAttributionSink.AttributeSpanAsync`, which adds only what
+  no record of the same activity already covers — phone time during a same-activity timer or desktop
+  stretch is not counted twice. An `IsIgnored` rule attributes nothing but the session is still stored;
+  the android ledger has never filtered on rules. Sessions synced before FO9 stay unattributed.
+  It publishes `ActivityTimeRecordedEvent` **for the user's today only**: a sync is a backlog upload,
+  and the completion handler's to-do / routine fallback has no day, so a past day's time would tick
+  off today's items. `AndroidSyncAttributionTests` is the guard.
+- **Mapping suggestions read History through `IFocusIntervalSource`** (FO9, F3-02):
+  `GET /activity-tracking/desktop/mapping-suggestions?days=` joins timer focus phases to the desktop
+  ledger by time, drops minutes any active rule covers, and suggests an exact-process rule at 3+
+  sittings, 10+ minutes and 70 %+ under one activity (`MappingSuggestionRule`). It never writes —
+  accepting is the client's ordinary rule create. `DesktopMappingSuggestionsTests` is the guard.
+  `GET /activity-tracking/android/mapping-suggestions?days=` is the android twin (exact-package rule):
+  phone sessions are clipped to the focus interval, and the app must also fill half the sittings it
+  appeared in (`MappingSuggestionRule.MinFill`), because a phone in the foreground during a focus timer
+  is as often the distraction as the work. `AndroidMappingSuggestionsTests` is its guard.
 
 - **Seeder `Order` is banded.** Tracking's `WebExtensionDataSeeder` sits at 600. See
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md` before adding a seeder
