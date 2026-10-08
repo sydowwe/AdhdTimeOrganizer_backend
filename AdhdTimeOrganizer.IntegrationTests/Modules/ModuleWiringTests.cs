@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using AdhdTimeOrganizer.application.service.welcomeBack;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -145,6 +146,21 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
     }
 
     /// <summary>
+    /// FO5's back-off seam. The dispatcher takes it as an <b>optional</b> dependency, so a dropped registration is
+    /// not a resolution error anywhere: nobody is ever away, and the routine nudges keep reaching the phones of
+    /// people who stopped opening the app. The concrete type is asserted for the same reason as the readers above.
+    /// </summary>
+    [Fact]
+    public void RecipientEngagementReader_IsTheHostsPresenceReader()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+
+        var reader = scope.ServiceProvider.GetRequiredService<IRecipientEngagementReader>();
+
+        Assert.IsType<RecipientEngagementReader>(reader);
+    }
+
+    /// <summary>
     /// Both modules' job handlers are discoverable by key. The Scheduler dispatcher matches
     /// <c>RecurringJobRegistration.HandlerKey</c> against these at fire time, so a handler missing from DI is
     /// a job that fires into nothing.
@@ -227,6 +243,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         AssertRegisteredOnce<IQuietHoursReader>(sp);
         AssertRegisteredOnce<IUserTimeZoneReader>(sp);
         AssertRegisteredOnce<IUserLocaleReader>(sp);
+        AssertRegisteredOnce<IRecipientEngagementReader>(sp);
         AssertRegisteredOnce<IReminderRegistry>(sp);
         AssertRegisteredOnce<IScheduler>(sp);
         AssertRegisteredOnce<ICronEvaluator>(sp);

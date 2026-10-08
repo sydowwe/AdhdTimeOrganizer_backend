@@ -21,7 +21,10 @@ right one.
   (`application/endpoint/user/welcomeBack/`). The pile is defined once in
   `application/service/welcomeBack/WelcomeBackPile.cs` and reads TodoLists, Planning, Routines and
   Notifications directly, for the reason `GetAccountDeletionSummaryEndpoint` gives. The thresholds are
-  Core's `UserPresence`.
+  Core's `UserPresence`. **The back-off:** `RecipientEngagementReader` (same folder) is the framework's
+  `IRecipientEngagementReader`, and the catalog in `ModuleServiceExtensions` lists the four routine kinds
+  as `HeldWhileAwayTypes`. A user away three days or more gets those in the bell only, never pushed or
+  mailed; their own reminders, the timer alarm and the scheduler alerts still go out.
 - **The Google integrations** — Sign-In and Calendar sync (`infrastructure/extService/`), deliberately
   portal-only.
 - **The composition root** — `AppDbContext` (framework + every slice's configurations, the global
@@ -148,6 +151,11 @@ scheduling) — those live in the `framework/` submodule and are consumed throug
   written with `ExecuteUpdateAsync` or as tracked single-property changes, never through
   `UserManager.UpdateAsync`, which rewrites every column. `LastActiveStampTests` pins the tracker
   exclusion; `WelcomeBackTests` pins the rest on rows.
+- **The notification back-off's reader is an optional dependency** (FO5). The framework dispatcher takes
+  `IRecipientEngagementReader` with a `null` default, so dropping its line in `ModuleServiceExtensions`
+  fails nowhere: nobody is ever away and the routine nudges keep reaching people who stopped opening the
+  app. `ModuleWiringTests` pins the registration; `NotificationAwayHoldTests` pins the hold on what the
+  fake senders receive, for the live send and the quiet-hours flush.
 
 ## Extension playbook
 

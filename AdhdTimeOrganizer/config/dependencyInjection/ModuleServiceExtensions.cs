@@ -1,5 +1,6 @@
 using System.Reflection;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.application.service.welcomeBack;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
@@ -143,6 +144,11 @@ public static class ModuleServiceExtensions
         // it as a constructor dependency, so a missing line is a resolution error on the first send or read.
         services.AddScoped<IUserLocaleReader, UserLocaleReader<User>>();
 
+        // FO5's back-off: who is away from the app, so the routine nudges in HeldWhileAwayTypes wait in the bell
+        // instead of reaching their phone. The dispatcher takes it as an OPTIONAL dependency, so a missing line
+        // here is silent: nobody is ever away and the nudges keep coming. ModuleWiringTests pins it.
+        services.AddScoped<IRecipientEngagementReader, RecipientEngagementReader>();
+
         // The only INotificationPayloadEnricher in the solution, and it carries no lifetime marker (it is
         // meant as the host-supplied default). Swap for a real enricher if payloads ever need overlays.
         services.AddScoped<INotificationPayloadEnricher, NoOpNotificationPayloadEnricher>();
@@ -201,6 +207,18 @@ public static class ModuleServiceExtensions
             // Dev/QA probe: only an administrator can raise it (SendTestNotificationEndpoint), so only an
             // administrator is offered a switch for it.
             o.AdminOnlyTypes = [NotificationType.Test];
+
+            // FO5's back-off: for a user away three days or more (RecipientEngagementReader), these wait in the
+            // bell and are not pushed or mailed. Only the routine sweeps' nudges, which are unsolicited and about
+            // a day or period that passes without them. The user's own reminders, the timer alarm and the
+            // scheduler's alerts are delivered whether anyone is around or not.
+            o.HeldWhileAwayTypes =
+            [
+                NotificationType.RoutinePeriodEndingSoon,
+                NotificationType.RoutinePeriodEnded,
+                NotificationType.RoutineStreakGraceExpiring,
+                NotificationType.RoutineSuggestedToday
+            ];
             o.SupportedTypes =
         [
             // Reminders module: the generic kind any producer can register a reminder under, its batched

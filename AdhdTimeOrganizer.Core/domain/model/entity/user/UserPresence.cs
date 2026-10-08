@@ -22,8 +22,8 @@ public static class UserPresence
     public static readonly TimeSpan GreetAfter = TimeSpan.FromDays(4);
 
     /// <summary>
-    /// An absence at least this long makes the user <see cref="IsAbsent">absent</see>: non-essential notifications
-    /// are held from here on (the back-off, FO5's second step, which is not built yet).
+    /// An absence at least this long makes the user <see cref="IsAbsent">absent</see>: from here on the routine
+    /// nudges wait in the bell instead of being pushed or mailed (FO5's back-off, <c>RecipientEngagementReader</c>).
     /// </summary>
     public static readonly TimeSpan QuietAfter = TimeSpan.FromDays(3);
 
@@ -36,7 +36,13 @@ public static class UserPresence
     /// never measured (null) is not: the column only accumulates from the deploy that added it.
     /// </summary>
     public static bool IsAbsent(DateTime? lastActiveAt, DateTime utcNow) =>
-        lastActiveAt is { } last && utcNow - last >= QuietAfter;
+        lastActiveAt is { } last && last <= AbsentIfLastActiveBy(utcNow);
+
+    /// <summary>
+    /// <see cref="IsAbsent"/> as a cutoff, for a query: a user last active at or before this instant is absent
+    /// at <paramref name="utcNow"/>. One rule, so the bulk read and the per-user check cannot drift apart.
+    /// </summary>
+    public static DateTime AbsentIfLastActiveBy(DateTime utcNow) => utcNow - QuietAfter;
 
     /// <summary>Whether a card for a return at <paramref name="returnedAt"/> is still offered at <paramref name="utcNow"/>.</summary>
     public static bool CardIsOpen(DateTime? returnedAt, DateTime utcNow) =>
