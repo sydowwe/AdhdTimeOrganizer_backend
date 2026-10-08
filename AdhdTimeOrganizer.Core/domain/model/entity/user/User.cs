@@ -31,6 +31,38 @@ public sealed class User : BaseUser, IBaseTableEntity
     [AuditIgnore]
     public string? WeatherLocation { get; set; }
 
+    /// <summary>
+    /// The last time the user used the app (FO5), stamped at most once per <see cref="UserPresence.StampInterval"/>
+    /// by the host's <c>LastActiveStampMiddleware</c> on any authenticated web-client request. Tracker tokens do not
+    /// stamp it, because a desktop heartbeat is the user at their computer, not in the app.
+    /// <para>
+    /// Not the same as the framework's last <i>sign-in</i>: a session that stays signed in for a month signs in once.
+    /// Null until the first request after the column was added. Every reader treats null as "present", since a
+    /// user nobody has measured is not known to be away.
+    /// </para>
+    /// <para>
+    /// Written only with <c>ExecuteUpdateAsync</c>, never through a tracked <see cref="User"/>, so it neither
+    /// bumps the Identity concurrency stamp nor fails a preferences save that loaded the row a moment earlier.
+    /// </para>
+    /// </summary>
+    [AuditIgnore]
+    public DateTime? LastActiveAt { get; set; }
+
+    /// <summary>
+    /// The pending welcome-back card (FO5): where the absence began, i.e. the <see cref="LastActiveAt"/> the stamp
+    /// replaced when it found a gap of at least <see cref="UserPresence.GreetAfter"/>. Set together with
+    /// <see cref="WelcomeBackReturnedAt"/>, and cleared together with it once the user applies a fresh start or
+    /// dismisses the card. Kept because <see cref="LastActiveAt"/> is overwritten by the very request that
+    /// discovers the gap, so the card cannot be derived from it afterwards.
+    /// </summary>
+    [AuditIgnore]
+    public DateTime? WelcomeBackAwayFrom { get; set; }
+
+    /// <summary>When the user came back from the absence <see cref="WelcomeBackAwayFrom"/> began. The card is
+    /// offered for <see cref="UserPresence.CardLifetime"/> after this, then lapses unanswered.</summary>
+    [AuditIgnore]
+    public DateTime? WelcomeBackReturnedAt { get; set; }
+
 
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
 

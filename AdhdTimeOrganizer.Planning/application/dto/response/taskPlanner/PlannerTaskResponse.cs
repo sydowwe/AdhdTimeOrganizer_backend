@@ -98,6 +98,7 @@ public record PlannerTaskResponse : BasePlannerTaskResponse, IProjectionResponse
             SkipReasonKey = t.SkipReasonKey == domain.model.@enum.SkipReasonKey.NoTime ? SkipReasonKeyTokens.NoTime
                 : t.SkipReasonKey == domain.model.@enum.SkipReasonKey.NotRelevant ? SkipReasonKeyTokens.NotRelevant
                 : t.SkipReasonKey == domain.model.@enum.SkipReasonKey.NoEnergy ? SkipReasonKeyTokens.NoEnergy
+                : t.SkipReasonKey == domain.model.@enum.SkipReasonKey.Away ? SkipReasonKeyTokens.Away
                 : null,
             CalendarId = t.CalendarId,
             TodolistItemId = t.TodolistItemId,

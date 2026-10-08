@@ -18,16 +18,24 @@ public static class SkipReasonKeyTokens
     public const string NotRelevant = "notRelevant";
     public const string NoEnergy = "noEnergy";
 
+    /// <summary>FO5's fresh start. Read-only on the wire: <see cref="TryParse"/> refuses it, so the skip sheet cannot
+    /// send it and the reason keeps meaning "closed because the user was away".</summary>
+    public const string Away = "away";
+
     public static string? Token(SkipReasonKey? key) => key switch
     {
         null => null,
         SkipReasonKey.NoTime => NoTime,
         SkipReasonKey.NotRelevant => NotRelevant,
         SkipReasonKey.NoEnergy => NoEnergy,
+        SkipReasonKey.Away => Away,
         _ => throw new ArgumentOutOfRangeException(nameof(key), key, null)
     };
 
-    /// <summary>Exact, case-sensitive — an unknown or mis-cased token is a 400, not a guess.</summary>
+    /// <summary>
+    /// Exact, case-sensitive — an unknown or mis-cased token is a 400, not a guess. Parses only the reasons a user
+    /// can pick; <see cref="Away"/> is written by the server alone.
+    /// </summary>
     public static bool TryParse(string? token, out SkipReasonKey key)
     {
         switch (token)

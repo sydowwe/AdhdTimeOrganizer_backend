@@ -29,7 +29,7 @@ namespace AdhdTimeOrganizer.Planning.application.service.taskPlanner;
 /// destructive mode can delete or carve the user's own blocks here exactly as a template apply would, which is
 /// why the deleted tasks' reminders are captured before the save and cancelled after it.</item>
 /// <item><b>Gates.</b> An away day (FO1: <c>Vacation</c>, <c>SickDay</c>) is passed over, as is every day while
-/// <see cref="IsUserAbsentAsync"/> says the user is gone (FO5's hook, unbuilt). A passed-over day is still
+/// <see cref="IsUserAbsentAsync"/> says the user is gone (which, from a user's own read, is never). A passed-over day is still
 /// decided: marking the day as a workday again later does not bring the occurrence back. The suggestion panel
 /// still offers the rule on that day.</item>
 /// <item><b>Concurrency.</b> Home and the planner can read the same day at once. Both stage the same
@@ -156,9 +156,16 @@ public sealed class RepeatingTaskMaterialiser(
     private static bool IsGated(Calendar calendar, bool userAbsent) => userAbsent || calendar.DayType.IsAway();
 
     /// <summary>
-    /// <b>FO5 hook — unbuilt.</b> FO5 adds <c>User.LastActiveAt</c> and one shared "is the user away?" check;
-    /// when it lands, answer from that here, and a user it sees as absent gets no auto-placed blocks. Until
-    /// then nobody is absent: this runs from the user's own reads, which is the user being present.
+    /// <b>FO5 looked, and this stays false.</b> FO5's check is <c>UserPresence.IsAbsent</c> over
+    /// <c>User.LastActiveAt</c>, and every caller of this class is the user's own request: a day-plan read, or a
+    /// rule's create or edit. The host stamps <c>LastActiveAt</c> before the endpoint runs, so the check would
+    /// always answer "present" here. Worse, if it ever answered from a value read <i>before</i> the stamp, the
+    /// first read after a holiday would gate today and tomorrow, and the watermark would make that permanent: the
+    /// user would come back to a plan missing the very blocks the rule exists to put there.
+    /// <para>
+    /// The hook is kept for a caller that is <b>not</b> the user, such as a nightly placing job, should one ever
+    /// exist. That caller should answer from <c>UserPresence.IsAbsent</c>.
+    /// </para>
     /// </summary>
     private static Task<bool> IsUserAbsentAsync(long userId, CancellationToken ct) => Task.FromResult(false);
 

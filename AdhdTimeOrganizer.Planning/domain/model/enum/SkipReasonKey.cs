@@ -1,7 +1,7 @@
 namespace AdhdTimeOrganizer.Planning.domain.model.@enum;
 
 /// <summary>
-/// The three built-in skip reasons the home widget offers, stored as a key instead of as translated copy — so a
+/// The three built-in skip reasons the home widget offers, plus the server-only <see cref="Away"/>, stored as a key instead of as translated copy — so a
 /// reworded label can no longer split one reason into two groups. Any other reason stays free text in
 /// <c>PlannerTask.SkipReason</c>; at most one of the two is ever set.
 /// <para>
@@ -13,7 +13,15 @@ public enum SkipReasonKey
 {
     NoTime,
     NotRelevant,
-    NoEnergy
+    NoEnergy,
+
+    /// <summary>
+    /// The user was away (FO5): closed in bulk by the welcome-back card's fresh start, never offered in the skip
+    /// sheet. Deliberately in none of <c>PlanHistory</c>'s skip buckets, so a block missed while the user was gone
+    /// does not count as a failed attempt at its to-do. No label in <see cref="SkipReasonKeyLabels"/>: no client
+    /// ever sent it as text.
+    /// </summary>
+    Away
 }
 
 /// <summary>

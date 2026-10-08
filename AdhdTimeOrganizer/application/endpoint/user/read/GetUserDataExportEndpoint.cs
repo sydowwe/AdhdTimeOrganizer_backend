@@ -135,6 +135,8 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
             {
                 email = user.Email,
                 createdAt = user.CreatedTimestamp,
+                // FO5: when the account was last used, hourly at most. Personal data about the person, so it travels.
+                lastActiveAt = user.LastActiveAt,
                 preferences = new
                 {
                     theme = user.Theme.ToString().ToLowerInvariant(),

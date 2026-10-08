@@ -64,6 +64,9 @@ public static class SkipSummaryService
     /// midnight counts in the hour it starts.</item>
     /// <item><b>The per-hour denominator is every eligible task, in any status</b> — Cancelled and
     /// Completed-without-times included. Hours with nothing planned are omitted.</item>
+    /// <item><b>A block closed as <see cref="SkipReasonKey.Away"/> is left out entirely</b> — neither planned nor
+    /// skipped. The welcome-back fresh start closes a week of blocks at once, and counting them would read as
+    /// "you skip everything at 9:00" about days the user was not there to plan or skip anything.</item>
     /// </list>
     /// </summary>
     public static SkipSummary Aggregate(IEnumerable<SkipSummaryTaskRow> rows)
@@ -77,6 +80,9 @@ public static class SkipSummaryService
 
         foreach (var row in rows)
         {
+            if (row.SkipReasonKey == SkipReasonKey.Away)
+                continue;
+
             var hour = row.PlannedStart.Hour;
             planned[hour]++;
 

@@ -1043,6 +1043,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
 
+                    b.Property<DateTime?>("LastActiveAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_active_at");
+
                     b.Property<string>("Locale")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1103,6 +1107,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
                         .HasColumnName("weather_location");
+
+                    b.Property<DateTime?>("WelcomeBackAwayFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("welcome_back_away_from");
+
+                    b.Property<DateTime?>("WelcomeBackReturnedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("welcome_back_returned_at");
 
                     b.Property<uint>("row_version")
                         .IsConcurrencyToken()

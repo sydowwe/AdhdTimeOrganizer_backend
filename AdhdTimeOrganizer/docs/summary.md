@@ -16,6 +16,12 @@ right one.
 - **Users and auth** — password login, 2FA, email confirmation and change, forgot/reset password,
   refresh tokens and sessions, extension auth, user preferences, account deletion and the GDPR data
   export (36 endpoints under `application/endpoint/{user,calendar}/`).
+- **Coming back after a gap (FO5)** — `User.LastActiveAt`, stamped hourly by `LastActiveStampMiddleware`,
+  and the welcome-back card: `GET /welcome-back`, `POST /welcome-back/{fresh-start,fresh-start/undo,dismiss}`
+  (`application/endpoint/user/welcomeBack/`). The pile is defined once in
+  `application/service/welcomeBack/WelcomeBackPile.cs` and reads TodoLists, Planning, Routines and
+  Notifications directly, for the reason `GetAccountDeletionSummaryEndpoint` gives. The thresholds are
+  Core's `UserPresence`.
 - **The Google integrations** — Sign-In and Calendar sync (`infrastructure/extService/`), deliberately
   portal-only.
 - **The composition root** — `AppDbContext` (framework + every slice's configurations, the global
@@ -45,7 +51,7 @@ scheduling) — those live in the `framework/` submodule and are consumed throug
   FastEndpoints' `o.Assemblies`, `ModuleAssemblies` and `ApplyHostConfigurations`. The host also names
   slice entity types in `AppDbContext.ConfigureCrossSliceRelationships` and `ModuleSchemas`. This is
   the only direction that edge runs: **no slice references the host.**
-- **Exposes to clients:** ~300 FastEndpoints classes, all under `/api` — but only **36** of them live
+- **Exposes to clients:** ~300 FastEndpoints classes, all under `/api` — but only **40** of them live
   in this project (`application/endpoint/`); the rest are the slices', registered here. Consumers are
   the SPA (separate repo), a Chrome extension, a desktop tracker and an Android app.
 - **External:** Google Sign-In and Google Calendar (`infrastructure/extService/googleCalendar/`,
@@ -133,6 +139,15 @@ scheduling) — those live in the `framework/` submodule and are consumed throug
   without revisiting it.
 - **`Activity.Clone()` is a `MemberwiseClone` with `Id = 0`** — it copies navigation *references* too.
   `CloneActivityEndpoint` is the only caller; treat it as a shallow copy.
+- **Every authenticated web request may write to `user.user`** (FO5). `LastActiveStampMiddleware` runs
+  between `UseAuthorization` and `UseFastEndpoints`, at most once per user per hour (an in-process
+  `IMemoryCache` throttle plus a `WHERE last_active_at < now - 1h`), and tracker tokens never stamp. It
+  must stay **before** the endpoints: the request that ends an absence opens the welcome-back card
+  (`WelcomeBackAwayFrom` / `WelcomeBackReturnedAt`) in the same `UPDATE` that overwrites `LastActiveAt`,
+  so the card no longer depends on which of the client's first requests reads it. All three columns are
+  written with `ExecuteUpdateAsync` or as tracked single-property changes, never through
+  `UserManager.UpdateAsync`, which rewrites every column. `LastActiveStampTests` pins the tracker
+  exclusion; `WelcomeBackTests` pins the rest on rows.
 
 ## Extension playbook
 

@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.service;
 using AdhdTimeOrganizer.ActivityProfiles.infrastructure.extService.weather;
 using AdhdTimeOrganizer.application.endpoint.@base;
+using AdhdTimeOrganizer.application.middleware;
 using AdhdTimeOrganizer.application.endpoint.testSupport;
 using AdhdTimeOrganizer.infrastructure.testSupport;
 using AdhdTimeOrganizer.config;
@@ -618,6 +619,11 @@ static void ConfigurePipeline(WebApplication app, ILogger<AdhdTimeOrganizer.Prog
     app.UseRequestLocalization();
     app.UseAuthentication();
     app.UseAuthorization();
+
+    // FO5: User.LastActiveAt, hourly at most. After authentication (it needs the user) and before the endpoints,
+    // so the request that ends an absence has already opened the welcome-back card when GET /welcome-back reads
+    // it, whichever of the client's first requests that turns out to be. See LastActiveStampMiddleware.
+    app.UseLastActiveStamp();
 
     // FastEndpoints configuration (replaces MapControllers)
     app.UseFastEndpoints(config =>
