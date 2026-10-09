@@ -184,21 +184,22 @@ public static class ModuleServiceExtensions
     }
 
     /// <summary>
-    /// The notification kinds <b>this</b> portal can raise — the eleven of <see cref="NotificationType"/>'s
+    /// The notification kinds <b>this</b> portal can raise — the nine of <see cref="NotificationType"/>'s
     /// twenty that some producer here actually calls <c>NotifyAsync</c> with.
     /// <para>
     /// Declared in code rather than bound from configuration on purpose: which events an app produces is a
     /// property of its code, not of a deployment's settings, and an appsettings typo would silently drop a
-    /// row from the settings screen. The nine kinds left out belong to the HR/inventory product that shares
-    /// <c>Sydowwe.Framework.Contracts</c> — there is no inventory and no leave here, so a preference row for
-    /// <c>StockLow</c> asks the user a question this portal can never act on, in an enum name no Slovak
-    /// locale here translates.
+    /// row from the settings screen. Nine of the eleven kinds left out belong to the HR/inventory product
+    /// that shares <c>Sydowwe.Framework.Contracts</c> — there is no inventory and no leave here, so a
+    /// preference row for <c>StockLow</c> asks the user a question this portal can never act on, in an enum
+    /// name no Slovak locale here translates. The other two are the Reminders module's own
+    /// <c>DeadlineApproaching</c> and <c>ReminderDigest</c>, which nothing here raises (see the list below).
     /// </para>
     /// <para>
     /// <b>Keep this list next to the producer when you add a kind.</b> Nothing fails if you forget: the kind
     /// still dispatches, it simply loses its row on <c>/nastavenia/pripomienky</c> and becomes unmutable
     /// through the UI. <c>NotificationCatalogTests</c> is what turns that into a red test — it asserts the
-    /// catalog covers every kind the renderer names and every quiet-hours-exempt kind.
+    /// catalog covers every quiet-hours-exempt kind and that the settings matrix is exactly this list.
     /// </para>
     /// </summary>
     private static void AddNotificationCatalog(IServiceCollection services) =>
@@ -221,10 +222,10 @@ public static class ModuleServiceExtensions
             ];
             o.SupportedTypes =
         [
-            // Reminders module: the generic kind any producer can register a reminder under, its batched
-            // digest, and the user's own self-set nudge.
-            NotificationType.DeadlineApproaching,
-            NotificationType.ReminderDigest,
+            // Reminders module: the user's own self-set nudge. Its generic DeadlineApproaching and batched
+            // ReminderDigest are deliberately absent — Planning registers PersonalReminder with no DigestKey,
+            // so neither is ever sent here, and their rows muted nothing (DeadlineApproaching even showed
+            // E-mail ✓, a promise the app never kept). Each comes back together with a producer.
             NotificationType.PersonalReminder,
 
             // Routines slice (RoutinePeriodNotificationService).
