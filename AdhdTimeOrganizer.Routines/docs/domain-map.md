@@ -137,12 +137,14 @@ same rule (`routineSuggestedDay.ts`); change both or neither. Hidden periods nev
 ticked in the still-open cycle is done, a tick from a cycle whose reset is due is not. A missed day is
 never mentioned again. Nothing qualifies → nothing sent, nothing marked.
 
-**Time.** Periods, resets and the two nudges are UTC end to end — those sweeps do no zone conversion, and
-two identical UTC periods owned by users in different zones must produce identical results (the nudge
-sweep's one zone read decides only whether the user's own today is an away day). **The
-suggested-today digest is the one deliberate exception**: "today" is the date in `User.Timezone` and
-"morning" is that day's `Calendar.WakeUpTime` (08:00 when the day row doesn't exist), because a weekday
-named in UTC is the wrong weekday for most of the world.
+**Time.** Periods, resets and the two nudge *windows* are UTC end to end: whether a nudge is due, what
+it says (days left) and which reset its mark names are identical for two identical UTC periods owned by
+users in different zones. **Delivery is the user's**: the nudge sweep runs every 15 minutes and sends a
+due window at the first `Calendar.WakeUpTime` + 60 min (08:00 + 60 min without a day row) in
+`User.Timezone` that falls inside it — or at the window's opening if none does, so a wake-up shift can
+never swallow a grace warning. It also reads the zone to decide whether the user's own today is an away
+day. **The suggested-today digest goes further**: "today" itself is the date in `User.Timezone` and
+"morning" is that day's wake-up, because a weekday named in UTC is the wrong weekday for most of the world.
 
 ## Glossary
 
@@ -244,7 +246,7 @@ They are picked up by the `IScopedService` marker scan like any other service, t
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `RoutineTodoListResetJobHandler` | Job (`Routines.TodoListReset`) | 02:00 UTC daily. Sweeps every period: `CheckGrace` → `RefreshFreezeBudget` → `TryResetCatchUp`; persists completions (one save per period), then notifies **after** the commit. Walks the table a page of users at a time (`RoutineSweepPaging`) | `infrastructure/jobs/RoutineTodoListResetJobHandler.cs` |
-| `RoutinePeriodNudgeJobHandler` | Job (`Routines.PeriodNudge`) | 09:00 UTC daily — deliberately not alongside the reset, because this one is addressed to a person. Skips hidden periods. Sequential per period, and each period's failure is caught so it can't lose earlier markers or skip later periods. Paged by user (`RoutineSweepPaging`), committing the markers per page; the `NOT is_hidden` filter is on both of its queries and is indexed | `infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
+| `RoutinePeriodNudgeJobHandler` | Job (`Routines.PeriodNudge`) | Every 15 min — addressed to a person, so each due window goes out at the first wake-up + 60 min in the user's zone inside it (`DeliverAt`); the window math and marks stay UTC. A SQL pre-filter (`Candidates`) loads only periods whose window could be open and unmarked. Skips hidden periods. Sequential per period, and each period's failure is caught so it can't lose earlier markers or skip later periods. Paged by user (`RoutineSweepPaging`), committing the markers per page; the candidate filter (incl. `NOT is_hidden`, indexed) is on both of its queries | `infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
 | `RoutineSuggestedTodayJobHandler` | Job (`Routines.SuggestedToday`) | Every 15 minutes, because each user's morning is a different UTC instant; sends each user **one** digest per local day once `Calendar.WakeUpTime` (via Core's `ICalendarDayLookup`) or 08:00 has passed in `User.Timezone` (via `IUserTimeZoneReader`, bulk per page). Composed at send time. Marks `SuggestedTodayNotifiedFor` on **all** the user's periods with one `ExecuteUpdate` right after a successful send — never tracked, never per page, so it can't lose a row_version race and a period created later that day is covered. Reads are `AsNoTracking`; pages by user through `RoutineSweepPaging` | `infrastructure/jobs/RoutineSuggestedTodayJobHandler.cs` |
 | `RoutineSweepPaging` | Helper (internal) | All three sweeps' user paging: the distinct user ids, ordered, in pages of `UserPageSize` (100). By user rather than by row — the page is also the commit and change-tracker-release unit, so one user's periods must never straddle two of them | `infrastructure/jobs/RoutineSweepPaging.cs` |
 | `RoutinesScheduledJobsRegistrar` | `IHostedService` | Pushes all three schedules through `IScheduler` on **every** boot (idempotent upsert by `JobKey`; the Scheduler's RAM job store drops triggers on restart). Registers each independently so one bad cadence can't keep the others off the schedule, and swallows failures so a scheduling problem never blocks startup | `infrastructure/scheduling/RoutinesScheduledJobsRegistrar.cs` |

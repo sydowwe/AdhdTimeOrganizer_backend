@@ -31,15 +31,17 @@ public sealed class RoutinesScheduledJobsRegistrar(
     };
 
     /// <summary>
-    /// Daily 09:00 nudge sweep. Deliberately not alongside the reset: this one is read by a person who is
-    /// expected to act on it.
+    /// The nudge sweep, every 15 minutes for the same reason as the digest below: it is read by a person who is
+    /// expected to act on it, so it goes out an hour after <i>their</i> wake-up, and each user's arrives at a
+    /// different UTC instant. Was a single 09:00 run — UTC, since no zone was given — which reached New York at
+    /// 05:00 and Tokyo at 18:00. The idempotency marks make the cadence safe.
     /// </summary>
     public static RecurringJobRegistration NudgeRegistration { get; } = new()
     {
         JobKey = RoutinePeriodNudgeJobHandler.HandlerKey,
         HandlerKey = RoutinePeriodNudgeJobHandler.HandlerKey,
         OwnerModule = "Routines",
-        Schedule = ScheduleSpec.FromCron("0 0 9 * * ?"),
+        Schedule = ScheduleSpec.FromCron("0 0/15 * * * ?"),
         DisallowConcurrent = true,
         Description = "Sends the lead-time 'period ending soon' nudges and the streak grace-expiry warnings."
     };

@@ -158,7 +158,7 @@ values are the `RecurrenceType` enum's ints (0 = DayOfWeek, 1 = DayOfMonth).
   overload used by `ToggleStepIsDoneRoutineTodoListEndpoint` only un-ticks the touched item for a
   fresh-looking UI — it never advances the period, so a step toggle can no longer consume a due reset
   cycle.
-- The 09:00 sweep (`RoutinePeriodNudgeJob`) sends two things: the lead-time nudge
+- The nudge sweep (`RoutinePeriodNudgeJob`, every 15 min, delivered at each user's wake-up + 60 min) sends two things: the lead-time nudge
   (`ReminderLeadDays` before the reset, only while something is still unfinished, ceiling days-left)
   and the grace-expiry warning (1 day before `StreakGraceUntil`). Both are marked idempotently
   (`EndingSoonNotifiedFor` / `GraceNotifiedFor`), and **a period that is fully done is skipped without
@@ -287,7 +287,7 @@ something the base classes do not.
 | UserDefaultsService | Service | `IUserDefaultsService` — runs per-user default seeders at sign-up | `application/service/UserDefaultsService.cs` |
 | TaskPlannerHelper | Helper | `WithIncludes()` for planner reads; `TasksOverlap` | `application/helper/TaskPlannerHelper.cs` |
 | RoutineTodoListResetJobHandler | Scheduled job handler | 02:00 daily period reset + completion history + summary notification | `AdhdTimeOrganizer.Routines/infrastructure/jobs/RoutineTodoListResetJobHandler.cs` |
-| RoutinePeriodNudgeJobHandler | Scheduled job handler | 09:00 daily lead-time nudge + grace-expiry warning sweep | `AdhdTimeOrganizer.Routines/infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
+| RoutinePeriodNudgeJobHandler | Scheduled job handler | 15-minute lead-time nudge + grace-expiry warning sweep, delivered at each user's wake-up + 60 min | `AdhdTimeOrganizer.Routines/infrastructure/jobs/RoutinePeriodNudgeJobHandler.cs` |
 | AppDbContext | DbContext | Portal + module DbSets, identity mapping, the `WebExtensionActivityEntry` combined filter | `infrastructure/persistence/AppDbContext.cs` |
 | SuggestionPatternRefreshInterceptor | Interceptor | Marks the matching pattern view dirty after saves touching planner/history/calendar (does not refresh itself) | `infrastructure/persistence/interceptors/SuggestionPatternRefreshInterceptor.cs` |
 | SuggestionPatternRefreshJobHandler | Scheduled job handler | Drains the dirty-view queue every 10s and REFRESHes the pattern views off the request thread; scheduled by `PortalScheduledJobsRegistrar` | `infrastructure/jobs/SuggestionPatternRefreshJobHandler.cs` |

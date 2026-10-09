@@ -72,10 +72,15 @@ has no knowledge of Planning at all.
 
 ## Gotchas — things that will bite you
 
-- **The suggested-today digest is the one zone-aware sweep.** Resets and the two nudges are UTC end to
-  end and must stay so; `RoutineSuggestedTodayJobHandler` deliberately works in `User.Timezone`, runs
-  every 15 minutes, and marks `SuggestedTodayNotifiedFor` on **all** of a user's periods with an
-  `ExecuteUpdate` straight after a successful send. Its "suggested for a day" rule
+- **Window math is UTC; delivery is the user's.** Resets, the nudge windows (`EvaluateEndingSoon`,
+  `ShouldWarnGraceExpiring`) and the `EndingSoonNotifiedFor` / `GraceNotifiedFor` marks are UTC end to
+  end and must stay so. Only *when a due nudge reaches the user* is zone-aware: the nudge sweep runs every
+  15 minutes and sends each window at the first wake-up + 60 min in `User.Timezone` that falls inside it
+  (the day's calendar wake-up, 08:00 without a row; the window's opening instant if no morning fits).
+  It used to be one 09:00 UTC run for everyone. `RoutineSuggestedTodayJobHandler` works in
+  `User.Timezone` throughout — "today" itself is local there — runs every 15 minutes, and marks
+  `SuggestedTodayNotifiedFor` on **all** of a user's periods with an `ExecuteUpdate` straight after a
+  successful send. Its "suggested for a day" rule
   (`RoutineSuggestedDay`) is duplicated on the client (`routineSuggestedDay.ts`) — change both or
   neither.
 

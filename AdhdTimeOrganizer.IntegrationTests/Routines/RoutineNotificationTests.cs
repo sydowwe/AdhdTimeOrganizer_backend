@@ -27,6 +27,18 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
 {
     private const long UserId = FakeLoggedUserService.TestUserId;
 
+    /// <summary>
+    /// Tuesday 29 September 2020, 12:00 UTC — past the test user's default morning (08:00 + 1 h, UTC). Years in
+    /// the past for the reason <c>RoutinePeriodNudgeJobTests</c> gives: the real-clock quarter-hourly fire inside
+    /// the test host finds these windows long closed instead of nudging mid-test.
+    /// </summary>
+    private static readonly DateTime Now = new(2020, 9, 29, 12, 0, 0, DateTimeKind.Utc);
+
+    private sealed class FixedTimeProvider(DateTime now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(now, TimeSpan.Zero);
+    }
+
     // ---- helpers ---------------------------------------------------------------------------------
 
     private static async Task<RoutineTimePeriod> SeedPeriodAsync(
@@ -82,12 +94,20 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
     /// take a scoped <c>DbContext</c>), and a hand-built <see cref="ScheduledJobContext"/> — these handlers
     /// read nothing off it, all their state comes from the database.
     /// </summary>
-    private async Task RunJobAsync<THandler>() where THandler : IScheduledJobHandler
+    private Task RunJobAsync<THandler>() where THandler : IScheduledJobHandler =>
+        RunJobAsync(typeof(THandler), DateTime.UtcNow);
+
+    /// <summary>
+    /// The nudge sweep on a pinned clock (<see cref="Now"/>): it delivers at each user's own morning, so on the
+    /// wall clock the grace case below would pass or fail by the hour it ran at.
+    /// </summary>
+    private Task RunNudgeJobAsync() => RunJobAsync(typeof(RoutinePeriodNudgeJobHandler), Now, new FixedTimeProvider(Now));
+
+    private async Task RunJobAsync(Type handlerType, DateTime now, params object[] args)
     {
         await using var scope = Fixture.AdminAndUserFactory.Services.CreateAsyncScope();
-        var handler = (IScheduledJobHandler)ActivatorUtilities.CreateInstance(scope.ServiceProvider, typeof(THandler));
+        var handler = (IScheduledJobHandler)ActivatorUtilities.CreateInstance(scope.ServiceProvider, handlerType, args);
 
-        var now = DateTime.UtcNow;
         await handler.ExecuteAsync(new ScheduledJobContext
         {
             ScheduledFireTimeUtc = now,
@@ -119,12 +139,12 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
         await using (var db = CreateDbContext())
         {
             // Reset lands two days out; a three-day lead therefore has the window already open.
-            period = await SeedPeriodAsync(db, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            period = await SeedPeriodAsync(db, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, period, isDone: false, CancellationToken);
         }
 
-        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
-        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
+        await RunNudgeJobAsync();
+        await RunNudgeJobAsync();
 
         Assert.Equal(1, await CountNotificationsAsync(NotificationType.RoutinePeriodEndingSoon));
 
@@ -144,11 +164,11 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
         RoutineTimePeriod period;
         await using (var db = CreateDbContext())
         {
-            period = await SeedPeriodAsync(db, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            period = await SeedPeriodAsync(db, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, period, isDone: true, CancellationToken);
         }
 
-        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
+        await RunNudgeJobAsync();
 
         Assert.Equal(0, await CountNotificationsAsync(NotificationType.RoutinePeriodEndingSoon));
 
@@ -164,11 +184,11 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
     {
         await using (var db = CreateDbContext())
         {
-            var period = await SeedPeriodAsync(db, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var period = await SeedPeriodAsync(db, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, period, isDone: false, CancellationToken);
         }
 
-        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
+        await RunNudgeJobAsync();
 
         Assert.Equal(0, await CountNotificationsAsync(NotificationType.RoutinePeriodEndingSoon));
     }
@@ -181,13 +201,13 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
         RoutineTimePeriod period;
         await using (var db = CreateDbContext())
         {
-            period = await SeedPeriodAsync(db, streak: 4, graceDays: 3, lastResetAt: DateTime.UtcNow, ct: CancellationToken);
-            period.StreakGraceUntil = DateTime.UtcNow.AddHours(12);
+            period = await SeedPeriodAsync(db, streak: 4, graceDays: 3, lastResetAt: Now, ct: CancellationToken);
+            period.StreakGraceUntil = Now.AddHours(12);
             await db.SaveChangesAsync(CancellationToken);
         }
 
-        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
-        await RunJobAsync<RoutinePeriodNudgeJobHandler>();
+        await RunNudgeJobAsync();
+        await RunNudgeJobAsync();
 
         Assert.Equal(1, await CountNotificationsAsync(NotificationType.RoutineStreakGraceExpiring));
 

@@ -113,7 +113,7 @@ scheduling) — those live in the `framework/` submodule and are consumed throug
   makes exactly one scheduling call — `services.AddSchedulerSubstrate()` — plus one
   `AddHostedService<…ScheduledJobsRegistrar>()` per owner (Notifications, Reminders, Scheduler, Routines,
   Tracking, Portal). `Sydowwe.Scheduler` is the only project that references Quartz; nobody else writes
-  an `IJob`. The routine reset (02:00) and nudge (09:00) are now
+  an `IJob`. The routine reset (02:00 UTC) and nudge (every 15 min) are now
   `Routines.TodoListReset` / `Routines.PeriodNudge` handlers registered by
   `RoutinesScheduledJobsRegistrar`.
 - **Notification dispatch from the routine domain is best-effort and deliberately post-commit.**

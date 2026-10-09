@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.IntegrationTests.Endpoints;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.IntegrationTests.Reminders;
+using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.model.@enum;
 using AdhdTimeOrganizer.Routines.domain.service;
@@ -31,11 +32,33 @@ namespace AdhdTimeOrganizer.IntegrationTests.Routines;
 /// an earlier period's tracked marker survives a later period's throw. The scenario is kept (unmarked, no
 /// <c>KnownGap</c> trait) as the regression pin for that guarantee.
 /// </para>
+/// <para>
+/// <b>The clock is pinned, years in the past.</b> Delivery waits for each user's own morning, so a case read
+/// off the wall clock would pass or fail by the hour it ran at. And Quartz fires this job every quarter hour
+/// inside every test host against the shared database with the <i>real</i> clock — seeded around the real
+/// today, such a fire could land mid-test and mark the very period a case is about. Every period here resets
+/// in 2020, so a real fire finds every window long closed. Same reasoning as <c>RoutineSuggestedTodayJobTests</c>.
+/// </para>
 /// </summary>
 [Collection("Postgres")]
 public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
 {
     private const long UserId = FakeLoggedUserService.TestUserId;
+
+    /// <summary>
+    /// Tuesday 29 September 2020, 12:00 UTC — past the default morning (08:00 + 1 h) of every seeded user, all
+    /// of them UTC unless a case says otherwise.
+    /// </summary>
+    private static readonly DateTime Now = new(2020, 9, 29, 12, 0, 0, DateTimeKind.Utc);
+
+    private static readonly TimeZoneInfo Tokyo = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tokyo");
+    private static readonly TimeZoneInfo Bratislava = TimeZoneInfo.FindSystemTimeZoneById("Europe/Bratislava");
+    private static readonly TimeZoneInfo NewYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+
+    private sealed class FixedTimeProvider(DateTime now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(now, TimeSpan.Zero);
+    }
 
     // ---- test double -------------------------------------------------------------------------------
 
@@ -194,7 +217,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
     /// Runs the job the way the Scheduler's dispatcher would (one DI scope per fire), against a factory whose
     /// <see cref="IRoutinePeriodNotificationService"/> has been substituted with a controllable double.
     /// </summary>
-    private static async Task RunJobAsync(IServiceProvider services, CancellationToken ct, int? userPageSize = null)
+    private static async Task RunJobAsync(IServiceProvider services, DateTime now, CancellationToken ct, int? userPageSize = null)
     {
         await using var scope = services.CreateAsyncScope();
         // PERF-4: the sweep pages by user. Passing 1 puts every user on their own page, which is the only way
@@ -204,7 +227,6 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
             ? ActivatorUtilities.CreateInstance(scope.ServiceProvider, typeof(RoutinePeriodNudgeJobHandler), size)
             : ActivatorUtilities.CreateInstance(scope.ServiceProvider, typeof(RoutinePeriodNudgeJobHandler)));
 
-        var now = DateTime.UtcNow;
         await handler.ExecuteAsync(new ScheduledJobContext
         {
             ScheduledFireTimeUtc = now,
@@ -216,10 +238,14 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
     }
 
     private async Task RunJobWithDoubleAsync(
-        RoutinePeriodNotificationServiceDouble notifier, CancellationToken ct, int? userPageSize = null)
+        RoutinePeriodNotificationServiceDouble notifier, CancellationToken ct, int? userPageSize = null, DateTime? at = null)
     {
+        var now = at ?? Now;
         await using var factory = CreateFactory(TestRoles.AdminAndUser, configureServices: services =>
         {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(new FixedTimeProvider(now));
+
             services.RemoveAll<IRoutinePeriodNotificationService>();
             services.AddSingleton<IRoutinePeriodNotificationService>(notifier);
 
@@ -229,7 +255,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
             services.RemoveAll<ILoggedUserService>();
             services.AddScoped<ILoggedUserService>(_ => new NoAmbientUserLoggedUserService());
         });
-        await RunJobAsync(factory.Services, ct, userPageSize);
+        await RunJobAsync(factory.Services, now, ct, userPageSize);
     }
 
     // ---- A. CQ-5: mid-loop notifier failure must not lose earlier markers ---------------------------
@@ -245,15 +271,15 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
             await EnsureUserAsync(db, thirdUserId, null, CancellationToken);
 
-            var period1 = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var period1 = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, period1, isDone: false, UserId, CancellationToken);
             period1Id = period1.Id;
 
-            var period2 = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var period2 = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, period2, isDone: false, ReminderSeedHelper.OtherUserId, CancellationToken);
             period2Id = period2.Id;
 
-            var period3 = await SeedPeriodAsync(db, thirdUserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var period3 = await SeedPeriodAsync(db, thirdUserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, period3, isDone: false, thirdUserId, CancellationToken);
             period3Id = period3.Id;
         }
@@ -299,16 +325,16 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         {
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
 
-            var away = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var away = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, away, isDone: false, UserId, CancellationToken);
             awayPeriodId = away.Id;
 
-            var home = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var home = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, home, isDone: false, ReminderSeedHelper.OtherUserId, CancellationToken);
             homePeriodId = home.Id;
 
             // Either side of the UTC date too, so the user's own today is away whatever their zone.
-            var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
+            var utcToday = DateOnly.FromDateTime(Now);
             for (var offset = -1; offset <= 1; offset++)
             {
                 await PlanningTestSeedHelper.SeedCalendarAsync(
@@ -335,7 +361,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
     {
         await using (var db = CreateDbContext())
         {
-            var period = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var period = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, period, isDone: false, UserId, CancellationToken);
         }
 
@@ -351,7 +377,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
     {
         await using (var db = CreateDbContext())
         {
-            await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: DateTime.UtcNow.AddHours(12), ct: CancellationToken);
+            await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: Now.AddHours(12), ct: CancellationToken);
         }
 
         var notifier = new RoutinePeriodNotificationServiceDouble();
@@ -372,7 +398,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         long periodId;
         await using (var db = CreateDbContext())
         {
-            var period = await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: DateTime.UtcNow.AddHours(12), ct: CancellationToken);
+            var period = await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: Now.AddHours(12), ct: CancellationToken);
             periodId = period.Id;
         }
 
@@ -408,7 +434,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         RoutineTodoList item;
         await using (var db = CreateDbContext())
         {
-            period = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            period = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             item = await SeedItemAsync(db, period, isDone: true, UserId, CancellationToken);
         }
 
@@ -443,8 +469,8 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         await using (var db = CreateDbContext())
         {
             var period = await SeedPeriodAsync(db, UserId,
-                reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5),
-                isHidden: true, graceDays: 3, streakGraceUntil: DateTime.UtcNow.AddHours(12),
+                reminderLeadDays: 3, lastResetAt: Now.AddDays(-5),
+                isHidden: true, graceDays: 3, streakGraceUntil: Now.AddHours(12),
                 ct: CancellationToken);
             await SeedItemAsync(db, period, isDone: false, UserId, CancellationToken);
         }
@@ -463,7 +489,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
     {
         await using (var db = CreateDbContext())
         {
-            var period = await SeedPeriodAsync(db, UserId, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var period = await SeedPeriodAsync(db, UserId, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, period, isDone: false, UserId, CancellationToken);
         }
 
@@ -480,7 +506,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         // midnight" is always strictly more than 1 and strictly less than 2 days from "now" regardless of the
         // current time of day -- landing reliably on the fractional day the ceiling behavior needs to prove out,
         // without the test being sensitive to what wall-clock time it happens to run at.
-        var nextResetUtc = DateTime.UtcNow.Date.AddDays(2);
+        var nextResetUtc = Now.Date.AddDays(2);
         var lastResetAt = nextResetUtc.AddDays(-7);
         long periodId;
         await using (var db = CreateDbContext())
@@ -502,7 +528,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
     {
         await using (var db = CreateDbContext())
         {
-            await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: DateTime.UtcNow.AddDays(2), ct: CancellationToken);
+            await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: Now.AddDays(2), ct: CancellationToken);
         }
 
         var notifier = new RoutinePeriodNotificationServiceDouble();
@@ -516,7 +542,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
     {
         await using (var db = CreateDbContext())
         {
-            await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: DateTime.UtcNow.AddHours(12), ct: CancellationToken);
+            await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: Now.AddHours(12), ct: CancellationToken);
         }
 
         var notifier = new RoutinePeriodNotificationServiceDouble();
@@ -532,7 +558,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         // nudge sweep must not warn about a window that is already closed.
         await using (var db = CreateDbContext())
         {
-            await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: DateTime.UtcNow.AddHours(-1), ct: CancellationToken);
+            await SeedPeriodAsync(db, UserId, graceDays: 3, streakGraceUntil: Now.AddHours(-1), ct: CancellationToken);
         }
 
         var notifier = new RoutinePeriodNotificationServiceDouble();
@@ -551,11 +577,11 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         {
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
 
-            var periodA = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var periodA = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, periodA, isDone: false, UserId, CancellationToken);
             periodAId = periodA.Id;
 
-            var periodB = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var periodB = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, periodB, isDone: false, ReminderSeedHelper.OtherUserId, CancellationToken);
             periodBId = periodB.Id;
         }
@@ -590,22 +616,22 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
             await ReminderSeedHelper.EnsureOtherUserAsync(db, CancellationToken);
             await EnsureUserAsync(db, thirdUserId, null, CancellationToken);
 
-            var periodA = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var periodA = await SeedPeriodAsync(db, UserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, periodA, isDone: false, UserId, CancellationToken);
             periodAId = periodA.Id;
 
-            var periodB = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var periodB = await SeedPeriodAsync(db, ReminderSeedHelper.OtherUserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, periodB, isDone: false, ReminderSeedHelper.OtherUserId, CancellationToken);
             periodBId = periodB.Id;
 
-            var periodC = await SeedPeriodAsync(db, thirdUserId, reminderLeadDays: 3, lastResetAt: DateTime.UtcNow.AddDays(-5), ct: CancellationToken);
+            var periodC = await SeedPeriodAsync(db, thirdUserId, reminderLeadDays: 3, lastResetAt: Now.AddDays(-5), ct: CancellationToken);
             await SeedItemAsync(db, periodC, isDone: false, thirdUserId, CancellationToken);
             periodCId = periodC.Id;
 
             // Same user as period C, on a different length so the unique (user_id, length_in_days) index holds:
             // one page must still be able to hold a mix.
             var hidden = await SeedPeriodAsync(db, thirdUserId, lengthInDays: 14, reminderLeadDays: 3,
-                lastResetAt: DateTime.UtcNow.AddDays(-12), isHidden: true, ct: CancellationToken);
+                lastResetAt: Now.AddDays(-12), isHidden: true, ct: CancellationToken);
             await SeedItemAsync(db, hidden, isDone: false, thirdUserId, CancellationToken);
             hiddenPeriodId = hidden.Id;
         }
@@ -629,57 +655,158 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
         }
     }
 
-    // ---- G. Timezone (exploratory) ---------------------------------------------------------------------
+
+    // ---- G. Delivery waits for the user's own morning (P1-01 B) ------------------------------------------
+
+    /// <summary>The weekly reset every case below is about: Thursday 1 October 2020, 00:00 UTC.</summary>
+    private static readonly DateTime LastResetBeforeThursday = new(2020, 9, 24, 0, 0, 0, DateTimeKind.Utc);
+
+    private static DateTime Sep30(int hour, int minute = 0) => new(2020, 9, 30, hour, minute, 0, DateTimeKind.Utc);
+
+    private static async Task SeedWakeUpAsync(DbContext db, long userId, DateOnly date, TimeOnly wakeUp, CancellationToken ct)
+    {
+        db.Set<Calendar>().Add(new Calendar
+        {
+            UserId = userId,
+            Date = date,
+            DayType = AdhdTimeOrganizer.Core.domain.model.@enum.DayType.Workday,
+            WakeUpTime = wakeUp,
+            BedTime = new TimeOnly(23, 0)
+        });
+        await db.SaveChangesAsync(ct);
+    }
 
     /// <summary>
-    /// TEST-13 Section G. <c>RoutinePeriodNudgeJobHandler</c> captures <c>now</c> once as
-    /// <c>DateTime.UtcNow</c> and applies it to every period regardless of <c>User.Timezone</c> — the job never
-    /// even loads the <c>User</c> row. This pins the CURRENT behavior (two users a full day apart in UTC offset
-    /// get an identical lead-time nudge for identically UTC-anchored periods) rather than asserting it is
-    /// correct: a job documented as a "09:00 wall-clock sweep" plausibly means each user's own 09:00, and a
-    /// reset anchored to UTC midnight is nobody's local midnight in particular. Forcing an actually-diverging
-    /// case deterministically would need a controllable clock the job doesn't have (it reads
-    /// <c>DateTime.UtcNow</c> directly, not an injected time provider), so this is recorded as a finding via
-    /// this comment rather than as a flaky boundary-crossing assertion. Not tagged <c>KnownGap</c> — that trait
-    /// is reserved for CQ-5; there is no fix reference for this one yet.
+    /// The defect: one 09:00 UTC run for everyone. Three users with the same UTC-anchored weekly period and a
+    /// one-day lead, so one shared window — [30 Sep 00:00, 1 Oct 00:00) UTC — and no calendar rows, so each
+    /// morning is the default 08:00 wake-up + 1 h in the user's own zone: Tokyo 00:00 UTC, Bratislava (CEST)
+    /// 07:00 UTC, New York (EDT) 13:00 UTC. The sweep runs at the quarter hours either side of each, and each
+    /// user is nudged at their own run and at no other — the last run, after all three, sends nothing again.
+    /// Asserted on the persisted marks too, since a mark that never lands re-sends on every one of 96 runs.
     /// </summary>
-    [Fact]
-    public async Task NudgeSweep_IgnoresUserTimezone_IdenticalUtcPeriodsProduceIdenticalResultsRegardlessOfOffset()
+    [Fact(DisplayName = "P1-01 B: each user's nudge goes out at their own wake-up + 1 h, once")]
+    public async Task NudgeSweep_DeliversAtEachUsersOwnMorning_AndOnlyOnce()
     {
-        var nextResetUtc = DateTime.UtcNow.Date.AddDays(1);
-        var lastResetAt = nextResetUtc.AddDays(-7);
+        var tokyoUserId = FakeLoggedUserService.TestUserId + 5;
+        var bratislavaUserId = FakeLoggedUserService.TestUserId + 6;
+        var newYorkUserId = FakeLoggedUserService.TestUserId + 7;
+        var periodIds = new Dictionary<long, long>();
 
-        var aheadTz = TimeZoneInfo.CreateCustomTimeZone("Test/UTC+14", TimeSpan.FromHours(14), "Test UTC+14", "Test UTC+14");
-        var behindTz = TimeZoneInfo.CreateCustomTimeZone("Test/UTC-11", TimeSpan.FromHours(-11), "Test UTC-11", "Test UTC-11");
-        var aheadUserId = FakeLoggedUserService.TestUserId + 5;
-        var behindUserId = FakeLoggedUserService.TestUserId + 6;
-
-        long aheadPeriodId, behindPeriodId;
         await using (var db = CreateDbContext())
         {
-            await EnsureUserAsync(db, aheadUserId, aheadTz, CancellationToken);
-            await EnsureUserAsync(db, behindUserId, behindTz, CancellationToken);
-
-            var aheadPeriod = await SeedPeriodAsync(db, aheadUserId, reminderLeadDays: 1, lastResetAt: lastResetAt, ct: CancellationToken);
-            await SeedItemAsync(db, aheadPeriod, isDone: false, aheadUserId, CancellationToken);
-            aheadPeriodId = aheadPeriod.Id;
-
-            var behindPeriod = await SeedPeriodAsync(db, behindUserId, reminderLeadDays: 1, lastResetAt: lastResetAt, ct: CancellationToken);
-            await SeedItemAsync(db, behindPeriod, isDone: false, behindUserId, CancellationToken);
-            behindPeriodId = behindPeriod.Id;
+            foreach (var (userId, zone) in new[] { (tokyoUserId, Tokyo), (bratislavaUserId, Bratislava), (newYorkUserId, NewYork) })
+            {
+                await EnsureUserAsync(db, userId, zone, CancellationToken);
+                var period = await SeedPeriodAsync(db, userId, reminderLeadDays: 1, lastResetAt: LastResetBeforeThursday, ct: CancellationToken);
+                await SeedItemAsync(db, period, isDone: false, userId, CancellationToken);
+                periodIds[userId] = period.Id;
+            }
         }
 
         var notifier = new RoutinePeriodNotificationServiceDouble();
-        await RunJobWithDoubleAsync(notifier, CancellationToken);
+        var sentAt = new List<string>();
+        foreach (var run in new[]
+                 {
+                     new DateTime(2020, 9, 29, 23, 45, 0, DateTimeKind.Utc), Sep30(0), Sep30(6, 45), Sep30(7),
+                     Sep30(12, 45), Sep30(13), Sep30(13, 15)
+                 })
+        {
+            var before = notifier.EndingSoonCalls.Count;
+            await RunJobWithDoubleAsync(notifier, CancellationToken, at: run);
+            sentAt.Add($"{run:dd HH:mm} -> [{string.Join(",", notifier.EndingSoonCalls.Skip(before).Select(c => c.UserId))}]");
+        }
 
-        var aheadCall = notifier.EndingSoonCalls.SingleOrDefault(c => c.PeriodId == aheadPeriodId);
-        var behindCall = notifier.EndingSoonCalls.SingleOrDefault(c => c.PeriodId == behindPeriodId);
+        sentAt.Should().Equal(
+            [
+                "29 23:45 -> []",
+                $"30 00:00 -> [{tokyoUserId}]",
+                "30 06:45 -> []",
+                $"30 07:00 -> [{bratislavaUserId}]",
+                "30 12:45 -> []",
+                $"30 13:00 -> [{newYorkUserId}]",
+                "30 13:15 -> []"
+            ],
+            "the window is UTC and shared, the morning is each user's own — and a mark stops every later run");
 
-        aheadCall.Should().NotBeNull();
-        behindCall.Should().NotBeNull();
-        aheadCall!.DaysLeft.Should().Be(behindCall!.DaysLeft,
-            "current behavior: both periods are evaluated against one shared UTC clock with no reference to " +
-            "User.Timezone at all, so a 25-hour offset gap between the two users changes nothing about the " +
-            "result -- pinned here so a future timezone-aware rewrite changes this test deliberately, not by accident");
+        await using var verify = CreateDbContext();
+        var marks = await verify.Set<RoutineTimePeriod>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => periodIds.Values.Contains(p.Id))
+            .Select(p => p.EndingSoonNotifiedFor)
+            .ToListAsync(CancellationToken);
+        marks.Should().HaveCount(3).And.AllBeEquivalentTo(new DateTime(2020, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+            "the mark is still the UTC reset instant — only when it was written moved");
+    }
+
+    /// <summary>
+    /// The morning is the day's own calendar wake-up when the row exists, not the 08:00 default — the same
+    /// resolution the suggested-today digest uses.
+    /// </summary>
+    [Fact(DisplayName = "P1-01 B: the day's calendar wake-up moves the delivery moment")]
+    public async Task NudgeSweep_UsesTheDaysCalendarWakeUp()
+    {
+        await using (var db = CreateDbContext())
+        {
+            var period = await SeedPeriodAsync(db, UserId, reminderLeadDays: 1, lastResetAt: LastResetBeforeThursday, ct: CancellationToken);
+            await SeedItemAsync(db, period, isDone: false, UserId, CancellationToken);
+            await SeedWakeUpAsync(db, UserId, new DateOnly(2020, 9, 30), new TimeOnly(5, 30), CancellationToken);
+        }
+
+        var notifier = new RoutinePeriodNotificationServiceDouble();
+        await RunJobWithDoubleAsync(notifier, CancellationToken, at: Sep30(6, 15));
+        notifier.EndingSoonCalls.Should().BeEmpty("a 05:30 wake-up puts the nudge at 06:30");
+
+        await RunJobWithDoubleAsync(notifier, CancellationToken, at: Sep30(6, 30));
+        notifier.EndingSoonCalls.Should().ContainSingle().Which.UserId.Should().Be(UserId);
+    }
+
+    /// <summary>
+    /// The grace warning is gated the same way. New York's grace window [29 Sep 00:00, 30 Sep 00:00) UTC opens
+    /// at 20:00 the evening before, local — past that day's morning — so it waits for the next one, 13:00 UTC.
+    /// </summary>
+    [Fact(DisplayName = "P1-01 B: the grace warning waits for the user's morning too")]
+    public async Task NudgeSweep_GraceWarning_WaitsForTheUsersMorning()
+    {
+        var newYorkUserId = FakeLoggedUserService.TestUserId + 7;
+        long periodId;
+        await using (var db = CreateDbContext())
+        {
+            await EnsureUserAsync(db, newYorkUserId, NewYork, CancellationToken);
+            var period = await SeedPeriodAsync(db, newYorkUserId, graceDays: 3,
+                streakGraceUntil: new DateTime(2020, 9, 30, 0, 0, 0, DateTimeKind.Utc), ct: CancellationToken);
+            periodId = period.Id;
+        }
+
+        var notifier = new RoutinePeriodNotificationServiceDouble();
+        await RunJobWithDoubleAsync(notifier, CancellationToken, at: new DateTime(2020, 9, 29, 0, 15, 0, DateTimeKind.Utc));
+        await RunJobWithDoubleAsync(notifier, CancellationToken, at: new DateTime(2020, 9, 29, 12, 45, 0, DateTimeKind.Utc));
+        notifier.GraceCalls.Should().BeEmpty("the old 09:00 UTC run would have woken New York at 05:00");
+
+        await RunJobWithDoubleAsync(notifier, CancellationToken, at: new DateTime(2020, 9, 29, 13, 0, 0, DateTimeKind.Utc));
+        notifier.GraceCalls.Select(c => c.PeriodId).Should().Equal(periodId);
+
+        await using var verify = CreateDbContext();
+        (await verify.Set<RoutineTimePeriod>().IgnoreQueryFilters().AsNoTracking().SingleAsync(p => p.Id == periodId, CancellationToken))
+            .GraceNotifiedFor.Should().Be(new DateTime(2020, 9, 30, 0, 0, 0, DateTimeKind.Utc));
+    }
+
+    /// <summary>
+    /// The safety branch: a window with no morning in it. A 23:30 wake-up puts the only moment of 30 September
+    /// at 00:30 on 1 October, after the reset — so instead of never, the nudge goes as soon as the window opens.
+    /// For the grace warning that is the difference between an odd hour and a streak broken without a word.
+    /// </summary>
+    [Fact(DisplayName = "P1-01 B: a window with no morning inside it is delivered as soon as it opens")]
+    public async Task NudgeSweep_WindowWithNoMorningInside_DeliversAtOpening()
+    {
+        await using (var db = CreateDbContext())
+        {
+            var period = await SeedPeriodAsync(db, UserId, reminderLeadDays: 1, lastResetAt: LastResetBeforeThursday, ct: CancellationToken);
+            await SeedItemAsync(db, period, isDone: false, UserId, CancellationToken);
+            await SeedWakeUpAsync(db, UserId, new DateOnly(2020, 9, 30), new TimeOnly(23, 30), CancellationToken);
+        }
+
+        var notifier = new RoutinePeriodNotificationServiceDouble();
+        await RunJobWithDoubleAsync(notifier, CancellationToken, at: Sep30(0, 15));
+
+        notifier.EndingSoonCalls.Should().ContainSingle().Which.UserId.Should().Be(UserId);
     }
 }

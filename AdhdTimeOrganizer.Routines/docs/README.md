@@ -16,9 +16,9 @@ The streak is the product here, so the module spends most of its complexity prot
 budget that refills each calendar month, and a frozen period *carries* the run without extending it —
 spending a freeze must never be worth more than actually doing the routine.
 
-Two daily background sweeps do the unattended work: a 02:00 reset (addressed to the database) and a
-09:00 nudge (addressed to a person — "3 of 8 done, resets tomorrow", and "your grace window lapses
-today").
+Two background sweeps do the unattended work: a 02:00 UTC reset (addressed to the database) and a
+nudge sweep every 15 minutes (addressed to a person, so it reaches each user an hour after their own
+wake-up — "3 of 8 done, resets tomorrow", and "your grace window lapses today").
 
 ## Setup / running
 
