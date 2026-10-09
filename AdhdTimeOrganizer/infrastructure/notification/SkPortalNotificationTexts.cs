@@ -48,6 +48,11 @@ public class SkPortalNotificationTexts : SkNotificationTexts
     public override string StreakOnGraceSuffix(int streak) => $" Séria ({streak}) je zatiaľ zachovaná v odkladovej lehote.";
     public override string StreakBrokenSuffix => " Séria bola prerušená.";
 
+    // "Vynechanie" is what the client calls a streak freeze (todoList.sk.ts, freeze.*), verb agreeing as there.
+    public override string StreakBrokenFreezableSuffix(int lostStreak, int freezesLeft) =>
+        $" Séria {lostStreak} sa prerušila — na jej záchranu vám {Plural(freezesLeft, "zostáva", "zostávajú", "zostáva")} " +
+        $"{freezesLeft} {Plural(freezesLeft, "vynechanie", "vynechania", "vynechaní")}.";
+
     public override string RoutineStreakGraceExpiringTitle => "Séria je ohrozená";
     public override string RoutineStreakGraceExpiringFallbackBody => "Odkladová lehota pre vašu sériu sa čoskoro končí.";
 

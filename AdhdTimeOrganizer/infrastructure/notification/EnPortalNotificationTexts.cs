@@ -37,6 +37,10 @@ public class EnPortalNotificationTexts : EnNotificationTexts
     public override string StreakOnGraceSuffix(int streak) => $" Your streak ({streak}) is holding for now, within the grace period.";
     public override string StreakBrokenSuffix => " The streak was broken.";
 
+    // "Skip" is what the client calls a streak freeze (todoList.en.ts, freeze.*).
+    public override string StreakBrokenFreezableSuffix(int lostStreak, int freezesLeft) =>
+        $" Your streak of {lostStreak} broke — you have {freezesLeft} {Plural(freezesLeft, "skip", "skips")} left to save it.";
+
     public override string RoutineStreakGraceExpiringTitle => "Streak at risk";
     public override string RoutineStreakGraceExpiringFallbackBody => "The grace period for your streak is ending soon.";
 

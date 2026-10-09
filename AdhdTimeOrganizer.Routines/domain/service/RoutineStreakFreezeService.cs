@@ -90,7 +90,7 @@ public static class RoutineStreakFreezeService
         // carries the run for free and a freeze on it would be charged for nothing.
         // An excused cycle (the user was away for most of it) already carries the run for free, exactly like an
         // empty one, so it is not a miss either — and the CHECK forbids a row being both.
-        if (entry.IsExcused || entry.TotalCount == 0 || IsSuccess(entry, period.StreakThreshold))
+        if (!IsMiss(entry, period.StreakThreshold))
             return StreakFreezeRejection.NotAMiss;
 
         RefreshFreezeBudget(period, now);
@@ -132,15 +132,78 @@ public static class RoutineStreakFreezeService
     /// </summary>
     public static void RecomputeStreak(RoutineTimePeriod period, IReadOnlyList<RoutinePeriodCompletion> historyAsc)
     {
+        var (streak, best) = Walk(historyAsc, period.StreakThreshold, alsoFrozen: null);
+
+        period.Streak = Math.Max(period.Streak, streak);
+        period.BestStreak = Math.Max(period.BestStreak, Math.Max(best, period.Streak));
+    }
+
+    /// <summary>
+    /// What a reset that broke the streak cost, and whether a freeze could still buy it back — for the
+    /// "streak broken" notification, which otherwise can only say "broken" (the streak it carries is already 0).
+    /// </summary>
+    /// <param name="LostStreak">The run the newest miss ended: the trailing run of the history before it.</param>
+    /// <param name="FreezesRemaining">The budget as <see cref="RefreshFreezeBudget"/> would leave it now.</param>
+    /// <param name="CanFreeze">
+    /// <see cref="Apply"/> on the newest entry would succeed now <b>and</b> raise the streak — so the
+    /// notification can offer it without promising a rescue the endpoint would refuse.
+    /// </param>
+    public readonly record struct StreakBreak(int LostStreak, int FreezesRemaining, bool CanFreeze);
+
+    /// <summary>
+    /// Pure, unlike <see cref="Apply"/>: answers what spending a freeze on the newest entry of
+    /// <paramref name="historyAsc"/> would do, without spending it or refilling the budget. Same rules as
+    /// <see cref="Apply"/> (an unfrozen, non-excused, non-empty miss, and budget left) and the same walk as
+    /// <see cref="RecomputeStreak"/>, so the offer and the endpoint cannot disagree.
+    /// <para>
+    /// <paramref name="historyAsc"/> must be the <b>complete</b> history, ascending, including the miss just
+    /// written — the same contract <see cref="Apply"/> has.
+    /// </para>
+    /// </summary>
+    public static StreakBreak DescribeBreak(RoutineTimePeriod period, IReadOnlyList<RoutinePeriodCompletion> historyAsc, DateTime now)
+    {
+        var freezesLeft = period.FreezeBudgetResetsAt is { } resetsAt && now < resetsAt
+            ? period.FreezesRemaining
+            : period.FreezeBudget;
+
+        if (historyAsc.Count == 0)
+            return new StreakBreak(0, freezesLeft, CanFreeze: false);
+
+        var newest = historyAsc[^1];
+        var (restored, _) = Walk(historyAsc, period.StreakThreshold, alsoFrozen: newest);
+
+        var canFreeze = !newest.IsFrozen
+                        && IsMiss(newest, period.StreakThreshold)
+                        && freezesLeft > 0
+                        && restored > period.Streak;
+
+        return new StreakBreak(restored, freezesLeft, canFreeze);
+    }
+
+    /// <summary>
+    /// A cycle a freeze can cover. An excused or empty one already carries the run for free, and a met one has
+    /// nothing to cover — see <see cref="Apply"/>.
+    /// </summary>
+    private static bool IsMiss(RoutinePeriodCompletion completion, int streakThreshold) =>
+        !completion.IsExcused && completion.TotalCount > 0 && !IsSuccess(completion, streakThreshold);
+
+    /// <summary>
+    /// The trailing run and the best run of <paramref name="historyAsc"/>, reading <paramref name="alsoFrozen"/>
+    /// as frozen whatever its flag says — which is how <see cref="DescribeBreak"/> asks "what if" without
+    /// touching the entity.
+    /// </summary>
+    private static (int Streak, int Best) Walk(
+        IReadOnlyList<RoutinePeriodCompletion> historyAsc, int streakThreshold, RoutinePeriodCompletion? alsoFrozen)
+    {
         var streak = 0;
         var best = 0;
 
         foreach (var completion in historyAsc)
         {
-            if (completion.IsFrozen || completion.IsExcused || completion.TotalCount == 0)
+            if (completion.IsFrozen || ReferenceEquals(completion, alsoFrozen) || completion.IsExcused || completion.TotalCount == 0)
                 continue;
 
-            if (IsSuccess(completion, period.StreakThreshold))
+            if (IsSuccess(completion, streakThreshold))
             {
                 streak++;
                 if (streak > best)
@@ -152,7 +215,6 @@ public static class RoutineStreakFreezeService
             }
         }
 
-        period.Streak = Math.Max(period.Streak, streak);
-        period.BestStreak = Math.Max(period.BestStreak, Math.Max(best, period.Streak));
+        return (streak, best);
     }
 }

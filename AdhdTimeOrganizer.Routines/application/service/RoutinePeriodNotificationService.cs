@@ -19,6 +19,8 @@ namespace AdhdTimeOrganizer.Routines.application.service.routine;
 /// </summary>
 public class RoutinePeriodNotificationService(
     INotificationService notificationService,
+    DbContext dbContext,
+    TimeProvider timeProvider,
     ILogger<RoutinePeriodNotificationService> logger) : IRoutinePeriodNotificationService, IScopedService
 {
     public async Task NotifyPeriodEndedAsync(
@@ -30,13 +32,52 @@ public class RoutinePeriodNotificationService(
         if (outcome == StreakOutcome.Excused)
             return;
 
+        var streakBreak = outcome == StreakOutcome.Broken ? await DescribeBreakAsync(period, ct) : null;
+
         await SafeNotifyAsync(period, new RoutinePeriodEndedPayload(
             period.Id,
             period.Text,
             completion.CompletedCount,
             completion.TotalCount,
             period.Streak,
-            ToKernelOutcome(outcome)), ct);
+            ToKernelOutcome(outcome),
+            LostStreak: streakBreak?.LostStreak ?? 0,
+            FreezesRemaining: streakBreak?.FreezesRemaining ?? 0,
+            CanFreeze: streakBreak?.CanFreeze ?? false), ct);
+    }
+
+    /// <summary>
+    /// What the break lost and whether a freeze can still save it, so the summary can say "your 12-period run
+    /// broke — 1 freeze left to save it" instead of only "broken" (the payload's streak is already 0). Read here,
+    /// once, for every reset site — the nightly job and the two request paths that reset lazily — because all
+    /// three call this after their commit, so the miss just written is the newest row.
+    /// <para>
+    /// The whole history, as <see cref="RoutineStreakFreezeService.Apply"/> reads it: the run reaches back past
+    /// <c>HistoryDepth</c>. Only on a break, which is rare. <b>Fails open</b> to the plain "broken" sentence — a
+    /// read that throws must not cost the user the summary itself.
+    /// </para>
+    /// </summary>
+    private async Task<RoutineStreakFreezeService.StreakBreak?> DescribeBreakAsync(RoutineTimePeriod period, CancellationToken ct)
+    {
+        try
+        {
+            var history = await dbContext.Set<RoutinePeriodCompletion>()
+                .AsNoTracking()
+                .Where(c => c.TimePeriodId == period.Id)
+                .OrderBy(c => c.PeriodStart)
+                .ToListAsync(ct);
+
+            return RoutineStreakFreezeService.DescribeBreak(period, history, timeProvider.GetUtcNow().UtcDateTime);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not read the completion history of period {PeriodId}; sending the plain summary", period.Id);
+            return null;
+        }
     }
 
     public async Task<bool> NotifyEndingSoonAsync(
