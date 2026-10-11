@@ -298,7 +298,7 @@ stored, and what audit N5's nudge reads too (§ *Slip nudges* below).
 | What moves? | Every `NotStarted` foreground block whose activity is not `IsUnavoidable` — missed, **late** (start passed, end not) or upcoming. An upcoming block starting at or past the window's end is left alone |
 | What stays and holds its time? | `InProgress`, `OnHold`, `Completed`, and any unavoidable block (missed or not), at their planned slots |
 | Background blocks? | Neither move nor hold time — they run alongside the day, the reading the day view's own conflict check takes (`checkConflict` skips them) |
-| The window? | From *packed-from* (the user's now, rounded up to the minute) to bed time. `BedTime` 00:00 — every day's default until FO10 — or any bed time at or before wake-up means the end of the day, **23:59**: a block cannot cross midnight and a `TimeDto` cannot say 24:00 |
+| The window? | From *packed-from* (the user's now, rounded up to the minute) to bed time. The bed time is the day's own, which since FO10 starts as the user's default (`User.DefaultBedTime`). 00:00 — that default's own default — or any bed time at or before wake-up means the end of the day, **23:59**: a block cannot cross midnight and a `TimeDto` cannot say 24:00 |
 | The order? | The blocks' current one (start, end, id), as a priority. **First fit**: each takes the earliest free stretch long enough, so a short later block may back-fill a gap a longer earlier one could not use. Missed/late blocks may start from packed-from; an upcoming one never earlier than it is planned, and it may keep its own slot past bed time. Lengths are kept; nothing is split |
 | When time runs out? | If a required block misses out, the day is packed again with required blocks ahead of optional ones (importance = `OptionalMarkerValue`), and that wins if it places more required blocks. What still has no room is `wontFit`, optional first, then in order |
 | Nothing slipped? | An empty 200 (`hasChanges: false`), even if upcoming blocks overlap — a re-plan answers a slip, it does not tidy the day |
@@ -481,8 +481,18 @@ product.
 | Type | Role |
 |---|---|
 | `HolidayCalendar` (`domain/service/`) | The Slovak holiday table + Computus; each entry is a `Holiday(Key, Name)` |
-| `CalendarDayFactory` (`domain/service/`) | What an unplanned day *is* — day type, holiday key + name, default sleep window (08:00 / 00:00) |
+| `CalendarDayFactory` (`domain/service/`) | What an unplanned day *is* — day type, holiday key + name, and the **user's** sleep window (FO10, Core's `UserSleepWindow`; 08:00 / 00:00 until they set one) |
 | `ICalendarProvisioner` / `CalendarProvisioner` | Read-or-create for one (user, date) |
+| `ICalendarSleepWindowSync` / `CalendarSleepWindowSync` | FO10: moves the user's days from their today on onto a changed default window, skipping days marked `HasCustomSleepWindow` |
+
+**The sleep window (FO10).** `User.DefaultWakeUpTime` / `DefaultBedTime` (Core, written through
+`PUT /user/preferences`) are what a new day starts with. Because the seeder fills two years ahead, a
+changed default also has to reach the rows that already exist: `CalendarSleepWindowSync` rewrites every
+day from the user's today on **unless** `Calendar.HasCustomSleepWindow` is set. That flag is set only by
+`Calendar.MarkSleepWindow` — the day editor's PUT and a template apply carrying a window — and only when the
+window actually differs, since the editor re-sends the inherited window with every save. It is never
+cleared. Past days are never rewritten. Migration `UserDefaultSleepWindow` marked every pre-existing row
+that held anything other than 08:00 / 00:00.
 
 Both creators go through `CalendarDayFactory`, and that is the point of it: a day filled in a year
 ahead and the same day created on its first task have to be the same day. Holidays do **not** override
@@ -632,7 +642,8 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `DayPacking` | Domain service (static, pure) | FO4's placement rule on minutes of one day: first fit in priority order, optional blocks give way first, the window's end. No SQL | `domain/service/DayPacking.cs` |
 | `DayReplanPlanner` | Helper (static) | Loads a day and turns it into FO4's plan: what moves, what holds time, each block's earliest start / latest end, and the preview token. Shared by all three FO4 routes | `application/helper/DayReplanPlanner.cs` |
 | `SkipSummaryService` | Domain service (static, pure) | `Aggregate` — reason groups by exact value, per-hour planned/skipped. No SQL | `domain/service/SkipSummaryService.cs` |
-| `CalendarDayFactory` | Domain service (static) | What an unplanned day *is*. The single definition, shared by both creators | `domain/service/CalendarDayFactory.cs` |
+| `CalendarDayFactory` | Domain service (static) | What an unplanned day *is*. The single definition, shared by both creators; takes the user's `UserSleepWindow` | `domain/service/CalendarDayFactory.cs` |
+| `CalendarSleepWindowSync` | Application service | FO10: one `ExecuteUpdate` moving untouched days from the user's today on onto their default sleep window | `application/service/taskPlanner/CalendarSleepWindowSync.cs` |
 | `HolidayCalendar` | Domain service (static) | Slovak holiday table + Computus; `Holiday(Key, Name)` per date | `domain/service/HolidayCalendar.cs` |
 | `PlannerStreakReader` | Application service | The grouped read + qualifying predicate + day boundary | `application/service/taskPlanner/PlannerStreakReader.cs` |
 | `CalendarProvisioner` | Application service | Read-or-create one day; **commits**, scopes by hand, survives the unique-index race | `application/service/taskPlanner/CalendarProvisioner.cs` |

@@ -91,13 +91,13 @@ standalone auth endpoint. Those generic over `TUser` are closed on the portal's 
 | `BaseChangePasswordEndpoint<TUser>` | `ChangePasswordEndpoint`; hook `AfterPasswordChangedAsync` |
 | `BaseValidateTwoFactorAuthForLoginEndpoint<TUser>` | `ValidateTwoFactorAuthForLoginWebEndpoint` + `…ExtensionEndpoint` |
 | `BaseSetupTwoFactorForLoginEndpoint<TUser>` | `SetupTwoFactorForLoginEndpoint` — empty; web only (reads the partial-auth *cookie*, so the extension flow has no equivalent) |
-| `BaseGetCurrentUserEndpoint<TUser, TResponse>` | `GetCurrentUserEndpoint` → `AppUserDataResponse`; hook `Enrich` adds `firstDayOfWeek` + `weatherLocation`. Route is **GET** `/user/data`. The one-parameter `BaseGetCurrentUserEndpoint<TUser>` is for hosts with no columns of their own — deriving from it here would silently stop those two fields reaching the client |
+| `BaseGetCurrentUserEndpoint<TUser, TResponse>` | `GetCurrentUserEndpoint` → `AppUserDataResponse`; hook `Enrich` adds `firstDayOfWeek`, `weatherLocation` and FO10's `defaultWakeUpTime` / `defaultBedTime` (`TimeDto`). Route is **GET** `/user/data`. The one-parameter `BaseGetCurrentUserEndpoint<TUser>` is for hosts with no columns of their own — deriving from it here would silently stop those fields reaching the client |
 | `BaseUserRoleGetAllSelectOptionsEndpoint` | **none** — the portal exposes no role-options route |
 | `BaseLogoutAllEndpoint` (non-generic) | `LogoutAllEndpoint` — empty |
 | `BaseRevokeSessionEndpoint` (non-generic) | `RevokeSessionEndpoint` — empty; 404 not-found / 400 current-session are load-bearing |
 | `BaseRevokeAllOtherSessionsEndpoint` (non-generic) | `RevokeAllOtherSessionsEndpoint` — empty |
 | `BaseGetUserSessionsEndpoint` (non-generic) | `GetUserSessionsEndpoint` — empty |
-| `BaseUpdateUserPreferencesEndpoint<TUser, TRequest>` | `UpdateUserPreferencesEndpoint`; hook `ApplyExtraPreferences`, and override `Configure` to attach the validator. Convention is "null leaves it unchanged", so a *clearable* string preference needs a second signal — `weatherLocation` takes `""` as the clear |
+| `BaseUpdateUserPreferencesEndpoint<TUser, TRequest>` | `UpdateUserPreferencesEndpoint`; hook `ApplyExtraPreferences`, and override `Configure` to attach the validator. Convention is "null leaves it unchanged", so a *clearable* string preference needs a second signal — `weatherLocation` takes `""` as the clear. `AfterUpdateAsync` re-syncs to-do due reminders on a zone change and, on a sleep-window or zone change, moves the user's untouched future calendar days onto the new window (FO10, Planning's `ICalendarSleepWindowSync`) |
 | `BaseForgotPasswordEndpoint<TUser>` | `ForgotPasswordEndpoint` — empty; hook `BuildResetLink` |
 | `BaseResetPasswordEndpoint<TUser>` | `ResetPasswordEndpoint` — empty |
 | `BaseGetTwoFactorAuthStatusEndpoint<TUser>` | `GetTwoFactorAuthStatusEndpoint` — empty |

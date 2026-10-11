@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.Routines.domain.serviceContract;
@@ -168,6 +169,11 @@ public class RoutinePeriodNudgeJobHandler(
         var to = LocalDate(opens.Max(), zone).AddDays(1);
         var wakeUps = (await calendarDayLookup.GetDaysAsync(dbContext, userId, from, to, ct))
             .ToDictionary(d => d.Date, d => d.WakeUpTime);
+        // A day with no row yet wakes at the user's own default (FO10), the wake-up it will be created with. Read only
+        // when a day is actually missing, which past the seeded calendar horizon is rare.
+        var fallbackWakeUp = wakeUps.Count == to.DayNumber - from.DayNumber + 1
+            ? UserSleepWindow.Fallback.WakeUpTime
+            : (await UserSleepWindow.ForUserAsync(dbContext, userId, ct)).WakeUpTime;
 
         var nudged = 0;
         var graceWarned = 0;
@@ -176,7 +182,7 @@ public class RoutinePeriodNudgeJobHandler(
         {
             try
             {
-                if (nudge is { } n && now >= DeliverAt(EndingSoonOpensAt(period, n), n.NextReset, zone, wakeUps))
+                if (nudge is { } n && now >= DeliverAt(EndingSoonOpensAt(period, n), n.NextReset, zone, wakeUps, fallbackWakeUp))
                 {
                     var items = period.RoutineTodoListColl;
                     var remaining = items.Count(i => !i.IsDone);
@@ -189,7 +195,7 @@ public class RoutinePeriodNudgeJobHandler(
                     }
                 }
 
-                if (grace && now >= DeliverAt(GraceOpensAt(period), period.StreakGraceUntil!.Value, zone, wakeUps))
+                if (grace && now >= DeliverAt(GraceOpensAt(period), period.StreakGraceUntil!.Value, zone, wakeUps, fallbackWakeUp))
                 {
                     // Marked only when something actually went out — a swallowed dispatch that still stamped the
                     // marker would suppress the warning for the whole grace window, and the window would then
@@ -219,7 +225,7 @@ public class RoutinePeriodNudgeJobHandler(
     /// <summary>
     /// When a window's notification reaches the user: the first wake-up + <see cref="DeliveryAfterWakeUp"/> in
     /// their zone at or after <paramref name="windowOpen"/>, from the day's calendar row, or
-    /// <see cref="RoutineSuggestedTodayJobHandler.DefaultSendAt"/> on a day without one (the wake-up a lazily
+    /// <paramref name="fallbackWakeUp"/> — the user's default (FO10) — on a day without one (the wake-up a lazily
     /// created day gets — the same resolution the suggested-today digest uses).
     /// <para>
     /// Both windows are at least a day long, so that moment falls inside one unless the wake-up moves later
@@ -234,7 +240,8 @@ public class RoutinePeriodNudgeJobHandler(
     /// </para>
     /// </summary>
     private static DateTime DeliverAt(
-        DateTime windowOpen, DateTime windowClose, TimeZoneInfo zone, IReadOnlyDictionary<DateOnly, TimeOnly> wakeUps)
+        DateTime windowOpen, DateTime windowClose, TimeZoneInfo zone, IReadOnlyDictionary<DateOnly, TimeOnly> wakeUps,
+        TimeOnly fallbackWakeUp)
     {
         var openDate = LocalDate(windowOpen, zone);
 
@@ -242,7 +249,7 @@ public class RoutinePeriodNudgeJobHandler(
         // one past windowOpen — two days are the whole search.
         foreach (var date in (DateOnly[])[openDate, openDate.AddDays(1)])
         {
-            var at = MomentOn(date, zone, wakeUps);
+            var at = MomentOn(date, zone, wakeUps, fallbackWakeUp);
             if (at >= windowOpen)
                 return at < windowClose ? at : windowOpen;
         }
@@ -250,9 +257,10 @@ public class RoutinePeriodNudgeJobHandler(
         return windowOpen;
     }
 
-    private static DateTime MomentOn(DateOnly date, TimeZoneInfo zone, IReadOnlyDictionary<DateOnly, TimeOnly> wakeUps)
+    private static DateTime MomentOn(
+        DateOnly date, TimeZoneInfo zone, IReadOnlyDictionary<DateOnly, TimeOnly> wakeUps, TimeOnly fallbackWakeUp)
     {
-        var wakeUp = wakeUps.TryGetValue(date, out var w) ? w : RoutineSuggestedTodayJobHandler.DefaultSendAt;
+        var wakeUp = wakeUps.TryGetValue(date, out var w) ? w : fallbackWakeUp;
         var local = date.ToDateTime(wakeUp).Add(DeliveryAfterWakeUp);
 
         // A wall-clock time inside a spring-forward gap never happens; the first one after the gap stands in.

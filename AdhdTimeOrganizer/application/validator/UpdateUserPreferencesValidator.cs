@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.application.dto.request.user;
+using AdhdTimeOrganizer.Core.application.validator;
 using FluentValidation;
 using Sydowwe.Framework.application.validator;
 
@@ -19,5 +20,9 @@ public class UpdateUserPreferencesValidator : BaseUserPreferencesValidator<Updat
         RuleFor(x => x.WeatherLocation)
             .MaximumLength(120)
             .When(x => x.WeatherLocation is not null);
+
+        // No ordering rule between the two: a bed time at or before the wake-up is a night that ends after midnight.
+        RuleFor(x => x.DefaultWakeUpTime!).ApplyTimeOfDayRules().When(x => x.DefaultWakeUpTime is not null);
+        RuleFor(x => x.DefaultBedTime!).ApplyTimeOfDayRules().When(x => x.DefaultBedTime is not null);
     }
 }

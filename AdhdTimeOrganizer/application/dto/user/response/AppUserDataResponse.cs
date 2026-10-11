@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.dto.response.user;
 
 namespace AdhdTimeOrganizer.application.dto.response.user;
@@ -23,4 +24,10 @@ public record AppUserDataResponse : UserDataResponse
 
     /// <summary>Free text, or null when the user has not set one. See <c>User.WeatherLocation</c>.</summary>
     public string? WeatherLocation { get; init; }
+
+    /// <summary>FO10: the user's default sleep window. See <c>User.DefaultWakeUpTime</c>.</summary>
+    public required TimeDto DefaultWakeUpTime { get; init; }
+
+    /// <inheritdoc cref="DefaultWakeUpTime"/>
+    public required TimeDto DefaultBedTime { get; init; }
 }

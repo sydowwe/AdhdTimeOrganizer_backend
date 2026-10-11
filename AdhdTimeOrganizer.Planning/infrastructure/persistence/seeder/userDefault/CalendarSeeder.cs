@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.service;
 using Sydowwe.Framework.config.dependencyInjection;
@@ -34,9 +35,10 @@ public class CalendarSeeder(
     public async Task SetupDefaults(long userId, CancellationToken ct = default)
     {
         var years = SeedYears();
+        var sleepWindow = await UserSleepWindow.ForUserAsync(dbContext, userId, ct);
 
         foreach (var year in years)
-            await SeedYearForUser(year, userId, ct);
+            await SeedYearForUser(year, userId, sleepWindow, ct);
 
         logger.LogInformation("Completed seeding calendars for user {UserId} across years {Years}",
             userId, string.Join(", ", years));
@@ -47,8 +49,9 @@ public class CalendarSeeder(
     /// </summary>
     /// <param name="year">Year to seed</param>
     /// <param name="userId">User ID to associate calendars with</param>
+    /// <param name="sleepWindow">The user's default sleep window (FO10), which every new day starts with</param>
     /// <param name="ct">Cancellation token</param>
-    private async Task SeedYearForUser(int year, long userId, CancellationToken ct = default)
+    private async Task SeedYearForUser(int year, long userId, UserSleepWindow sleepWindow, CancellationToken ct = default)
     {
         // Per missing date, not "the year has any rows at all": the unique index is (user_id, date),
         // so a year the user has partially deleted has to be filled in rather than skipped whole or
@@ -75,10 +78,10 @@ public class CalendarSeeder(
             if (existingDates.Contains(date))
                 continue;
 
-            // Day type, holiday name and the default sleep window all come from CalendarDayFactory, which
+            // Day type, holiday name and the user's sleep window all come from CalendarDayFactory, which
             // CalendarProvisioner also uses. A day filled in here and the same day created lazily on its first
             // task have to be the same day.
-            calendars.Add(CalendarDayFactory.Create(userId, date));
+            calendars.Add(CalendarDayFactory.Create(userId, date, sleepWindow));
         }
 
         if (calendars.Count == 0)
@@ -101,7 +104,7 @@ public class CalendarSeeder(
     /// <param name="userId">User ID to associate calendars with</param>
     public async Task SeedYear(int year, long userId)
     {
-        await SeedYearForUser(year, userId);
+        await SeedYearForUser(year, userId, await UserSleepWindow.ForUserAsync(dbContext, userId, CancellationToken.None));
     }
 
     public async Task<bool> ResetDefaults(long userId, CancellationToken ct = default)

@@ -1009,6 +1009,18 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnName("created_timestamp")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<TimeOnly>("DefaultBedTime")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("time without time zone")
+                        .HasDefaultValue(new TimeOnly(0, 0, 0))
+                        .HasColumnName("default_bed_time");
+
+                    b.Property<TimeOnly>("DefaultWakeUpTime")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("time without time zone")
+                        .HasDefaultValue(new TimeOnly(8, 0, 0))
+                        .HasColumnName("default_wake_up_time");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
@@ -1410,6 +1422,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("day_type");
+
+                    b.Property<bool>("HasCustomSleepWindow")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_custom_sleep_window");
 
                     b.Property<string>("HolidayKey")
                         .HasMaxLength(50)

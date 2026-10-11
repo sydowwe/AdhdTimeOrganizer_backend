@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
@@ -111,9 +112,11 @@ public static class DayReplanPlanner
     /// <summary>The plan for <paramref name="date"/> (the user's today), packed from <paramref name="packedFrom"/>.</summary>
     public static Result Compute(Calendar? calendar, IReadOnlyList<PlannerTask> tasks, DateOnly date, int packedFrom)
     {
+        // A day with no row has no tasks either (LoadDayAsync), so its plan is empty whatever the window; the fallback
+        // only fills in the preview's reported window end, and costs no read of the user's own default.
         var windowEnd = DayPacking.WindowEnd(
-            calendar?.WakeUpTime ?? CalendarDayFactory.DefaultWakeUpTime,
-            calendar?.BedTime ?? CalendarDayFactory.DefaultBedTime);
+            calendar?.WakeUpTime ?? UserSleepWindow.Fallback.WakeUpTime,
+            calendar?.BedTime ?? UserSleepWindow.Fallback.BedTime);
         var token = TokenFor(packedFrom, calendar, tasks);
         var userNow = date.ToDateTime(TimeOnly.MinValue).AddMinutes(packedFrom);
 

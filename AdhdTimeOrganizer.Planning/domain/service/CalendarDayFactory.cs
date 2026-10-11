@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 
@@ -17,15 +18,11 @@ namespace AdhdTimeOrganizer.Planning.domain.service;
 public static class CalendarDayFactory
 {
     /// <summary>
-    /// What a day's sleep window starts as. Not user-configurable today — <c>UserPlannerSettings</c> has no
-    /// wake/bed fields — so this is the one place to change when it becomes so.
+    /// The day for <paramref name="userId"/> on <paramref name="date"/>, starting with the user's own sleep window
+    /// (FO10, <see cref="UserSleepWindow.ForUserAsync"/>). The day does not carry
+    /// <see cref="Calendar.HasCustomSleepWindow"/>, so it keeps following the default until the user edits it.
     /// </summary>
-    public static readonly TimeOnly DefaultWakeUpTime = new(8, 0);
-
-    /// <inheritdoc cref="DefaultWakeUpTime"/>
-    public static readonly TimeOnly DefaultBedTime = new(0, 0);
-
-    public static Calendar Create(long userId, DateOnly date)
+    public static Calendar Create(long userId, DateOnly date, UserSleepWindow sleepWindow)
     {
         var holiday = HolidayCalendar.ForDate(date);
 
@@ -39,8 +36,8 @@ public static class CalendarDayFactory
             // Key and name are written together, from the same table entry, so they cannot disagree.
             HolidayKey = holiday?.Key,
             HolidayName = holiday?.Name,
-            WakeUpTime = DefaultWakeUpTime,
-            BedTime = DefaultBedTime
+            WakeUpTime = sleepWindow.WakeUpTime,
+            BedTime = sleepWindow.BedTime
         };
     }
 

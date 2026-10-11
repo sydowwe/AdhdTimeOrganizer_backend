@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
@@ -20,7 +21,7 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.calen
 /// moved.
 /// <para>
 /// <b>Window:</b> on the user's today it starts at their now (rounded up to the minute); on a later day at that day's
-/// wake-up time (08:00 for a day with no row yet, <c>CalendarDayFactory</c>). <c>notBeforeMinute</c> can only push
+/// wake-up time (the user's default for a day with no row yet, FO10's <c>UserSleepWindow</c>). <c>notBeforeMinute</c> can only push
 /// it later. It ends at bed time, or 23:59 when bed time is 00:00 or after midnight. A past day is a 400.
 /// </para>
 /// <para>
@@ -78,8 +79,9 @@ public class GetNextFreeSlotCalendarEndpoint(
         await materialiser.PlaceForReadAsync(userId, date, ct);
 
         var (calendar, tasks) = await DayReplanPlanner.LoadDayAsync(dbContext, userId, date, track: false, ct);
-        var wakeUpTime = calendar?.WakeUpTime ?? CalendarDayFactory.DefaultWakeUpTime;
-        var bedTime = calendar?.BedTime ?? CalendarDayFactory.DefaultBedTime;
+        var (wakeUpTime, bedTime) = calendar is not null
+            ? new UserSleepWindow(calendar.WakeUpTime, calendar.BedTime)
+            : await UserSleepWindow.ForUserAsync(dbContext, userId, ct);
 
         var earliest = date == today ? DayReplanPlanner.PackedFromNow(utcNow, zone) : DayPacking.MinuteOf(wakeUpTime);
         if (req.NotBeforeMinute is { } notBefore)

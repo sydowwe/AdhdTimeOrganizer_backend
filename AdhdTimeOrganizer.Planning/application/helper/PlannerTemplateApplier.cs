@@ -149,8 +149,9 @@ public static class PlannerTemplateApplier
     {
         calendar.AppliedTemplateId = template.Id;
         calendar.AppliedTemplateName = template.Name;
-        calendar.WakeUpTime = template.DefaultWakeUpTime ?? calendar.WakeUpTime;
-        calendar.BedTime = template.DefaultBedTime ?? calendar.BedTime;
+        calendar.MarkSleepWindow(
+            template.DefaultWakeUpTime ?? calendar.WakeUpTime,
+            template.DefaultBedTime ?? calendar.BedTime);
 
         template.LastUsedAt = DateTime.UtcNow;
         template.UsageCount++;

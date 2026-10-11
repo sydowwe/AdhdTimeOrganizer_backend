@@ -22,8 +22,7 @@ public record CalendarRequest : IUpdateRequest<Calendar>
     {
         entity.DayType = DayType;
         entity.Label = Label;
-        entity.WakeUpTime = WakeUpTime.ToTimeOnly();
-        entity.BedTime = BedTime.ToTimeOnly();
+        entity.MarkSleepWindow(WakeUpTime.ToTimeOnly(), BedTime.ToTimeOnly());
         entity.Location = Location;
         entity.Weather = Weather;
         entity.Notes = Notes;

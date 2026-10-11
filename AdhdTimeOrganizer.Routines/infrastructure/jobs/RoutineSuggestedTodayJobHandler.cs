@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.application.seam;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
@@ -21,7 +22,7 @@ namespace AdhdTimeOrganizer.Routines.infrastructure.jobs;
 /// <para>
 /// <b>The morning</b> is the day's own <c>Calendar.WakeUpTime</c> when the user's day row exists — read through
 /// Core's <see cref="ICalendarDayLookup"/>, since the calendar is Planning's — and
-/// <see cref="DefaultSendAt"/> otherwise, the same 08:00 a lazily created day gets. No per-user setting.
+/// the user's own default otherwise (FO10, <c>User.DefaultWakeUpTime</c>), the wake-up a lazily created day gets.
 /// </para>
 /// <para>
 /// <b>Not on an away day.</b> A user-local today marked vacation or sick gets no digest (FO1): a nudge on
@@ -52,9 +53,6 @@ public class RoutineSuggestedTodayJobHandler(
     int userPageSize = RoutineSweepPaging.UserPageSize) : IScheduledJobHandler, IScopedService
 {
     public const string HandlerKey = "Routines.SuggestedToday";
-
-    /// <summary>When the digest goes out on a day the user has no calendar row for — a lazily created day's wake-up.</summary>
-    public static readonly TimeOnly DefaultSendAt = new(8, 0);
 
     public string Key => HandlerKey;
 
@@ -134,7 +132,8 @@ public class RoutineSuggestedTodayJobHandler(
         if (day is not null && day.DayType.IsAway())
             return false;
 
-        if (TimeOnly.FromDateTime(localNow) < (day?.WakeUpTime ?? DefaultSendAt))
+        var wakeUp = day?.WakeUpTime ?? (await UserSleepWindow.ForUserAsync(dbContext, userId, ct)).WakeUpTime;
+        if (TimeOnly.FromDateTime(localNow) < wakeUp)
             return false;
 
         if (!await notifier.NotifySuggestedTodayAsync(userId, today, items, ct))

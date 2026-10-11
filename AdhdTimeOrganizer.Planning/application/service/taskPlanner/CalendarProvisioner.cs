@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.service;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -14,7 +15,7 @@ public sealed class CalendarProvisioner(DbContext dbContext, ILogger<CalendarPro
         if (await FindAsync(userId, date, ct) is { } existing)
             return existing;
 
-        var calendar = CalendarDayFactory.Create(userId, date);
+        var calendar = CalendarDayFactory.Create(userId, date, await UserSleepWindow.ForUserAsync(dbContext, userId, ct));
         dbContext.Set<Calendar>().Add(calendar);
 
         try

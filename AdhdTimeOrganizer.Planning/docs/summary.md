@@ -15,8 +15,8 @@ configurations, ~62 endpoints, their DTOs and 16 validator files, the domain ser
 (`PlannerStreakService`, `PlanVsActualTrendService`, `SkipSummaryService`, `CalendarDayFactory`,
 `HolidayCalendar`, `PlannerTaskPostponeRule`, `RepeatingPlannerTaskSchedule`, FO11's `SuggestionPatternWindow`,
 and FO4's `PlannerTaskMissedRule` + `DayPacking`), the
-five application services (`CalendarProvisioner`, `PlannerStreakReader`, `PlannedBlockAutoReminders`,
-`ReminderRegistrationService`, `RepeatingTaskMaterialiser`), the two Core seam implementations, the two cross-slice event
+six application services (`CalendarProvisioner`, FO10's `CalendarSleepWindowSync`, `PlannerStreakReader`,
+`PlannedBlockAutoReminders`, `ReminderRegistrationService`, `RepeatingTaskMaterialiser`), the two Core seam implementations, the two cross-slice event
 handlers, and five seeders.
 
 Tables live in the **`planning`** schema (`ModuleSchemas.cs`, keyed on this assembly).
@@ -114,6 +114,13 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   and for the same reason: it is told which user to act for, and filtered it would read no row and
   try to insert a duplicate onto the unique `(user_id, date)`.
 
+- **A day's sleep window is inherited unless the day says otherwise (FO10).** New days start with the user's
+  `UserSleepWindow`, and a changed default is pushed onto existing days from today on by
+  `CalendarSleepWindowSync` — except days with `HasCustomSleepWindow`. Write a day's window through
+  `Calendar.MarkSleepWindow`, never by assigning `WakeUpTime` / `BedTime` directly: an assignment that skips
+  the flag leaves the user's chosen window to be overwritten by their next change of default, with no error.
+  Details in `domain-map.md` § *The sleep window*.
+
 - **`GET /calendar/day-plan/{date}` and `GET /calendar/by-Date/{date}` write (FO6).** For the user's today and
   tomorrow each first runs
   `RepeatingTaskMaterialiser`, which puts every active `AutoPlace` rule's occurrence on the plan
@@ -152,8 +159,8 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
     neither move nor hold time; `InProgress` / `OnHold` / `Completed` / unavoidable blocks hold their slots.
   - **"Now" is the injected `TimeProvider`**, and the apply feeds the same instant to `PlannerTaskMoveRecorder`'s
     `utcNow` overload, so every move is judged against one clock — and the tests can fix it.
-  - **Bed time 00:00 (or after midnight) means 23:59**, the last end a block can have. FO10 will change only the
-    input, not this rule.
+  - **Bed time 00:00 (or after midnight) means 23:59**, the last end a block can have. FO10 changed only the
+    input (the day's bed time now starts as the user's default), not this rule.
 
 - **The slip nudges (audit N5) are a sweep that only notifies.** `PlannerSlipNudgeJobHandler`, every five minutes,
   sends `PlannedBlocksMissed` (today's missed blocks — one notification per user per sweep, at most two a day, none on

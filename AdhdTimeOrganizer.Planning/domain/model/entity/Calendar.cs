@@ -34,6 +34,29 @@ public class Calendar : BaseEntityWithUser
     public required TimeOnly WakeUpTime { get; set; }
     public required TimeOnly BedTime { get; set; }
 
+    /// <summary>
+    /// FO10: whether this day's sleep window was chosen for this day — edited on the day, or brought in by an applied
+    /// template — rather than inherited from the user's default. Only an inherited window follows the default when the
+    /// user changes it (<c>CalendarSleepWindowSync</c>); a chosen one is the user's and is never rewritten. Set by
+    /// <see cref="MarkSleepWindow"/>, never cleared.
+    /// </summary>
+    public bool HasCustomSleepWindow { get; set; }
+
+    /// <summary>
+    /// Writes a sleep window chosen for this day, and marks the day as having one — but only if it actually differs:
+    /// the day editor PUTs the whole row, so re-sending the inherited window while changing the day type is not a
+    /// choice, and must not pin the day against the next change of default.
+    /// </summary>
+    public void MarkSleepWindow(TimeOnly wakeUpTime, TimeOnly bedTime)
+    {
+        if (wakeUpTime == WakeUpTime && bedTime == BedTime)
+            return;
+
+        WakeUpTime = wakeUpTime;
+        BedTime = bedTime;
+        HasCustomSleepWindow = true;
+    }
+
     // Planning status
     public long? AppliedTemplateId { get; set; }
     public string? AppliedTemplateName { get; set; }

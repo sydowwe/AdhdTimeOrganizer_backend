@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.application.dto.response.user;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Microsoft.AspNetCore.Identity;
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.endpoint.user.read;
 using Sydowwe.Framework.application.dto.response.user;
 
@@ -22,6 +23,8 @@ public class GetCurrentUserEndpoint(UserManager<User> userManager)
         new(response)
         {
             FirstDayOfWeek = user.FirstDayOfWeek,
-            WeatherLocation = user.WeatherLocation
+            WeatherLocation = user.WeatherLocation,
+            DefaultWakeUpTime = new TimeDto(user.DefaultWakeUpTime.Hour, user.DefaultWakeUpTime.Minute),
+            DefaultBedTime = new TimeDto(user.DefaultBedTime.Hour, user.DefaultBedTime.Minute)
         };
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -144,7 +145,10 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
                     timezone = user.Timezone.Id,
                     firstDayOfWeek = user.FirstDayOfWeek,
                     askBeforeDelete = user.AskBeforeDelete,
-                    weatherLocation = user.WeatherLocation
+                    weatherLocation = user.WeatherLocation,
+                    // FO10: when the person's day usually starts and ends — about the person, so it travels.
+                    defaultWakeUpTime = user.DefaultWakeUpTime.ToString("HH:mm", CultureInfo.InvariantCulture),
+                    defaultBedTime = user.DefaultBedTime.ToString("HH:mm", CultureInfo.InvariantCulture)
                 }
             },
             plannerTasks,

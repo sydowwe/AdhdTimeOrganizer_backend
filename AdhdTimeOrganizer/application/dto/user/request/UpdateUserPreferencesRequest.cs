@@ -1,10 +1,12 @@
+using Sydowwe.Framework.application.dto.dto;
 using Sydowwe.Framework.application.dto.request.user;
 
 namespace AdhdTimeOrganizer.application.dto.request.user;
 
 /// <summary>
 /// Theme / Locale / Timezone / AskBeforeDelete come from <see cref="UserPreferencesRequest"/>;
-/// <see cref="FirstDayOfWeek"/> and <see cref="WeatherLocation"/> are this portal's own <c>User</c> columns.
+/// <see cref="FirstDayOfWeek"/>, <see cref="WeatherLocation"/> and the default sleep window are this portal's own
+/// <c>User</c> columns.
 /// Everything readable back through <c>AppUserDataResponse</c>.
 /// </summary>
 public record UpdateUserPreferencesRequest : UserPreferencesRequest
@@ -21,4 +23,14 @@ public record UpdateUserPreferencesRequest : UserPreferencesRequest
     /// stored as null.</para>
     /// </summary>
     public string? WeatherLocation { get; init; }
+
+    /// <summary>
+    /// FO10: when the user's day usually starts. Every calendar day they have not given a sleep window of its own —
+    /// today and later — moves onto it (<c>ICalendarSleepWindowSync</c>), and every day created later starts with it.
+    /// </summary>
+    public TimeDto? DefaultWakeUpTime { get; init; }
+
+    /// <summary>FO10: when the user's day usually ends. At or before <see cref="DefaultWakeUpTime"/> means after
+    /// midnight; 00:00 is the default.</summary>
+    public TimeDto? DefaultBedTime { get; init; }
 }

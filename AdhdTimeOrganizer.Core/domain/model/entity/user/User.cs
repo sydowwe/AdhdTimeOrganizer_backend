@@ -63,6 +63,16 @@ public sealed class User : BaseUser, IBaseTableEntity
     [AuditIgnore]
     public DateTime? WelcomeBackReturnedAt { get; set; }
 
+    /// <summary>
+    /// FO10: when this user's day usually starts — the wake-up every calendar day of theirs is created with, and the
+    /// one their untouched future days are rewritten to when it changes. See <see cref="UserSleepWindow"/>.
+    /// </summary>
+    public TimeOnly DefaultWakeUpTime { get; set; } = UserSleepWindow.Fallback.WakeUpTime;
+
+    /// <inheritdoc cref="DefaultWakeUpTime"/>
+    public TimeOnly DefaultBedTime { get; set; } = UserSleepWindow.Fallback.BedTime;
+
+    public UserSleepWindow SleepWindow => new(DefaultWakeUpTime, DefaultBedTime);
 
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
 

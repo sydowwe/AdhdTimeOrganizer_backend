@@ -23,6 +23,7 @@ public class CalendarConfiguration : IEntityTypeConfiguration<Calendar>
         builder.Property(c => c.AppliedTemplateName).HasMaxLength(200);
         builder.Property(c => c.Weather).HasMaxLength(100);
         builder.Property(c => c.Notes).HasMaxLength(1000);
+        builder.Property(c => c.HasCustomSleepWindow).HasDefaultValue(false).IsRequired();
 
         builder.HasIndex(c => new { c.UserId, c.Date }).IsUnique();
         // The one cross-user read by date: PlannerSlipNudgeJobHandler, every five minutes, wants the three dates around

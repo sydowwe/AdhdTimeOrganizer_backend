@@ -57,7 +57,7 @@ public static class DayPacking
 
     /// <summary>
     /// The last minute a day's blocks may end on, from its sleep window: bed time, unless bed time is at or before
-    /// wake-up time — 00:00 (the default every day starts with, <c>CalendarDayFactory</c>) or any time after
+    /// wake-up time — 00:00 (the default bed time, <c>UserSleepWindow.Fallback</c>) or any time after
     /// midnight — in which case the day's own end, <see cref="LastEndMinute"/>. A block cannot cross midnight, so
     /// a bed time after it clips to the end of the day rather than reaching into the next one.
     /// </summary>

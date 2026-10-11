@@ -28,6 +28,13 @@ public class UserEntityConfiguration : IEntityTypeConfiguration<User>
         // state (no weather signal) rather than a missing value to be defaulted.
         builder.Property(u => u.WeatherLocation).HasMaxLength(120);
         builder.Property(u => u.AskBeforeDelete).HasDefaultValue(true).IsRequired();
+        // The C# initializers are C#-only, like IsActive's below: without a database default the migration would
+        // backfill every existing user with 00:00 for both. The sentinel is the default itself, so an insert carrying
+        // 00:00 (a user who wakes at midnight) is written as 00:00 rather than mistaken for "unset" and replaced.
+        builder.Property(u => u.DefaultWakeUpTime).HasDefaultValue(UserSleepWindow.Fallback.WakeUpTime)
+            .HasSentinel(UserSleepWindow.Fallback.WakeUpTime).IsRequired();
+        builder.Property(u => u.DefaultBedTime).HasDefaultValue(UserSleepWindow.Fallback.BedTime).IsRequired();
+        builder.Ignore(u => u.SleepWindow);
         // BaseUser's `= true` initializer is C#-only; without this the migration backfills existing rows
         // with `false` and deactivates every user.
         builder.Property(u => u.IsActive).HasDefaultValue(true).IsRequired();

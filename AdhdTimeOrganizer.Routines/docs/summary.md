@@ -66,7 +66,7 @@ has no knowledge of Planning at all.
   `GetAwayDatesAsync` — by `RoutineAwayDaysReader` (every reset site), the nudge sweep and
   `CalendarDayTypesChangedEventHandler`, for FO1's away-cycle excusal (see `domain-map.md`, *Away cycles*).
   Single-service resolution, so a missing registration throws at activation rather than silently falling
-  back to 08:00 or to "never away".
+  back to the user's default wake-up or to "never away".
 - **One Core event is consumed here**: `CalendarDayTypesChangedEvent`, published by Planning's two day-type
   writes. Its handler logs and swallows, so `RoutineAwayExcusalFlowTests` asserts on rows.
 
@@ -76,7 +76,8 @@ has no knowledge of Planning at all.
   `ShouldWarnGraceExpiring`) and the `EndingSoonNotifiedFor` / `GraceNotifiedFor` marks are UTC end to
   end and must stay so. Only *when a due nudge reaches the user* is zone-aware: the nudge sweep runs every
   15 minutes and sends each window at the first wake-up + 60 min in `User.Timezone` that falls inside it
-  (the day's calendar wake-up, 08:00 without a row; the window's opening instant if no morning fits).
+  (the day's calendar wake-up, or without a row the user's own default, `User.DefaultWakeUpTime` — FO10;
+  the window's opening instant if no morning fits).
   It used to be one 09:00 UTC run for everyone. `RoutineSuggestedTodayJobHandler` works in
   `User.Timezone` throughout — "today" itself is local there — runs every 15 minutes, and marks
   `SuggestedTodayNotifiedFor` on **all** of a user's periods with an `ExecuteUpdate` straight after a
