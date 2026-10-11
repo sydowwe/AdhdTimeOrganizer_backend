@@ -41,12 +41,24 @@ public sealed class PlanningScheduledJobsRegistrar(
         Description = "Places auto-placing repeating rules' occurrences for each user's today and tomorrow, and their automatic reminders."
     };
 
+    public static RecurringJobRegistration SlipNudgeRegistration { get; } = new()
+    {
+        JobKey = PlannerSlipNudgeJobHandler.HandlerKey,
+        HandlerKey = PlannerSlipNudgeJobHandler.HandlerKey,
+        OwnerModule = "Planning",
+        // Every five minutes in UTC; the handler is zone-aware per user. Five is how late a "missed" or "time's up"
+        // may arrive and still be about now — the overrun already waits five minutes past the end on purpose.
+        Schedule = ScheduleSpec.FromCron("0 0/5 * * * ?"),
+        DisallowConcurrent = true,
+        Description = "Tells users when today's planned blocks slipped by unstarted, or a started block ran past its end."
+    };
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = services.CreateAsyncScope();
         var scheduler = scope.ServiceProvider.GetRequiredService<IScheduler>();
 
-        foreach (var registration in new[] { CompleteFinishedTasksRegistration, MaterialiseRepeatingTasksRegistration })
+        foreach (var registration in new[] { CompleteFinishedTasksRegistration, MaterialiseRepeatingTasksRegistration, SlipNudgeRegistration })
         {
             try
             {

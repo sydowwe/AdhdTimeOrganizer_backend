@@ -25,6 +25,10 @@ public class CalendarConfiguration : IEntityTypeConfiguration<Calendar>
         builder.Property(c => c.Notes).HasMaxLength(1000);
 
         builder.HasIndex(c => new { c.UserId, c.Date }).IsUnique();
+        // The one cross-user read by date: PlannerSlipNudgeJobHandler, every five minutes, wants the three dates around
+        // UTC today for everyone. The unique index above leads with user_id and cannot serve it, and CalendarSeeder fills
+        // whole years per user, so without this every tick scans every seeded day. Writes here are rare.
+        builder.HasIndex(c => c.Date);
         // No index on DayType alone (PERF-5), for the same reason as planner_task.status: five distinct values
         // and no user prefix, so every calendar read reaches the row through (user_id, date) instead.
     }

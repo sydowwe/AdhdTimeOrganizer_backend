@@ -231,6 +231,10 @@ Archived activities pass; archival is not ownership. Guarded by
   and the same seconds would be credited to both. Its second method, `LatestStartBetweenAsync`, is the
   one that *does* key on `ActivityId`, on purpose: it answers "was the paired leisure activity started
   after this item was done", and that recording is never linked to the item. Don't unify the two.
+- **`TimerBoundaryAlarmRunningTimerLookup` (`application/seam/`) answers Core's `IRunningTimerLookup`** for
+  Planning's overrun nudge (audit N5): "running" is a pending `TimerBoundaryAlarm` whose `BoundaryAt` is still
+  ahead. Keep the `BoundaryAt > now` predicate — a stale row the boot registrar has not swept yet would otherwise
+  silence every overrun nudge for that user. It reads alarm rows only; they are still not timer state.
 - **A save touching `ActivityHistory` needs the three materialized views to exist**, or Postgres
   fails with 42P01. The app installs them via `SuggestionPatternViewInstaller` (embedded resources);
   the test fixture applies `sqlScripts/*.sql` in `AppDbContextFixture.OnSchemaCreatedAsync`. If

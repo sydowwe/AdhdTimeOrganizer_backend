@@ -138,6 +138,35 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
         push.Endpoints.Should().BeEquivalentTo([EndpointOf(PresentUserId), EndpointOf(NeverMeasuredUserId)]);
     }
 
+    /// <summary>
+    /// P1-04: the planner's slip sweep — "blocks slipped" and "time's up" — is about a moment that passes without it,
+    /// so a user who is not there gets it in the bell only.
+    /// </summary>
+    [Theory(DisplayName = "A missed-block or overrun nudge to an away user waits in the bell; the others are pushed")]
+    [InlineData(NotificationType.PlannedBlocksMissed)]
+    [InlineData(NotificationType.PlannedBlockOverrun)]
+    public async Task PlannerSlipNudges_ReachTheAwayUsersBellOnly(NotificationType type)
+    {
+        var push = new CapturingWebPushSender();
+        await using var factory = CreateFactory(push, new CapturingEmailSender());
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var notifications = scope.ServiceProvider.GetRequiredService<INotificationService>();
+            var recipients = NotificationRecipients.Users(Everyone);
+            if (type == NotificationType.PlannedBlocksMissed)
+                await notifications.NotifyAsync(recipients, new PlannedBlocksMissedPayload(DateOnly.FromDateTime(DateTime.UtcNow), 2, 1), CancellationToken);
+            else
+                await notifications.NotifyAsync(recipients, new PlannedBlockOverrunPayload(1, "Deep work", 10), CancellationToken);
+        }
+
+        await using var db = CreateDbContext();
+        (await db.Set<Notification>().Where(n => n.Type == type).Select(n => n.UserId).ToListAsync(CancellationToken))
+            .Should().BeEquivalentTo(Everyone, "held means bell-only, never dropped");
+
+        push.Endpoints.Should().BeEquivalentTo([EndpointOf(PresentUserId), EndpointOf(NeverMeasuredUserId)]);
+    }
+
     [Fact(DisplayName = "A reminder the away user set is still pushed to them")]
     public async Task UnheldKind_ReachesTheAwayUserAsUsual()
     {

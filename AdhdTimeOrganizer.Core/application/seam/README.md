@@ -19,6 +19,7 @@ if the two ever drift apart.
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` (`AttributeAsync`), `AndroidSyncEndpoint` (`AttributeSpanAsync`, FO9) |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint`; Routines — `RoutineSuggestedTodayJobHandler`, for the day's `WakeUpTime` |
 | `IFocusIntervalSource` | read | single | History | Tracking — `DesktopMappingSuggestionsEndpoint` (FO9), which learns process → activity from timer focus phases |
+| `IRunningTimerLookup` | read | single | History (pending `TimerBoundaryAlarm` rows) | Planning — `PlannerSlipNudgeJobHandler`, which holds the overrun nudge while the user has a timer running (audit N5) |
 | `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint` |
 | `ITodoListItemPlanSource` | read | single | Planning | TodoLists — `GetAllTodoListItemEndpoint`, `GetByIdTodoListItemEndpoint`, through `TodoListItemPlannedSlotFiller`, for `NextPlannedSlot`; the same two plus `GetDashboardTodoListItemEndpoint` for `PlanHelp` (`PlanHistoryAsync`, FO3) |
 | `IUserOwnedReferenceVerifier` | read | keyed `IEnumerable<>` | TodoLists (`todoListItem`), Routines (`routineTodoList`) | History — `Create`/`UpdateActivityHistoryEndpoint`; Planning — `Create`/`UpdatePlannerTaskEndpoint` and both apply-template endpoints, for `PlannerTask.TodolistItemId`. Both through Core's `IReferencedIdOwnershipService` |
@@ -108,6 +109,11 @@ None of these break the build, and only one of them throws.
   rows looks like "more data", but tracker rows were produced by the very rules a suggestion creates, so the
   suggestions would start confirming themselves. `DesktopMappingSuggestionsTests` seeds a non-timer row and
   asserts it suggests nothing.
+- **`IRunningTimerLookup` fails silently if it answers wrongly.** Answering "nobody" sends the overrun nudge over a
+  running Pomodoro — the pre-seam behaviour, noisy but harmless; answering "everybody" (a dropped `BoundaryAt > now`
+  predicate, which stale alarm rows would satisfy) silences every overrun nudge for good.
+  `PlannerSlipNudgeJobTests` asserts both directions on sent notifications: a pending alarm holds the nudge, a past
+  one does not.
 - **The single seams throw at endpoint activation** if unregistered. That is the point of
   resolving them as a single service rather than an `IEnumerable<>`. `IActivityReferenceService` —
   the one face Core's endpoints inject over the keyed sources — is registered the same way and for the

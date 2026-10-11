@@ -147,13 +147,21 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   nothing written. `GET …/next-free-slot` is the same rule for one block. Details in `domain-map.md`
   § *Re-planning the rest of today*. What keeps it honest:
   - **One "missed"** — `PlannerTaskMissedRule` (`NotStarted`, foreground, end passed on the user's clock). Derived,
-    never stored; N5's nudge should read it, not re-derive it.
+    never stored; N5's nudge (`PlannerSlipNudgeJobHandler`) reads it rather than re-deriving it.
   - **One placement rule** — `DayPacking`, pure, behind all three routes via `DayReplanPlanner`. Background blocks
     neither move nor hold time; `InProgress` / `OnHold` / `Completed` / unavoidable blocks hold their slots.
   - **"Now" is the injected `TimeProvider`**, and the apply feeds the same instant to `PlannerTaskMoveRecorder`'s
     `utcNow` overload, so every move is judged against one clock — and the tests can fix it.
   - **Bed time 00:00 (or after midnight) means 23:59**, the last end a block can have. FO10 will change only the
     input, not this rule.
+
+- **The slip nudges (audit N5) are a sweep that only notifies.** `PlannerSlipNudgeJobHandler`, every five minutes,
+  sends `PlannedBlocksMissed` (today's missed blocks — one notification per user per sweep, at most two a day, none on
+  an away day or for a block created after its end) and `PlannedBlockOverrun` (a started, non-auto-complete block 5+
+  minutes past its end — held while the user has a timer running, through Core's `IRunningTimerLookup`, implemented by
+  History). Its marks, `MissedNotifiedAt` / `OverrunNotifiedAt`, cover **one slot**: a block moved or extended later
+  can be announced again, and the daily cap counts the distinct missed stamps on the day. A write path needs to do
+  nothing for it. Details in `domain-map.md` § *Slip nudges*.
 
 - **Pattern suggestions are recent-only, and the numbers live twice (FO11).** `SuggestionPatternWindow` holds
   the windows (weekday: 3+ sittings in 12 weeks, one in the last 4; day of month: 3+ in 12 months, one in the

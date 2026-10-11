@@ -1463,6 +1463,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_calendar");
 
+                    b.HasIndex("Date")
+                        .HasDatabaseName("ix_calendar_date");
+
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_calendar_user_id");
 
@@ -1534,6 +1537,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("location");
 
+                    b.Property<DateTime?>("MissedNotifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("missed_notified_at");
+
                     b.Property<DateTime>("ModifiedTimestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1552,6 +1559,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Property<TimeOnly?>("OriginalStartTime")
                         .HasColumnType("time without time zone")
                         .HasColumnName("original_start_time");
+
+                    b.Property<DateTime?>("OverrunNotifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("overrun_notified_at");
 
                     b.Property<int>("PostponeCount")
                         .HasColumnType("integer")

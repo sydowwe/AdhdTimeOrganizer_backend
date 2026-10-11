@@ -81,6 +81,26 @@ public class EnPortalNotificationTexts : EnNotificationTexts
 
     public override string PlannedBlockStartingFallbackBody => "Your next planned block is about to start.";
 
+    // A nudge, not a reproach: it says what happened and offers the next step.
+    public override string PlannedBlocksMissedTitle => "Your plan slipped";
+
+    // "1 planned block slipped by — re-plan the rest of today?", "3 planned blocks slipped by — …".
+    public override string PlannedBlocksMissedBody(int count) =>
+        $"{count} planned {Plural(count, "block", "blocks")} slipped by — re-plan the rest of today?";
+
+    public override string PlannedBlocksMissedFallbackBody => "Some planned blocks slipped by — re-plan the rest of today?";
+
+    public override string PlannedBlockOverrunTitle => "Time's up";
+
+    // "Time for “Deep work” ran out 10 min ago — wrap up or extend?"; no name: "Your planned block ended …".
+    public override string PlannedBlockOverrunBody(string? activityName, int minutesOver)
+    {
+        var ago = minutesOver > 0 ? $" {Lead(minutesOver)} ago" : string.Empty;
+        return activityName is { Length: > 0 }
+            ? $"Time for {Quote(activityName)} ran out{ago} — wrap up or extend?"
+            : $"Your planned block ended{ago} — wrap up or extend?";
+    }
+
     private static string Lead(int minutes) => (minutes / 60, minutes % 60) switch
     {
         (0, var m) => $"{m} min",

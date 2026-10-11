@@ -224,7 +224,12 @@ public static class ModuleServiceExtensions
                 // Planning's automatic block reminders: system-generated, about a moment that passes without them,
                 // and a whole day of them is exactly what a returning user should not find on their lock screen.
                 // The reminders the user wrote (PersonalReminder) are not held — they asked for those.
-                NotificationType.PlannedBlockStarting
+                NotificationType.PlannedBlockStarting,
+
+                // Planning's slip sweep (audit N5): "blocks slipped" and "time's up" are about a moment, and a
+                // returning user does not need a pile of them on the lock screen.
+                NotificationType.PlannedBlocksMissed,
+                NotificationType.PlannedBlockOverrun
             ];
             o.SupportedTypes =
         [
@@ -251,6 +256,10 @@ public static class ModuleServiceExtensions
             // Planning slice: the automatic reminder PlannedBlockAutoReminders creates for a new block, under the
             // user's own UserPlannerSettings.AutoReminderMode. Its own row, so muting it leaves PersonalReminder alone.
             NotificationType.PlannedBlockStarting,
+
+            // Planning slice: PlannerSlipNudgeJobHandler, through PlannerNotificationService.
+            NotificationType.PlannedBlocksMissed,
+            NotificationType.PlannedBlockOverrun,
 
             // History slice: TimerBoundaryAlarmJobHandler, on every pomodoro boundary.
             NotificationType.TimerBoundary,

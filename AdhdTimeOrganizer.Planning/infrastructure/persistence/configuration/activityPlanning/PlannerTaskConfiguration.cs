@@ -68,6 +68,5 @@ public class PlannerTaskConfiguration : IEntityTypeConfiguration<PlannerTask>
         // index leading with an FK column makes EF drop that FK's own (unfiltered) index as redundant.
         builder.HasIndex(p => p.AutoCompleteAtEnd)
             .HasDatabaseName("ix_planner_task_auto_complete_in_progress")
-            .HasFilter("auto_complete_at_end AND status = 1");
-    }
+            .HasFilter("auto_complete_at_end AND status = 1");    }
 }

@@ -73,6 +73,25 @@ public class PlannerTask : BasePlannerTask
     /// </summary>
     public long? SourceRepeatingTaskId { get; set; }
 
+    /// <summary>
+    /// When <c>PlannerSlipNudgeJobHandler</c> last told the user this block slipped by unstarted (audit N5), UTC;
+    /// null if it never did. Written only after the notification went out.
+    /// <para>
+    /// <b>A mark for one slot, not for the task.</b> The block counts as announced only while this is at or after
+    /// its current end — move it later (a re-plan, a drag) and the new slot can be announced once more. The sweep
+    /// stamps every block of one notification with the same instant, so the distinct values on a day are also how
+    /// many missed notifications that day already cost the user, which is what the daily cap counts.
+    /// </para>
+    /// </summary>
+    public DateTime? MissedNotifiedAt { get; set; }
+
+    /// <summary>
+    /// When <c>PlannerSlipNudgeJobHandler</c> last told the user this started block ran past its end, UTC; null if
+    /// it never did. The same "at or after the current end" reading as <see cref="MissedNotifiedAt"/>, so extending
+    /// the block re-arms the nudge for its new end.
+    /// </summary>
+    public DateTime? OverrunNotifiedAt { get; set; }
+
     public long CalendarId { get; set; }
 
     /// <summary>

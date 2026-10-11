@@ -285,7 +285,7 @@ in the same migration for FO6, so `planner_task` is altered once. Nothing reads 
 At 11:30, with the 10:00 and 11:00 blocks slipped, one tap packs what slipped into the time that is left. Three
 routes off `/calendar/day-plan/{date}`, one rule (`DayPacking`, fed by `DayReplanPlanner`), and one definition of
 **missed** (`PlannerTaskMissedRule`): `NotStarted`, not background, end passed on the user's clock — derived, never
-stored, and meant to be what audit N5's nudge reads too.
+stored, and what audit N5's nudge reads too (§ *Slip nudges* below).
 
 | Route | What it does |
 |---|---|
@@ -317,6 +317,29 @@ minutes, registered by `PlanningScheduledJobsRegistrar`) completes such a task o
 `EndTime` has passed **on the owner's clock**, recording `ActualEndTime = EndTime`; it re-syncs reminders and
 fans out for tasks on the user's today, like `PatchPlannerTaskStatusEndpoint`. A `NotStarted` task is never
 closed — nothing said it began.
+
+### Slip nudges (audit N5, P1-04)
+
+`PlannerSlipNudgeJobHandler` (every five minutes, `PlanningScheduledJobsRegistrar`) **only notifies** — it never writes a
+status, which is why it is not folded into the auto-complete job above. Two kinds, through `IPlannerNotificationService`:
+
+| Question | Missed — `PlannedBlocksMissed` | Overrun — `PlannedBlockOverrun` |
+|---|---|---|
+| Which blocks? | `PlannerTaskMissedRule.IsMissed` on the user's clock: `NotStarted`, foreground, end passed | `InProgress`, not `AutoCompleteAtEnd` (that one is the other job's), foreground, end passed by ≥ `OverrunGrace` (5 min) |
+| Which day? | The user's **today** only (calendar date in their zone) — a block left open on an earlier day never pings | Same |
+| How many notifications? | **One per user per sweep**, `Count` = the blocks newly found, linked to the earliest. At most `MissedNotificationsPerDay` (2) a day; after that, nothing | One per block end |
+| Also skipped | An away day (`DayType.IsAway`). A block **created after its own end** — a template applied at noon, a block logged after the fact — was never an attempt | While the user has a timer running (`IRunningTimerLookup`, History's pending alarms): the timer rings on its own. Left unmarked, so it comes on the first sweep after the timer stops |
+| The mark | `PlannerTask.MissedNotifiedAt` | `PlannerTask.OverrunNotifiedAt` |
+
+**A mark covers one slot, not the task.** Both are the sweep's UTC instant, stamped (`ExecuteUpdate` — not an edit, so no
+timestamp or `row_version` bump) only after the notification went out, and a block counts as announced only while its mark
+is at or after its **current** end. Re-plan a missed block later, or extend an overrunning one, and the new slot can be
+announced again. Every block in one missed notification shares one stamp, so the **distinct** stamps on the user's today are
+the count the daily cap reads — no ledger table. A deleted block takes its stamp with it, which can only loosen the cap.
+
+Both kinds are held while away (`HeldWhileAwayTypes`) and deferred by quiet hours, downstream in Notifications. The query
+reads the three calendar dates around UTC today for every user (`ix_calendar_date`) and keeps each user's own today in
+memory.
 
 ### Skip summary (B1)
 
@@ -623,13 +646,15 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `PlannerTaskActivityReferenceSource` | Core seam (keyed) | Publishes and repoints `ActivityId` across **all three** task tables and FO11's dismissals (collapsing duplicate keys to the latest). The suggestion views are deliberately absent — they'd double-count | `application/seam/PlannerTaskActivityReferenceSource.cs` |
 | `TodoListItemPlanSource` | Core seam (by type) | `ITodoListItemPlanSource` — each to-do item's earliest open block from the user's today on, so TodoLists can say "scheduled" without the planner writing the item's `DueDate`; and (`PlanHistoryAsync`, FO3) every linked block sorted by outcome (completed, carried over, missed, skipped per reason) so TodoLists can tell a stuck item | `application/seam/TodoListItemPlanSource.cs` |
 | `CompleteFinishedPlannerTasksJobHandler` | Scheduled job | Completes `AutoCompleteAtEnd` tasks that are in progress and over, every five minutes; registered by `PlanningScheduledJobsRegistrar` (wired in `Program.cs`) | `infrastructure/jobs/`, `infrastructure/scheduling/` |
+| `PlannerSlipNudgeJobHandler` | Scheduled job | Audit N5, every five minutes: today's missed blocks (one capped notification per user per sweep) and started blocks running past their end (one per block end, held while a timer runs). Notifies only; marks `MissedNotifiedAt` / `OverrunNotifiedAt` | `infrastructure/jobs/`, `infrastructure/scheduling/` |
+| `PlannerNotificationService` | Application service | The planner's direct notification producer (`IPlannerNotificationService`): maps the sweep's findings onto `PlannedBlocksMissedPayload` / `PlannedBlockOverrunPayload`, best-effort, returns whether it went out, logs ids only | `application/service/PlannerNotificationService.cs` |
 | `MaterialiseRepeatingTasksJobHandler` | Scheduled job | Every 15 min (UTC cron, zone-aware per user): runs the materialiser for each user whose own tomorrow is past an active auto-placing rule's watermark — once per local day, after their midnight. Skips away users (`UserPresence.IsAbsent`) rather than gating them; one DI scope per user; no signed-in user | `infrastructure/jobs/`, `infrastructure/scheduling/` |
 | `CalendarDayLookup` | Core seam (by type) | Day metadata for History's calendar dashboard. Reads no-tracking and selects seven columns; `DayIndex` is the eighth and is computed (`Calendar.DayIndexOf`), so that one is projected in memory | `application/seam/CalendarDayLookup.cs` |
 | `RoutineTodoListIsDoneChangedEventHandler` | Event handler | A routine's done state onto today's planner tasks for the same activity, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows, exactly as the to-do handler below does — the two are the same rule and any difference between them is a bug, not a design | `application/eventHandler/` |
 | `TodoListItemIsDoneChangedEventHandler` | Event handler | A to-do item's done state onto today's linked tasks, then re-syncs their reminders. **Leaves `Cancelled` tasks alone**, and log-and-swallows so an unrelated endpoint never 500s | `application/eventHandler/` |
 | *(both handlers)* | — | "Today" is the **user's** date, resolved from the event's `UserId` through `IUserTimeZoneResolver` / `TaskPlannerHelper.TodayIn` — never `DateTime.UtcNow`'s. `PatchPlannerTaskStatusEndpoint` holds the same rule for deciding whether to publish at all | — |
 | *(both handlers)* | — | Each scopes its query on the **event's** `UserId`, never on the ambient query filter: they run in a fresh scope, and `ScopeUserId` is `null` in any unauthenticated context, which turns that filter into a no-op. Both events carry the id for exactly this | — |
-| `ICalendarProvisioner` · `IPlannerStreakReader` · `IReminderRegistrationService` | Contracts | | `domain/serviceContract/` |
+| `ICalendarProvisioner` · `IPlannerStreakReader` · `IReminderRegistrationService` · `IPlannerNotificationService` | Contracts | | `domain/serviceContract/` |
 
 ### Seeders (Order band 400–499)
 

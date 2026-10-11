@@ -189,6 +189,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(PurgeExpiredActivityTrackingEntriesJobHandler.HandlerKey, keys);
         Assert.Contains(CompleteFinishedPlannerTasksJobHandler.HandlerKey, keys);
         Assert.Contains(MaterialiseRepeatingTasksJobHandler.HandlerKey, keys);
+        Assert.Contains(PlannerSlipNudgeJobHandler.HandlerKey, keys);
         Assert.Contains(SuggestionPatternRefreshJobHandler.HandlerKey, keys);
     }
 
@@ -394,6 +395,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(TrackingScheduledJobsRegistrar.RetentionPurgeRegistration.JobKey, jobKeys);
         Assert.Contains(PlanningScheduledJobsRegistrar.CompleteFinishedTasksRegistration.JobKey, jobKeys);
         Assert.Contains(PlanningScheduledJobsRegistrar.MaterialiseRepeatingTasksRegistration.JobKey, jobKeys);
+        Assert.Contains(PlanningScheduledJobsRegistrar.SlipNudgeRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.SuggestionPatternRefreshRegistration.JobKey, jobKeys);
     }
 
