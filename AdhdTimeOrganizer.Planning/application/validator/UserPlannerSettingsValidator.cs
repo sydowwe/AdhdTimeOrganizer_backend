@@ -9,6 +9,7 @@ public class UserPlannerSettingsValidator : Validator<UserPlannerSettingsRequest
     public UserPlannerSettingsValidator()
     {
         RuleFor(x => x.ReminderMinutesBefore).InclusiveBetween(0, 120);
+        RuleFor(x => x.AutoReminderMode).IsInEnum();
         RuleFor(x => x.SlotDurationMinutes).InclusiveBetween(1, 120);
         RuleFor(x => x.DefaultConflictResolution).IsInEnum();
         RuleFor(x => x.DefaultApplyTemplateId).GreaterThan(0).When(x => x.DefaultApplyTemplateId.HasValue);

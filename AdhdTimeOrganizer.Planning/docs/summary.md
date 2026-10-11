@@ -14,7 +14,7 @@ configurations, ~62 endpoints, their DTOs and 16 validator files, the domain ser
 (`PlannerStreakService`, `PlanVsActualTrendService`, `SkipSummaryService`, `CalendarDayFactory`,
 `HolidayCalendar`, `PlannerTaskPostponeRule`, `RepeatingPlannerTaskSchedule`, and FO4's `PlannerTaskMissedRule` +
 `DayPacking`), the
-four application services (`CalendarProvisioner`, `PlannerStreakReader`,
+five application services (`CalendarProvisioner`, `PlannerStreakReader`, `PlannedBlockAutoReminders`,
 `ReminderRegistrationService`, `RepeatingTaskMaterialiser`), the two Core seam implementations, the two cross-slice event
 handlers, and five seeders.
 
@@ -91,6 +91,21 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   after the commit. Same reason `PlannerTemplateApplier.StagedTaskDeletions` reads the ChangeTracker
   before the save.
 
+- **Every path that creates a `PlannerTask` must hand the new ids to `IPlannedBlockAutoReminders`
+  after its save** (audit N1, P1-03). That is what gives a new block its automatic reminder under
+  `UserPlannerSettings.AutoReminderMode` (default `ImportantOnly`, importance ≥
+  `AutoReminderMinImportance` = Critical): an ordinary `Reminder` row with `IsAuto = true`, registered
+  as its own kind `PlannedBlockStarting` (mutable separately, held while the user is away). Today's
+  callers: `CreatePlannerTaskEndpoint`, both template applies and the materialiser (read
+  `PlannerTemplateApplier.StagedTaskAdditions` before the save, take the ids after — carved segments
+  are new blocks too), and `CopyToDaysPlannerTaskEndpoint`. A path that forgets answers 201 and the
+  block silently never rings. A move or status change must **not** call it: created-once is what lets
+  a user delete an automatic reminder for good. Everything after creation — moves, status, deletes —
+  is the existing `SyncForPlannerTasksAsync` / `CancelManyAsync` story, and
+  `PlannedBlockStartingGuard` retires at fire time what a path missed (gone, started, moved).
+  `SyncCalendarToGoogleEndpoint` (host) turns Google's own popups off for any block with a portal
+  reminder, or the phone rings twice. Pinned by `PlannedBlockAutoReminderTests`.
+
 - **`ICalendarProvisioner.EnsureForDateAsync` commits.** Call it *before* staging your own writes —
   anything already pending on the ambient `DbContext` goes in with the calendar. All three callers
   resolve up front, which is why the two CRUD ones do it in `BeforeMapping` and not `AfterMapping`.
@@ -111,12 +126,18 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
     `row_version` serialises two racing reads.
   - **Conflicts go through `PlannerTemplateApplier.StageAgainstDay`** with the user's `DefaultConflictResolution`.
   - **A rule edit reconciles** (`ReconcileAfterEditAsync`): *untouched* occurrences from today on (still
-    `NotStarted`, no original slot, still the old rule's exact plan, no to-do/Google/reminder link) follow the edit,
-    or are removed when the rule stops placing there; a decided day the edit newly matches gets its block.
+    `NotStarted`, no original slot, still the old rule's exact plan, no to-do/Google link and no reminder the
+    *user* wrote — an automatic one does not count) follow the edit, or are removed when the rule stops placing
+    there; a decided day the edit newly matches gets its block.
   - **It never fails its caller** and clears the tracker on failure; it **commits**, so the same ordering rule as
     `EnsureForDateAsync` applies.
   - **Day matching is `RepeatingPlannerTaskSchedule.FallsOn`**, shared with the suggestion endpoint, so the
     panel never offers a rule on a day the plan would not receive it.
+  - **It also runs with nobody signed in**: `MaterialiseRepeatingTasksJobHandler` (every 15 min, zone-aware) calls
+    it once per user per local day, after their midnight, so a user who never opens the app still gets the
+    block — and its automatic reminder. Every row it writes carries an explicit `UserId`; in that job nothing
+    could stamp one, and an insert relying on it dies on the FK. Away users (`UserPresence.IsAbsent`) are
+    **skipped, not gated**, so their days stay undecided and their first read after the return places them.
 
 - **FO4's re-plan never trusts a client placement — it never receives one.** `POST /calendar/day-plan/{date}/replan`
   previews (writes no task), `…/replan/apply` takes back only the preview's `previewToken` plus a decision per

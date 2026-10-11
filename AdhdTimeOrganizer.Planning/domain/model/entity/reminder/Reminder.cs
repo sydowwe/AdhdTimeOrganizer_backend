@@ -15,10 +15,11 @@ namespace AdhdTimeOrganizer.Planning.domain.model.entity.reminder;
 /// for "did it fire yet" drift the first time a scan and a request interleave.
 /// </para>
 /// <para>
-/// <b>The absence of a row is the "no reminder" state.</b> That is what makes reminders opt-in per planner
-/// task rather than automatic for every task, and it is why this is a separate entity instead of a couple of
-/// columns on <c>PlannerTask</c> — columns would cap the user at one reminder per task and would have
-/// nowhere to put a standalone one.
+/// <b>The absence of a row is the "no reminder" state.</b> That is why this is a separate entity instead of a
+/// couple of columns on <c>PlannerTask</c> — columns would cap the user at one reminder per task and would have
+/// nowhere to put a standalone one. A new block may get one row without asking (<see cref="IsAuto"/>, under the
+/// user's <c>AutoReminderMode</c>); deleting that row is how the user says "not for this block", and it stays
+/// deleted.
 /// </para>
 /// </summary>
 public class Reminder : BaseEntityWithUser
@@ -86,6 +87,22 @@ public class Reminder : BaseEntityWithUser
     public long? PlannerTaskId { get; set; }
 
     public virtual PlannerTask? PlannerTask { get; set; }
+
+    /// <summary>
+    /// True for a reminder the planner created by itself when the block was created (audit N1, under
+    /// <c>UserPlannerSettings.AutoReminderMode</c>), false for one the user wrote. Set at creation, and only ever
+    /// cleared: an edit through <c>PUT /reminder/{id}</c> makes the row the user's own. It picks the module key's
+    /// <c>Kind</c>, so that one path cancels the automatic key before re-registering — a key that changed silently
+    /// would strand the old definition and fire twice.
+    /// <para>
+    /// It is what makes the automatic ones distinguishable: they are registered as their own notification kind
+    /// (<c>PlannedBlockStarting</c>, mutable and held while the user is away without touching the reminders the
+    /// user wrote), and they do not count as "the user touched this block" for a repeating rule's reconcile. They
+    /// are created at the block's creation <b>only</b>: no re-sync ever re-creates one, so a user who deletes an
+    /// automatic reminder wins.
+    /// </para>
+    /// </summary>
+    public bool IsAuto { get; set; }
 
     /// <summary>True when this reminder stands on its own rather than tracking a planner task's time.</summary>
     public bool IsStandalone => PlannerTaskId is null;

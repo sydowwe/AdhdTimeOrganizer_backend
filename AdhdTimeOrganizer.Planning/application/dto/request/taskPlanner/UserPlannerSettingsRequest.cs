@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using AdhdTimeOrganizer.Planning.application.dto.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using Sydowwe.Framework.application.dto.request.@interface;
 
 namespace AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
@@ -12,6 +13,13 @@ public record UserPlannerSettingsRequest : IMyRequest<UserPlannerSettings>
 
     [Range(0, 120)]
     public required int ReminderMinutesBefore { get; init; }
+
+    /// <summary>Which new blocks get a reminder automatically.</summary>
+    public required AutoReminderMode AutoReminderMode { get; init; }
+
+
+    /// <summary>The importance value a block must reach in <c>ImportantOnly</c> mode — one of the user's own levels.</summary>
+    public required int AutoReminderMinImportance { get; init; }
 
 
     public required bool DetailsPanelExpandedByDefault { get; init; }
@@ -38,6 +46,8 @@ public record UserPlannerSettingsRequest : IMyRequest<UserPlannerSettings>
     {
         entity.RemindersEnabled = RemindersEnabled;
         entity.ReminderMinutesBefore = ReminderMinutesBefore;
+        entity.AutoReminderMode = AutoReminderMode;
+        entity.AutoReminderMinImportance = AutoReminderMinImportance;
         entity.DetailsPanelExpandedByDefault = DetailsPanelExpandedByDefault;
         entity.ArrowKeyNavEnabled = ArrowKeyNavEnabled;
         entity.PredefinedSkipReasons = PredefinedSkipReasons;
@@ -52,6 +62,8 @@ public record UserPlannerSettingsRequest : IMyRequest<UserPlannerSettings>
         UserId = 0,
         RemindersEnabled = RemindersEnabled,
         ReminderMinutesBefore = ReminderMinutesBefore,
+        AutoReminderMode = AutoReminderMode,
+        AutoReminderMinImportance = AutoReminderMinImportance,
         DetailsPanelExpandedByDefault = DetailsPanelExpandedByDefault,
         ArrowKeyNavEnabled = ArrowKeyNavEnabled,
         PredefinedSkipReasons = PredefinedSkipReasons,

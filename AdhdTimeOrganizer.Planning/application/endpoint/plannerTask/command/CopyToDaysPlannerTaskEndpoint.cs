@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.helper;
@@ -33,7 +34,7 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 /// stop the rule placing its own occurrence on the target day.
 /// </para>
 /// </summary>
-public class CopyToDaysPlannerTaskEndpoint(DbContext dbContext)
+public class CopyToDaysPlannerTaskEndpoint(DbContext dbContext, IPlannedBlockAutoReminders autoReminders)
     : Endpoint<CopyPlannerTasksToDaysRequest, CalendarBatchResultResponse>
 {
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
@@ -103,8 +104,13 @@ public class CopyToDaysPlannerTaskEndpoint(DbContext dbContext)
                 // target days to look like the source day, and they do.
                 if (sourceTasks.Count > 0)
                 {
-                    dbContext.Set<PlannerTask>().AddRange(sourceTasks.Select(t => CopyOnto(t, targetCalendarId, userId)));
+                    var copies = sourceTasks.Select(t => CopyOnto(t, targetCalendarId, userId)).ToList();
+                    dbContext.Set<PlannerTask>().AddRange(copies);
                     await dbContext.SaveChangesAsync(ct);
+
+                    // A copy is a new block (audit N1), so it may get an automatic reminder of its own — decided by
+                    // the user's mode, never carried from the source, which is the same rule as its status.
+                    await autoReminders.CreateForNewBlocksAsync(copies.Select(t => t.Id).ToList(), ct);
                 }
 
                 results.Add(CalendarBatchResult.Ok(targetCalendarId));

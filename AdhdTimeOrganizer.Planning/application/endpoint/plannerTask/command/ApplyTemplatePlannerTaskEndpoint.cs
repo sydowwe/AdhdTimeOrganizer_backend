@@ -24,7 +24,8 @@ public class ApplyTemplatePlannerTaskEndpoint(
     DbContext dbContext,
     IReminderRegistrationService reminders,
     ICalendarProvisioner calendars,
-    IReferencedIdOwnershipService ownership)
+    IReferencedIdOwnershipService ownership,
+    IPlannedBlockAutoReminders autoReminders)
     : Endpoint<ApplyTemplateToTaskPlannerRequest, ApplyTemplatePlannerTaskResponse>
 {
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
@@ -91,10 +92,12 @@ public class ApplyTemplatePlannerTaskEndpoint(
 
             var orphanedReminderIds = await reminders.GetReminderIdsForPlannerTasksAsync(
                 PlannerTemplateApplier.StagedTaskDeletions(dbContext), ct);
+            var addedTasks = PlannerTemplateApplier.StagedTaskAdditions(dbContext);
 
             await dbContext.SaveChangesAsync(ct);
 
             await reminders.CancelManyAsync(orphanedReminderIds, ct);
+            await autoReminders.CreateForNewBlocksAsync(addedTasks.Select(t => t.Id).ToList(), ct);
 
             var updatedTasks = await PlannerTaskResponse.Projection(dbContext.Set<PlannerTask>().Where(t => t.CalendarId == calendar.Id).WithIncludes().OrderBy(t => t.StartTime)).ToListAsync(ct);
 

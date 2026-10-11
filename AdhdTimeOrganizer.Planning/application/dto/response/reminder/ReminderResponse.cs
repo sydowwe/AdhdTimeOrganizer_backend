@@ -20,6 +20,9 @@ public record ReminderResponse : IIdResponse, IProjectionResponse<ReminderRespon
     public ReminderRecurrence? Recurrence { get; init; }
     public long? PlannerTaskId { get; init; }
 
+    /// <summary>Created by the planner for a new block (<c>UserPlannerSettings.AutoReminderMode</c>), not written by the user.</summary>
+    public bool IsAuto { get; init; }
+
     public static IQueryable<ReminderResponse> Projection(IQueryable<Reminder> query)
     {
         return query.Select(r => new ReminderResponse
@@ -30,7 +33,8 @@ public record ReminderResponse : IIdResponse, IProjectionResponse<ReminderRespon
             RemindAt = r.RemindAt,
             LeadOffsetsMinutes = r.LeadOffsetsMinutes,
             Recurrence = r.Recurrence,
-            PlannerTaskId = r.PlannerTaskId
+            PlannerTaskId = r.PlannerTaskId,
+            IsAuto = r.IsAuto
         });
     }
 }

@@ -71,6 +71,16 @@ public class EnPortalNotificationTexts : EnNotificationTexts
 
     public override string TodoItemDueFallbackBody => "One of your to-dos is coming due.";
 
+    // "Starts in 10 min", "… in 1 h 30 min"; "Starting now"; no lead: "Starting soon".
+    public override string PlannedBlockStartingTitle(int? minutesBefore) => minutesBefore switch
+    {
+        null => "Starting soon",
+        <= 0 => "Starting now",
+        var m => $"Starts in {Lead(m.Value)}"
+    };
+
+    public override string PlannedBlockStartingFallbackBody => "Your next planned block is about to start.";
+
     private static string Lead(int minutes) => (minutes / 60, minutes % 60) switch
     {
         (0, var m) => $"{m} min",

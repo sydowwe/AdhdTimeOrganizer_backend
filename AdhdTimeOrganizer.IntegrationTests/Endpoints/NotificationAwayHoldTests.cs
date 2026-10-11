@@ -113,6 +113,31 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
             "the away user opted into e-mail for this kind too, and is held on that channel as well");
     }
 
+    /// <summary>
+    /// P1-03: the planner's automatic block reminder is system-generated and about a moment, so it is held like the
+    /// routine nudges — a whole day of "starts in 10 min" is exactly what a returning user should not find on their
+    /// lock screen. The next test is its counterpart: the reminder the user wrote is not held.
+    /// </summary>
+    [Fact(DisplayName = "An automatic block reminder to an away user waits in the bell; the others are pushed")]
+    public async Task PlannedBlockStarting_ReachesTheAwayUsersBellOnly()
+    {
+        var push = new CapturingWebPushSender();
+        await using var factory = CreateFactory(push, new CapturingEmailSender());
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<INotificationService>().NotifyAsync(
+                NotificationRecipients.Users(Everyone),
+                new PlannedBlockStartingPayload(PlannerTaskId: 1, ReminderId: 1, Title: "Deep work", MinutesBefore: 10),
+                CancellationToken);
+
+        await using var db = CreateDbContext();
+        (await db.Set<Notification>().Where(n => n.Type == NotificationType.PlannedBlockStarting)
+                .Select(n => n.UserId).ToListAsync(CancellationToken))
+            .Should().BeEquivalentTo(Everyone, "held means bell-only, never dropped");
+
+        push.Endpoints.Should().BeEquivalentTo([EndpointOf(PresentUserId), EndpointOf(NeverMeasuredUserId)]);
+    }
+
     [Fact(DisplayName = "A reminder the away user set is still pushed to them")]
     public async Task UnheldKind_ReachesTheAwayUserAsUsual()
     {

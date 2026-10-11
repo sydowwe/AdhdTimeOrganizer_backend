@@ -10,7 +10,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// <see cref="BaseNotificationCatalogTests"/>, in the module's own testing package, so every host that ships
 /// the module inherits them instead of copying them.
 /// <para>
-/// All this portal owes the base is the list below: the nine kinds it can raise, out of the twenty the
+/// All this portal owes the base is the list below: the eleven kinds it can raise, out of the twenty-two the
 /// shared <see cref="NotificationType"/> enum carries. It is deliberately a <b>second copy</b> of what
 /// <c>ModuleServiceExtensions.AddNotificationCatalog</c> declares — reading the registration back would
 /// assert that the composition root equals itself, and the failure this guards against is someone editing
@@ -40,6 +40,7 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         NotificationType.ScheduledJobFailed,
         NotificationType.ScheduledJobOverdue,
         NotificationType.TodoItemDue,
+        NotificationType.PlannedBlockStarting,
         NotificationType.TimerBoundary,
         NotificationType.Test
     };

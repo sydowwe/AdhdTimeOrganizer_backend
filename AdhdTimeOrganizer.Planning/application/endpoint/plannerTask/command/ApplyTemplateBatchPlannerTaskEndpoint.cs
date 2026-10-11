@@ -33,7 +33,8 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 public class ApplyTemplateBatchPlannerTaskEndpoint(
     DbContext dbContext,
     IReminderRegistrationService reminders,
-    IReferencedIdOwnershipService ownership)
+    IReferencedIdOwnershipService ownership,
+    IPlannedBlockAutoReminders autoReminders)
     : Endpoint<ApplyTemplateToCalendarsBatchRequest, CalendarBatchResultResponse>
 {
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
@@ -103,10 +104,12 @@ public class ApplyTemplateBatchPlannerTaskEndpoint(
 
                 var orphanedReminderIds = await reminders.GetReminderIdsForPlannerTasksAsync(
                     PlannerTemplateApplier.StagedTaskDeletions(dbContext), ct);
+                var addedTasks = PlannerTemplateApplier.StagedTaskAdditions(dbContext);
 
                 await dbContext.SaveChangesAsync(ct);
 
                 await reminders.CancelManyAsync(orphanedReminderIds, ct);
+                await autoReminders.CreateForNewBlocksAsync(addedTasks.Select(t => t.Id).ToList(), ct);
 
                 results.Add(CalendarBatchResult.Ok(calendarId));
             }

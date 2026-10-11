@@ -207,6 +207,8 @@ public class UserPlannerSettingsTests(AppDbContextFixture fixture) : PostgresTes
     {
         RemindersEnabled = true,
         ReminderMinutesBefore = reminderMinutesBefore,
+        AutoReminderMode = "ImportantOnly",
+        AutoReminderMinImportance = 999,
         DetailsPanelExpandedByDefault = true,
         ArrowKeyNavEnabled = true,
         PredefinedSkipReasons = new[] { "Not needed today" },

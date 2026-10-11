@@ -10,10 +10,9 @@ using Sydowwe.Framework.application.extensions;
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plannerTask.command;
 
 /// <summary>
-/// No reminder wiring here on purpose, and that is the opt-in guarantee working: a task that has just been
-/// created cannot have a reminder yet — nothing can reference an id that did not exist a moment ago — and a
-/// task never grows one on its own. The user attaches one afterwards by POSTing a <c>Reminder</c> with this
-/// task's id, which is the only path that creates one.
+/// The one reminder wiring here is audit N1's: once the task has saved, <see cref="IPlannedBlockAutoReminders"/>
+/// gives it an automatic reminder if it qualifies under the user's <c>AutoReminderMode</c>. Any other reminder is
+/// still the user's to attach afterwards, by POSTing a <c>Reminder</c> with this task's id.
 /// <para>
 /// It accepts a <c>Date</c> in place of a <c>CalendarId</c>, and that is the lazy-creation path: the calendar
 /// row is made on the spot if the user has none for that day. Without it, a date past the seeded horizon
@@ -24,7 +23,8 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 public class CreatePlannerTaskEndpoint(
     DbContext dbContext,
     ICalendarProvisioner calendars,
-    IReferencedIdOwnershipService ownership)
+    IReferencedIdOwnershipService ownership,
+    IPlannedBlockAutoReminders autoReminders)
     : BaseCreateEndpoint<PlannerTask, PlannerTaskRequest>(dbContext)
 {
     private readonly DbContext _dbContext = dbContext;
@@ -64,4 +64,7 @@ public class CreatePlannerTaskEndpoint(
 
         return Task.FromResult(true);
     }
+
+    protected override Task AfterSave(PlannerTask entity, CancellationToken ct = default) =>
+        autoReminders.CreateForNewBlocksAsync([entity.Id], ct);
 }

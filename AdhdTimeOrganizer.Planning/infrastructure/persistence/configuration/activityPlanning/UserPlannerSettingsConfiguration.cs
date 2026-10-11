@@ -21,6 +21,12 @@ public class UserPlannerSettingsConfiguration : IEntityTypeConfiguration<UserPla
 
         builder.Property(s => s.RemindersEnabled).IsRequired().HasDefaultValue(true);
         builder.Property(s => s.ReminderMinutesBefore).IsRequired().HasDefaultValue(10);
+
+        // No HasDefaultValue on these two, unlike their neighbours: Off is the enum's CLR default, and EF skips a
+        // property holding its CLR default on insert so the database default wins — a user choosing Off on their
+        // first PUT would silently get ImportantOnly. The entity's initialisers are the defaults.
+        builder.EnumColumn(s => s.AutoReminderMode);
+        builder.Property(s => s.AutoReminderMinImportance).IsRequired();
         builder.Property(s => s.DetailsPanelExpandedByDefault).IsRequired().HasDefaultValue(true);
         builder.Property(s => s.ArrowKeyNavEnabled).IsRequired().HasDefaultValue(true);
 

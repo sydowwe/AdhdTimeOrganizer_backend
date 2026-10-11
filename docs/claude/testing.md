@@ -93,6 +93,14 @@ worth copying the shape of:
   ring). One test per write path asserts the `ReminderDefinition` row; the scan-level cases change the item
   behind the sync's back and assert a `Skipped / SubjectRetired` dispatch row **and no `Notification` row**.
   The fresh-start path is pinned in `WelcomeBackTests`, under that file's fixed clock.
+- `PlannedBlockAutoReminderTests` — the planner's automatic block reminder (P1-03, audit N1). Silent in three
+  ways: a creation path that forgets `IPlannedBlockAutoReminders` answers 201 and the block never rings; a
+  re-sync that re-created one would bring back a reminder the user deleted; and the 15-min materialiser sweep
+  runs **with no signed-in user**, where nothing stamps `UserId` and an insert relying on it dies on the FK.
+  So every creation path asserts the portal `Reminder` row **and** the module `ReminderDefinition`; the sweep
+  runs under a `BackgroundLoggedUserService` and asserts the owner's `UserId` on the occurrence, its reminder
+  and the recipient; and the guard cases change the block behind the sync's back and assert `Skipped /
+  SubjectRetired` with no `Notification` row. Copy this file's `CreateBackgroundFactory` for any job that writes.
 - `HistorySummaryCustomRangeTests` — `rangeType: "CustomRange"` is `date`…`endDate` inclusive on all four
   `summary/` endpoints. The range resolver used to fall through to `(date, date)` and a `to <= from` guard
   widened that to two days, so a month-long request was answered for two days — a well-formed 200 the

@@ -83,6 +83,16 @@ public class SkPortalNotificationTexts : SkNotificationTexts
 
     public override string TodoItemDueFallbackBody => "Blíži sa termín jednej z vašich úloh.";
 
+    // "Začína o 10 min", "… o 1 h 30 min"; "Začína teraz"; no lead: "Čoskoro začína".
+    public override string PlannedBlockStartingTitle(int? minutesBefore) => minutesBefore switch
+    {
+        null => "Čoskoro začína",
+        <= 0 => "Začína teraz",
+        var m => $"Začína o {Lead(m.Value)}"
+    };
+
+    public override string PlannedBlockStartingFallbackBody => "Váš ďalší naplánovaný blok čoskoro začína.";
+
     private static string Lead(int minutes) => (minutes / 60, minutes % 60) switch
     {
         (0, var m) => $"{m} min",

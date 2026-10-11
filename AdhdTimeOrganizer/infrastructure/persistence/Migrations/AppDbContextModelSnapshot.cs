@@ -2020,6 +2020,15 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("arrow_key_nav_enabled");
 
+                    b.Property<int>("AutoReminderMinImportance")
+                        .HasColumnType("integer")
+                        .HasColumnName("auto_reminder_min_importance");
+
+                    b.Property<string>("AutoReminderMode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("auto_reminder_mode");
+
                     b.Property<DateTime>("CreatedTimestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -2113,6 +2122,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_timestamp")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("IsAuto")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_auto");
 
                     b.PrimitiveCollection<string>("LeadOffsetsMinutes")
                         .IsRequired()

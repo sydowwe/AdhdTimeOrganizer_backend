@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.IntegrationTests.Reminders;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.model.entity.reminder;
 using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
 using FluentAssertions;
 using Google.Apis.Calendar.v3;
@@ -214,12 +216,59 @@ public class SyncCalendarToGoogleTests(AppDbContextFixture fixture) : PostgresTe
         ids.Should().AllSatisfy(id => id.Should().BeNull("un-skipping the task later must insert a fresh event"));
     }
 
+    /// <summary>
+    /// P1-03: a block the portal reminds about is pushed with Google's popups off, or a phone with Google Calendar
+    /// rings twice per block — and Google's alert ignores quiet hours, the away hold and snooze. A block without a
+    /// portal reminder says <c>useDefault: true</c> explicitly, so an update restores the alert once the portal
+    /// reminder is gone.
+    /// </summary>
+    [Fact(DisplayName = "P1-03: a block with a portal reminder is pushed with Google's own reminders off; one without keeps the defaults")]
+    public async Task PortalReminder_TurnsOffGooglesOwnPopups()
+    {
+        var google = new FakeGoogleCalendarTransport();
+        await using var factory = CreateFactoryWith(google);
+
+        long calendarId;
+        await using (var db = CreateDbContext())
+        {
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 7, 6), ct: TestContext.Current.CancellationToken);
+            var remindedActivity = await PlanningTestSeedHelper.SeedActivityAsync(db, "google-reminded", ct: TestContext.Current.CancellationToken);
+            var plainActivity = await PlanningTestSeedHelper.SeedActivityAsync(db, "google-plain", ct: TestContext.Current.CancellationToken);
+            var remindedId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, remindedActivity, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: TestContext.Current.CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, plainActivity, calendarId, new TimeOnly(11, 0), new TimeOnly(12, 0), ct: TestContext.Current.CancellationToken);
+
+            db.Add(new Reminder
+            {
+                UserId = PlanningTestSeedHelper.TestUserId,
+                Title = "google-reminded",
+                RemindAt = new DateTime(2027, 7, 6, 9, 0, 0, DateTimeKind.Utc),
+                PlannerTaskId = remindedId,
+                IsAuto = true
+            });
+            await ConnectTestUserAsync(db);
+        }
+
+        var response = await factory.CreateClient().PostAsync($"api/calendar/{calendarId}/sync-to-google", null, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(CancellationToken));
+
+        var events = google.Bodies.Select(b => JsonDocument.Parse(b).RootElement).ToDictionary(e => e.GetProperty("summary").GetString()!);
+        events.Should().HaveCount(2);
+
+        var reminded = events["google-reminded"].GetProperty("reminders");
+        reminded.GetProperty("useDefault").GetBoolean().Should().BeFalse();
+        reminded.GetProperty("overrides").GetArrayLength().Should().Be(0);
+
+        events["google-plain"].GetProperty("reminders").GetProperty("useDefault").GetBoolean().Should().BeTrue();
+    }
+
     private ITestClientFactory CreateFactoryWith(FakeGoogleCalendarTransport google)
     {
         var calendarService = new CalendarService(new Google.Apis.Services.BaseClientService.Initializer
         {
             ApplicationName = "AdhdTimeOrganizer-Test",
-            HttpClientFactory = google
+            HttpClientFactory = google,
+            // Plain JSON on the wire, so the fake transport can read the bodies it records.
+            GZipEnabled = false
         });
         var googleServiceMock = new Mock<IGoogleCalendarService>(MockBehavior.Strict);
         googleServiceMock.Setup(s => s.GetCalendarService(It.IsAny<string>())).Returns(calendarService);
@@ -251,6 +300,9 @@ public class SyncCalendarToGoogleTests(AppDbContextFixture fixture) : PostgresTe
         public List<HttpRequestMessage> Requests { get; } = [];
         public HashSet<string> MissingEventIds { get; } = [];
 
+        /// <summary>Each request's body, read before it is answered — the content is disposed once the client is done.</summary>
+        public List<string> Bodies { get; } = [];
+
         protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) => new Handler(this);
 
         private sealed class Handler(FakeGoogleCalendarTransport owner) : HttpMessageHandler
@@ -258,6 +310,7 @@ public class SyncCalendarToGoogleTests(AppDbContextFixture fixture) : PostgresTe
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
                 owner.Requests.Add(request);
+                owner.Bodies.Add(request.Content?.ReadAsStringAsync(cancellationToken).GetAwaiter().GetResult() ?? string.Empty);
 
                 var eventId = request.RequestUri!.Segments[^1];
                 if (request.Method == HttpMethod.Delete)

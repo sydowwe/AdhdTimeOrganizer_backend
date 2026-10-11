@@ -133,6 +133,18 @@ public static class PlannerTemplateApplier
             .Select(e => e.Entity.Id)
             .ToList();
 
+    /// <summary>
+    /// The planner tasks the staged resolution is about to insert — the template's tasks, and the segments a merge
+    /// mode carved. Read this <b>before</b> saving and take their <c>Id</c>s <b>after</b> it, then hand those to
+    /// <c>IPlannedBlockAutoReminders</c> (audit N1): every one of them is a new block, carved segments included.
+    /// Read off the ChangeTracker for the same reason as <see cref="StagedTaskDeletions"/>.
+    /// </summary>
+    public static List<PlannerTask> StagedTaskAdditions(DbContext dbContext) =>
+        dbContext.ChangeTracker.Entries<PlannerTask>()
+            .Where(e => e.State == EntityState.Added)
+            .Select(e => e.Entity)
+            .ToList();
+
     private static void StampTemplate(TaskPlannerDayTemplate template, Calendar calendar)
     {
         calendar.AppliedTemplateId = template.Id;

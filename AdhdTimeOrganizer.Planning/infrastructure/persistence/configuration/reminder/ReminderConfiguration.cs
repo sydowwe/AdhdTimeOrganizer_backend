@@ -25,6 +25,9 @@ public class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
 
         builder.EnumColumn(r => r.Recurrence);
 
+        // False is both the CLR and the database default, so the insert-skips-the-CLR-default rule is harmless here.
+        builder.Property(r => r.IsAuto).IsRequired().HasDefaultValue(false);
+
         // Cascade is the point of using a real FK here (see Reminder.PlannerTaskId): deleting a task takes
         // its reminders with it, so no planner-task delete path can leak an orphan by forgetting to.
         // The module-side ReminderDefinition is NOT reached by this cascade — the delete endpoints cancel it

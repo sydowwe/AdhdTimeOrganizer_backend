@@ -65,13 +65,20 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
     private static readonly TimeZoneInfo Bratislava = TimeZoneInfo.FindSystemTimeZoneById("Europe/Bratislava");
 
     /// <summary>
-    /// Push is left unconfigured for the quiet-hours cases (they assert on <c>DeferredUntil</c>, not on a
-    /// send) but SMTP must be switched off explicitly: the fixture sets every MAIL_* var, so the dispatcher
-    /// would otherwise open a socket to a fake host.
+    /// No background channel at all: push unconfigured, and SMTP switched off explicitly — the fixture sets
+    /// every MAIL_* var, so the dispatcher would otherwise open a socket to a fake host. Only for cases that do
+    /// not need a deferral: with nothing but InApp deliverable, the dispatcher has nothing to withhold and never
+    /// stamps <c>DeferredUntil</c>.
     /// </summary>
     private static readonly KeyValuePair<string, string?>[] EmailOff =
         [new($"{EmailNotificationOptions.SectionName}:Enabled", "false")];
 
+    /// <summary>
+    /// Push configured, SMTP off. The quiet-hours cases need this: quiet hours only ever defer the background
+    /// channels, and the dispatcher discounts a channel the deployment cannot deliver on (framework 240dc58), so
+    /// without a configured one no recipient is ever deferred and <c>DeferredUntil</c> stays null whatever the
+    /// window says. No subscription is seeded — the assertions are on the row, not on a send.
+    /// </summary>
     private static readonly KeyValuePair<string, string?>[] PushOn =
     [
         new($"{EmailNotificationOptions.SectionName}:Enabled", "false"),
@@ -141,7 +148,7 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
             await seed.SaveChangesAsync(CancellationToken);
         }
 
-        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: PushOn);
         await using (var scope = factory.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<INotificationService>().NotifyAsync(
                 NotificationRecipients.Users([TestUserId, UtcUserId]),
@@ -176,7 +183,7 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
             await seed.SaveChangesAsync(CancellationToken);
         }
 
-        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: PushOn);
         await using (var scope = factory.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<INotificationService>().NotifyAsync(
                 NotificationRecipients.User(TestUserId), new TestNotificationPayload("resume check"), CancellationToken);

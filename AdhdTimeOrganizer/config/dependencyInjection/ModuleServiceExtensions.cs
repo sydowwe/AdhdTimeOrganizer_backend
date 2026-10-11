@@ -210,15 +210,21 @@ public static class ModuleServiceExtensions
             o.AdminOnlyTypes = [NotificationType.Test];
 
             // FO5's back-off: for a user away three days or more (RecipientEngagementReader), these wait in the
-            // bell and are not pushed or mailed. Only the routine sweeps' nudges, which are unsolicited and about
-            // a day or period that passes without them. The user's own reminders, the timer alarm and the
-            // scheduler's alerts are delivered whether anyone is around or not.
+            // bell and are not pushed or mailed. Only the unsolicited ones about a day, period or block that passes
+            // without them: the routine sweeps' nudges and the planner's automatic block reminders. The reminders
+            // the user wrote, the to-do due reminders, the timer alarm and the scheduler's alerts are delivered
+            // whether anyone is around or not.
             o.HeldWhileAwayTypes =
             [
                 NotificationType.RoutinePeriodEndingSoon,
                 NotificationType.RoutinePeriodEnded,
                 NotificationType.RoutineStreakGraceExpiring,
-                NotificationType.RoutineSuggestedToday
+                NotificationType.RoutineSuggestedToday,
+
+                // Planning's automatic block reminders: system-generated, about a moment that passes without them,
+                // and a whole day of them is exactly what a returning user should not find on their lock screen.
+                // The reminders the user wrote (PersonalReminder) are not held — they asked for those.
+                NotificationType.PlannedBlockStarting
             ];
             o.SupportedTypes =
         [
@@ -241,6 +247,10 @@ public static class ModuleServiceExtensions
             // TodoLists slice: TodoListItemDueReminderSync, registered through the Reminders module per timed item.
             // Not held while away: it is about the user's own commitment, not a nudge to come back.
             NotificationType.TodoItemDue,
+
+            // Planning slice: the automatic reminder PlannedBlockAutoReminders creates for a new block, under the
+            // user's own UserPlannerSettings.AutoReminderMode. Its own row, so muting it leaves PersonalReminder alone.
+            NotificationType.PlannedBlockStarting,
 
             // History slice: TimerBoundaryAlarmJobHandler, on every pomodoro boundary.
             NotificationType.TimerBoundary,

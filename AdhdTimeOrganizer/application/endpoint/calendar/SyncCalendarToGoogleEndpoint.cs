@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.domain.extServiceContract.googleCalendar;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.model.entity.reminder;
 using FastEndpoints;
 using Google;
 using Google.Apis.Calendar.v3;
@@ -62,6 +63,13 @@ public class SyncCalendarToGoogleEndpoint(
             return;
         }
 
+        // The tasks the portal itself will remind about — a reminder the user wrote or an automatic one (audit N1).
+        var taskIds = calendar.Tasks.Select(t => t.Id).ToList();
+        var remindedTaskIds = await dbContext.Set<Reminder>()
+            .Where(r => r.PlannerTaskId != null && taskIds.Contains(r.PlannerTaskId.Value))
+            .Select(r => r.PlannerTaskId!.Value)
+            .ToHashSetAsync(ct);
+
         using var calendarService = googleCalendarService.GetCalendarService(user.GoogleCalendarRefreshToken);
         var tzOffset = user.Timezone.GetUtcOffset(DateTime.UtcNow);
         var syncedCount = 0;
@@ -100,7 +108,8 @@ public class SyncCalendarToGoogleEndpoint(
                     Description = task.Notes,
                     Location = task.Location,
                     Start = new EventDateTime { DateTimeDateTimeOffset = startDto, TimeZone = user.Timezone.Id },
-                    End = new EventDateTime { DateTimeDateTimeOffset = endDto, TimeZone = user.Timezone.Id }
+                    End = new EventDateTime { DateTimeDateTimeOffset = endDto, TimeZone = user.Timezone.Id },
+                    Reminders = GoogleReminders(remindedTaskIds.Contains(task.Id))
                 };
 
                 if (task.GoogleEventId is null)
@@ -136,6 +145,18 @@ public class SyncCalendarToGoogleEndpoint(
 
     private static bool IsPushable(PlannerTask task) =>
         task.Status != PlannerTaskStatus.Cancelled && !task.IsBackground;
+
+    /// <summary>
+    /// Google's own popups for a synced block. A task the portal already reminds about gets none — without this
+    /// Google applies the calendar's default alert too, and a phone with Google Calendar rings twice per block. The
+    /// portal's reminder is the one to keep: it respects quiet hours, the away hold and snooze, and Google's does
+    /// not. A task without a portal reminder keeps Google's defaults, and says so explicitly, because the sync
+    /// <i>updates</i> existing events: a block whose portal reminder was deleted gets its Google alert back.
+    /// </summary>
+    private static Event.RemindersData GoogleReminders(bool portalReminds) =>
+        portalReminds
+            ? new Event.RemindersData { UseDefault = false, Overrides = [] }
+            : new Event.RemindersData { UseDefault = true };
 
     // Already gone on Google's side (the user deleted it there) is the outcome we wanted, not a failure.
     private static async Task DeleteEventAsync(CalendarService calendarService, string eventId, CancellationToken ct)

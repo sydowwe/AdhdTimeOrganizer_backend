@@ -37,8 +37,11 @@ namespace AdhdTimeOrganizer.Planning.application.service.taskPlanner;
 /// and the loser's whole save — occurrences included — rolls back.</item>
 /// </list>
 /// <para>
-/// <b>No reminders.</b> No planner-task create registers one today (audit N1 is unbuilt), and occurrences are no
-/// exception. When N1 lands, this is a create path it has to cover.
+/// <b>Automatic reminders (audit N1).</b> Every block placed here is a new block, so after the save it goes to
+/// <see cref="IPlannedBlockAutoReminders"/> like any other create. An automatic reminder is not something the user
+/// hung off the occurrence, so it does not make it "touched" (<see cref="IsUntouched"/>) — only one they wrote does.
+/// Because the materialiser also runs from <c>MaterialiseRepeatingTasksJobHandler</c> with no signed-in user, every
+/// row it writes carries an explicit <c>UserId</c>; nothing here may rely on the ambient user to stamp one.
 /// </para>
 /// <para>
 /// <b>FO3 needs nothing here.</b> An occurrence starts with <c>PostponeCount = 0</c> and no original slot; moving
@@ -54,6 +57,7 @@ public sealed class RepeatingTaskMaterialiser(
     ICalendarProvisioner calendars,
     IUserTimeZoneResolver timeZones,
     IReminderRegistrationService reminders,
+    IPlannedBlockAutoReminders autoReminders,
     ILogger<RepeatingTaskMaterialiser> logger)
     : IRepeatingTaskMaterialiser, IScopedService
 {
@@ -163,8 +167,10 @@ public sealed class RepeatingTaskMaterialiser(
     /// first read after a holiday would gate today and tomorrow, and the watermark would make that permanent: the
     /// user would come back to a plan missing the very blocks the rule exists to put there.
     /// <para>
-    /// The hook is kept for a caller that is <b>not</b> the user, such as a nightly placing job, should one ever
-    /// exist. That caller should answer from <c>UserPresence.IsAbsent</c>.
+    /// The caller that is <b>not</b> the user now exists — <c>MaterialiseRepeatingTasksJobHandler</c> — and it still
+    /// does not use this hook: it skips an absent user outright instead of calling in. Gating here would decide the
+    /// days and pass the watermark over them, so the user would come back to a plan missing exactly the blocks the
+    /// rule is for; skipping leaves the days undecided, and the user's first read after the return places them.
     /// </para>
     /// </summary>
     private static Task<bool> IsUserAbsentAsync(long userId, CancellationToken ct) => Task.FromResult(false);
@@ -211,7 +217,7 @@ public sealed class RepeatingTaskMaterialiser(
             var ids = occurrences.Select(t => t.Id).ToList();
             var withReminder = await dbContext.Set<Reminder>()
                 .IgnoreQueryFilters()
-                .Where(r => r.PlannerTaskId != null && ids.Contains(r.PlannerTaskId.Value))
+                .Where(r => r.PlannerTaskId != null && ids.Contains(r.PlannerTaskId.Value) && !r.IsAuto)
                 .Select(r => r.PlannerTaskId!.Value)
                 .ToHashSetAsync(ct);
 
@@ -313,6 +319,11 @@ public sealed class RepeatingTaskMaterialiser(
     /// A destructive conflict mode deletes the user's own blocks, and their portal reminder rows go with them by
     /// FK cascade, which the Reminders module never sees — so the ids are read off the tracker before the save
     /// and cancelled after it, the same as a template apply.
+    /// <para>
+    /// After the save the other two reminder duties run, both against the tracker as it stood before it: the blocks
+    /// placed (occurrences and any carved segments) get their automatic reminders (audit N1), and the occurrences a
+    /// rule edit moved in place re-sync theirs, which would otherwise keep firing at the old start.
+    /// </para>
     /// </summary>
     private async Task SaveAndCancelOrphanedRemindersAsync(CancellationToken ct)
     {
@@ -321,11 +332,20 @@ public sealed class RepeatingTaskMaterialiser(
 
         var orphanedReminderIds = await reminders.GetReminderIdsForPlannerTasksAsync(
             PlannerTemplateApplier.StagedTaskDeletions(dbContext), ct);
+        var placed = PlannerTemplateApplier.StagedTaskAdditions(dbContext);
+        var moved = dbContext.ChangeTracker.Entries<PlannerTask>()
+            .Where(e => e.State == EntityState.Modified)
+            .Select(e => e.Entity.Id)
+            .ToList();
 
         await dbContext.SaveChangesAsync(ct);
 
         if (orphanedReminderIds.Count > 0)
             await reminders.CancelManyAsync(orphanedReminderIds, ct);
+        if (moved.Count > 0)
+            await reminders.SyncForPlannerTasksAsync(moved, ct);
+        if (placed.Count > 0)
+            await autoReminders.CreateForNewBlocksAsync(placed.Select(t => t.Id).ToList(), ct);
     }
 
     /// <summary>

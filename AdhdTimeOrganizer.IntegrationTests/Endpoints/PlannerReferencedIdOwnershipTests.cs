@@ -398,6 +398,8 @@ public class PlannerReferencedIdOwnershipTests(AppDbContextFixture fixture) : Po
     {
         RemindersEnabled = true,
         ReminderMinutesBefore = 10,
+        AutoReminderMode = "ImportantOnly",
+        AutoReminderMinImportance = 999,
         DetailsPanelExpandedByDefault = true,
         ArrowKeyNavEnabled = true,
         PredefinedSkipReasons = new[] { "Not needed today" },

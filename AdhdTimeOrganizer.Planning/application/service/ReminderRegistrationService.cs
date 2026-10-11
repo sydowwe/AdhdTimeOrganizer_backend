@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
@@ -43,8 +44,20 @@ public class ReminderRegistrationService(
     /// <summary>Stable content key. Required by the registry even when the text comes from a NotificationType.</summary>
     public const string TemplateKey = "portal.personal-reminder";
 
+    /// <summary>
+    /// The kind of a reminder the planner created by itself for a new block (<see cref="Reminder.IsAuto"/>). Its own
+    /// kind, so the user mutes the automatic ones from <c>/reminder-preference</c> without muting the ones they
+    /// wrote. Safe to derive from the row, unlike the link (see <see cref="Kind"/>), because <c>IsAuto</c> only ever
+    /// goes from true to false — and the one path that does that cancels the old key first.
+    /// </summary>
+    public const string AutoKind = "PlannedBlockStarting";
+
+    /// <summary>Content key of the automatic reminders. Also keys their label resolver and dispatch guard.</summary>
+    public const string AutoTemplateKey = "portal.planned-block-starting";
+
     /// <summary>The module's idempotency identity for one portal reminder row.</summary>
-    public static ReminderKey KeyFor(long reminderId) => new(OwnerModule, SubjectType, reminderId.ToString(), Kind);
+    public static ReminderKey KeyFor(long reminderId, bool isAuto = false) =>
+        new(OwnerModule, SubjectType, reminderId.ToString(), isAuto ? AutoKind : Kind);
 
     public async Task SyncAsync(Reminder reminder, CancellationToken ct = default)
     {
@@ -85,12 +98,46 @@ public class ReminderRegistrationService(
             }
 
             timezone ??= await ResolveTimezoneAsync(reminder.UserId, ct);
-            if (RefreshRemindAt(reminder, task, timezone))
+            var moved = RefreshRemindAt(reminder, task, timezone);
+            var renamed = reminder.IsAuto
+                          && RefreshAutoTitle(reminder, (await ActivityNamesAsync(dbContext, [task.ActivityId], ct)).GetValueOrDefault(task.ActivityId));
+            if (moved || renamed)
                 await dbContext.SaveChangesAsync(ct);
         }
 
         await RegisterAsync(reminder, ct);
     }
+
+    /// <summary>
+    /// An automatic reminder is titled with its block's activity — the planner chose the words, not the user — so
+    /// it follows the block onto another activity, or a rename, on the next sync. Returns whether it changed; does
+    /// not save. A reminder the user wrote keeps their own words and never comes through here.
+    /// </summary>
+    private static bool RefreshAutoTitle(Reminder reminder, string? activityName)
+    {
+        if (string.IsNullOrEmpty(activityName) || reminder.Title == activityName)
+            return false;
+
+        reminder.Title = activityName;
+        return true;
+    }
+
+    /// <summary>
+    /// Activity names by id, for <see cref="RefreshAutoTitle"/>. Read off <c>Activity</c> directly with the filters
+    /// lifted rather than through the task's navigation: an archived activity is filtered out of every read, and a
+    /// required navigation onto a filtered row drops the task from the query — which a sync would read as "task
+    /// gone" and cancel a live reminder. The ids come from tasks the caller already loaded, so lifting the user
+    /// scope widens nothing.
+    /// </summary>
+    internal static async Task<Dictionary<long, string>> ActivityNamesAsync(
+        DbContext dbContext, IReadOnlyCollection<long> activityIds, CancellationToken ct) =>
+        activityIds.Count == 0
+            ? []
+            : await dbContext.Set<Activity>()
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .Where(a => activityIds.Contains(a.Id))
+                .ToDictionaryAsync(a => a.Id, a => a.Name, ct);
 
     /// <summary>
     /// Rewrites <c>RemindAt</c> to the task's current instant, returning whether it moved. <b>Does not save</b>
@@ -111,20 +158,37 @@ public class ReminderRegistrationService(
         return true;
     }
 
-    private Task RegisterAsync(Reminder reminder, CancellationToken ct) =>
-        registry.RegisterAsync(new ReminderRegistration
+    /// <summary>
+    /// The registration for one row. An automatic reminder (<see cref="Reminder.IsAuto"/>) is its own kind, template
+    /// and <see cref="NotificationType.PlannedBlockStarting"/>; everything else about the two is the same mapping.
+    /// </summary>
+    private Task RegisterAsync(Reminder reminder, CancellationToken ct)
+    {
+        var schedule = BuildSchedule(reminder);
+        var auto = reminder is { IsAuto: true, PlannerTaskId: not null };
+
+        return registry.RegisterAsync(new ReminderRegistration
         {
-            Key = KeyFor(reminder.Id),
-            Schedule = BuildSchedule(reminder),
-            TemplateKey = TemplateKey,
-            NotificationType = NotificationType.PersonalReminder,
-            Payload = new PersonalReminderPayload(reminder.Id, reminder.Title, reminder.PlannerTaskId),
+            Key = KeyFor(reminder.Id, auto),
+            Schedule = schedule,
+            TemplateKey = auto ? AutoTemplateKey : TemplateKey,
+            NotificationType = auto ? NotificationType.PlannedBlockStarting : NotificationType.PersonalReminder,
+            Payload = auto
+                ? new PlannedBlockStartingPayload(
+                    reminder.PlannerTaskId!.Value,
+                    reminder.Id,
+                    reminder.Title,
+                    AsUtc(reminder.RemindAt),
+                    -NormalizeOffsets(reminder.LeadOffsetsMinutes)[0])
+                : new PersonalReminderPayload(reminder.Id, reminder.Title, reminder.PlannerTaskId),
             // Explicit users, never a resolver strategy: the module's self-service reads (the user's own
             // upcoming list, snooze and dismiss) all exclude resolver-backed reminders, because a read path
-            // must never invoke a resolver. A personal reminder has exactly one, known recipient anyway.
+            // must never invoke a resolver. A personal reminder has exactly one, known recipient anyway. An
+            // automatic one is guarded at dispatch instead (PlannedBlockStartingGuard).
             RecipientMode = RecipientMode.ExplicitUsers,
             ExplicitRecipientUserIds = [reminder.UserId]
         }, ct);
+    }
 
     public async Task ApplyUserDefaultsAsync(Reminder reminder, bool leadOffsetsWereSpecified, CancellationToken ct = default)
     {
@@ -157,12 +221,18 @@ public class ReminderRegistrationService(
     /// here must not throw back into a request that has nothing left to roll back — it is logged loudly
     /// instead, leaving a strandable <c>ReminderDefinition</c> that has to be found and cancelled by hand.
     /// </para>
+    /// <para>
+    /// <b>Both kinds' keys are withdrawn.</b> Most callers hold only the id of a row the cascade already took, so
+    /// whether it was automatic is gone with it; cancelling a key that was never registered is the registry's
+    /// idempotent no-op, so the second call costs one indexed read.
+    /// </para>
     /// </summary>
     public async Task CancelAsync(long reminderId, CancellationToken ct = default)
     {
         try
         {
             await registry.CancelAsync(KeyFor(reminderId), ct);
+            await registry.CancelAsync(KeyFor(reminderId, isAuto: true), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -205,11 +275,16 @@ public class ReminderRegistrationService(
             .Select(u => new { u.Id, u.Timezone })
             .ToDictionaryAsync(u => u.Id, u => u.Timezone ?? TimeZoneInfo.Utc, ct);
 
+        // Only when the batch holds an automatic reminder, which is titled from its block's activity.
+        var activityNames = reminders.Any(r => r.IsAuto)
+            ? await ActivityNamesAsync(dbContext, tasks.Values.Select(t => t.ActivityId).Distinct().ToList(), ct)
+            : [];
+
         // Mutate the whole batch, save once, then talk to the registry — rather than a save inside the loop,
         // which is one round trip per reminder whose instant moved and undoes the batch loading above.
         var toRegister = new List<Reminder>(reminders.Count);
         var toCancel = new List<long>();
-        var anyInstantMoved = false;
+        var anyRowChanged = false;
 
         foreach (var reminder in reminders)
         {
@@ -222,11 +297,13 @@ public class ReminderRegistrationService(
                 continue;
             }
 
-            anyInstantMoved |= RefreshRemindAt(reminder, task, timezones.GetValueOrDefault(reminder.UserId, TimeZoneInfo.Utc));
+            anyRowChanged |= RefreshRemindAt(reminder, task, timezones.GetValueOrDefault(reminder.UserId, TimeZoneInfo.Utc));
+            if (reminder.IsAuto)
+                anyRowChanged |= RefreshAutoTitle(reminder, activityNames.GetValueOrDefault(task.ActivityId));
             toRegister.Add(reminder);
         }
 
-        if (anyInstantMoved)
+        if (anyRowChanged)
             await dbContext.SaveChangesAsync(ct);
 
         foreach (var reminderId in toCancel)
@@ -309,23 +386,34 @@ public class ReminderRegistrationService(
         // Spring-forward: the wall-clock time the task claims does not exist that day. Push it to the first
         // instant that does rather than throwing — a DST gap must not make a planner task unsaveable.
         if (timezone.IsInvalidTime(local))
-        {
-            var shifted = local.Add(timezone.GetAdjustmentRules()
-                .FirstOrDefault(r => local.Date >= r.DateStart && local.Date <= r.DateEnd)?.DaylightDelta ?? TimeSpan.FromHours(1));
             logger.LogInformation(
-                "Planner task reminder for user {UserId} falls in a DST gap; shifted to {Shifted:HH:mm} local", userId, shifted);
-            local = shifted;
-        }
+                "Planner task reminder for user {UserId} falls in a DST gap; shifted to {Shifted:HH:mm} local", userId, ShiftOutOfGap(local, timezone));
         // Fall-back: the wall-clock time occurs twice that day. ConvertTimeToUtc silently resolves it to the
         // earlier (standard-time) occurrence; log so an hour-off nudge has a trail, same as the DST-gap case.
         else if (timezone.IsAmbiguousTime(local))
-        {
             logger.LogInformation(
                 "Planner task reminder for user {UserId} falls in an ambiguous DST fall-back hour; resolving to the earlier occurrence", userId);
-        }
+
+        return ComposeTaskInstant(date, startTime, timezone);
+    }
+
+    /// <summary>
+    /// The rule above without the trail: the one composition every reader of a task's reminder instant shares —
+    /// the sync, the automatic reminders' creation and their dispatch guard, which retires an occurrence exactly
+    /// when this no longer equals the instant it was registered for.
+    /// </summary>
+    internal static DateTime ComposeTaskInstant(DateOnly date, TimeOnly startTime, TimeZoneInfo timezone)
+    {
+        var local = DateTime.SpecifyKind(date.ToDateTime(startTime), DateTimeKind.Unspecified);
+        if (timezone.IsInvalidTime(local))
+            local = ShiftOutOfGap(local, timezone);
 
         return TimeZoneInfo.ConvertTimeToUtc(local, timezone);
     }
+
+    private static DateTime ShiftOutOfGap(DateTime local, TimeZoneInfo timezone) =>
+        local.Add(timezone.GetAdjustmentRules()
+            .FirstOrDefault(r => local.Date >= r.DateStart && local.Date <= r.DateEnd)?.DaylightDelta ?? TimeSpan.FromHours(1));
 
     private async Task<TimeZoneInfo> ResolveTimezoneAsync(long userId, CancellationToken ct) =>
         await dbContext.Set<User>()

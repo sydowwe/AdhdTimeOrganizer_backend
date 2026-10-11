@@ -28,20 +28,37 @@ public sealed class PlanningScheduledJobsRegistrar(
         Description = "Completes in-progress planner tasks marked auto-complete once their slot has ended."
     };
 
+    public static RecurringJobRegistration MaterialiseRepeatingTasksRegistration { get; } = new()
+    {
+        JobKey = MaterialiseRepeatingTasksJobHandler.HandlerKey,
+        HandlerKey = MaterialiseRepeatingTasksJobHandler.HandlerKey,
+        OwnerModule = "Planning",
+        // Every 15 minutes in UTC, deliberately with no zone: the handler is zone-aware per user, and the quarter
+        // hour is the granularity of every zone's midnight. A user is due once per local day; the rest of the ticks
+        // are one indexed read of the active auto-placing rules.
+        Schedule = ScheduleSpec.FromCron("0 0/15 * * * ?"),
+        DisallowConcurrent = true,
+        Description = "Places auto-placing repeating rules' occurrences for each user's today and tomorrow, and their automatic reminders."
+    };
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = services.CreateAsyncScope();
-        try
+        var scheduler = scope.ServiceProvider.GetRequiredService<IScheduler>();
+
+        foreach (var registration in new[] { CompleteFinishedTasksRegistration, MaterialiseRepeatingTasksRegistration })
         {
-            var scheduler = scope.ServiceProvider.GetRequiredService<IScheduler>();
-            await scheduler.RegisterRecurringJobAsync(CompleteFinishedTasksRegistration, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            // Don't block host startup — rest blocks simply stay open and the job shows as absent in the
-            // dashboard. JobKey is non-PII.
-            logger.LogError(ex, "Failed to register the planning recurring job {JobKey}",
-                CompleteFinishedTasksRegistration.JobKey);
+            try
+            {
+                await scheduler.RegisterRecurringJobAsync(registration, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // Don't block host startup — the job shows as absent in the dashboard, and the work it does falls
+                // back to the user's own reads (rest blocks stay open; occurrences wait for a day-plan read).
+                // JobKey is non-PII.
+                logger.LogError(ex, "Failed to register the planning recurring job {JobKey}", registration.JobKey);
+            }
         }
     }
 
