@@ -440,7 +440,8 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
     /// <item>User-authored content, the ones that actually look like Art. 15 gaps: <c>TimerPreset</c>,
     /// <c>PomodoroTimerPreset</c>, <c>Reminder</c>, <c>RepeatingPlannerTask</c>, <c>TemplatePlannerTask</c>,
     /// <c>MemoryAnchor</c>, <c>AndroidSessionData</c>, the two tracker pattern-mapping tables and
-    /// <c>LeisureSuggestionRecord</c>.</item>
+    /// <c>LeisureSuggestionRecord</c>, and FO11's <c>PlannerSuggestionDismissal</c> (a preference about
+    /// suggestions, of the same kind).</item>
     /// <item>Lookups and settings the exported rows refer to by id, so the export is readable but not
     /// self-contained: the <c>Activity*</c> family, <c>TodoListCategory</c>, <c>TaskPriority</c>,
     /// <c>TaskImportance</c>, <c>RoutineTimePeriod</c>, <c>UserPlannerSettings</c>,
@@ -472,6 +473,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         "LeisureSuggestionRecord",
         "MemoryAnchor",
         "NotificationPreference",
+        "PlannerSuggestionDismissal",
         "PomodoroTimerPreset",
         "PushSubscription",
         "RefreshToken",

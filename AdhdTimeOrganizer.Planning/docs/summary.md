@@ -9,11 +9,12 @@ rather than a project of their own.
 
 Owns: `Calendar`, `BasePlannerTask` and its three concrete shapes (`PlannerTask`,
 `RepeatingPlannerTask`, `TemplatePlannerTask`), `TaskPlannerDayTemplate`, `TaskImportance`,
-`UserPlannerSettings`, `Reminder`, the three `PlannerSuggestionFrom*` read-models, their EF
+`UserPlannerSettings`, `Reminder`, the three `PlannerSuggestionFrom*` read-models and FO11's
+`PlannerSuggestionDismissal`, their EF
 configurations, ~62 endpoints, their DTOs and 16 validator files, the domain services
 (`PlannerStreakService`, `PlanVsActualTrendService`, `SkipSummaryService`, `CalendarDayFactory`,
-`HolidayCalendar`, `PlannerTaskPostponeRule`, `RepeatingPlannerTaskSchedule`, and FO4's `PlannerTaskMissedRule` +
-`DayPacking`), the
+`HolidayCalendar`, `PlannerTaskPostponeRule`, `RepeatingPlannerTaskSchedule`, FO11's `SuggestionPatternWindow`,
+and FO4's `PlannerTaskMissedRule` + `DayPacking`), the
 five application services (`CalendarProvisioner`, `PlannerStreakReader`, `PlannedBlockAutoReminders`,
 `ReminderRegistrationService`, `RepeatingTaskMaterialiser`), the two Core seam implementations, the two cross-slice event
 handlers, and five seeders.
@@ -153,6 +154,13 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
     `utcNow` overload, so every move is judged against one clock — and the tests can fix it.
   - **Bed time 00:00 (or after midnight) means 23:59**, the last end a block can have. FO10 will change only the
     input, not this rule.
+
+- **Pattern suggestions are recent-only, and the numbers live twice (FO11).** `SuggestionPatternWindow` holds
+  the windows (weekday: 3+ sittings in 12 weeks, one in the last 4; day of month: 3+ in 12 months, one in the
+  last 3) and the dismissal lapse rule; both host-side `mv_*_pattern.sql` scripts repeat them literally, because
+  a view takes no parameters. Change both. The window moves with `current_date` only when a view refreshes,
+  which the host's refresh queue forces once a day. A dismissal (`PlannerSuggestionDismissal`) hides a pattern
+  from both pattern tiers until it lapses — never a user-set recurrence.
 
 - **`GetPlanVsActualTrendPlannerTaskEndpoint` and `GetSkipSummaryPlannerTaskEndpoint` filter `UserId`
   by hand**, not through the host's

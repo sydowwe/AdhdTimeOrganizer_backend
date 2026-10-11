@@ -59,7 +59,7 @@ public class ActivityForeignKeyInventoryTests(AppDbContextFixture fixture) : Pos
     }
 
     /// <summary>
-    /// The 19 model edges into <see cref="Activity"/>. Seventeen are real database constraints; the last
+    /// The 20 model edges into <see cref="Activity"/>. Eighteen are real database constraints; the other
     /// two are on the <c>PlannerSuggestionFrom*</c> query-type entities, which map to materialized views
     /// and therefore carry no constraint of their own — they are in the model all the same, and a change
     /// to their shape would move the generated SQL.
@@ -93,10 +93,12 @@ public class ActivityForeignKeyInventoryTests(AppDbContextFixture fixture) : Pos
         // History
         new("ActivityHistory", "ActivityId", true, false, DeleteBehavior.Cascade),
 
-        // Planning — three task shapes, each its own table, plus the two view entities.
+        // Planning — three task shapes, each its own table, FO11's dismissals, plus the two view entities.
+        // A dismissal of a deleted activity's pattern hides nothing, so it goes with the activity.
         new("PlannerTask", "ActivityId", true, false, DeleteBehavior.Cascade),
         new("RepeatingPlannerTask", "ActivityId", true, false, DeleteBehavior.Cascade),
         new("TemplatePlannerTask", "ActivityId", true, false, DeleteBehavior.Cascade),
+        new("PlannerSuggestionDismissal", "ActivityId", true, false, DeleteBehavior.Cascade),
         new("PlannerSuggestionFromActivityHistory", "ActivityId", true, false, DeleteBehavior.Cascade),
         new("PlannerSuggestionFromPlannerTask", "ActivityId", true, false, DeleteBehavior.Cascade),
 

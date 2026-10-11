@@ -15,7 +15,7 @@ using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.repeatingPlannerTask.query;
 
-public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
+public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext, TimeProvider timeProvider)
     : EndpointWithoutRequest<List<SuggestionResponse>>
 {
     private static readonly string[] DayNames =
@@ -32,7 +32,8 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
         {
             s.Summary = "Get task suggestions for a date";
             s.Description = "Returns user-set and automatic (pattern-based) suggestions for the given date. On an away " +
-                            "day (Vacation, SickDay) only the user-set ones";
+                            "day (Vacation, SickDay) only the user-set ones. A pattern the user dismissed is left out " +
+                            "until the dismissal lapses";
             s.Response<List<SuggestionResponse>>(200, "Success");
             s.Response(400, "Invalid date format");
         });
@@ -134,6 +135,10 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
             return;
         }
 
+        // FO11. Patterns the user said "not any more" to. Keyed like the views, so one dismissal hides the planner
+        // and the history row alike; tier 1 is never filtered, since a user-set recurrence has its own delete.
+        var dismissedKeys = await LiveDismissalKeysAsync(ct);
+
         // 2. Planner-pattern suggestions
         var plannerPatterns = await dbContext.Set<PlannerSuggestionFromPlannerTask>()
             .Where(p => p.UserId == userId &&
@@ -152,6 +157,8 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
         foreach (var p in plannerPatterns)
         {
             if (coveredActivityIds.Contains(p.ActivityId))
+                continue;
+            if (dismissedKeys.Contains((p.ActivityId, p.PatternType, p.PatternValue)))
                 continue;
 
             result.Add(MapPatternToSuggestion(p, SuggestionSourceType.PlannedPattern));
@@ -175,11 +182,35 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext)
                 continue;
             if (plannerCoveredKeys.Contains((p.ActivityId, p.PatternType, p.PatternValue)))
                 continue;
+            if (dismissedKeys.Contains((p.ActivityId, p.PatternType, p.PatternValue)))
+                continue;
 
             result.Add(MapHistoryPatternToSuggestion(p));
         }
 
         await Send.OkAsync(result, ct);
+    }
+
+    /// <summary>
+    /// The (activity, pattern type, pattern value) keys of the caller's dismissals that still hold today. The
+    /// lapse rule is <see cref="SuggestionPatternWindow.StillHolds"/>; the WHERE only trims what can never hold.
+    /// </summary>
+    private async Task<HashSet<(long, int, int)>> LiveDismissalKeysAsync(CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var oldestThatCanHold = today.AddDays(-SuggestionPatternWindow.MonthlyWindowDays);
+
+        // Scoped by the host's global IEntityWithUser filter.
+        var dismissals = await dbContext.Set<PlannerSuggestionDismissal>()
+            .AsNoTracking()
+            .Where(d => d.DismissedOn > oldestThatCanHold)
+            .Select(d => new { d.ActivityId, d.PatternType, d.PatternValue, d.DismissedOn })
+            .ToListAsync(ct);
+
+        return dismissals
+            .Where(d => SuggestionPatternWindow.StillHolds(d.PatternType, d.DismissedOn, today))
+            .Select(d => (d.ActivityId, (int)d.PatternType, d.PatternValue))
+            .ToHashSet();
     }
 
     private static SuggestionResponse MapPatternToSuggestion(PlannerSuggestionFromPlannerTask p, SuggestionSourceType sourceType)

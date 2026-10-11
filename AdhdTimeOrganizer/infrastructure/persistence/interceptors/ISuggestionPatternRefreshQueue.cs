@@ -10,6 +10,9 @@ public interface ISuggestionPatternRefreshQueue
 {
     void MarkDirty(SuggestionPatternView view);
 
-    /// <summary>Atomically returns every currently-dirty view and clears them.</summary>
+    /// <summary>
+    /// Atomically returns every currently-dirty view and clears them. The first call on a new UTC date also
+    /// reports the two windowed pattern views, written to or not (FO11).
+    /// </summary>
     IReadOnlyCollection<SuggestionPatternView> DrainDirty();
 }

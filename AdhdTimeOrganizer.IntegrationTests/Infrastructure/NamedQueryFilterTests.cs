@@ -249,6 +249,9 @@ public class NamedQueryFilterTests(AppDbContextFixture fixture) : PostgresTestBa
         typeof(RepeatingPlannerTask),
         typeof(TemplatePlannerTask),
 
+        // FO11. The user's own "not any more" — it must still hold if the activity is archived and brought back.
+        typeof(AdhdTimeOrganizer.Planning.domain.model.entity.suggestion.PlannerSuggestionDismissal),
+
         // Routines / TodoLists.
         typeof(RoutineTodoList),
         typeof(TodoListItem),

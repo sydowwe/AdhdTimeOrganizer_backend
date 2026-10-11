@@ -6,18 +6,28 @@
 -- When the times cancel out on the clock (06:00 + 18:00) there is no circular mean; the plain average is
 -- used, which is as good a guess as any.
 -- start_time / end_time and calendar.date are already the user's wall-clock values, so no zone conversion.
+--
+-- FO11, the recency window: a pattern is what the user does now, not what they did once. A weekday pattern
+-- counts only the last 12 weeks (84 days) and needs a sitting in the last 4 (28); a day-of-month pattern the
+-- last 12 months (365) and one in the last 3 (92). The numbers are SuggestionPatternWindow's, written out
+-- because a view takes no parameters — change both together. Days ahead of today count: a block planned for
+-- next Tuesday is as current as last Tuesday's. current_date is the refreshing session's (UTC), a day loose
+-- against the user's own date at either edge, which a twelve-week window does not notice. The window only
+-- moves when the view refreshes, which SuggestionPatternRefreshQueue forces at least once a day.
 CREATE MATERIALIZED VIEW planning.mv_planner_task_pattern AS
 WITH task AS (SELECT pt.user_id,
                      pt.activity_id,
                      pt.importance_id,
                      pt.is_background,
+                     c.date                            AS local_date,
                      EXTRACT(ISODOW FROM c.date)::int  AS iso_day_of_week,
                      EXTRACT(DAY FROM c.date)::int     AS day_of_month,
                      EXTRACT(EPOCH FROM pt.start_time) AS start_s,
                      EXTRACT(EPOCH FROM pt.end_time)   AS end_s
               FROM planning.planner_task pt
                        JOIN planning.calendar c ON c.id = pt.calendar_id
-              WHERE pt.status != 4),
+              WHERE pt.status != 4
+                AND c.date >= current_date - 365),
      pattern AS (SELECT user_id, activity_id, importance_id, is_background,
                         0                                 AS pattern_type,
                         iso_day_of_week                   AS pattern_value,
@@ -29,8 +39,10 @@ WITH task AS (SELECT pt.user_id,
                         AVG(sin(2 * pi() * end_s / 86400))   AS end_sin,
                         AVG(cos(2 * pi() * end_s / 86400))   AS end_cos
                  FROM task
+                 WHERE local_date >= current_date - 84
                  GROUP BY user_id, activity_id, importance_id, is_background, iso_day_of_week
                  HAVING COUNT(*) >= 3
+                    AND max(local_date) >= current_date - 28
 
                  UNION ALL
 
@@ -46,7 +58,8 @@ WITH task AS (SELECT pt.user_id,
                         AVG(cos(2 * pi() * end_s / 86400))   AS end_cos
                  FROM task
                  GROUP BY user_id, activity_id, importance_id, is_background, day_of_month
-                 HAVING COUNT(*) >= 3),
+                 HAVING COUNT(*) >= 3
+                    AND max(local_date) >= current_date - 92),
      mean_seconds AS (SELECT p.*,
                              CASE
                                  WHEN sqrt(start_sin ^ 2 + start_cos ^ 2) < 1e-6 THEN start_plain

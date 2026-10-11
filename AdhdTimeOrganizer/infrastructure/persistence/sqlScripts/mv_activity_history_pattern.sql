@@ -16,6 +16,11 @@
 -- its last focus period's end. Break rows (ShortBreak / LongBreak) are left out altogether: they say when the
 -- user rested, not when they did the activity, and the rest activity may be a different one or the same one.
 -- A row outside a session is a sitting of its own.
+--
+-- FO11, the recency window: the same 84/28 days for a weekday pattern and 365/92 for a day of the month as
+-- mv_planner_task_pattern.sql, which explains them. Measured on the sitting's local date against the
+-- session's current_date (UTC), a day loose at either edge. The outer 366-day cut is on the instant, so it
+-- never drops a sitting the 365-day window would keep.
 CREATE MATERIALIZED VIEW planning.mv_activity_history_pattern AS
 WITH local_history AS (SELECT ah.id,
                               ah.user_id,
@@ -28,7 +33,8 @@ WITH local_history AS (SELECT ah.id,
                                       FROM "user"."user" u
                                                LEFT JOIN pg_timezone_names n ON n.name = u.timezone) tz
                                      ON tz.id = ah.user_id
-                       WHERE ah.phase IS NULL OR ah.phase = 'Focus'),
+                       WHERE (ah.phase IS NULL OR ah.phase = 'Focus')
+                         AND ah.start_timestamp >= now() - interval '366 days'),
      sitting AS (SELECT user_id,
                         activity_id,
                         min(local_start) AS local_start,
@@ -37,6 +43,7 @@ WITH local_history AS (SELECT ah.id,
                  GROUP BY user_id, activity_id, session_id, CASE WHEN session_id IS NULL THEN id END),
      sitting_time AS (SELECT user_id,
                              activity_id,
+                             local_start::date                     AS local_date,
                              EXTRACT(ISODOW FROM local_start)::int AS iso_day_of_week,
                              EXTRACT(DAY FROM local_start)::int    AS day_of_month,
                              EXTRACT(EPOCH FROM local_start::time) AS start_s,
@@ -53,8 +60,10 @@ WITH local_history AS (SELECT ah.id,
                         AVG(sin(2 * pi() * end_s / 86400))   AS end_sin,
                         AVG(cos(2 * pi() * end_s / 86400))   AS end_cos
                  FROM sitting_time
+                 WHERE local_date >= current_date - 84
                  GROUP BY user_id, activity_id, iso_day_of_week
                  HAVING COUNT(*) >= 3
+                    AND max(local_date) >= current_date - 28
 
                  UNION ALL
 
@@ -69,8 +78,10 @@ WITH local_history AS (SELECT ah.id,
                         AVG(sin(2 * pi() * end_s / 86400))   AS end_sin,
                         AVG(cos(2 * pi() * end_s / 86400))   AS end_cos
                  FROM sitting_time
+                 WHERE local_date >= current_date - 365
                  GROUP BY user_id, activity_id, day_of_month
-                 HAVING COUNT(*) >= 3),
+                 HAVING COUNT(*) >= 3
+                    AND max(local_date) >= current_date - 92),
      mean_seconds AS (SELECT p.*,
                              CASE
                                  WHEN sqrt(start_sin ^ 2 + start_cos ^ 2) < 1e-6 THEN start_plain

@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.model.entity.suggestion;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 
@@ -28,6 +29,12 @@ namespace AdhdTimeOrganizer.Planning.application.seam;
 /// them would double-count the same underlying fact, and repointing a view is not a thing that can be
 /// done. The next refresh reflects the merge on its own.
 /// </para>
+/// <para>
+/// <b><c>PlannerSuggestionDismissal</c> (FO11) is present</b>, because it is not derived: it is the user's own
+/// "not any more", and a merge that left it behind would cascade it away with the merged activity and bring the
+/// pattern straight back. It is unique per (user, activity, pattern type, pattern value), so dismissals of the
+/// same pattern collapse to one carrying the latest date — the one that holds longest, as the user meant.
+/// </para>
 /// </remarks>
 public sealed class PlannerTaskActivityReferenceSource : IActivityReferenceSource, IScopedService
 {
@@ -36,13 +43,49 @@ public sealed class PlannerTaskActivityReferenceSource : IActivityReferenceSourc
     public IQueryable<long> ReferencingActivityIds(DbContext db) =>
         db.Set<PlannerTask>().Select(t => t.ActivityId)
             .Concat(db.Set<RepeatingPlannerTask>().Select(t => t.ActivityId))
-            .Concat(db.Set<TemplatePlannerTask>().Select(t => t.ActivityId));
+            .Concat(db.Set<TemplatePlannerTask>().Select(t => t.ActivityId))
+            .Concat(db.Set<PlannerSuggestionDismissal>().Select(d => d.ActivityId));
 
     public async Task<int> RepointAsync(DbContext db, long survivorId, IReadOnlyCollection<long> mergedIds, CancellationToken ct)
     {
         return await RepointSetAsync<PlannerTask>(db, survivorId, mergedIds, ct)
                + await RepointSetAsync<RepeatingPlannerTask>(db, survivorId, mergedIds, ct)
-               + await RepointSetAsync<TemplatePlannerTask>(db, survivorId, mergedIds, ct);
+               + await RepointSetAsync<TemplatePlannerTask>(db, survivorId, mergedIds, ct)
+               + await RepointDismissalsAsync(db, survivorId, mergedIds, ct);
+    }
+
+    private static async Task<int> RepointDismissalsAsync(DbContext db, long survivorId, IReadOnlyCollection<long> mergedIds, CancellationToken ct)
+    {
+        var merged = await db.Set<PlannerSuggestionDismissal>()
+            .Where(d => mergedIds.Contains(d.ActivityId))
+            .ToListAsync(ct);
+
+        if (merged.Count == 0)
+            return 0;
+
+        var survivors = await db.Set<PlannerSuggestionDismissal>()
+            .Where(d => d.ActivityId == survivorId)
+            .ToListAsync(ct);
+
+        foreach (var group in merged.GroupBy(d => (d.PatternType, d.PatternValue)))
+        {
+            var latest = group.MaxBy(d => d.DismissedOn)!;
+            var existing = survivors.FirstOrDefault(d => d.PatternType == group.Key.PatternType && d.PatternValue == group.Key.PatternValue);
+
+            if (existing is null)
+            {
+                latest.ActivityId = survivorId;
+            }
+            else if (latest.DismissedOn > existing.DismissedOn)
+            {
+                existing.DismissedOn = latest.DismissedOn;
+            }
+
+            foreach (var dismissal in group.Where(d => d.ActivityId != survivorId))
+                db.Set<PlannerSuggestionDismissal>().Remove(dismissal);
+        }
+
+        return merged.Count;
     }
 
     private static async Task<int> RepointSetAsync<TTask>(DbContext db, long survivorId, IReadOnlyCollection<long> mergedIds, CancellationToken ct)

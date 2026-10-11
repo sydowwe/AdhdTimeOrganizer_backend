@@ -37,6 +37,7 @@ project** — see [the one cross-slice relationship](#the-one-cross-slice-relati
 | `UserPlannerSettings` | `domain/model/entity/activityPlanning/UserPlannerSettings.cs` |
 | `Reminder` | `domain/model/entity/reminder/Reminder.cs` |
 | `PlannerSuggestionFromPlannerTask` / `…FromActivityHistory` / `…FromDayTemplate` | `domain/model/entity/suggestion/` |
+| `PlannerSuggestionDismissal` (FO11) | `domain/model/entity/suggestion/PlannerSuggestionDismissal.cs` |
 | `PlannerTaskStatus` · `RecurrenceType` · `ReminderRecurrence` · `SuggestionSourceType` | `domain/model/enum/` |
 
 **Three task tables, one C# base.** `PlannerTask`, `RepeatingPlannerTask` and `TemplatePlannerTask`
@@ -87,6 +88,22 @@ select `id` / `created_timestamp` / `modified_timestamp` from an aggregate that 
 every call to its endpoint answered 500 (`42703`). The consequence to keep in mind is that none of the
 three is `IEntityWithUser`, so **no global query filter covers them** and each endpoint's own
 `p.UserId == userId` predicate is the whole of the scoping.
+
+**The two weekday/day-of-month views count a recent window only (FO11).** A weekday pattern needs 3+
+sittings in the last 12 weeks and one in the last 4; a day-of-month pattern 3+ in the last 12 months
+and one in the last 3. The numbers live in `SuggestionPatternWindow` **and** literally in both SQL
+scripts — a view takes no parameters, so change both together. The window is measured from
+`current_date` at refresh time, which is why `SuggestionPatternRefreshQueue` reports both views dirty
+on the first drain of each UTC date even if nothing was written.
+
+**`PlannerSuggestionDismissal` is the one suggestion table that is a real entity** — the user's
+"×, not any more" on a pattern row, written by `POST /repeating-planner-task/suggestions/dismiss`.
+Unique per `(user, activity, pattern type, pattern value)`, keyed like the views, so one row hides the
+planner-pattern and the history-pattern tier alike (never tier 1). It lapses after one window length
+(`SuggestionPatternWindow.StillHolds`): by then every sitting the view still counts postdates it, so a
+pattern that is back has re-formed. It is `BaseEntityWithActivity`, cascades with its activity,
+survives archiving, and is carried by a merge (`PlannerTaskActivityReferenceSource` collapses duplicate
+keys to the latest date).
 
 ## Invariants
 
@@ -553,7 +570,9 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | Name | Kind | Responsibility | Path |
 |---|---|---|---|
 | `Create/Update/Delete/GetById/GetAllRepeatingPlannerTaskEndpoint` | CRUD (Framework bases) | Recurrence CRUD | `repeatingPlannerTask/{command,query}/` |
-| `GetSuggestionsRepeatingPlannerTaskEndpoint` | Query (custom) | `/repeating-planner-task/suggestions/{calendarId}` — tiered suggestions over the planner-task and activity-history views | `repeatingPlannerTask/query/` |
+| `GetSuggestionsRepeatingPlannerTaskEndpoint` | Query (custom) | `/repeating-planner-task/suggestions/{calendarId}` — tiered suggestions over the planner-task and activity-history views, minus live dismissals | `repeatingPlannerTask/query/` |
+| `DismissSuggestionRepeatingPlannerTaskEndpoint` | Command (custom) | `POST /repeating-planner-task/suggestions/dismiss` — FO11 upsert of a `PlannerSuggestionDismissal`; 204, 404 on a foreign activity | `repeatingPlannerTask/command/` |
+| `UndoDismissSuggestionRepeatingPlannerTaskEndpoint` | Command (custom) | `POST /repeating-planner-task/suggestions/dismiss/undo` — the snackbar's Undo; deletes the row (exact, since a visible pattern's older dismissal had lapsed), idempotent 204 | `repeatingPlannerTask/command/` |
 | `Create/Update/Delete/BatchDelete/GetByIdTemplatePlannerTaskEndpoint` | CRUD (Framework bases) | Template-line CRUD | `templatePlannerTask/{command,query}/` |
 | `TemplatePlannerTaskChangeSpanEndpoint` | Command (`BasePatchEndpoint`) | Drag/resize a template line | `templatePlannerTask/command/` |
 | `FilterTemplatePlannerTaskEndpoint` | Query (`BaseFilterEndpoint`) | Lines of a template | `templatePlannerTask/query/GetFilteredSortedTemplatePlannerTask.cs` |
@@ -601,7 +620,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `CalendarDayTypeRule` | Helper (static) | The one weekday/day-type rule, returning a message rather than throwing | `application/helper/CalendarDayTypeRule.cs` |
 | `PlannerBatchLimits` | Helper (constants) | `MaxCalendarIds` / `MaxSummaryRangeDays`, both 366 | `application/helper/PlannerBatchLimits.cs` |
 | `TaskPlannerHelper` | Helper (extensions) | `WithIncludes` (importance + activity/role/category), `TasksOverlap` (assumes non-wrapping spans), `TodayIn` (the one definition of "today" — the user's, never UTC's) and `InTimeWindow` (the one definition of the day planner's time-of-day filter, shared by both filter endpoints) | `application/helper/TaskPlannerHelper.cs` |
-| `PlannerTaskActivityReferenceSource` | Core seam (keyed) | Publishes and repoints `ActivityId` across **all three** task tables. The suggestion views are deliberately absent — they'd double-count | `application/seam/PlannerTaskActivityReferenceSource.cs` |
+| `PlannerTaskActivityReferenceSource` | Core seam (keyed) | Publishes and repoints `ActivityId` across **all three** task tables and FO11's dismissals (collapsing duplicate keys to the latest). The suggestion views are deliberately absent — they'd double-count | `application/seam/PlannerTaskActivityReferenceSource.cs` |
 | `TodoListItemPlanSource` | Core seam (by type) | `ITodoListItemPlanSource` — each to-do item's earliest open block from the user's today on, so TodoLists can say "scheduled" without the planner writing the item's `DueDate`; and (`PlanHistoryAsync`, FO3) every linked block sorted by outcome (completed, carried over, missed, skipped per reason) so TodoLists can tell a stuck item | `application/seam/TodoListItemPlanSource.cs` |
 | `CompleteFinishedPlannerTasksJobHandler` | Scheduled job | Completes `AutoCompleteAtEnd` tasks that are in progress and over, every five minutes; registered by `PlanningScheduledJobsRegistrar` (wired in `Program.cs`) | `infrastructure/jobs/`, `infrastructure/scheduling/` |
 | `MaterialiseRepeatingTasksJobHandler` | Scheduled job | Every 15 min (UTC cron, zone-aware per user): runs the materialiser for each user whose own tomorrow is past an active auto-placing rule's watermark — once per local day, after their midnight. Skips away users (`UserPresence.IsAbsent`) rather than gating them; one DI scope per user; no signed-in user | `infrastructure/jobs/`, `infrastructure/scheduling/` |

@@ -6,6 +6,7 @@ using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.application.dto.response.suggestion;
+using AdhdTimeOrganizer.Planning.domain.model.entity.suggestion;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -39,7 +40,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "Exactly 2 occurrences on the same weekday produce no pattern suggestion")]
     public async Task TwoOccurrences_NoPattern()
     {
-        var target = new DateOnly(2027, 5, 3); // any fixed date; only its DayOfWeek matters
+        var target = UpcomingMonday();
         long activityId;
         long calendarTargetId;
         await using (var db = CreateDbContext())
@@ -60,7 +61,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "A 3rd occurrence makes the pattern appear, with averaged start/end times")]
     public async Task ThreeOccurrences_PatternAppears_WithAveragedTimes()
     {
-        var target = new DateOnly(2027, 5, 10);
+        var target = UpcomingMonday();
         long activityId;
         long calendarTargetId;
         await using (var db = CreateDbContext())
@@ -96,7 +97,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "Times either side of an hour average to the mean time of day, in both pattern views")]
     public async Task AverageCrossingAnHour_IsTheMeanTimeOfDay()
     {
-        var target = new DateOnly(2027, 7, 5);
+        var target = UpcomingMonday();
         long plannedActivityId, historyActivityId, calendarTargetId;
         await using (var db = CreateDbContext())
         {
@@ -134,7 +135,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "Times either side of midnight average to midnight, in both pattern views")]
     public async Task AverageAcrossMidnight_IsMidnight()
     {
-        var target = new DateOnly(2027, 7, 19);
+        var target = UpcomingMonday();
         long plannedActivityId, historyActivityId, calendarTargetId;
         await using (var db = CreateDbContext())
         {
@@ -173,7 +174,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "A Pomodoro is one sitting: counted once, ending at its last focus period, breaks ignored")]
     public async Task Pomodoro_IsOneSitting_EndingAtItsLastFocusPeriod()
     {
-        var target = new DateOnly(2027, 8, 2);
+        var target = UpcomingMonday();
         long focusActivityId, restActivityId, calendarTargetId;
         await using (var db = CreateDbContext())
         {
@@ -208,7 +209,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "Times that cancel out on the clock fall back to the plain average")]
     public async Task TimesThatCancelOut_FallBackToThePlainAverage()
     {
-        var target = new DateOnly(2027, 7, 26);
+        var target = UpcomingMonday();
         long activityId, calendarTargetId;
         await using (var db = CreateDbContext())
         {
@@ -235,7 +236,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "A mean in the day's last half-minute rounds to 00:00, as the clock does")]
     public async Task MeanJustBeforeMidnight_RoundsToMidnight()
     {
-        var target = new DateOnly(2027, 7, 12);
+        var target = UpcomingMonday();
         long activityId, calendarTargetId;
         await using (var db = CreateDbContext())
         {
@@ -266,7 +267,8 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "History patterns use the user's zone for both the weekday and the time of day")]
     public async Task HistoryPattern_IsInTheUsersZone()
     {
-        var target = new DateOnly(2027, 6, 22); // a Tuesday, in CEST (UTC+2)
+        // A Tuesday. Bratislava is UTC+1 or +2 by season; either way 00:30 local is still Monday in UTC.
+        var target = UpcomingMonday().AddDays(1);
         var zone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Bratislava");
         long activityId, calendarTargetId, mondayCalendarId;
         await using (var db = CreateDbContext())
@@ -302,7 +304,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "3 occurrences including a cancelled one still fall short of a pattern")]
     public async Task ThreeOccurrencesWithOneCancelled_NoPattern()
     {
-        var target = new DateOnly(2027, 5, 17);
+        var target = UpcomingMonday();
         long activityId;
         long calendarTargetId;
         await using (var db = CreateDbContext())
@@ -324,7 +326,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "A user-set RepeatingPlannerTask suppresses the PlannedPattern suggestion for the same activity")]
     public async Task Tier1Suppresses_Tier2()
     {
-        var target = new DateOnly(2027, 5, 24);
+        var target = UpcomingMonday();
         long activityId;
         long calendarTargetId;
         await using (var db = CreateDbContext())
@@ -357,7 +359,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "A PlannedPattern suggestion suppresses the matching HistoryPattern suggestion")]
     public async Task Tier2Suppresses_Tier3()
     {
-        var target = new DateOnly(2027, 5, 31);
+        var target = UpcomingMonday();
         long activityId;
         long calendarTargetId;
         await using (var db = CreateDbContext())
@@ -393,7 +395,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "FO1: an away day drops both pattern tiers and keeps the user-set recurrences")]
     public async Task AwayDay_KeepsOnlyUserSetSuggestions()
     {
-        var target = new DateOnly(2027, 6, 7);
+        var target = UpcomingMonday();
         long patternActivityId, userSetActivityId, awayCalendarId, workdayCalendarId;
         await using (var db = CreateDbContext())
         {
@@ -437,7 +439,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "An activity already planned on the day is not suggested for it, from any tier")]
     public async Task ActivityAlreadyPlannedOnTheDay_IsNotSuggested()
     {
-        var target = new DateOnly(2027, 6, 21);
+        var target = UpcomingMonday();
         long userSetActivityId, patternActivityId, controlActivityId, calendarTargetId;
         await using (var db = CreateDbContext())
         {
@@ -489,7 +491,7 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
     [Fact(DisplayName = "CQ-13: a pattern row whose activity was just deleted is skipped, not a 500")]
     public async Task DeletedActivity_IsSkippedUntilTheViewCatchesUp()
     {
-        var target = new DateOnly(2027, 6, 7);
+        var target = UpcomingMonday();
         long doomedActivityId, survivingActivityId, calendarTargetId;
         await using (var db = CreateDbContext())
         {
@@ -583,7 +585,343 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    // ─── FO11: recency window and dismissal ─────────────────────────────────────
+
+    /// <summary>
+    /// FO11. "Tuesday: Swimming 18:00" from a course dropped last spring. Both views counted sittings over all
+    /// history, so three old ones made a pattern for ever. They now count the last 12 weeks only. Sixteen to
+    /// fourteen weeks back is out of it whatever weekday today is; a planner pattern and a history pattern, one
+    /// activity each, plus a recent pattern as the control.
+    /// </summary>
+    [Fact(DisplayName = "FO11: three sittings from before the twelve-week window make no weekday pattern, in either view")]
+    public async Task SittingsOlderThanTheWindow_MakeNoPattern()
+    {
+        var target = UpcomingMonday();
+        long stalePlannedId, staleHistoryId, recentId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            stalePlannedId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-stale-planned", ct: CancellationToken);
+            staleHistoryId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-stale-history", ct: CancellationToken);
+            recentId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-recent", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+
+            for (var weeksAgo = 14; weeksAgo <= 16; weeksAgo++)
+            {
+                await SeedSameWeekdayTaskAsync(db, stalePlannedId, target, weeksAgo);
+                await SeedActivityHistoryOnWeekdayAsync(db, staleHistoryId, target, weeksAgo);
+            }
+            for (var weeksAgo = 1; weeksAgo <= 3; weeksAgo++)
+                await SeedSameWeekdayTaskAsync(db, recentId, target, weeksAgo);
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        suggestions.Should().NotContain(s => s.Activity.Id == stalePlannedId, "its planner sittings are all older than 12 weeks");
+        suggestions.Should().NotContain(s => s.Activity.Id == staleHistoryId, "its tracked sittings are all older than 12 weeks");
+        suggestions.Should().ContainSingle(s => s.Activity.Id == recentId);
+    }
+
+    /// <summary>
+    /// FO11. Enough sittings inside the window is not enough on its own: a habit dropped six weeks ago still has
+    /// three in the last twelve. A weekday pattern also needs one in the last four weeks — three missed weeks and
+    /// it stops being offered.
+    /// </summary>
+    [Fact(DisplayName = "FO11: a weekday pattern with no sitting in the last four weeks is not suggested, in either view")]
+    public async Task PatternNotSeenForFourWeeks_IsNotSuggested()
+    {
+        var target = UpcomingMonday();
+        long lapsedPlannedId, lapsedHistoryId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            lapsedPlannedId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-lapsed-planned", ct: CancellationToken);
+            lapsedHistoryId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-lapsed-history", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+
+            // Six to eight weeks back from a target at most a week ahead: the latest is 35+ days ago.
+            for (var weeksAgo = 6; weeksAgo <= 8; weeksAgo++)
+            {
+                await SeedSameWeekdayTaskAsync(db, lapsedPlannedId, target, weeksAgo);
+                await SeedActivityHistoryOnWeekdayAsync(db, lapsedHistoryId, target, weeksAgo);
+            }
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        (await GetSuggestionsAsync(calendarTargetId)).Should().BeEmpty(
+            "both activities have three sittings inside twelve weeks, but none inside the last four");
+    }
+
+    /// <summary>
+    /// FO11, the monthly half: a day-of-month pattern counts twelve months (three a year is the floor) and needs
+    /// one in the last three. Rent on the 5th, three months running, is offered; the same three a year ago is not.
+    /// </summary>
+    [Fact(DisplayName = "FO11: a day-of-month pattern counts the last year and needs a sitting in the last three months")]
+    public async Task DayOfMonthPattern_UsesItsOwnWindow()
+    {
+        var target = UpcomingMonday();
+        while (target.Day > 28)
+            target = target.AddDays(7); // so every month back has the same day of the month
+        long currentId, lapsedId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            currentId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-monthly-current", ct: CancellationToken);
+            lapsedId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-monthly-lapsed", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+
+            for (var monthsAgo = 1; monthsAgo <= 3; monthsAgo++)
+                await SeedTaskOnAsync(db, currentId, target.AddMonths(-monthsAgo));
+            for (var monthsAgo = 5; monthsAgo <= 7; monthsAgo++)
+                await SeedTaskOnAsync(db, lapsedId, target.AddMonths(-monthsAgo));
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        suggestions.Should().ContainSingle(s => s.Activity.Id == currentId && s.RecurrenceType == RecurrenceType.DayOfMonth)
+            .Which.ScheduledDates.Should().Equal(target.Day);
+        suggestions.Should().NotContain(s => s.Activity.Id == lapsedId && s.RecurrenceType == RecurrenceType.DayOfMonth,
+            "its latest sitting is five months back, past the three-month last-seen limit");
+    }
+
+    /// <summary>
+    /// FO11. "×, not any more". The dismissed activity has a planner pattern <b>and</b> a history pattern on the
+    /// same weekday; tier 3 is normally suppressed only by tier 2, so a dismissal that hid tier 2 alone would let
+    /// the history row take its place. A second pattern is the control.
+    /// </summary>
+    [Fact(DisplayName = "FO11: a dismissed pattern is hidden from both pattern tiers, and only that one")]
+    public async Task DismissedPattern_IsHiddenFromBothTiers()
+    {
+        var target = UpcomingMonday();
+        long dismissedId, controlId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            dismissedId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-dismissed", ct: CancellationToken);
+            controlId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-dismiss-control", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+            for (var weeksAgo = 1; weeksAgo <= 3; weeksAgo++)
+            {
+                await SeedSameWeekdayTaskAsync(db, dismissedId, target, weeksAgo);
+                await SeedActivityHistoryOnWeekdayAsync(db, dismissedId, target, weeksAgo);
+                await SeedSameWeekdayTaskAsync(db, controlId, target, weeksAgo);
+            }
+        }
+
+        await RefreshSuggestionViewsAsync();
+        (await GetSuggestionsAsync(calendarTargetId)).Should().Contain(s => s.Activity.Id == dismissedId);
+
+        var response = await DismissAsync(dismissedId, RecurrenceType.DayOfWeek, MondayIso);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        suggestions.Should().NotContain(s => s.Activity.Id == dismissedId, "neither the planner nor the history pattern may stand in");
+        suggestions.Should().ContainSingle(s => s.Activity.Id == controlId);
+    }
+
+    /// <summary>
+    /// FO11. A dismissal holds for one window length and then lapses — by then every sitting the view still
+    /// counts was made after it, so a pattern that is back has re-formed. Two dismissals of two live patterns:
+    /// one a day inside twelve weeks old, one a day past it.
+    /// </summary>
+    [Fact(DisplayName = "FO11: a weekday dismissal lapses after twelve weeks")]
+    public async Task Dismissal_LapsesAfterTheWindow()
+    {
+        var target = UpcomingMonday();
+        var today = Today();
+        long holdingId, lapsedId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            holdingId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-dismissal-holds", ct: CancellationToken);
+            lapsedId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-dismissal-lapsed", ct: CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+            for (var weeksAgo = 1; weeksAgo <= 3; weeksAgo++)
+            {
+                await SeedSameWeekdayTaskAsync(db, holdingId, target, weeksAgo);
+                await SeedSameWeekdayTaskAsync(db, lapsedId, target, weeksAgo);
+            }
+            await SeedDismissalAsync(db, holdingId, RecurrenceType.DayOfWeek, MondayIso, today.AddDays(-83));
+            await SeedDismissalAsync(db, lapsedId, RecurrenceType.DayOfWeek, MondayIso, today.AddDays(-84));
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarTargetId);
+        suggestions.Should().NotContain(s => s.Activity.Id == holdingId, "83 days is inside the 84-day window");
+        suggestions.Should().ContainSingle(s => s.Activity.Id == lapsedId, "84 days is the whole window: the dismissal has lapsed");
+    }
+
+    /// <summary>
+    /// FO11. The snackbar's Undo deletes the caller's dismissal and the pattern is back. Another user's dismissal
+    /// of the same key (their own activity id, so a different row) is the control: the delete is a bulk
+    /// <c>ExecuteDeleteAsync</c>, and only the global user filter keeps it on the caller's rows.
+    /// </summary>
+    [Fact(DisplayName = "FO11: undoing a dismissal brings the pattern back and touches only the caller's row")]
+    public async Task UndoDismiss_BringsThePatternBack()
+    {
+        var target = UpcomingMonday();
+        var foreignUserId = await ActivityMergeTestSupport.SecondUserAsync(
+            Fixture, $"fo11-undo-foreign-{Guid.NewGuid():N}@test.com");
+        long activityId, foreignActivityId, calendarTargetId;
+        await using (var db = CreateDbContext())
+        {
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-undo", ct: CancellationToken);
+            foreignActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-undo-foreign", foreignUserId, CancellationToken);
+            calendarTargetId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, ct: CancellationToken);
+            for (var weeksAgo = 1; weeksAgo <= 3; weeksAgo++)
+                await SeedSameWeekdayTaskAsync(db, activityId, target, weeksAgo);
+
+            db.Set<PlannerSuggestionDismissal>().Add(new PlannerSuggestionDismissal
+            {
+                UserId = foreignUserId, ActivityId = foreignActivityId,
+                PatternType = RecurrenceType.DayOfWeek, PatternValue = MondayIso, DismissedOn = Today()
+            });
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        await RefreshSuggestionViewsAsync();
+        (await DismissAsync(activityId, RecurrenceType.DayOfWeek, MondayIso)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await GetSuggestionsAsync(calendarTargetId)).Should().NotContain(s => s.Activity.Id == activityId);
+
+        var undo = await CreateClient().PostAsJsonAsync("api/repeating-planner-task/suggestions/dismiss/undo",
+            new { activityId, patternType = RecurrenceType.DayOfWeek, patternValue = MondayIso }, JsonOpts, CancellationToken);
+        undo.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await GetSuggestionsAsync(calendarTargetId)).Should().ContainSingle(s => s.Activity.Id == activityId);
+
+        await using var assertDb = CreateDbContext();
+        var remaining = await assertDb.Set<PlannerSuggestionDismissal>().IgnoreQueryFilters()
+            .Select(d => d.UserId).ToListAsync(CancellationToken);
+        remaining.Should().Equal([foreignUserId], "the other user's dismissal is not the caller's to undo");
+    }
+
+    [Fact(DisplayName = "FO11: dismissing again moves the one row's date forward rather than adding another")]
+    public async Task Dismissing_Twice_UpsertsOneRow()
+    {
+        long activityId;
+        await using (var db = CreateDbContext())
+        {
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-dismiss-twice", ct: CancellationToken);
+            await SeedDismissalAsync(db, activityId, RecurrenceType.DayOfMonth, 5, Today().AddDays(-200));
+        }
+
+        (await DismissAsync(activityId, RecurrenceType.DayOfMonth, 5)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await DismissAsync(activityId, RecurrenceType.DayOfMonth, 5)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var assertDb = CreateDbContext();
+        var rows = await assertDb.Set<PlannerSuggestionDismissal>().IgnoreQueryFilters()
+            .Where(d => d.ActivityId == activityId).ToListAsync(CancellationToken);
+        rows.Should().ContainSingle().Which.DismissedOn.Should().Be(Today());
+    }
+
+    [Theory(DisplayName = "FO11: only a weekday or day-of-month pattern with an in-range value can be dismissed")]
+    [InlineData(RecurrenceType.DateRange, 1)]
+    [InlineData(RecurrenceType.DayType, 1)]
+    [InlineData(RecurrenceType.DayOfWeek, 0)]
+    [InlineData(RecurrenceType.DayOfWeek, 8)]
+    [InlineData(RecurrenceType.DayOfMonth, 32)]
+    public async Task Dismiss_RejectsWhatIsNotAPattern(RecurrenceType patternType, int patternValue)
+    {
+        long activityId;
+        await using (var db = CreateDbContext())
+            activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-dismiss-invalid", ct: CancellationToken);
+
+        (await DismissAsync(activityId, patternType, patternValue)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var assertDb = CreateDbContext();
+        (await assertDb.Set<PlannerSuggestionDismissal>().IgnoreQueryFilters().AnyAsync(CancellationToken)).Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "FO11: another user's activity cannot be dismissed")]
+    public async Task Dismiss_ForeignActivity_IsNotFound()
+    {
+        var foreignUserId = await ActivityMergeTestSupport.SecondUserAsync(
+            Fixture, $"fo11-dismiss-foreign-{Guid.NewGuid():N}@test.com");
+        long foreignActivityId;
+        await using (var db = CreateDbContext())
+            foreignActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-foreign", foreignUserId, CancellationToken);
+
+        (await DismissAsync(foreignActivityId, RecurrenceType.DayOfWeek, MondayIso)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await using var assertDb = CreateDbContext();
+        (await assertDb.Set<PlannerSuggestionDismissal>().IgnoreQueryFilters().AnyAsync(CancellationToken)).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// FO11. A dismissal is the user's own decision, so a merge carries it: left behind, it would cascade away
+    /// with the merged activity and bring the pattern straight back. The same pattern dismissed on both sides
+    /// collapses to one row with the later date; a pattern only the merged side dismissed moves across.
+    /// </summary>
+    [Fact(DisplayName = "FO11: merging activities carries their dismissals, collapsing duplicates to the latest")]
+    public async Task Merge_CarriesDismissals()
+    {
+        var today = Today();
+        long survivorId, mergedId;
+        await using (var db = CreateDbContext())
+        {
+            survivorId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-merge-survivor", ct: CancellationToken);
+            mergedId = await PlanningTestSeedHelper.SeedActivityAsync(db, "fo11-merge-merged", ct: CancellationToken);
+            await SeedDismissalAsync(db, survivorId, RecurrenceType.DayOfWeek, MondayIso, today.AddDays(-30));
+            await SeedDismissalAsync(db, mergedId, RecurrenceType.DayOfWeek, MondayIso, today.AddDays(-2));
+            await SeedDismissalAsync(db, mergedId, RecurrenceType.DayOfMonth, 15, today.AddDays(-10));
+        }
+
+        var response = await CreateClient().PostAsJsonAsync("api/activity/merge",
+            new { survivorId, mergedIds = new[] { mergedId } }, JsonOpts, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(CancellationToken));
+
+        await using var assertDb = CreateDbContext();
+        var rows = await assertDb.Set<PlannerSuggestionDismissal>().IgnoreQueryFilters()
+            .OrderBy(d => d.PatternType)
+            .Select(d => new { d.ActivityId, d.PatternType, d.PatternValue, d.DismissedOn })
+            .ToListAsync(CancellationToken);
+        rows.Should().BeEquivalentTo([
+            new { ActivityId = survivorId, PatternType = RecurrenceType.DayOfWeek, PatternValue = MondayIso, DismissedOn = today.AddDays(-2) },
+            new { ActivityId = survivorId, PatternType = RecurrenceType.DayOfMonth, PatternValue = 15, DismissedOn = today.AddDays(-10) }
+        ]);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
+
+    private const int MondayIso = 1;
+
+    /// <summary>
+    /// The views' window is measured from the database's <c>current_date</c>, so targets are relative to the real
+    /// clock. Fixed future dates used to stand in here and would have aged out of the window — every pattern test
+    /// would have started failing on its own a few months on.
+    /// </summary>
+    private static DateOnly Today() => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    /// <summary>The first Monday after today, so the three sittings a week apart before it are all recent.</summary>
+    private static DateOnly UpcomingMonday()
+    {
+        var today = Today();
+        var days = ((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7;
+        return today.AddDays(days == 0 ? 7 : days);
+    }
+
+    private static async Task SeedTaskOnAsync(Microsoft.EntityFrameworkCore.DbContext db, long activityId, DateOnly date)
+    {
+        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, date);
+        await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0));
+    }
+
+    private static async Task SeedDismissalAsync(Microsoft.EntityFrameworkCore.DbContext db, long activityId,
+        RecurrenceType patternType, int patternValue, DateOnly dismissedOn)
+    {
+        db.Set<PlannerSuggestionDismissal>().Add(new PlannerSuggestionDismissal
+        {
+            UserId = PlanningTestSeedHelper.TestUserId,
+            ActivityId = activityId,
+            PatternType = patternType,
+            PatternValue = patternValue,
+            DismissedOn = dismissedOn
+        });
+        await db.SaveChangesAsync(CancellationToken.None);
+    }
+
+    private async Task<HttpResponseMessage> DismissAsync(long activityId, RecurrenceType patternType, int patternValue) =>
+        await CreateClient().PostAsJsonAsync("api/repeating-planner-task/suggestions/dismiss",
+            new { activityId, patternType, patternValue }, JsonOpts, CancellationToken);
 
     private async Task SeedSameWeekdayTaskAsync(
         Microsoft.EntityFrameworkCore.DbContext db, long activityId, DateOnly target, int weeksAgo,

@@ -2188,6 +2188,70 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.ToTable("reminder", "planning");
                 });
 
+            modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.suggestion.PlannerSuggestionDismissal", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ActivityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("activity_id");
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateOnly>("DismissedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("dismissed_on");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("PatternType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pattern_type");
+
+                    b.Property<int>("PatternValue")
+                        .HasColumnType("integer")
+                        .HasColumnName("pattern_value");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_planner_suggestion_dismissal");
+
+                    b.HasIndex("ActivityId")
+                        .HasDatabaseName("ix_planner_suggestion_dismissal_activity_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_planner_suggestion_dismissal_user_id");
+
+                    b.HasIndex("UserId", "ActivityId", "PatternType", "PatternValue")
+                        .IsUnique()
+                        .HasDatabaseName("ix_planner_suggestion_dismissal_user_id_activity_id_pattern_ty");
+
+                    b.ToTable("planner_suggestion_dismissal", "planning");
+                });
+
             modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.suggestion.PlannerSuggestionFromActivityHistory", b =>
                 {
                     b.Property<long>("ActivityId")
@@ -5393,6 +5457,27 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasConstraintName("fk_reminder_user_user_id");
 
                     b.Navigation("PlannerTask");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.suggestion.PlannerSuggestionDismissal", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.activity.Activity", "Activity")
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_planner_suggestion_dismissal_activity_activity_id");
+
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_planner_suggestion_dismissal_user_user_id");
+
+                    b.Navigation("Activity");
 
                     b.Navigation("User");
                 });
