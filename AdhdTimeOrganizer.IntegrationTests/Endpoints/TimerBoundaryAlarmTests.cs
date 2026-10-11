@@ -688,7 +688,10 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
     {
         var sessionId = Guid.NewGuid();
 
-        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        // Push configured, not EmailOff: quiet hours only defer the background channels, and the dispatcher
+        // discounts one the deployment cannot deliver on (framework 240dc58) — with none, the control is never
+        // deferred and the exemption would pass vacuously. No subscription is seeded; the assertions are on rows.
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: PushOn);
 
         // A window covering effectively the whole day, so "now" is inside it whenever this test runs.
         await using (var seed = CreateDbContext())

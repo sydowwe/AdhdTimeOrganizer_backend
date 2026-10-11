@@ -309,6 +309,26 @@ public class PlannedBlockAutoReminderTests(AppDbContextFixture fixture) : Postgr
         definitions[0].NextOccurrenceAt.Should().Be(Utc(BlockDay, new TimeOnly(15, 0)).AddMinutes(-10));
     }
 
+    /// <summary>
+    /// The cascade takes the block and its <c>Reminder</c> row; <c>PlannerTaskActivityRemovalParticipant</c> only has
+    /// the gone row's id, so it is <c>CancelAsync</c> withdrawing both kinds' keys that reaches the automatic one.
+    /// </summary>
+    [Fact(DisplayName = "N1: deleting the block's activity withdraws its automatic reminder")]
+    public async Task DeletedActivity_WithdrawsTheAutoReminder()
+    {
+        var client = CreateClient();
+        await PutSettingsAsync(client, "All");
+        var activityId = await ActivityAsync("deleted with its activity");
+        var taskId = await CreateBlockAsync(client, activityId, BlockDay, Noon);
+        var reminderId = (await AutoReminderAsync(taskId))!.Id;
+
+        (await client.DeleteAsync($"api/activity/{activityId}", CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await RemindersOfAsync(taskId)).Should().BeEmpty("the cascade took the block and its reminder");
+        (await DefinitionAsync(reminderId))!.Status.Should().Be(ReminderStatus.Cancelled,
+            "otherwise it sits on my-upcoming and rings for a block that no longer exists");
+    }
+
     [Fact(DisplayName = "N1: an automatic reminder the user edits becomes theirs — a personal reminder, the automatic one withdrawn")]
     public async Task EditedAutoReminder_BecomesTheUsersOwn()
     {
