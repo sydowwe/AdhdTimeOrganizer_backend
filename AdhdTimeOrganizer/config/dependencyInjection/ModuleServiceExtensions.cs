@@ -238,6 +238,10 @@ public static class ModuleServiceExtensions
             NotificationType.ScheduledJobFailed,
             NotificationType.ScheduledJobOverdue,
 
+            // TodoLists slice: TodoListItemDueReminderSync, registered through the Reminders module per timed item.
+            // Not held while away: it is about the user's own commitment, not a nudge to come back.
+            NotificationType.TodoItemDue,
+
             // History slice: TimerBoundaryAlarmJobHandler, on every pomodoro boundary.
             NotificationType.TimerBoundary,
 

@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
 using AdhdTimeOrganizer.TodoLists.application.endpoint.extensions;
 using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using Microsoft.Extensions.Options;
@@ -16,7 +17,8 @@ namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListItem
 public class CreateTodoListItemEndpoint(
     DbContext dbContext,
     IOptions<TodoListSettings> settings,
-    IReferencedIdOwnershipService ownership)
+    IReferencedIdOwnershipService ownership,
+    ITodoListItemDueReminderSync dueReminders)
     : BaseCreateEndpoint<TodoListItem, CreateTodoListItemRequest>(dbContext)
 {
     private readonly DbContext _dbContext = dbContext;
@@ -69,4 +71,8 @@ public class CreateTodoListItemEndpoint(
 
         return true;
     }
+
+    /// <summary>A new item with a due date and time gets its reminder; any other item is a no-op cancel.</summary>
+    protected override Task AfterSave(TodoListItem entity, CancellationToken ct = default) =>
+        dueReminders.SyncAsync([entity.Id], ct);
 }

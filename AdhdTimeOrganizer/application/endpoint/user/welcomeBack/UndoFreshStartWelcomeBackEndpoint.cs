@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.application.service.welcomeBack;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
+using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -26,6 +27,7 @@ namespace AdhdTimeOrganizer.application.endpoint.user.welcomeBack;
 public class UndoFreshStartWelcomeBackEndpoint(
     AppDbContext dbContext,
     IReminderRegistrationService reminders,
+    ITodoListItemDueReminderSync dueReminders,
     IMemoryCache undoStore)
     : Endpoint<UndoFreshStartRequest, UndoFreshStartResponse>
 {
@@ -118,6 +120,11 @@ public class UndoFreshStartWelcomeBackEndpoint(
 
             if (restoredTasks.Count > 0)
                 await reminders.SyncForPlannerTasksAsync(restoredTasks, ct);
+
+            // A restored to-do is back on its old, passed date (or its cleared time is back), so the reminder the
+            // spread registered is withdrawn — and a restored "someday" item that had a time gets its own again.
+            if (restoredTodos.Count > 0)
+                await dueReminders.SyncAsync(restoredTodos, ct);
 
             await Send.OkAsync(new UndoFreshStartResponse
             {

@@ -61,6 +61,23 @@ public class EnPortalNotificationTexts : EnNotificationTexts
         return parts.Count == 1 ? parts[0] : $"{string.Join(", ", parts[..^1])} and {parts[^1]}";
     }
 
+    // "Due in 30 min", "… in 2 h", "… in 1 h 30 min"; "Due now"; no lead: "Due soon".
+    public override string TodoItemDueTitle(int? minutesBefore) => minutesBefore switch
+    {
+        null => "Due soon",
+        <= 0 => "Due now",
+        var m => $"Due in {Lead(m.Value)}"
+    };
+
+    public override string TodoItemDueFallbackBody => "One of your to-dos is coming due.";
+
+    private static string Lead(int minutes) => (minutes / 60, minutes % 60) switch
+    {
+        (0, var m) => $"{m} min",
+        (var h, 0) => $"{h} h",
+        var (h, m) => $"{h} h {m} min"
+    };
+
     public override string TimerEndedTitle => "Timer finished";
     public override string FocusEndedTitle => "Focus finished";
     public override string ShortBreakEndedTitle => "Short break over";

@@ -9,6 +9,7 @@ using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.application.service;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -47,6 +48,7 @@ public class ApplyFreshStartWelcomeBackEndpoint(
     AppDbContext dbContext,
     ICalendarProvisioner calendars,
     IReminderRegistrationService reminders,
+    ITodoListItemDueReminderSync dueReminders,
     IMemoryCache undoStore,
     TimeProvider time)
     : Endpoint<ApplyFreshStartRequest, ApplyFreshStartResponse>
@@ -123,6 +125,11 @@ public class ApplyFreshStartWelcomeBackEndpoint(
             // (the Reminder.RemindAt gotcha), in one call after the commit.
             if (tasks.Count > 0)
                 await reminders.SyncForPlannerTasksAsync(tasks.Select(t => t.Id).ToList(), ct);
+
+            // A spread to-do keeps its time of day on its new date, so a timed one gets a reminder again; a
+            // "someday" one lost its date and time, so whatever it had is withdrawn.
+            if (todos.Count > 0)
+                await dueReminders.SyncAsync(todos.Select(i => i.Id).ToList(), ct);
 
             var token = FreshStartUndo.Store(undoStore, new FreshStartUndo.Snapshot(
                 userId, window.AwayFrom, window.ReturnedAt, todosBefore, tasksBefore,

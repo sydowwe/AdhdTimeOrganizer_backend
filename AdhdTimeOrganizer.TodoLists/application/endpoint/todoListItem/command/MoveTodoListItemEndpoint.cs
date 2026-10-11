@@ -2,6 +2,7 @@ using AdhdTimeOrganizer.TodoLists.application.dto.request.todoList;
 using AdhdTimeOrganizer.TodoLists.application.endpoint.extensions;
 using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.infrastructure.persistence.extensions;
 using AdhdTimeOrganizer.TodoLists.infrastructure.settings;
 using Humanizer;
@@ -11,7 +12,10 @@ using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListItem.command;
 
-public class MoveTodoListItemEndpoint(DbContext dbContext, IOptions<TodoListSettings> settings)
+public class MoveTodoListItemEndpoint(
+    DbContext dbContext,
+    IOptions<TodoListSettings> settings,
+    ITodoListItemDueReminderSync dueReminders)
     : BasePatchEndpoint<TodoListItem, MoveToListTodoListItemRequest>(dbContext)
 {
     private readonly TodoListSettings _settings = settings.Value;
@@ -57,4 +61,8 @@ public class MoveTodoListItemEndpoint(DbContext dbContext, IOptions<TodoListSett
             .GetNextDisplayOrder(_settings, User.GetId(), e => e.TodoListId == req.DestinationListId, ct);
         return true;
     }
+
+    /// <summary>The schedule does not move, but the registered payload names the list, so it is refreshed.</summary>
+    protected override Task AfterSave(TodoListItem entity, CancellationToken ct = default) =>
+        dueReminders.SyncAsync([entity.Id], ct);
 }

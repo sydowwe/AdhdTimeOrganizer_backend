@@ -73,6 +73,23 @@ public class SkPortalNotificationTexts : SkNotificationTexts
         return parts.Count == 1 ? parts[0] : $"{string.Join(", ", parts[..^1])} a {parts[^1]}";
     }
 
+    // "Termín úlohy o 30 min", "… o 2 h", "… o 1 h 30 min"; "Termín úlohy je teraz"; no lead: "Termín úlohy sa blíži".
+    public override string TodoItemDueTitle(int? minutesBefore) => minutesBefore switch
+    {
+        null => "Termín úlohy sa blíži",
+        <= 0 => "Termín úlohy je teraz",
+        var m => $"Termín úlohy o {Lead(m.Value)}"
+    };
+
+    public override string TodoItemDueFallbackBody => "Blíži sa termín jednej z vašich úloh.";
+
+    private static string Lead(int minutes) => (minutes / 60, minutes % 60) switch
+    {
+        (0, var m) => $"{m} min",
+        (var h, 0) => $"{h} h",
+        var (h, m) => $"{h} h {m} min"
+    };
+
     public override string TimerEndedTitle => "Časovač skončil";
     public override string FocusEndedTitle => "Sústredenie skončilo";
     public override string ShortBreakEndedTitle => "Krátka prestávka skončila";

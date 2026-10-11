@@ -142,6 +142,24 @@ project's bases.
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md` before adding a
   seeder anywhere in the solution.
 
+- **A timed to-do has a reminder, and every write to its due instant, completion or existence must
+  sync it** (P1-02). An item with `DueDate` **and** `DueTime` is registered with the Reminders module
+  as a one-shot `TodoItemDue` at the user's lead (`UserTodoListSettings.DueReminderMinutesBefore`,
+  default 30, `GET/PUT /todo-list/settings`); a date-only item never is. All of it lives in
+  `application/service/reminder/`: `TodoListItemDueReminderSync` (behind
+  `ITodoListItemDueReminderSync`) is the one place that knows the key, offsets and payload, and is
+  called **after the save** by create, update, both toggles, move, reschedule-overdue, item delete,
+  list delete (ids read in `BeforeDeleteAsync` — the cascade never passes through), and on the host
+  side by the fresh start and its undo, `ActivityTimeRecordedEventHandler`,
+  `PlannerTaskIsDoneChangedEventHandler`, the lead setting and the user's time-zone change. A new
+  write path that forgets is **silent**: the reminder simply stays on the user's `my-upcoming` list.
+  The net under it is `TodoListItemDueReminderGuard` (`IReminderDispatchGuard`): at fire time an
+  item that is gone, done, or due at a different instant than registered is retired
+  (`Skipped / SubjectRetired`), so the push never goes out — that is what covers the activity delete,
+  whose cascade lives in Core and cannot call this slice. Recipients are explicit, not a resolver,
+  on purpose: the module hides resolver-backed reminders from `my-upcoming`, snooze and dismiss.
+  Pinned by `TodoListItemDueReminderTests` (one test per path, plus the guard at scan level).
+
 ## Extension playbook
 
 - **Add a field to `TodoListItem`:** entity → `TodoListItemConfiguration` → the request DTOs

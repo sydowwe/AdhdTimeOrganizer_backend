@@ -60,6 +60,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     public DbSet<RoutineTimePeriod> RoutineTimePeriods { get; set; }
     public DbSet<RoutinePeriodCompletion> RoutinePeriodCompletions { get; set; }
     public DbSet<UserRoutineSettings> UserRoutineSettings { get; set; }
+    public DbSet<UserTodoListSettings> UserTodoListSettings { get; set; }
     public DbSet<TodoListItem> TodoListItems { get; set; }
     public DbSet<TodoList> TodoLists { get; set; }
     public DbSet<TodoListCategory> TodoListCategories { get; set; }

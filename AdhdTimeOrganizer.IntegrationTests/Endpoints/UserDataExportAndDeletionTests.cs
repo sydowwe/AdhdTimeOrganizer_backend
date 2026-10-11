@@ -444,7 +444,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
     /// <item>Lookups and settings the exported rows refer to by id, so the export is readable but not
     /// self-contained: the <c>Activity*</c> family, <c>TodoListCategory</c>, <c>TaskPriority</c>,
     /// <c>TaskImportance</c>, <c>RoutineTimePeriod</c>, <c>UserPlannerSettings</c>,
-    /// <c>UserRoutineSettings</c>.</item>
+    /// <c>UserRoutineSettings</c>, <c>UserTodoListSettings</c>.</item>
     /// <item>Not here at all, deliberately: the three <c>PlannerSuggestionFrom*</c> mappings.
     /// <c>PlannerSuggestionFromDayTemplate</c> used to be listed, because it alone derived from
     /// <c>BaseEntityWithUser</c> — which was also what made its endpoint 500 (see that entity's own doc).
@@ -487,7 +487,8 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         "TrackerAndroidMappingByPattern",
         "TrackerDesktopMappingByPattern",
         "UserPlannerSettings",
-        "UserRoutineSettings"
+        "UserRoutineSettings",
+        "UserTodoListSettings"
     ];
 }
 

@@ -39,6 +39,7 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         NotificationType.RoutineSuggestedToday,
         NotificationType.ScheduledJobFailed,
         NotificationType.ScheduledJobOverdue,
+        NotificationType.TodoItemDue,
         NotificationType.TimerBoundary,
         NotificationType.Test
     };

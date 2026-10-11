@@ -49,7 +49,9 @@ public class ModuleSchemaTests(AppDbContextFixture fixture) : PostgresTestBase(f
             "user__role", "user_claim", "user_login", "user_role_claim", "user_token"
         ],
         [ModuleSchemas.Activity] = ["activity", "activity_category", "activity_role"],
-        [ModuleSchemas.TodoLists] = ["todo_list", "todo_list_item", "todo_list_category", "task_priority"],
+        [ModuleSchemas.TodoLists] = [
+            "todo_list", "todo_list_item", "todo_list_category", "task_priority", "user_todo_list_settings"
+        ],
         [ModuleSchemas.History] = ["activity_history", "activity_history_session", "timer_boundary_alarm"],
         [ModuleSchemas.Planning] =
         [

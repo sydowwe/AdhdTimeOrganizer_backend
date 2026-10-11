@@ -86,6 +86,13 @@ worth copying the shape of:
   endpoint, so a resolver the scan missed, a drifted key or a read that skips the step all return a valid 200
   with a null label — which the client renders as "Reminder #23001", indistinguishable from "no resolver".
   It asserts the title on every read that names a reminder, and that `/my-upcoming` still sends no payload.
+- `TodoListItemDueReminderTests` — the to-do due reminder (P1-02). Two silent mechanisms: every write path
+  has to call the sync after its save (a path that forgets leaves a reminder for a finished or deleted item
+  on the user's upcoming list — no error anywhere), and the dispatch guard is found by **template key** over
+  an injected `IEnumerable<IReminderDispatchGuard>` (a missing or misnamed guard just lets a stale reminder
+  ring). One test per write path asserts the `ReminderDefinition` row; the scan-level cases change the item
+  behind the sync's back and assert a `Skipped / SubjectRetired` dispatch row **and no `Notification` row**.
+  The fresh-start path is pinned in `WelcomeBackTests`, under that file's fixed clock.
 - `HistorySummaryCustomRangeTests` — `rangeType: "CustomRange"` is `date`…`endDate` inclusive on all four
   `summary/` endpoints. The range resolver used to fall through to `(date, date)` and a `to <= from` guard
   widened that to two days, so a month-long request was answered for two days — a well-formed 200 the

@@ -9,6 +9,7 @@ using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.application.service.reminder;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Notifications.domain.entity;
+using Sydowwe.Reminders.domain.entity;
+using Sydowwe.Reminders.domain.@enum;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
@@ -387,6 +390,46 @@ public class WelcomeBackTests(AppDbContextFixture fixture) : PostgresTestBase(fi
         (await GetCardAsync(client)).Should().BeNull();
         (await LoadTodoAsync(pile.TodoMarch1)).DueDate.Should().Be(D(1));
         (await LoadTaskAsync(pile.TaskOnLeavingDay)).Status.Should().Be(PlannerTaskStatus.NotStarted);
+    }
+
+    // ---------------------------------------------------------------- the to-do due reminder (P1-02)
+
+    [Fact(DisplayName = "P1-02: a fresh-start spread gives a timed to-do its reminder on the new day, and the undo withdraws it")]
+    public async Task FreshStart_SpreadAndUndo_SyncTheDueReminder()
+    {
+        var timed = await SeedTodoAsync("todo-timed", D(10));
+        await using (var db = CreateDbContext())
+            await db.Set<TodoListItem>().Where(i => i.Id == timed)
+                .ExecuteUpdateAsync(s => s.SetProperty(i => i.DueTime, new TimeOnly(15, 0)), CancellationToken);
+        await SetLastActiveAsync(LeftAt);
+        await using var host = Host();
+        var client = host.CreateClient();
+
+        var (status, body) = await SendAsync(FreshStartAsync(client, "Spread", 1, "Keep", markRead: false));
+        status.Should().Be(HttpStatusCode.OK, body);
+        var applied = Read<ApplyFreshStartResponse>(body);
+        applied.RescheduledTodoIds.Should().Contain(timed);
+
+        var registered = await DueReminderAsync(timed);
+        registered.Should().NotBeNull("the overdue item had no reminder; the spread put it on today, still ahead at 15:00");
+        registered!.Status.Should().Be(ReminderStatus.Active);
+        registered.DueAt.Should().Be(new DateTimeOffset(2030, 3, 12, 15, 0, 0, TimeSpan.Zero));
+
+        var (undoStatus, undoBody) = await SendAsync(client.PostAsJsonAsync("api/welcome-back/fresh-start/undo",
+            new { applied.UndoToken }, JsonOpts, CancellationToken));
+        undoStatus.Should().Be(HttpStatusCode.OK, undoBody);
+
+        (await DueReminderAsync(timed))!.Status.Should().Be(ReminderStatus.Cancelled,
+            "the item is back on its passed date, so the reminder the spread registered goes with the move");
+    }
+
+    private async Task<ReminderDefinition?> DueReminderAsync(long itemId)
+    {
+        await using var db = CreateDbContext();
+        return await db.Set<ReminderDefinition>().AsNoTracking().IgnoreQueryFilters()
+            .SingleOrDefaultAsync(d => d.OwnerModule == TodoListItemDueReminder.OwnerModule
+                                       && d.SubjectId == itemId.ToString()
+                                       && d.Kind == TodoListItemDueReminder.Kind, CancellationToken);
     }
 
     // ---------------------------------------------------------------- seeding

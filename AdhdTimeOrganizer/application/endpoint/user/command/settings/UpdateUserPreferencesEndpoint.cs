@@ -1,14 +1,26 @@
 using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.application.validator;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using Microsoft.AspNetCore.Identity;
 using Sydowwe.Framework.application.endpoint.user.command.settings;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.settings;
 
-public class UpdateUserPreferencesEndpoint(UserManager<User> userManager)
+public class UpdateUserPreferencesEndpoint(UserManager<User> userManager, ITodoListItemDueReminderSync dueReminders)
     : BaseUpdateUserPreferencesEndpoint<User, UpdateUserPreferencesRequest>(userManager)
 {
+    /// <summary>
+    /// A to-do's due instant is its date and time read in the user's zone, and the registered reminder froze the
+    /// old zone's instant. Re-sync every open timed item when the zone is sent, or the dispatch guard — which
+    /// compares instants — would read every one of them as moved and retire it.
+    /// </summary>
+    protected override async Task AfterUpdateAsync(User user, UpdateUserPreferencesRequest req, CancellationToken ct)
+    {
+        if (req.Timezone is not null)
+            await dueReminders.SyncAllForUserAsync(user.Id, ct);
+    }
+
     public override void Configure()
     {
         base.Configure();

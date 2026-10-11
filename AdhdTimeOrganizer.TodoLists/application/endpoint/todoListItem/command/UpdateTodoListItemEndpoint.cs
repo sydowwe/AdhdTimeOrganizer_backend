@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.TodoLists.application.endpoint.extensions;
 using AdhdTimeOrganizer.TodoLists.application.service;
 using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using Sydowwe.Framework.application.endpoint.@base.command;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.helper;
@@ -14,7 +15,8 @@ namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListItem
 public class UpdateTodoListItemEndpoint(
     DbContext dbContext,
     IReferencedIdOwnershipService ownership,
-    IUserTimeZoneResolver timeZones)
+    IUserTimeZoneResolver timeZones,
+    ITodoListItemDueReminderSync dueReminders)
     : BaseUpdateEndpoint<TodoListItem, UpdateTodoListItemRequest>(dbContext)
 {
     public override void Configure()
@@ -79,4 +81,12 @@ public class UpdateTodoListItemEndpoint(
 
         return true;
     }
+
+    /// <summary>
+    /// The PUT can move the date, the time and the completion at once, in either direction — un-ticking an item
+    /// whose due time is still ahead brings its reminder back. Unconditional: an edit that changed none of them
+    /// re-registers the same schedule, which the registry treats as an in-place no-op.
+    /// </summary>
+    protected override Task AfterSave(TodoListItem entity, CancellationToken ct = default) =>
+        dueReminders.SyncAsync([entity.Id], ct);
 }

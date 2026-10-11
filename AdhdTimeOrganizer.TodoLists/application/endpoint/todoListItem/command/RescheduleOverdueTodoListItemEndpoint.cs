@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
 using AdhdTimeOrganizer.TodoLists.application.service;
 using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using FastEndpoints;
 using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.extensions;
@@ -26,7 +27,10 @@ namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListItem
 /// is not the caller's moves nothing, exactly like an empty list of their own.
 /// </para>
 /// </summary>
-public class RescheduleOverdueTodoListItemEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones)
+public class RescheduleOverdueTodoListItemEndpoint(
+    DbContext dbContext,
+    IUserTimeZoneResolver timeZones,
+    ITodoListItemDueReminderSync dueReminders)
     : Endpoint<RescheduleOverdueTodoListItemRequest, RescheduleOverdueTodoListItemResponse>
 {
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
@@ -74,6 +78,10 @@ public class RescheduleOverdueTodoListItemEndpoint(DbContext dbContext, IUserTim
             }
 
             await dbContext.SaveChangesAsync(ct);
+
+            // Every moved item, not the first: a timed item lands on its new date with its time of day kept, so
+            // its reminder moves with it. One batched call after the commit.
+            await dueReminders.SyncAsync(items.Select(i => i.Id).ToList(), ct);
 
             await Send.OkAsync(new RescheduleOverdueTodoListItemResponse
             {

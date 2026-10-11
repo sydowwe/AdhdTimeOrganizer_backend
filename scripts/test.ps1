@@ -69,6 +69,19 @@ if (-not (Test-Path $projectFile)) {
     throw "No such project: $projectFile"
 }
 
+# A user-local SDK (~/.dotnet) is found through DOTNET_ROOT, not PATH. A shell started before the variable
+# was set has neither, so read the persisted value too. The runner exe needs DOTNET_ROOT for the same reason.
+if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+    $dotnetRoot = $env:DOTNET_ROOT
+    if (-not $dotnetRoot) { $dotnetRoot = [Environment]::GetEnvironmentVariable('DOTNET_ROOT', 'User') }
+    if (-not $dotnetRoot) { $dotnetRoot = [Environment]::GetEnvironmentVariable('DOTNET_ROOT', 'Machine') }
+    if (-not $dotnetRoot -or -not (Test-Path (Join-Path $dotnetRoot 'dotnet.exe'))) {
+        throw "dotnet is not on PATH and DOTNET_ROOT does not point at an SDK."
+    }
+    $env:DOTNET_ROOT = $dotnetRoot
+    $env:PATH = "$dotnetRoot$([IO.Path]::PathSeparator)$env:PATH"
+}
+
 if (-not $NoBuild) {
     Write-Host "Building $Project into artifacts-cli..." -ForegroundColor Cyan
     dotnet build $projectFile --artifacts-path $artifacts --nologo -v q

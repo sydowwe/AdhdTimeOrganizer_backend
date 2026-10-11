@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.Routines.domain.serviceContract;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,12 +17,18 @@ public class PlannerTaskIsDoneChangedEventHandler(IServiceScopeFactory scopeFact
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var awayDaysReader = scope.ServiceProvider.GetRequiredService<IRoutineAwayDaysReader>();
+        var dueReminders = scope.ServiceProvider.GetRequiredService<ITodoListItemDueReminderSync>();
 
         try
         {
             await SyncRoutineTodoList(dbContext, awayDaysReader, eventModel, ct);
             await SyncTodoListItem(dbContext, eventModel, ct);
             await dbContext.SaveChangesAsync(ct);
+
+            // Both directions, after the commit: a block ticked off finishes its to-do and withdraws the to-do's
+            // due reminder; un-ticking it reopens the to-do and brings the reminder back if it is still ahead.
+            if (eventModel.TodoListItemId is { } todoListItemId)
+                await dueReminders.SyncAsync([todoListItemId], ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

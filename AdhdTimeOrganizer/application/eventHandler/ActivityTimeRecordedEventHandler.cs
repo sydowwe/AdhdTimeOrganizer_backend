@@ -9,6 +9,7 @@ using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
+using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 
@@ -47,7 +48,8 @@ public class ActivityTimeRecordedEventHandler(
             scope.ServiceProvider.GetRequiredService<AppDbContext>(),
             scope.ServiceProvider.GetRequiredService<IReminderRegistrationService>(),
             scope.ServiceProvider.GetRequiredService<IActivityTimeAttributionSink>(),
-            scope.ServiceProvider.GetRequiredService<IUserTimeZoneResolver>());
+            scope.ServiceProvider.GetRequiredService<IUserTimeZoneResolver>(),
+            scope.ServiceProvider.GetRequiredService<ITodoListItemDueReminderSync>());
 
         foreach (var total in eventModel.Totals)
         {
@@ -100,7 +102,7 @@ public class ActivityTimeRecordedEventHandler(
 
         if (openTasks.Count == 0)
         {
-            await AutomateWithoutPlannerTaskAsync(dbContext, userId, total, ct);
+            await AutomateWithoutPlannerTaskAsync(services, userId, total, ct);
             return;
         }
 
@@ -199,7 +201,8 @@ public class ActivityTimeRecordedEventHandler(
         AppDbContext Db,
         IReminderRegistrationService Reminders,
         IActivityTimeAttributionSink Sink,
-        IUserTimeZoneResolver TimeZones);
+        IUserTimeZoneResolver TimeZones,
+        ITodoListItemDueReminderSync DueReminders);
 
     /// <remarks>
     /// When the time was logged <em>for</em> an item (<see cref="ActivityDayTotal.TodoListItemId"/> /
@@ -208,19 +211,20 @@ public class ActivityTimeRecordedEventHandler(
     /// used to be settled by whichever Postgres returned first, which is a visible wrong tick once a deliberate
     /// timer can trigger it rather than only background tracking.
     /// </remarks>
-    private static async Task AutomateWithoutPlannerTaskAsync(AppDbContext dbContext, long userId, ActivityDayTotal total, CancellationToken ct)
+    private static async Task AutomateWithoutPlannerTaskAsync(Collaborators services, long userId, ActivityDayTotal total, CancellationToken ct)
     {
         var isLinked = total.TodoListItemId is not null || total.RoutineTodoListId is not null;
 
         if (!isLinked || total.TodoListItemId is not null)
-            await CompleteTodoItemAsync(dbContext, userId, total, ct);
+            await CompleteTodoItemAsync(services, userId, total, ct);
 
         if (!isLinked || total.RoutineTodoListId is not null)
-            await CompleteRoutineItemAsync(dbContext, userId, total, ct);
+            await CompleteRoutineItemAsync(services.Db, userId, total, ct);
     }
 
-    private static async Task CompleteTodoItemAsync(AppDbContext dbContext, long userId, ActivityDayTotal total, CancellationToken ct)
+    private static async Task CompleteTodoItemAsync(Collaborators services, long userId, ActivityDayTotal total, CancellationToken ct)
     {
+        var dbContext = services.Db;
         var candidates = dbContext.Set<TodoListItem>()
             .Where(i => i.UserId == userId && !i.IsDone && i.SuggestedTime != null);
         var todoItem = await (total.TodoListItemId is { } itemId
@@ -234,6 +238,9 @@ public class ActivityTimeRecordedEventHandler(
             if (todoItem.TotalCount.HasValue)
                 todoItem.DoneCount = todoItem.TotalCount;
             await dbContext.SaveChangesAsync(ct);
+
+            // Finished by tracked time is finished: its due reminder is withdrawn like a manual tick's.
+            await services.DueReminders.SyncAsync([todoItem.Id], ct);
         }
     }
 

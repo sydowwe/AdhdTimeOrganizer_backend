@@ -3016,6 +3016,51 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList.UserTodoListSettings", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("DueReminderMinutesBefore")
+                        .HasColumnType("integer")
+                        .HasColumnName("due_reminder_minutes_before");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_todo_list_settings");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_todo_list_settings_user_id");
+
+                    b.ToTable("user_todo_list_settings", "todo");
+                });
+
             modelBuilder.Entity("AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.AndroidSessionData", b =>
                 {
                     b.Property<long>("Id")
@@ -5600,6 +5645,18 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.Navigation("TaskPriority");
 
                     b.Navigation("TodoList");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList.UserTodoListSettings", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
+                        .WithOne()
+                        .HasForeignKey("AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList.UserTodoListSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_todo_list_settings_user_user_id");
 
                     b.Navigation("User");
                 });
