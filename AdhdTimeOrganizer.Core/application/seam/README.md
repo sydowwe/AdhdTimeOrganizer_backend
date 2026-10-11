@@ -15,6 +15,7 @@ if the two ever drift apart.
 |---|---|---|---|---|
 | `IActivityMembershipSource` | read | keyed `IEnumerable<>` | TodoLists (`todoList`), Routines (`routineTodoList`) | **nobody** — its one consumer, History's `grid` grid, was deleted with `CQ-1`. Kept for the next one |
 | `IActivityReferenceSource` | read **+ write**, in the caller's transaction | keyed `IEnumerable<>` | Core (`timerPreset`), History (`activityHistory`), TodoLists (`todoList`), Routines (`routineTodoList`), Planning (`plannerTask`), Tracking (`trackerMapping`), ActivityProfiles (`activityProfile`) | Core — `GridActivityEndpoint`, `GetByIdActivityEndpoint`, `MergeActivityEndpoint`, all through `IActivityReferenceService` |
+| `IActivityRemovalParticipant` | read before, **any** work after the removal commits | keyed `IEnumerable<>` | TodoLists (`todoList`) — re-syncs the due reminders of the to-dos on the removed activities | Core — `DeleteActivityEndpoint`, `MergeActivityEndpoint`, through `IActivityRemovalService` |
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` (`AttributeAsync`), `AndroidSyncEndpoint` (`AttributeSpanAsync`, FO9) |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint`; Routines — `RoutineSuggestedTodayJobHandler`, for the day's `WakeUpTime` |
 | `IFocusIntervalSource` | read | single | History | Tracking — `DesktopMappingSuggestionsEndpoint` (FO9), which learns process → activity from timer focus phases |
@@ -30,6 +31,7 @@ if the two ever drift apart.
 | `PlannerTaskIsDoneChangedEvent` | Planning, and the host handler above | host | TodoLists + Routines |
 | `TodoListItemIsDoneChangedEvent` | TodoLists | **Planning** | Planning only |
 | `RoutineTodoListIsDoneChangedEvent` | Routines | **Planning** | Planning only |
+| `ActivityArchivedChangedEvent` | Core (`SetArchivedActivityEndpoint`, on a real change) | **TodoLists** | TodoLists only — re-syncs the due reminders of the activity's to-dos |
 
 **A handler belongs to the slice it writes into, not to the host and not to the publisher.** The two
 Planning-side handlers each touch only `PlannerTask` (and, for the to-do one, Planning's own
@@ -43,7 +45,7 @@ would silently double-complete an activity holding both.
 A handler in a slice needs that slice's assembly in the FastEndpoints `o.Assemblies` list in
 `Program.cs`. A missing one is not a build error — the event simply publishes into nothing.
 
-All four are published `Mode.WaitForAll` — the publisher blocks on the handler, so these are
+All five are published `Mode.WaitForAll` — the publisher blocks on the handler, so these are
 synchronous in-process calls, not background work. Every handler runs **after** the publisher's own
 commit, in its own scope, and logs-and-swallows rather than failing the request that raised it.
 

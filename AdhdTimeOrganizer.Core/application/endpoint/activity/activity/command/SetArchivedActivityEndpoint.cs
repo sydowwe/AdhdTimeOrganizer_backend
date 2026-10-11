@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.application.dto.request.activity;
+using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.infrastructure.persistence;
 using FastEndpoints;
@@ -70,6 +71,7 @@ public class SetArchivedActivityEndpoint(DbContext dbContext) : Endpoint<SetActi
                 return;
             }
 
+            var changed = entity.IsArchived != req.IsArchived;
             entity.IsArchived = req.IsArchived;
 
             var result = await dbContext.UpdateEntityAsync(entity, ct);
@@ -79,6 +81,12 @@ public class SetArchivedActivityEndpoint(DbContext dbContext) : Endpoint<SetActi
                 await Send.ErrorsAsync(this.ErrorStatus(result.ErrorType), ct);
                 return;
             }
+
+            // After the commit and only on a real change — a repeat archive is a 204 that moved nothing. The
+            // handlers log and swallow, so a failure there cannot turn this into an error for a write that stuck.
+            if (changed)
+                await new ActivityArchivedChangedEvent(entity.Id, entity.UserId, entity.IsArchived)
+                    .PublishAsync(Mode.WaitForAll, ct);
 
             await Send.NoContentAsync(ct);
         }

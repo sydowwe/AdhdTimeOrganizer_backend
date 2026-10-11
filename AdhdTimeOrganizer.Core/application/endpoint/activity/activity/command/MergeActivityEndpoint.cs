@@ -60,7 +60,8 @@ namespace AdhdTimeOrganizer.Core.application.endpoint.activity.activity.command;
 /// </remarks>
 public class MergeActivityEndpoint(
     DbContext dbContext,
-    IActivityReferenceService referenceService) : Endpoint<MergeActivityRequest, MergeActivityResponse>
+    IActivityReferenceService referenceService,
+    IActivityRemovalService removal) : Endpoint<MergeActivityRequest, MergeActivityResponse>
 {
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
@@ -108,6 +109,11 @@ public class MergeActivityEndpoint(
 
         try
         {
+            // Before the repoint, while every dependent still names its merged activity: a slice that keeps
+            // something outside the database for those rows (a to-do's due reminder) captures them now and is
+            // told after the commit. Repointed rows re-sync onto the survivor; rows a slice collapses away are gone.
+            var afterCommit = await removal.BeforeRemovalAsync(dbContext, mergedIds, ct);
+
             await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
 
             var repointedCount = await referenceService.RepointAsync(dbContext, survivor.Id, mergedIds, ct);
@@ -121,6 +127,8 @@ public class MergeActivityEndpoint(
             await dbContext.SaveChangesAsync(ct);
 
             await transaction.CommitAsync(ct);
+
+            await afterCommit(ct);
 
             await Send.OkAsync(new MergeActivityResponse
             {

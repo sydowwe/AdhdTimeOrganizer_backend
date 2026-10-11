@@ -272,6 +272,38 @@ public class SeamWiringTests(AppDbContextFixture fixture) : PostgresTestBase(fix
         AssertRegisteredOnce<IActivityReferenceService>(scope.ServiceProvider);
     }
 
+    /// <summary>
+    /// The activity <b>removal</b> participants resolve, their keys are distinct, they cover
+    /// <see cref="ActivityRemovalParticipantKeys"/> exactly, and the face the endpoints inject resolves once.
+    /// </summary>
+    /// <remarks>
+    /// A missing participant is silent: the delete and the merge still succeed, and the slice's out-of-database
+    /// state for the cascaded rows — a to-do's due reminder on the user's upcoming list — simply never hears of it.
+    /// <c>TodoListItemDueReminderActivityLifecycleTests</c> asserts the rows; this pins the registration.
+    /// </remarks>
+    [Fact]
+    public void ActivityRemovalParticipants_CoverEveryKey_Exactly()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+        AssertRegisteredOnce<IActivityRemovalService>(scope.ServiceProvider);
+
+        var participants = scope.ServiceProvider.GetServices<IActivityRemovalParticipant>().ToList();
+        var declaredKeys = typeof(ActivityRemovalParticipantKeys)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(f => f is { IsLiteral: true, IsInitOnly: false } && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+        var resolvedKeys = participants.Select(p => p.Key).ToList();
+
+        Assert.True(resolvedKeys.Distinct().Count() == resolvedKeys.Count,
+            "Two IActivityRemovalParticipant implementations claim the same Key: "
+            + string.Join(", ", participants.Select(p => $"{p.Key}={p.GetType().Name}")));
+
+        Assert.True(declaredKeys.OrderBy(k => k).SequenceEqual(resolvedKeys.OrderBy(k => k)),
+            $"ActivityRemovalParticipantKeys declares [{string.Join(", ", declaredKeys.OrderBy(k => k))}] "
+            + $"but the container resolved [{string.Join(", ", resolvedKeys.OrderBy(k => k))}].");
+    }
+
     private static void AssertRegisteredOnce<TService>(IServiceProvider sp) where TService : class
     {
         var implementations = sp.GetServices<TService>().ToList();
