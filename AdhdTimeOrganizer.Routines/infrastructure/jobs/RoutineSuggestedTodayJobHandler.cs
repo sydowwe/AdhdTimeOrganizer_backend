@@ -25,6 +25,11 @@ namespace AdhdTimeOrganizer.Routines.infrastructure.jobs;
 /// the user's own default otherwise (FO10, <c>User.DefaultWakeUpTime</c>), the wake-up a lazily created day gets.
 /// </para>
 /// <para>
+/// <b>Not for a user who has the morning briefing on</b> (<c>User.MorningBriefingEnabled</c>, the default). The
+/// host's briefing counts these same items, by the same rule (<see cref="RoutineSuggestedDay.IsOpenSuggestionOn"/>),
+/// in the one morning notification; this digest would be its duplicate. Turning the briefing off brings it back.
+/// </para>
+/// <para>
 /// <b>Not on an away day.</b> A user-local today marked vacation or sick gets no digest (FO1): a nudge on
 /// holiday is one the user learns to ignore, and the habit outlasts the holiday.
 /// </para>
@@ -59,10 +64,12 @@ public class RoutineSuggestedTodayJobHandler(
     public async Task ExecuteAsync(ScheduledJobContext context, CancellationToken ct)
     {
         // Unauthenticated, so the per-user query filter is inert and every user is in scope. Only users who
-        // could possibly qualify are paged: a visible, non-daily period with at least one item. Whether an item
-        // names a day is decided in memory — SuggestedDays is a value-converted column, which EF cannot count.
+        // could possibly qualify are paged: a visible, non-daily period with at least one item, owned by a user
+        // without the morning briefing — that one already counts these items. Whether an item names a day is
+        // decided in memory — SuggestedDays is a value-converted column, which EF cannot count.
         var candidates = dbContext.Set<RoutineTimePeriod>()
-            .Where(p => !p.IsHidden && p.LengthInDays > 1 && p.RoutineTodoListColl.Any());
+            .Where(p => !p.IsHidden && p.LengthInDays > 1 && p.RoutineTodoListColl.Any())
+            .Where(p => !dbContext.Set<User>().Any(u => u.Id == p.UserId && u.MorningBriefingEnabled));
         var pages = await RoutineSweepPaging.LoadUserPagesAsync(candidates, userPageSize, ct);
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -114,10 +121,9 @@ public class RoutineSuggestedTodayJobHandler(
             return false;
 
         var items = periods
-            .Where(p => !p.IsHidden)
             .OrderBy(p => p.LengthInDays)
             .SelectMany(p => p.RoutineTodoListColl
-                .Where(i => RoutineSuggestedDay.IsSuggestedOn(p, i, today) && !IsDoneThisCycle(p, i, now))
+                .Where(i => RoutineSuggestedDay.IsOpenSuggestionOn(p, i, today, now))
                 .OrderBy(i => i.DisplayOrder))
             .ToList();
 
@@ -144,14 +150,4 @@ public class RoutineSuggestedTodayJobHandler(
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.SuggestedTodayNotifiedFor, today), ct);
         return true;
     }
-
-    /// <summary>
-    /// Done <i>in the cycle that is still open</i>. Resets fall on midnight UTC but are only <i>applied</i> by the
-    /// 02:00 UTC job or lazily on the next read, so at a user's morning the reset that closes last cycle may be
-    /// due and not yet applied — an item ticked last Tuesday still reads <c>IsDone</c>. Past the due reset, that
-    /// tick belongs to a closed cycle and says nothing about today. Before it, the tick is the current cycle's by
-    /// the server's own definition, which is also what the routine list shows.
-    /// </summary>
-    private static bool IsDoneThisCycle(RoutineTimePeriod period, RoutineTodoList item, DateTime now) =>
-        item.IsDone && now < RoutineResetService.ComputeNextReset(period, now);
 }

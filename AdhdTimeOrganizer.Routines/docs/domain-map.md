@@ -158,7 +158,7 @@ day. **The suggested-today digest goes further**: "today" itself is the date in 
 | Excused cycle | A miss while the user was away for at least half the cycle: carried like a freeze, free, automatic | `RoutinePeriodCompletion.IsExcused`, `RoutineAwayRule` |
 | Nudge | The mid-period "n of m done" notification | `EvaluateEndingSoon` / `RoutinePeriodEndingSoonPayload` |
 | Suggested day | The day a weekly/monthly item is meant for | `SuggestedDays` / `SuggestedDayOfMonth`, `RoutineSuggestedDay` |
-| Suggested-today digest | The morning "these are today's" notification, one per user per day | `RoutineSuggestedTodayJobHandler` / `RoutineSuggestedTodayPayload` |
+| Suggested-today digest | The morning "these are today's" notification, one per user per day — only for users with the host's morning briefing off (`User.MorningBriefingEnabled`), which otherwise counts these items itself | `RoutineSuggestedTodayJobHandler` / `RoutineSuggestedTodayPayload`; the shared rule is `RoutineSuggestedDay.IsOpenSuggestionOn` |
 | Review card | The weekly "fresh start" prompt the user can dismiss | `RoutineReviewDismissedForWeekStart` |
 
 ## Invariants

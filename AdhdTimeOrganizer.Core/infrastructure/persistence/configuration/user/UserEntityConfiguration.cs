@@ -35,6 +35,11 @@ public class UserEntityConfiguration : IEntityTypeConfiguration<User>
             .HasSentinel(UserSleepWindow.Fallback.WakeUpTime).IsRequired();
         builder.Property(u => u.DefaultBedTime).HasDefaultValue(UserSleepWindow.Fallback.BedTime).IsRequired();
         builder.Ignore(u => u.SleepWindow);
+        // On for every existing user too: the briefing replaces the routine digest for whoever has it on, so a
+        // database default of false would quietly leave every current user on the old digest instead. The sentinel
+        // is the default itself, so an insert carrying false is written as false rather than mistaken for "unset"
+        // and replaced by the database's true.
+        builder.Property(u => u.MorningBriefingEnabled).HasDefaultValue(true).HasSentinel(true).IsRequired();
         // BaseUser's `= true` initializer is C#-only; without this the migration backfills existing rows
         // with `false` and deactivates every user.
         builder.Property(u => u.IsActive).HasDefaultValue(true).IsRequired();

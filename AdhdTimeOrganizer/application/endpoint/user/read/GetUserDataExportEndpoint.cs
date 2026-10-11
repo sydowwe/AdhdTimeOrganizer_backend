@@ -148,7 +148,9 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
                     weatherLocation = user.WeatherLocation,
                     // FO10: when the person's day usually starts and ends — about the person, so it travels.
                     defaultWakeUpTime = user.DefaultWakeUpTime.ToString("HH:mm", CultureInfo.InvariantCulture),
-                    defaultBedTime = user.DefaultBedTime.ToString("HH:mm", CultureInfo.InvariantCulture)
+                    defaultBedTime = user.DefaultBedTime.ToString("HH:mm", CultureInfo.InvariantCulture),
+                    morningBriefingEnabled = user.MorningBriefingEnabled,
+                    morningBriefingOffsetMinutes = user.MorningBriefingOffsetMinutes
                 }
             },
             plannerTasks,

@@ -104,6 +104,14 @@ public class RoutineSuggestedTodayJobTests(AppDbContextFixture fixture) : Postgr
 
     // ---- helpers ----------------------------------------------------------------------------------
 
+    /// <summary>
+    /// Every user here has the morning briefing off — it is on by default, and with it on this digest is not sent at
+    /// all (that half is pinned by <see cref="Digest_IsNotSent_WhenTheMorningBriefingIsOn"/>).
+    /// </summary>
+    protected override Task SeedAsync(DbContext db) =>
+        db.Set<User>().Where(u => u.Id == UserId)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.MorningBriefingEnabled, false), CancellationToken);
+
     private static async Task<RoutineTimePeriod> SeedPeriodAsync(
         DbContext db, long userId, int lengthInDays, bool isHidden = false, DateTime? lastResetAt = null, CancellationToken ct = default)
     {
@@ -177,7 +185,8 @@ public class RoutineSuggestedTodayJobTests(AppDbContextFixture fixture) : Postgr
             EmailConfirmed = true,
             SecurityStamp = Guid.NewGuid().ToString("N"),
             ConcurrencyStamp = Guid.NewGuid().ToString("N"),
-            Timezone = timezone
+            Timezone = timezone,
+            MorningBriefingEnabled = false
         };
         user.PasswordHash = new PasswordHasher<User>().HashPassword(user, AppDbContextFixture.TestUserPassword);
         db.Set<User>().Add(user);
@@ -401,6 +410,33 @@ public class RoutineSuggestedTodayJobTests(AppDbContextFixture fixture) : Postgr
         await RunJobAsync(TuesdayMorning.AddDays(1), notifier);
         notifier.Calls.Should().ContainSingle().Which.Should().BeEquivalentTo(
             new NotifierDouble.DigestCall(UserId, Tuesday.AddDays(1), [itemId]));
+    }
+
+    /// <summary>
+    /// P2-01: the morning briefing counts these same items, so a user who has it on — the default — gets no digest of
+    /// their own. Turning it off brings the digest back, the same morning.
+    /// </summary>
+    [Fact(DisplayName = "P2-01: with the morning briefing on, the digest is not sent; off, it is")]
+    public async Task Digest_IsNotSent_WhenTheMorningBriefingIsOn()
+    {
+        await using (var db = CreateDbContext())
+        {
+            var weekly = await SeedPeriodAsync(db, UserId, lengthInDays: 7, ct: CancellationToken);
+            await SeedItemAsync(db, weekly, "Gym", days: [DayOfWeek.Tuesday], ct: CancellationToken);
+            await db.Set<User>().Where(u => u.Id == UserId)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.MorningBriefingEnabled, true), CancellationToken);
+        }
+
+        var notifier = new NotifierDouble();
+        await RunJobAsync(TuesdayMorning, notifier);
+        notifier.Calls.Should().BeEmpty("the briefing already names the routine items suggested for today");
+
+        await using (var db = CreateDbContext())
+            await db.Set<User>().Where(u => u.Id == UserId)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.MorningBriefingEnabled, false), CancellationToken);
+
+        await RunJobAsync(TuesdayMorning.AddMinutes(15), notifier);
+        notifier.Calls.Should().ContainSingle();
     }
 
     [Fact(DisplayName = "B4: a hidden period's items are never named")]

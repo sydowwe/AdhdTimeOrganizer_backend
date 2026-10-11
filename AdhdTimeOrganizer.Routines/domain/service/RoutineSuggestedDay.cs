@@ -35,4 +35,23 @@ public static class RoutineSuggestedDay
         return item.SuggestedDayOfMonth is { } day
                && Math.Min(day, DateTime.DaysInMonth(date.Year, date.Month)) == date.Day;
     }
+
+    /// <summary>
+    /// What a morning message counts as "suggested for today": a visible period's item suggested on
+    /// <paramref name="date"/> (<see cref="IsSuggestedOn"/>) and not <see cref="IsDoneThisCycle">done this cycle</see>.
+    /// One rule for the routine slice's own digest and the host's morning briefing, so the two cannot disagree about
+    /// which items the user still has to do today.
+    /// </summary>
+    public static bool IsOpenSuggestionOn(RoutineTimePeriod period, RoutineTodoList item, DateOnly date, DateTime utcNow) =>
+        !period.IsHidden && IsSuggestedOn(period, item, date) && !IsDoneThisCycle(period, item, utcNow);
+
+    /// <summary>
+    /// Done <i>in the cycle that is still open</i>. Resets fall on midnight UTC but are only <i>applied</i> by the
+    /// 02:00 UTC job or lazily on the next read, so at a user's morning the reset that closes last cycle may be
+    /// due and not yet applied — an item ticked last Tuesday still reads <c>IsDone</c>. Past the due reset, that
+    /// tick belongs to a closed cycle and says nothing about today. Before it, the tick is the current cycle's by
+    /// the server's own definition, which is also what the routine list shows.
+    /// </summary>
+    public static bool IsDoneThisCycle(RoutineTimePeriod period, RoutineTodoList item, DateTime utcNow) =>
+        item.IsDone && utcNow < RoutineResetService.ComputeNextReset(period, utcNow);
 }

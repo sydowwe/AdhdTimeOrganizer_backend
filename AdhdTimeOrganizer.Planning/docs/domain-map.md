@@ -278,7 +278,7 @@ change tracker and hands them to `PlannerTaskPostponeRule`, the one place that d
 `SourceRepeatingTaskId` (FK to `repeating_planner_task`, `SET NULL`) and `RepeatingPlannerTask.AutoPlace` arrived
 in the same migration for FO6, so `planner_task` is altered once. Nothing reads or writes them yet.
 | Streak? | The task leaves its old day, so that day no longer counts it — the same neutral outcome a skip has |
-| Which tasks does the client offer? | `GET /planner-task/carry-over-candidates`: `NotStarted` / `InProgress`, non-background tasks on the user's previous seven days (their zone), newest day first, each with its date |
+| Which tasks does the client offer? | `GET /planner-task/carry-over-candidates`: `NotStarted` / `InProgress`, non-background tasks on the user's previous seven days (their zone), newest day first, each with its date. The rule is `PlannerTaskCarryOverRule` (`domain/service/`), which the host's morning briefing and welcome-back pile read too — change it there, not in the endpoint |
 
 ### Re-planning the rest of today (FO4)
 

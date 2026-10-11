@@ -1,5 +1,11 @@
 # P2-01 — Morning briefing: one push instead of several
 
+> **Status: backend done (2026-10-11).** Decisions taken: (1) only mornings with content get a briefing — "no plan
+> yet" appears only beside something else; (2) option 1, `User.MorningBriefingEnabled` in Core, **on by default**;
+> (3) P1-01 B's nudges stay separate. Setting: on/off + `MorningBriefingOffsetMinutes` (0–180). A morning is
+> decided once (`User.MorningBriefingHandledFor`) — sent, empty, away day or welcome-back card — so nothing fires
+> later that day; only a failed dispatch is retried, within 3 h. Frontend: [P2-01-frontend-prompt.md](P2-01-frontend-prompt.md).
+
 > Paste into a fresh session. Read `review/notifications-opportunities/_SHARED-CONTEXT.md` first.
 > Best after [P1-02](P1-02-todo-due-reminders.md), which deliberately leaves date-only to-dos to this briefing.
 

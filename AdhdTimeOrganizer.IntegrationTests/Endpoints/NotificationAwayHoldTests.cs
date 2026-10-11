@@ -167,6 +167,26 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
         push.Endpoints.Should().BeEquivalentTo([EndpointOf(PresentUserId), EndpointOf(NeverMeasuredUserId)]);
     }
 
+    /// <summary>P2-01: the morning briefing is unsolicited and about a morning that passes without it.</summary>
+    [Fact(DisplayName = "A morning briefing to an away user waits in the bell; the others are pushed")]
+    public async Task MorningBriefing_ReachesTheAwayUsersBellOnly()
+    {
+        var push = new CapturingWebPushSender();
+        await using var factory = CreateFactory(push, new CapturingEmailSender());
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<INotificationService>().NotifyAsync(
+                NotificationRecipients.Users(Everyone),
+                new MorningBriefingPayload(DateOnly.FromDateTime(DateTime.UtcNow), Blocks: 2, Overdue: 1),
+                CancellationToken);
+
+        await using var db = CreateDbContext();
+        (await db.Set<Notification>().Where(n => n.Type == NotificationType.MorningBriefing).Select(n => n.UserId).ToListAsync(CancellationToken))
+            .Should().BeEquivalentTo(Everyone, "held means bell-only, never dropped");
+
+        push.Endpoints.Should().BeEquivalentTo([EndpointOf(PresentUserId), EndpointOf(NeverMeasuredUserId)]);
+    }
+
     [Fact(DisplayName = "A reminder the away user set is still pushed to them")]
     public async Task UnheldKind_ReachesTheAwayUserAsUsual()
     {

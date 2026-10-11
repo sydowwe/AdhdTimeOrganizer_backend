@@ -229,7 +229,11 @@ public static class ModuleServiceExtensions
                 // Planning's slip sweep (audit N5): "blocks slipped" and "time's up" are about a moment, and a
                 // returning user does not need a pile of them on the lock screen.
                 NotificationType.PlannedBlocksMissed,
-                NotificationType.PlannedBlockOverrun
+                NotificationType.PlannedBlockOverrun,
+
+                // The host's morning briefing: unsolicited and about a morning that passes without it. A returning
+                // user gets the welcome-back card instead (MorningBriefingJobHandler skips them while it is open).
+                NotificationType.MorningBriefing
             ];
             o.SupportedTypes =
         [
@@ -260,6 +264,10 @@ public static class ModuleServiceExtensions
             // Planning slice: PlannerSlipNudgeJobHandler, through PlannerNotificationService.
             NotificationType.PlannedBlocksMissed,
             NotificationType.PlannedBlockOverrun,
+
+            // The host: MorningBriefingJobHandler, through MorningBriefingNotifier. Its own row, so the briefing's
+            // channels can be chosen apart from the routine digest it replaces.
+            NotificationType.MorningBriefing,
 
             // History slice: TimerBoundaryAlarmJobHandler, on every pomodoro boundary.
             NotificationType.TimerBoundary,

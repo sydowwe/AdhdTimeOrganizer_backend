@@ -2,7 +2,7 @@ using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
-using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.service;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using Microsoft.EntityFrameworkCore;
@@ -76,15 +76,14 @@ public static class WelcomeBackPile
 
     /// <summary>
     /// Blocks left open from the day the absence began up to yesterday, oldest first. "Open" is the carry-over
-    /// banner's definition (<c>GetCarryOverCandidatesPlannerTaskEndpoint</c>): not started or in progress, and not
+    /// banner's definition (<see cref="PlannerTaskCarryOverRule.IsOpen"/>): not started or in progress, and not
     /// background. Bounded below by the absence rather than by that banner's seven days, so a fortnight away is
     /// one pile, not a pile plus a remainder.
     /// </summary>
     public static IQueryable<PlannerTask> PastTasks(AppDbContext db, long userId, Window window) =>
         db.PlannerTasks
+            .Where(PlannerTaskCarryOverRule.IsOpen)
             .Where(t => t.UserId == userId
-                        && !t.IsBackground
-                        && (t.Status == PlannerTaskStatus.NotStarted || t.Status == PlannerTaskStatus.InProgress)
                         && t.Calendar.Date >= window.AwayDate
                         && t.Calendar.Date < window.Today)
             .OrderBy(t => t.Calendar.Date).ThenBy(t => t.StartTime).ThenBy(t => t.Id);

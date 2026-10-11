@@ -5,13 +5,22 @@ namespace AdhdTimeOrganizer.application.dto.request.user;
 
 /// <summary>
 /// Theme / Locale / Timezone / AskBeforeDelete come from <see cref="UserPreferencesRequest"/>;
-/// <see cref="FirstDayOfWeek"/>, <see cref="WeatherLocation"/> and the default sleep window are this portal's own
-/// <c>User</c> columns.
+/// <see cref="FirstDayOfWeek"/>, <see cref="WeatherLocation"/>, the default sleep window and the two morning-briefing
+/// fields are this portal's own <c>User</c> columns.
 /// Everything readable back through <c>AppUserDataResponse</c>.
 /// </summary>
 public record UpdateUserPreferencesRequest : UserPreferencesRequest
 {
     public int? FirstDayOfWeek { get; init; }
+
+    /// <summary>
+    /// The morning briefing on or off. Off brings back the routine slice's own "suggested for today" digest, which the
+    /// briefing otherwise replaces. Null leaves it unchanged.
+    /// </summary>
+    public bool? MorningBriefingEnabled { get; init; }
+
+    /// <summary>Minutes after the day's wake-up the briefing goes out, 0 – 180. Null leaves it unchanged.</summary>
+    public int? MorningBriefingOffsetMinutes { get; init; }
 
     /// <summary>
     /// Free text for "where I am", e.g. <c>Bratislava, SK</c> — the input the leisure weather signal geocodes.

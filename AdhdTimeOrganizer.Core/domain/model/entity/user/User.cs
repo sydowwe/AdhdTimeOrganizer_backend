@@ -74,6 +74,38 @@ public sealed class User : BaseUser, IBaseTableEntity
 
     public UserSleepWindow SleepWindow => new(DefaultWakeUpTime, DefaultBedTime);
 
+    /// <summary>
+    /// Whether the user gets the morning briefing — one notification at wake-up summing up today's plan, carry-overs,
+    /// due and overdue to-dos and the routines suggested for today (the host's <c>MorningBriefingJobHandler</c>).
+    /// On by default.
+    /// <para>
+    /// <b>In Core, not the host, because Routines reads it.</b> With the briefing on, the routine slice's own
+    /// suggested-today digest would say the same thing a second time, so <c>RoutineSuggestedTodayJobHandler</c> skips
+    /// every user who has this set; turning the briefing off brings that digest back. Routines can see Core but not
+    /// the host, and a flag is the honest coupling — the host writing the routine sweep's marks to silence it would
+    /// be a cross-slice side effect nobody would find.
+    /// </para>
+    /// </summary>
+    public bool MorningBriefingEnabled { get; set; } = true;
+
+    /// <summary>
+    /// How long after the day's wake-up the briefing goes out, in minutes (0 – <see cref="MorningBriefingMaxOffsetMinutes"/>).
+    /// 0 is at wake-up itself.
+    /// </summary>
+    public int MorningBriefingOffsetMinutes { get; set; }
+
+    /// <summary>The longest offset a user may choose: three hours — past that it is no longer the morning's message.</summary>
+    public const int MorningBriefingMaxOffsetMinutes = 180;
+
+    /// <summary>
+    /// The user-local date whose morning briefing has been decided: sent, found to have nothing to say, or stood in
+    /// for by the welcome-back card. What stops the next quarter-hour run from deciding the same morning again. Only a
+    /// dispatch that failed leaves the day open, so a later run that morning retries. Written with
+    /// <c>ExecuteUpdateAsync</c> only, like <see cref="LastActiveAt"/>.
+    /// </summary>
+    [AuditIgnore]
+    public DateOnly? MorningBriefingHandledFor { get; set; }
+
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
 
     // Navigation properties.

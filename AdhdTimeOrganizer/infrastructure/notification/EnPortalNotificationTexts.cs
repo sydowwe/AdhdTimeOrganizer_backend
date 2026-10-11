@@ -101,6 +101,24 @@ public class EnPortalNotificationTexts : EnNotificationTexts
             : $"Your planned block ended{ago} — wrap up or extend?";
     }
 
+    public override string MorningBriefingTitle => "Your day";
+    public override string MorningBriefingFallbackBody => "Here's what today holds.";
+
+    // "4 blocks planned, first at 09:00 · 2 to carry over · 3 to-dos due today · 1 overdue · 2 routine tasks for today".
+    public override string MorningBriefingPlan(int blocks, TimeOnly? firstAt)
+    {
+        var plan = $"{blocks} {Plural(blocks, "block", "blocks")} planned";
+        return firstAt is { } at ? $"{plan}, first at {at:HH\\:mm}" : plan;
+    }
+
+    // Only ever sent next to something else, so it reads as a gentle prompt, not an empty report.
+    public override string MorningBriefingNoPlan => "No plan yet";
+    public override string MorningBriefingCarryOver(int count) => $"{count} to carry over";
+    public override string MorningBriefingDueToday(int count) => $"{count} {Plural(count, "to-do", "to-dos")} due today";
+    public override string MorningBriefingOverdue(int count) => $"{count} overdue";
+    public override string MorningBriefingRoutines(int count) => $"{count} routine {Plural(count, "task", "tasks")} for today";
+    public override string MorningBriefingBody(IReadOnlyList<string> sections) => string.Join(" · ", sections);
+
     private static string Lead(int minutes) => (minutes / 60, minutes % 60) switch
     {
         (0, var m) => $"{m} min",

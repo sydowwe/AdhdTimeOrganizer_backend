@@ -25,6 +25,8 @@ public class GetCurrentUserEndpoint(UserManager<User> userManager)
             FirstDayOfWeek = user.FirstDayOfWeek,
             WeatherLocation = user.WeatherLocation,
             DefaultWakeUpTime = new TimeDto(user.DefaultWakeUpTime.Hour, user.DefaultWakeUpTime.Minute),
-            DefaultBedTime = new TimeDto(user.DefaultBedTime.Hour, user.DefaultBedTime.Minute)
+            DefaultBedTime = new TimeDto(user.DefaultBedTime.Hour, user.DefaultBedTime.Minute),
+            MorningBriefingEnabled = user.MorningBriefingEnabled,
+            MorningBriefingOffsetMinutes = user.MorningBriefingOffsetMinutes
         };
 }

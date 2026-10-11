@@ -25,6 +25,16 @@ right one.
   `IRecipientEngagementReader`, and the catalog in `ModuleServiceExtensions` lists the four routine kinds
   as `HeldWhileAwayTypes`. A user away three days or more gets those in the bell only, never pushed or
   mailed; their own reminders, the timer alarm and the scheduler alerts still go out.
+- **The morning briefing (P2-01)** — one notification per user per morning instead of a push per signal:
+  today's open blocks and the first one ahead, the carry-over week, date-only to-dos due today, overdue
+  to-dos, and the routine items suggested for today. `infrastructure/jobs/MorningBriefingJobHandler.cs`
+  (every 15 min, registered by `PortalScheduledJobsRegistrar`) decides *when* — the day's wake-up plus
+  `User.MorningBriefingOffsetMinutes`, once per local date via `User.MorningBriefingHandledFor`;
+  `application/service/morningBriefing/MorningBriefingComposer.cs` decides *what*, reading Planning, TodoLists
+  and Routines directly and calling their rules (`PlannerTaskCarryOverRule`, `RoutineSuggestedDay`). No
+  briefing on an empty morning, an away day, or while the welcome-back card is open; held while away; email
+  off by default. `User.MorningBriefingEnabled` (Core, default on) is what makes Routines' own suggested-today
+  digest step aside. Pinned by `MorningBriefingJobTests`.
 - **The Google integrations** — Sign-In and Calendar sync (`infrastructure/extService/`), deliberately
   portal-only.
 - **The composition root** — `AppDbContext` (framework + every slice's configurations, the global

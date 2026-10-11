@@ -1078,6 +1078,20 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnName("modified_timestamp")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<bool>("MorningBriefingEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("morning_briefing_enabled");
+
+                    b.Property<DateOnly?>("MorningBriefingHandledFor")
+                        .HasColumnType("date")
+                        .HasColumnName("morning_briefing_handled_for");
+
+                    b.Property<int>("MorningBriefingOffsetMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("morning_briefing_offset_minutes");
+
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")

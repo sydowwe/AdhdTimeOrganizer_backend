@@ -40,20 +40,37 @@ public sealed class PortalScheduledJobsRegistrar(
         Description = "Refreshes the three suggestion-pattern materialized views marked dirty since the last run."
     };
 
+    /// <summary>
+    /// The morning briefing. Every 15 minutes in UTC; the handler is zone-aware per user and decides each user's
+    /// morning once, so the cadence only bounds how late after wake-up the briefing can arrive.
+    /// </summary>
+    public static RecurringJobRegistration MorningBriefingRegistration { get; } = new()
+    {
+        JobKey = MorningBriefingJobHandler.HandlerKey,
+        HandlerKey = MorningBriefingJobHandler.HandlerKey,
+        OwnerModule = "Portal",
+        Schedule = ScheduleSpec.FromCron("0 0/15 * * * ?"),
+        DisallowConcurrent = true,
+        Description = "Sends each user their morning briefing — today's plan, carry-overs, due and overdue to-dos, routines — once their own wake-up has come."
+    };
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = services.CreateAsyncScope();
-        try
+        var scheduler = scope.ServiceProvider.GetRequiredService<IScheduler>();
+
+        foreach (var registration in new[] { SuggestionPatternRefreshRegistration, MorningBriefingRegistration })
         {
-            var scheduler = scope.ServiceProvider.GetRequiredService<IScheduler>();
-            await scheduler.RegisterRecurringJobAsync(SuggestionPatternRefreshRegistration, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            // Don't block host startup on a scheduling problem — the views simply stop refreshing and the
-            // job shows as absent in the dashboard. JobKey is non-PII.
-            logger.LogError(ex, "Failed to register the portal recurring job {JobKey}",
-                SuggestionPatternRefreshRegistration.JobKey);
+            try
+            {
+                await scheduler.RegisterRecurringJobAsync(registration, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // Don't block host startup on a scheduling problem — the job simply does not run and shows as
+                // absent in the dashboard. One failure does not cost the other job its registration. JobKey is non-PII.
+                logger.LogError(ex, "Failed to register the portal recurring job {JobKey}", registration.JobKey);
+            }
         }
     }
 

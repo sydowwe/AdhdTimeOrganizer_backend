@@ -1,8 +1,8 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.helper;
-using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Planning.domain.service;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.helper;
@@ -14,15 +14,15 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 /// <see cref="LookbackDays"/> days, newest day first, for the day view's carry-over banner.
 /// <para>
 /// One read rather than the client fanning out a by-date + filter pair per day: the banner used to look at
-/// yesterday alone for exactly that reason, so a task left open two days ago never surfaced again. Open means
-/// <c>NotStarted</c> or <c>InProgress</c> and not background — a skip is a decision, not something left behind.
+/// yesterday alone for exactly that reason, so a task left open two days ago never surfaced again. What counts is
+/// <see cref="PlannerTaskCarryOverRule"/>, which the morning briefing's count reads too.
 /// </para>
 /// </summary>
 public class GetCarryOverCandidatesPlannerTaskEndpoint(DbContext dbContext, IUserTimeZoneResolver timeZones)
     : EndpointWithoutRequest<List<CarryOverCandidateResponse>>
 {
-    /// <summary>How far back the banner looks. A week: past that, a task is a backlog item, not a slip.</summary>
-    public const int LookbackDays = 7;
+    /// <summary>How far back the banner looks — <see cref="PlannerTaskCarryOverRule.LookbackDays"/>.</summary>
+    public const int LookbackDays = PlannerTaskCarryOverRule.LookbackDays;
 
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
@@ -49,10 +49,8 @@ public class GetCarryOverCandidatesPlannerTaskEndpoint(DbContext dbContext, IUse
         // DbContext and cannot see that filter.
         var open = await dbContext.Set<PlannerTask>()
             .AsNoTracking()
-            .Where(t => t.UserId == userId
-                        && t.Calendar.Date >= from && t.Calendar.Date < today
-                        && !t.IsBackground
-                        && (t.Status == PlannerTaskStatus.NotStarted || t.Status == PlannerTaskStatus.InProgress))
+            .Where(t => t.UserId == userId && t.Calendar.Date >= from && t.Calendar.Date < today)
+            .Where(PlannerTaskCarryOverRule.IsOpen)
             .Select(t => new { t.Id, t.Calendar.Date })
             .ToListAsync(ct);
 

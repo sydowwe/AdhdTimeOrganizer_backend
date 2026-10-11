@@ -85,6 +85,12 @@ has no knowledge of Planning at all.
   (`RoutineSuggestedDay`) is duplicated on the client (`routineSuggestedDay.ts`) — change both or
   neither.
 
+- **The suggested-today digest is off for most users.** It skips every user with Core's
+  `User.MorningBriefingEnabled` (on by default): the host's morning briefing (P2-01,
+  `MorningBriefingJobHandler`) counts the same items in its one morning notification, through the same
+  `RoutineSuggestedDay.IsOpenSuggestionOn`. A user who turns the briefing off gets this digest back. The
+  coupling is that flag and nothing else — the host never writes `SuggestedTodayNotifiedFor`.
+
 - **Everything here takes a plain `DbContext`, never `AppDbContext`.**
   `ModuleServiceExtensions.AddModuleServices` aliases `DbContext` → `AppDbContext` at runtime (global
   query filters and all). At the call site that means no `dbContext.RoutineTimePeriods` — use

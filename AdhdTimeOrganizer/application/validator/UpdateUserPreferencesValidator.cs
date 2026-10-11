@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.application.dto.request.user;
 using AdhdTimeOrganizer.Core.application.validator;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using FluentValidation;
 using Sydowwe.Framework.application.validator;
 
@@ -13,6 +14,10 @@ public class UpdateUserPreferencesValidator : BaseUserPreferencesValidator<Updat
             .InclusiveBetween(0, 1)
             .When(x => x.FirstDayOfWeek.HasValue)
             .WithMessage("FirstDayOfWeek must be 0 (Sunday) or 1 (Monday).");
+
+        RuleFor(x => x.MorningBriefingOffsetMinutes)
+            .InclusiveBetween(0, User.MorningBriefingMaxOffsetMinutes)
+            .When(x => x.MorningBriefingOffsetMinutes.HasValue);
 
         // Length only. What makes a place name valid is whether the geocoder finds it, and that answer belongs
         // to a request the user should not have to wait on to save a setting — an unresolvable location simply

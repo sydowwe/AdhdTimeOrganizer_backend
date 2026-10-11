@@ -30,4 +30,10 @@ public record AppUserDataResponse : UserDataResponse
 
     /// <inheritdoc cref="DefaultWakeUpTime"/>
     public required TimeDto DefaultBedTime { get; init; }
+
+    /// <summary>See <c>User.MorningBriefingEnabled</c>.</summary>
+    public bool MorningBriefingEnabled { get; init; }
+
+    /// <summary>See <c>User.MorningBriefingOffsetMinutes</c>.</summary>
+    public int MorningBriefingOffsetMinutes { get; init; }
 }
