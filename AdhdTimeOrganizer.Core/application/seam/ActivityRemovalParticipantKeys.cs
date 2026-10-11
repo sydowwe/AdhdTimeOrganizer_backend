@@ -8,4 +8,7 @@ public static class ActivityRemovalParticipantKeys
 {
     /// <summary>TodoLists: the due reminders of the to-dos on the activity.</summary>
     public const string TodoList = "todoList";
+
+    /// <summary>Planning: the personal reminders attached to the activity's planner tasks.</summary>
+    public const string PlannerTask = "plannerTask";
 }
