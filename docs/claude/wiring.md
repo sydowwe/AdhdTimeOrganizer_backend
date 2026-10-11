@@ -111,8 +111,8 @@ never falls back, which is why the deny is attached per endpoint.
 
 **Framework's auth services are open generics with no DI marker interface**, so the Scrutor scans in
 `config/dependencyInjection/DependencyInjectionExtensions.cs` cannot see them — `IJwtService<User>`,
-`IJwtService`, `ITwoFactorAuthService<User>` and `IUserEmailSenderService<User>` are registered
-explicitly there. Dropping a portal service in favour of a generic Framework one **compiles** and then
+`IJwtService`, `ITwoFactorAuthService<User>`, `IUserEmailSenderService<User>` and
+`ISecurityAlertService<User>` are registered explicitly there. Dropping a portal service in favour of a generic Framework one **compiles** and then
 throws at runtime on first resolution; add the explicit registration in the same commit.
 `IRefreshTokenService` is the exception — non-generic and carrying `IScopedService`, so the scan finds it.
 
@@ -183,7 +183,8 @@ up at all. Logs counts only, never a token owner.
 ## Email templates
 
 `framework/Sydowwe.Framework/infrastructure/templates/email/` — `ConfirmEmail.html`,
-`ResetPassword.html`, `ResetPasswordCode.html`, consumed by `UserEmailSenderService`. They are
+`ResetPassword.html`, `ResetPasswordCode.html`, `SecurityAlert.html`, consumed by
+`UserEmailSenderService`. All are English; none follow `User.Locale` yet. They are
 **`<EmbeddedResource>`** in `Sydowwe.Framework.csproj` (`infrastructure\templates\email\*.html`), read
 via `Assembly.GetManifestResourceStream`, so there is no copy-to-output step and no working-directory
 assumption. A new template just needs to land in that folder — the glob picks it up.
@@ -197,4 +198,27 @@ per-file to the embedded copy.
 ignores, so they never reached the output — and read them from
 `Directory.GetCurrentDirectory()/templates/email`, a path that did not exist in any environment. Every
 mail this service sends threw `FileNotFoundException`; on sign-up that surfaced as a 500 *after* the
-account was already committed. Nothing in the test suite covers mail rendering, so it went unnoticed.
+account was already committed. Nothing in the test suite covered mail rendering then, so it went
+unnoticed. `SecurityAlertTests` now runs the real sender, stopped at the SMTP hop. `SendEmailAsync` is
+virtual for that purpose. Copy its `CapturingUserEmailSender` to test any other account mail.
+
+## Security alerts (P1-05)
+
+After a password, login-address or 2FA change, the framework endpoint bases mail the owner. The
+`SecurityAlertKind`s are `PasswordChanged`, `PasswordReset`, `EmailChanged`, `TwoFactorEnabled`,
+`TwoFactorDisabled`, `TwoFactorReset` and `RecoveryCodesRegenerated`. The bases take
+`ISecurityAlertService<TUser>` in their constructor, so every host gets the mails without opting in.
+
+- **Never fails the change.** `SecurityAlertService` swallows a send failure and logs `{Kind}` and
+  `{UserId}` only. The change is already committed by the time it runs.
+- **Host opt-out:** `"SecurityAlerts": { "Enabled": false }` (`SecurityAlertOptions`, read per send).
+  There is no per-user switch, and it deliberately does **not** go through `NotifyAsync`, so preferences,
+  quiet hours and the away hold never apply.
+- **An email change alerts the *previous* address,** captured before `ChangeEmailAsync`. The mail shows
+  the new address in full and carries an undo link instead of forgot-password, because a reset link would
+  go to the new address. The undo link is a change-email token back to the old address, minted *after*
+  the security-stamp bump (which would otherwise kill it). It is consumed by the same
+  `/confirm-email-change` SPA page and endpoint.
+- The sender builds every SPA link from `PAGE_URL` (`BuildEmailChangeLink`, `BuildForgottenPasswordLink`,
+  both virtual). The link is built inside the swallowed path, so a missing variable loses the mail but
+  not the change.

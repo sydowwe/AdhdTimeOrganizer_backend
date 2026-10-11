@@ -71,6 +71,7 @@ public static class DependencyInjectionExtensions
         // Missing one of these compiles fine and fails at runtime on first resolution.
         services.AddScoped<ITwoFactorAuthService<User>, TwoFactorAuthService<User>>();
         services.AddSingleton<IUserEmailSenderService<User>, UserEmailSenderService<User>>();
+        services.AddSingleton<ISecurityAlertService<User>, SecurityAlertService<User>>();
 
         // JwtService implements both the generic surface (login flows, typed user) and the non-generic
         // one (refresh / cookie helpers). Register the concrete type once and forward both interfaces to

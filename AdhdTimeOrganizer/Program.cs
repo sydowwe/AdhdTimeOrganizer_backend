@@ -675,6 +675,12 @@ static void LoadSettingsFromConfiguration(IConfiguration configuration, IService
     services.Configure<TwoFactorOptions>(
         configuration.GetSection(TwoFactorOptions.SectionName)
     );
+
+    // Security-alert mails after a password / email / 2FA change. On unless the section says
+    // "Enabled": false. See framework/Sydowwe.Framework/config/SecurityAlertOptions.cs.
+    services.Configure<SecurityAlertOptions>(
+        configuration.GetSection(SecurityAlertOptions.SectionName)
+    );
 }
 
 namespace AdhdTimeOrganizer

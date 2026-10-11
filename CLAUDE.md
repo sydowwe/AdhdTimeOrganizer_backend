@@ -60,6 +60,10 @@ The portal has been fully split into vertical slices; **the split is finished**.
   then commit the new gitlink here. `git status` in the parent shows only "modified: framework (new
   commits)", so an uncommitted framework edit is invisible to the parent's diff and won't travel with
   a push. Module entities live in the submodule; their **migrations live here**.
+- **Don't preserve framework compatibility for other hosts.** The framework is shared with other
+  solutions (MojaDigitalnaFirma etc.), but breaking them is fine — change signatures, add interface
+  members, reshape base classes as the best design demands. Don't go checking the other repos and
+  don't trade API quality for back-compat; their owner fixes them later.
 - **Never anchor an assembly scan** (`ApplyConfigurationsFromAssembly`, `ModuleAssemblies`,
   FastEndpoints `o.Assemblies`) **on a type that can move slices.** It compiles fine and silently
   drops half the model.

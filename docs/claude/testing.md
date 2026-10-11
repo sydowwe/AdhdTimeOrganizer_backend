@@ -293,6 +293,12 @@ worth copying the shape of:
   activities as `DbForeignKeyError`) because a mechanism that cannot tell those apart is the bug the
   field exists to fix. The validation case asserts the field is **absent**, not null, on a
   FluentValidation 400.
+- `SecurityAlertTests` (`Auth/`): every password / email / 2FA change mails the owner (P1-05). Drop
+  the `securityAlerts` call from a framework base and the endpoint still returns 2xx, so these assert on
+  what reached a capturing **real** `UserEmailSenderService` that stops only at the SMTP hop. Each test
+  checks the recipient, the subject and the links. The email-change test also *follows* the undo link and
+  asserts that the address came back. Two tests make the SMTP hop throw and assert that the change went
+  through anyway. One test sets `SecurityAlerts:Enabled=false` and asserts that nothing was sent.
 - `SessionRevocationTests` (`Auth/`): a revoked session's access token 401s at its next request (B28).
   The check is one `OnTokenValidated` line in `IdentityServiceExtensions`; remove it and every endpoint
   still works, every revoke still returns 204, and the refresh still dies. Only the unexpired access
