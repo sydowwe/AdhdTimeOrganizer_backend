@@ -46,6 +46,13 @@ public record LeisureSuggestionItemResponse
     /// <summary>Backlog only; null elsewhere.</summary>
     public int? MinParticipants { get; init; }
 
+    /// <summary>
+    /// The latest UTC instant the user actually did this activity, from any source (a recording, a completed
+    /// block, a memory anchor's month), or null. F3-06. The card says "last time: 3 weeks ago" from it — a
+    /// memory, never a reproach, so nothing is said when there is no evidence.
+    /// </summary>
+    public DateTime? LastDoneAt { get; init; }
+
     /// <summary>Backlog only, and optional there; null elsewhere. The rule demotes a row with fewer seats than people.</summary>
     public int? MaxParticipants { get; init; }
 

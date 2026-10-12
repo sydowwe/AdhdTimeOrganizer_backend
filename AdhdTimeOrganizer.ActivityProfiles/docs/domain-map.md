@@ -48,7 +48,8 @@ is not an API break, and a new member cannot reach the wire unspelled: the mappe
   decision, written down where the diff will show it.
 - `LeisureCandidate` — the facts the rule reads, flattened out of whichever profile the row came from.
 - `LeisureDrawConstraints` / `LeisureRankingContext` — what the user has available, and the history +
-  reference instant + seed + today's weather codes (`null` = no signal) the ranking reads.
+  reference instant + seed + today's weather codes (`null` = no signal) + last-done instants and unkept-plan
+  counts per activity (F3-06) the ranking reads.
 
 `LeisureDrawRankerTests` (no database) is the guard on all of it.
 

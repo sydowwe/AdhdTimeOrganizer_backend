@@ -41,6 +41,9 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   Core's `TodoListItemIsDoneChangedEvent`, and `ActivityProjectProfile.ShoppingTodoListItemId` →
   TodoLists' `TodoListItem` (`SetNull`) is declared in the host's `ConfigureCrossSliceRelationships`.
   Neither is a project reference.
+- **One consumed seam (F3-06).** The draw resolves Core's keyed `IActivityLastDoneSource` — History,
+  Planning and this slice's own `MemoryAnchorLastDoneSource` — to learn when each candidate was last actually
+  done. Still no project reference.
 
 ## Gotchas — things that will bite you
 
@@ -116,6 +119,14 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   `ThenBy`, ranking in a `HashSet`, ordering by `Id` — breaks a promise no exception will report. The
   hash pair (FNV-1a + mulberry32) is also bit-compatible with the client rule this endpoint replaced,
   deliberately.
+
+- **The draw also knows what the user actually did (F3-06), and only from positive evidence.** Staleness
+  reads the later of "last shown" (`LeisureSuggestionRecord`) and "last done" — the newest of a recording, a
+  completed planner block and a memory anchor (read as the first of its month, so it never overstates
+  recency), merged over `IActivityLastDoneSource`. Untouched past "plan it for later" blocks count only after
+  that, within 30 days, and two of them cost a soft -1.5 (less than the jitter, never an exclusion). There is
+  no list of things not done anywhere — rest must not become an obligation. The card gets `lastDoneAt` for a
+  "last time: 3 weeks ago" line. `LeisureLastDoneTests` and `LeisureDrawRankerTests` are the guards.
 
 - **The draw's memory is `LeisureSuggestionRecord`, written only by `/leisure-suggestion/seen`.** A
   *rendered* draw records nothing: recording on render would demote the very cards on screen and stop a

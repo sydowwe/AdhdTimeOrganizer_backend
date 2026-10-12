@@ -219,6 +219,35 @@ public class SeamWiringTests(AppDbContextFixture fixture) : PostgresTestBase(fix
     }
 
     /// <summary>
+    /// F3-06: the last-done sources resolve, their keys are distinct, and they cover
+    /// <see cref="ActivityLastDoneSourceKeys"/> exactly. A missing one is quiet — the draw goes back to
+    /// staleness from "last shown" alone and still returns three plausible cards — so the coverage is pinned
+    /// here and the evidence itself in <c>LeisureLastDoneTests</c>.
+    /// </summary>
+    [Fact]
+    public void ActivityLastDoneSources_CoverEveryKey_Exactly()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+        var sources = scope.ServiceProvider.GetServices<IActivityLastDoneSource>().ToList();
+
+        var declaredKeys = typeof(ActivityLastDoneSourceKeys)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(f => f is { IsLiteral: true, IsInitOnly: false } && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+
+        var resolvedKeys = sources.Select(s => s.Key).ToList();
+
+        Assert.True(resolvedKeys.Distinct().Count() == resolvedKeys.Count,
+            "Two IActivityLastDoneSource implementations claim the same Key: "
+            + string.Join(", ", sources.Select(s => $"{s.Key}={s.GetType().Name}")));
+
+        Assert.True(declaredKeys.OrderBy(k => k).SequenceEqual(resolvedKeys.OrderBy(k => k)),
+            $"ActivityLastDoneSourceKeys declares [{string.Join(", ", declaredKeys.OrderBy(k => k))}] "
+            + $"but the container resolved [{string.Join(", ", resolvedKeys.OrderBy(k => k))}].");
+    }
+
+    /// <summary>
     /// The <b>ownership</b> verifiers resolve, their keys are distinct, and they cover
     /// <see cref="UserOwnedReferenceKeys"/> exactly.
     /// </summary>

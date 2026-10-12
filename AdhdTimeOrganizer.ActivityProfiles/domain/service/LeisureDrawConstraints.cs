@@ -32,10 +32,21 @@ public readonly record struct LeisureDrawConstraints(int Minutes, EnergyLevel En
 /// The weather codes today fits (<see cref="ILeisureWeatherSignal"/>), or <c>null</c> when there is no signal.
 /// <c>null</c> must never be read as "nothing fits": it excludes nothing and boosts nothing.
 /// </param>
+/// <param name="LastDoneAt">
+/// Activity id → the latest positive evidence it actually happened (F3-06, merged over every
+/// <c>IActivityLastDoneSource</c>). Keyed on the activity, not the candidate key: doing it counts for every
+/// profile it has. Staleness reads the later of this and <paramref name="LastSuggestedAt"/>.
+/// </param>
+/// <param name="UnkeptCommitments">
+/// Activity id → how many planned times for it passed untouched since it was last done, within the expiry
+/// window. A soft demotion past a threshold, never an exclusion.
+/// </param>
 public sealed record LeisureRankingContext(
     LeisureDrawConstraints Constraints,
     IReadOnlyDictionary<string, DateTime> LastSuggestedAt,
     EffortType? LastCommittedEffort,
     DateTime Now,
     uint Seed,
-    IReadOnlySet<string>? WeatherMatchCodes = null);
+    IReadOnlySet<string>? WeatherMatchCodes = null,
+    IReadOnlyDictionary<long, DateTime>? LastDoneAt = null,
+    IReadOnlyDictionary<long, int>? UnkeptCommitments = null);

@@ -263,6 +263,64 @@ public class LeisureDrawRankerTests
             .Should().BeApproximately(-2, 1e-9, "flat, not per extra person");
     }
 
+    // ─── what actually happened (F3-06) ──────────────────────────────────────────────────────────────
+
+    private static LeisureRankingContext DoneContext(IReadOnlyDictionary<long, DateTime>? lastDone = null,
+        IReadOnlyDictionary<long, int>? unkept = null, IReadOnlyDictionary<string, DateTime>? history = null) =>
+        new(new LeisureDrawConstraints(240, EnergyLevel.Low, 1), history ?? new Dictionary<string, DateTime>(), null, Now,
+            1837465239, null, lastDone, unkept);
+
+    [Fact]
+    public void SomethingDoneYesterday_RanksBelowItself_NeverDone_EvenIfNeverShown()
+    {
+        var walk = Backlog(1);
+
+        LeisureDrawRanker.Score(walk, DoneContext(lastDone: new Dictionary<long, DateTime> { [1] = Now.AddDays(-1) }))
+            .Should().BeLessThan(LeisureDrawRanker.Score(walk, DoneContext()),
+                "done yesterday is buried tonight exactly as if it had been shown yesterday");
+    }
+
+    [Fact]
+    public void StalenessReadsTheLaterOfShownAndDone()
+    {
+        var walk = Backlog(1);
+        var shownLongAgo = new Dictionary<string, DateTime> { [walk.Key] = Now.AddDays(-20) };
+        var doneYesterday = new Dictionary<long, DateTime> { [1] = Now.AddDays(-1) };
+        var shownYesterday = new Dictionary<string, DateTime> { [walk.Key] = Now.AddDays(-1) };
+
+        LeisureDrawRanker.Score(walk, DoneContext(doneYesterday, history: shownLongAgo))
+            .Should().Be(LeisureDrawRanker.Score(walk, DoneContext(history: shownYesterday)));
+    }
+
+    [Fact]
+    public void DoneAWeekAgo_IsAsGoodAsNew()
+    {
+        var walk = Backlog(1);
+
+        LeisureDrawRanker.Score(walk, DoneContext(lastDone: new Dictionary<long, DateTime> { [1] = Now.AddDays(-8) }))
+            .Should().Be(LeisureDrawRanker.Score(walk, DoneContext()));
+    }
+
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(2, -1.5)]
+    [InlineData(5, -1.5)]
+    public void UnkeptCommitments_DemoteSoftly_FromTheSecond(int unkept, double expectedDelta)
+    {
+        var boardGames = Backlog(1);
+
+        (LeisureDrawRanker.Score(boardGames, DoneContext(unkept: new Dictionary<long, int> { [1] = unkept }))
+         - LeisureDrawRanker.Score(boardGames, DoneContext()))
+            .Should().BeApproximately(expectedDelta, 1e-9, "one missed evening is just an evening; it never excludes");
+    }
+
+    [Fact]
+    public void UnkeptCommitments_NeverExclude()
+    {
+        LeisureDrawRanker.Draw([Backlog(1)], DoneContext(unkept: new Dictionary<long, int> { [1] = 9 }), 3)
+            .Chosen.Should().ContainSingle();
+    }
+
     // ─── source caps ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]

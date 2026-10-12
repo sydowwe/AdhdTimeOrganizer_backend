@@ -6,6 +6,7 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.ActivityProfiles.domain.service;
+using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using FastEndpoints;
@@ -34,7 +35,10 @@ namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.leisureSuggest
 /// <para>The rule itself is <see cref="LeisureDrawRanker"/>. This endpoint only decides which rows reach it,
 /// and turns what comes back into cards.</para>
 /// </summary>
-public class DrawLeisureSuggestionEndpoint(DbContext dbContext, ILeisureWeatherSignal weatherSignal)
+public class DrawLeisureSuggestionEndpoint(
+    DbContext dbContext,
+    ILeisureWeatherSignal weatherSignal,
+    IEnumerable<IActivityLastDoneSource> lastDoneSources)
     : Endpoint<LeisureSuggestionDrawRequest, LeisureSuggestionDrawResponse>
 {
     /// <summary>
@@ -99,15 +103,21 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext, ILeisureWeatherS
             ? await weatherSignal.TodayMatchingCodesAsync(userId, WeatherMaxWait, ct)
             : null;
 
+        var now = DateTime.UtcNow;
+        var (lastDoneAt, unkeptCommitments) = await ReadDoneEvidenceAsync(
+            userId, rows.Select(row => row.Candidate.ActivityId).Distinct().ToList(), now, ct);
+
         var context = new LeisureRankingContext(
             constraints,
             await ReadHistoryAsync(userId, ct),
             await ReadLastCommittedEffortAsync(userId, ct),
-            DateTime.UtcNow,
+            now,
             // The seed is a uint32 the client keeps in the page URL; the validator pins it to that range, so
             // this cast never loses a bit it was given.
             unchecked((uint)req.Seed),
-            weatherMatchCodes);
+            weatherMatchCodes,
+            lastDoneAt,
+            unkeptCommitments);
 
         var (chosen, eligibleCount) = LeisureDrawRanker.Draw(rows.Select(row => row.Candidate), context, req.Count);
 
@@ -120,7 +130,8 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext, ILeisureWeatherS
         {
             Items = chosen
                 .Where(candidate => activities.ContainsKey(candidate.ActivityId))
-                .Select(candidate => Map(byKey[candidate.Key], activities[candidate.ActivityId]))
+                .Select(candidate => Map(byKey[candidate.Key], activities[candidate.ActivityId],
+                lastDoneAt.TryGetValue(candidate.ActivityId, out var doneAt) ? doneAt : null))
                 .ToList(),
             PoolCount = poolCount,
             EligibleCount = eligibleCount,
@@ -128,8 +139,9 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext, ILeisureWeatherS
         }, ct);
     }
 
-    private static LeisureSuggestionItemResponse Map(DrawRow row, ActivityInfoResponse activity) => new()
+    private static LeisureSuggestionItemResponse Map(DrawRow row, ActivityInfoResponse activity, DateTime? lastDoneAt) => new()
     {
+        LastDoneAt = lastDoneAt,
         Key = row.Candidate.Key,
         Source = LeisureSuggestionKey.Token(row.Candidate.Source),
         ActivityId = row.Candidate.ActivityId,
@@ -392,6 +404,47 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext, ILeisureWeatherS
             .FirstOrDefaultAsync(ct);
 
         return lastCommitted is { Source: LeisureSuggestionSource.Backlog } ? lastCommitted.EffortType : null;
+    }
+
+    /// <summary>
+    /// F3-06: what the user actually did, merged over every <see cref="IActivityLastDoneSource"/> — History's
+    /// recordings, Planning's blocks, this slice's own memory anchors. The latest positive evidence wins; the
+    /// untouched blocks count only after it, so a missed evening the user later made up for is forgotten.
+    ///
+    /// <para>Sources run one after another, not in parallel: they read through this request's single
+    /// <see cref="DbContext"/>, which is not safe to share across concurrent queries. Three grouped reads over the
+    /// pool's activity ids.</para>
+    /// </summary>
+    private async Task<(IReadOnlyDictionary<long, DateTime> LastDoneAt, IReadOnlyDictionary<long, int> Unkept)>
+        ReadDoneEvidenceAsync(long userId, IReadOnlyCollection<long> activityIds, DateTime now, CancellationToken ct)
+    {
+        var lastDone = new Dictionary<long, DateTime>();
+        var unkeptAt = new Dictionary<long, List<DateTime>>();
+        if (activityIds.Count == 0)
+            return (lastDone, new Dictionary<long, int>());
+
+        var unkeptSince = now.AddDays(-LeisureDrawRanker.UnkeptCommitmentExpiryDays);
+        foreach (var source in lastDoneSources)
+        {
+            var evidence = await source.ReadAsync(dbContext, userId, activityIds, unkeptSince, now, ct);
+            foreach (var (activityId, item) in evidence)
+            {
+                if (item.LastDoneAt is { } at && (!lastDone.TryGetValue(activityId, out var known) || at > known))
+                    lastDone[activityId] = at;
+                if (item.UnkeptAt.Count > 0)
+                {
+                    if (!unkeptAt.TryGetValue(activityId, out var list))
+                        unkeptAt[activityId] = list = [];
+                    list.AddRange(item.UnkeptAt);
+                }
+            }
+        }
+
+        var unkept = unkeptAt.ToDictionary(
+            entry => entry.Key,
+            entry => entry.Value.Count(at => !lastDone.TryGetValue(entry.Key, out var doneAt) || at > doneAt));
+
+        return (lastDone, unkept);
     }
 
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;

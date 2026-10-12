@@ -13,6 +13,7 @@ if the two ever drift apart.
 
 | Seam | Kind | Resolution | Implemented by | Consumed by |
 |---|---|---|---|---|
+| `IActivityLastDoneSource` | read | keyed `IEnumerable<>` | History (`activityHistory`), Planning (`plannerTask`), ActivityProfiles (`memoryAnchor`) | ActivityProfiles — `DrawLeisureSuggestionEndpoint` (F3-06): staleness from "last done" as well as "last shown", the soft unkept-plans demotion, and the card's "last time" |
 | `IActivityMembershipSource` | read | keyed `IEnumerable<>` | TodoLists (`todoList`), Routines (`routineTodoList`) | **nobody** — its one consumer, History's `grid` grid, was deleted with `CQ-1`. Kept for the next one |
 | `IActivityReferenceSource` | read **+ write**, in the caller's transaction | keyed `IEnumerable<>` | Core (`timerPreset`), History (`activityHistory`), TodoLists (`todoList`), Routines (`routineTodoList`), Planning (`plannerTask`), Tracking (`trackerMapping`), ActivityProfiles (`activityProfile`) | Core — `GridActivityEndpoint`, `GetByIdActivityEndpoint`, `MergeActivityEndpoint`, all through `IActivityReferenceService` |
 | `IActivityRemovalParticipant` | read before, **any** work after the removal commits | keyed `IEnumerable<>` | TodoLists (`todoList`) — re-syncs the due reminders of the to-dos on the removed activities; Planning (`plannerTask`) — cancels the personal reminders cascaded away with the activity's planner tasks | Core — `DeleteActivityEndpoint`, `MergeActivityEndpoint`, through `IActivityRemovalService` |
@@ -106,6 +107,13 @@ None of these break the build, and only one of them throws.
   an entire merge on a unique index. The rule is on `ReferencingActivityIds` and each implementation
   applies it; it cannot be centralised, because by the time `ActivityReferenceService` sees the
   queryable it is an `IQueryable<long>` and `IgnoreQueryFilters` needs an entity type.
+- **`IActivityLastDoneSource` fails silently in the quiet direction.** A dropped slice or renamed key
+  contributes no evidence, and the draw falls back to staleness from "last shown" alone — three plausible cards,
+  just ones that offer tonight what was done yesterday. `SeamWiringTests.ActivityLastDoneSources_CoverEveryKey_Exactly`
+  pins coverage; `LeisureLastDoneTests` asserts each source's `lastDoneAt` on the card it reaches and the
+  demotion's effect across seeds. The other way it goes wrong is reading *absence* as evidence: only a
+  recording, a completed block or an anchor may move `LastDoneAt`, and an untouched block counts against an
+  activity only after the latest of those.
 - **`IFocusIntervalSource` fails silently if it widens.** Admitting stopwatch, manual or tracker-attributed
   rows looks like "more data", but tracker rows were produced by the very rules a suggestion creates, so the
   suggestions would start confirming themselves. `DesktopMappingSuggestionsTests` seeds a non-timer row and

@@ -37,9 +37,10 @@ namespace AdhdTimeOrganizer.ActivityProfiles.domain.service;
 /// <para><b>Soft signals (<see cref="Score"/>) rank.</b> Energy fit (asymmetric: too demanding is worse
 /// than too easy), duration fit (using most of the free time beats a five-minute filler), weather fit (a real
 /// dependency today's conditions match is a happy coincidence worth surfacing), party size (more people around
-/// than the activity takes — doable, but leaves someone out), effort variety
+/// than the activity takes — doable, but leaves someone out), unkept commitments (a soft demotion once two
+/// planned times for it passed untouched since it was last done, expiring after 30 days), effort variety
 /// against the last thing committed to, staleness (the same three every visit is the failure mode of a
-/// top-3), source weight (the bucket list is a rare treat, not the daily driver), project readiness,
+/// top-3; read from the later of "last shown" and "last actually done" — F3-06), source weight (the bucket list is a rare treat, not the daily driver), project readiness,
 /// comfort step, and jitter — because a deterministic top-3 is invisible after a week.</para>
 ///
 /// <para><b>The jitter is derived from the candidate key and the draw seed</b>, not from a sequential RNG:
@@ -102,6 +103,22 @@ public static class LeisureDrawRanker
     /// the cap is not a number it actually knows.
     /// </summary>
     private const double PartyTooBigPenalty = -2;
+
+    /// <summary>
+    /// How many untouched "plan it for later" blocks since the activity was last done before it is demoted. Two,
+    /// not one: a single missed block is an evening that went differently, and rest must not turn into an
+    /// obligation the app keeps score of.
+    /// </summary>
+    public const int UnkeptCommitmentThreshold = 2;
+
+    /// <summary>How long an untouched block keeps counting. Past this, the evening it was planned for is forgotten.</summary>
+    public const int UnkeptCommitmentExpiryDays = 30;
+
+    /// <summary>
+    /// Soft on purpose: less than the jitter range, so a twice-missed favourite still comes up some evenings —
+    /// the signal is "this keeps not happening", which is weak evidence about rest, not a verdict.
+    /// </summary>
+    private const double UnkeptCommitmentPenalty = -1.5;
 
     private const double EffortVarietyBonus = 1;
     private const double StalenessNeverSuggested = 3;
@@ -243,9 +260,21 @@ public static class LeisureDrawRanker
         return DurationFitMax * Math.Min((double)stated / constraints.Minutes, 1);
     }
 
+    /// <summary>
+    /// The later of "last put in front of the user" and "last actually done" (F3-06) — so something done
+    /// yesterday is buried tonight exactly as if it had been shown yesterday, whether or not the picker ever
+    /// offered it.
+    /// </summary>
+    private static DateTime? LastSeenOrDone(LeisureCandidate candidate, LeisureRankingContext context)
+    {
+        DateTime? suggested = context.LastSuggestedAt.TryGetValue(candidate.Key, out var s) ? s : null;
+        DateTime? done = context.LastDoneAt is not null && context.LastDoneAt.TryGetValue(candidate.ActivityId, out var d) ? d : null;
+        return suggested is null ? done : done is null ? suggested : suggested > done ? suggested : done;
+    }
+
     private static double Staleness(LeisureCandidate candidate, LeisureRankingContext context)
     {
-        if (!context.LastSuggestedAt.TryGetValue(candidate.Key, out var at))
+        if (LastSeenOrDone(candidate, context) is not { } at)
             return StalenessNeverSuggested;
 
         var days = Math.Max(0, (context.Now - at).TotalDays);
@@ -266,6 +295,11 @@ public static class LeisureDrawRanker
 
         if (candidate.MaxParticipants is { } maxParticipants && context.Constraints.People > maxParticipants)
             score += PartyTooBigPenalty;
+
+        if (context.UnkeptCommitments is not null
+            && context.UnkeptCommitments.TryGetValue(candidate.ActivityId, out var unkept)
+            && unkept >= UnkeptCommitmentThreshold)
+            score += UnkeptCommitmentPenalty;
 
         if (candidate.EffortType is { } effort && context.LastCommittedEffort is { } lastEffort && effort != lastEffort)
             score += EffortVarietyBonus;

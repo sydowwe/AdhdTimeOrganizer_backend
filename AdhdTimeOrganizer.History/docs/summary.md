@@ -244,6 +244,11 @@ Archived activities pass; archival is not ownership. Guarded by
   Planning's overrun nudge (audit N5): "running" is a pending `TimerBoundaryAlarm` whose `BoundaryAt` is still
   ahead. Keep the `BoundaryAt > now` predicate — a stale row the boot registrar has not swept yet would otherwise
   silence every overrun nudge for that user. It reads alarm rows only; they are still not timer state.
+- **`ActivityHistoryLastDoneSource` (`application/seam/`) answers Core's keyed `IActivityLastDoneSource`**
+  (F3-06): the latest recording's start per activity, for the leisure draw's "last time" and staleness. Keyed
+  on `ActivityId` **deliberately** — unlike the item-keyed logged-time seams, "did this activity happen" is a
+  question about the activity, and every recording kind (timer, manual, tracker) counts. Grouped in SQL, since a
+  tracked activity can carry thousands of rows.
 - **A save touching `ActivityHistory` needs the three materialized views to exist**, or Postgres
   fails with 42P01. The app installs them via `SuggestionPatternViewInstaller` (embedded resources);
   the test fixture applies `sqlScripts/*.sql` in `AppDbContextFixture.OnSchemaCreatedAsync`. If
