@@ -34,8 +34,11 @@ project's bases.
     id the caller's?", so History can refuse a recording linked to somebody else's task. It filters on
     the user id it is handed rather than the ambient query filter: this answers a security question,
     not a scoped read, and must not change with whoever happens to be executing.
-- **Consumes one Core seam:** `ITodoListItemLoggedTimeSource`, implemented in History, for the daily
-  recap's per-item logged time.
+- **Consumes two Core seams:** `ITodoListItemLoggedTimeSource`, implemented in History, for the daily
+  recap's and the estimate fit's per-item logged time; and `ITodoListItemPlanSource`, implemented in
+  Planning, for each item's next slot, its plan history (FO3) and its first block (F3-01).
+- **Uses Core's `EstimateFitRule`** (`domain/rule/`): the median and the minimum sample count every FO8
+  read shares — this slice's estimate fit, and later the routine and timer reads.
 - **Publishes completion through Core events** (`TodoListItemIsDoneChangedEvent`) rather than calling
   into Planning or History directly.
 
@@ -88,6 +91,15 @@ project's bases.
   `rewardTaken` from recordings of the **paired leisure activity** (keyed on `ActivityId`, the one
   place that is right), and the recap bounds its day in the user's zone — the home screen's
   earned-reward strip treats this recap as the truth about "earned today".
+
+- **The estimate fit (F3-01) is item-keyed on both sides, and says nothing below five items.**
+  `GET /todo-list-item/estimate-fit?groupBy=list|category|priority` returns, per group, the median of
+  logged ÷ estimate and of first-block ÷ estimate over items completed in the last 90 days that have an
+  estimate and logged time — plus each timed item's logged-so-far, open items included. Open items are
+  never samples (their figure is not final). It replaces the client's activity-keyed calibration, which
+  compared a per-*sitting* mean with a per-*item* estimate. Two rules hold it honest: never widen the
+  logged side to the activity (same reason as the recap), and never write the figure back into
+  `SuggestedTime`, which also gates tracker auto-completion. Pinned by `TodoListItemEstimateFitTests`.
 
 - **The merge repoint has a collapse case, and it lives in this slice.**
   `TodoListActivityReferenceSource` counts `ActivityId` and `PairedLeisureActivityId` as two separate

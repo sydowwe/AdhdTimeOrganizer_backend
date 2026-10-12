@@ -20,8 +20,8 @@ if the two ever drift apart.
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint`; Routines — `RoutineSuggestedTodayJobHandler`, for the day's `WakeUpTime` |
 | `IFocusIntervalSource` | read | single | History | Tracking — `DesktopMappingSuggestionsEndpoint` (FO9), which learns process → activity from timer focus phases |
 | `IRunningTimerLookup` | read | single | History (pending `TimerBoundaryAlarm` rows) | Planning — `PlannerSlipNudgeJobHandler`, which holds the overrun nudge while the user has a timer running (audit N5) |
-| `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint` |
-| `ITodoListItemPlanSource` | read | single | Planning | TodoLists — `GetAllTodoListItemEndpoint`, `GetByIdTodoListItemEndpoint`, through `TodoListItemPlannedSlotFiller`, for `NextPlannedSlot`; the same two plus `GetDashboardTodoListItemEndpoint` for `PlanHelp` (`PlanHistoryAsync`, FO3) |
+| `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint`; `GetEstimateFitTodoListItemEndpoint` (F3-01), over all days |
+| `ITodoListItemPlanSource` | read | single | Planning | TodoLists — `GetAllTodoListItemEndpoint`, `GetByIdTodoListItemEndpoint`, through `TodoListItemPlannedSlotFiller`, for `NextPlannedSlot`; the same two plus `GetDashboardTodoListItemEndpoint` for `PlanHelp` (`PlanHistoryAsync`, FO3); `GetEstimateFitTodoListItemEndpoint` for each item's first block (`FirstPlannedSecondsAsync`, F3-01) |
 | `IUserOwnedReferenceVerifier` | read | keyed `IEnumerable<>` | TodoLists (`todoListItem`), Routines (`routineTodoList`) | History — `Create`/`UpdateActivityHistoryEndpoint`; Planning — `Create`/`UpdatePlannerTaskEndpoint` and both apply-template endpoints, for `PlannerTask.TodolistItemId`. Both through Core's `IReferencedIdOwnershipService` |
 
 ## Event seams (`ISeamEvent`)
@@ -139,6 +139,10 @@ None of these break the build, and only one of them throws.
   history (and one built by three real carry-overs). It also asserts the response carries no count.
   `PlanHistory.Postponed` (FO3 phase 2) sums the planner's `PostponeCount`, which is disjoint from
   `CarryOverCount` by construction — summing both is correct, and is what `FailedAttempts` does.
+  Its third method, `FirstPlannedSecondsAsync` (F3-01), reads the **first-created** block per item. Reading
+  the latest instead still answers with a plausible length — usually the leftover slot after a slip — so
+  `TodoListItemEstimateFitTests.PlannedRatio_ReadsTheFirstBlock` seeds a short block and a later long one
+  and asserts on the ratio.
 - **`IUserOwnedReferenceVerifier` is the one that fails *closed*.** `ReferencedIdOwnershipService`
   looks a verifier up by key and answers `false` when none matches, so a slice dropped from
   `ModuleAssemblies` or a renamed key rejects every write carrying that id instead of waving them all

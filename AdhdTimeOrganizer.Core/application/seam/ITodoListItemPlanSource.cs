@@ -61,6 +61,27 @@ public interface ITodoListItemPlanSource : ISeam
     /// started counts as missed only once its whole day is behind the user.</param>
     Task<IReadOnlyDictionary<long, PlanHistory>> PlanHistoryAsync(
         DbContext db, long userId, IReadOnlyCollection<long> todoListItemIds, DateOnly today, CancellationToken ct);
+
+    /// <summary>
+    /// For each of <paramref name="todoListItemIds"/>, the length in seconds of the <b>first</b> planner block ever
+    /// linked to it — the first one created, whatever happened to it since.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The planned side of F3-01's estimate fit. The first block is the user's first guess at how long the item
+    /// needs in the day; a later block may only be what was left over, and a carry-over keeps the block's length,
+    /// so neither tells you more. Skipped and carried blocks still count: the question is what was planned, not
+    /// what happened.
+    /// </para>
+    /// <para>
+    /// Items with no linked block are <b>absent</b> from the result.
+    /// </para>
+    /// </remarks>
+    /// <param name="db">The ambient context. The query is composed from it.</param>
+    /// <param name="userId">The authenticated caller, filtered on explicitly.</param>
+    /// <param name="todoListItemIds">Items to report on. An empty collection returns an empty map.</param>
+    Task<IReadOnlyDictionary<long, int>> FirstPlannedSecondsAsync(
+        DbContext db, long userId, IReadOnlyCollection<long> todoListItemIds, CancellationToken ct);
 }
 
 /// <param name="Date">The planner day, on the user's clock.</param>

@@ -87,4 +87,30 @@ public sealed class TodoListItemPlanSource : ITodoListItemPlanSource, IScopedSer
                     Postponed: g.Sum(r => r.PostponeCount));
             });
     }
+
+    public async Task<IReadOnlyDictionary<long, int>> FirstPlannedSecondsAsync(
+        DbContext db, long userId, IReadOnlyCollection<long> todoListItemIds, CancellationToken ct)
+    {
+        if (todoListItemIds.Count == 0)
+            return new Dictionary<long, int>();
+
+        var ids = todoListItemIds.Distinct().ToList();
+
+        // "First" by id, which is creation order: a carry-over or a drag moves the block's date, not its identity.
+        var rows = await db.Set<PlannerTask>()
+            .AsNoTracking()
+            .Where(t => t.UserId == userId
+                        && t.TodolistItemId != null
+                        && ids.Contains(t.TodolistItemId.Value))
+            .Select(t => new { ItemId = t.TodolistItemId!.Value, t.Id, t.StartTime, t.EndTime })
+            .ToListAsync(ct);
+
+        // EndTime > StartTime is a write-path invariant (no overnight blocks), so the span is a plain subtraction.
+        // The guard only keeps a pre-invariant row from reporting a negative plan.
+        return rows
+            .GroupBy(r => r.ItemId)
+            .Select(g => g.MinBy(r => r.Id)!)
+            .Where(r => r.EndTime > r.StartTime)
+            .ToDictionary(r => r.ItemId, r => (int)(r.EndTime - r.StartTime).TotalSeconds);
+    }
 }
