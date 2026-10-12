@@ -15,7 +15,7 @@ alike.
 
 ## Bounded context
 
-Owns: the nine entities and their EF configurations, 58 endpoints (23 profile, 24 lookup, 8 memory
+Owns: the nine entities and their EF configurations, 59 endpoints (24 profile, 24 lookup, 8 memory
 anchor, 3 leisure), their DTOs, 11 validators, 4 filter requests, 6 slice-only enums
 (`EnergyLevel`, `EffortType`, `DifficultyLevel`, `ReadinessStatus`, `LeisureSuggestionSource`,
 `LeisureSuggestionOutcome`), 4 per-user default seeders and 8 dev seeders.
@@ -37,6 +37,10 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   `ActivityTimeRecordedEvent`). Nothing outside Core ever referenced these eight entities.
 - **Referenced by:** the host and `AdhdTimeOrganizer.IntegrationTests`. **No other slice references
   it, and none should** — see the note in the csproj.
+- **One inbound seam, one host-declared FK (FO13).** `ProjectShoppingDoneEventHandler` subscribes to
+  Core's `TodoListItemIsDoneChangedEvent`, and `ActivityProjectProfile.ShoppingTodoListItemId` →
+  TodoLists' `TodoListItem` (`SetNull`) is declared in the host's `ConfigureCrossSliceRelationships`.
+  Neither is a project reference.
 
 ## Gotchas — things that will bite you
 
@@ -118,6 +122,17 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   seeded URL from reproducing its own draw. Rows are swept after 90 days on the next write by the same
   user, so there is no scheduled job to forget to register.
 
+- **A project leaves `NeedsShopping` when its shopping item is ticked, keyed on a link, not the
+  activity (FO13).** The handoff dialog creates one to-do item for the project's own activity, then calls
+  `PATCH /activity-project-profile/{id}/shopping-item` to store its id. `ProjectShoppingDoneEventHandler`
+  moves the project to `ReadyToStart` on the item's done transition — forwards only, only out of
+  `NeedsShopping`, and never on un-tick. Matching on the activity instead would also fire on a "work on
+  the bookshelf" to-do, and it would pass every test that seeds only one item.
+  `ProjectShoppingHandoffTests.AnUnlinkedItemForTheSameActivity_DoesNotMoveTheProject` is the guard. The
+  handler logs and swallows like every seam-event handler, so the stored status is the only evidence it
+  ran. `ActivityProjectProfileRequest.UpdateEntity` leaves the column alone, or every save from the profile
+  form would unlink it.
+
 - **The weather signal answers 200 with an empty list for every kind of failure, and that is the
   contract.** No location on the user, a place that does not geocode, a provider outage, a provider that
   breaks its own never-throw promise — all of them come back as "no weather opinion". The client cannot
@@ -153,7 +168,7 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   a lookup while a profile still referenced it.
 
 - **Registering with the host is four places, none of which break the build.** FastEndpoints
-  `o.Assemblies` in `Program.cs` (missing → all 58 routes 404);
+  `o.Assemblies` in `Program.cs` (missing → all 59 routes 404, and the shopping handler never runs);
   `ModuleServiceExtensions.ModuleAssemblies` (missing → the 12 seeders register *twice*, since the
   `AppDomain` sweep then also sees them: the dev ones truncate and reseed twice, the per-user defaults
   double-insert); `AppDbContext.ApplyHostConfigurations` (missing → all eight tables vanish from the

@@ -11,7 +11,7 @@ three namespaces and bought nothing once they were alone in a project.
 | Entity | Base | Owner | Notes |
 |---|---|---|---|
 | `ActivityBacklogProfile` | `BaseTableEntity` | `Activity` (1:1) | Energy/effort, participants, cost tier, duration, repeatable. FKs three lookups `Restrict`. |
-| `ActivityProjectProfile` | `BaseTableEntity` | `Activity` (1:1) | Difficulty, project area, estimated hours, messy, `jsonb` materials + tools, readiness. No lookup FKs. |
+| `ActivityProjectProfile` | `BaseTableEntity` | `Activity` (1:1) | Difficulty, project area, estimated hours, messy, `jsonb` materials + tools, readiness. No lookup FKs. Nullable `ShoppingTodoListItemId` (FO13) — the handoff's to-do item, FK declared host-side, `SetNull`. |
 | `ActivityBucketListProfile` | `BaseTableEntity` | `Activity` (1:1) | Experience type, comfort-zone step (**1–5**, enforced by the two validators only — no check constraint), travel, financial goal, inspiration source. |
 | `ActivityLocationType` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. |
 | `ActivityWeatherDependency` | `BaseLookupWithUser` | user | Per-user lookup. Backlog only. **The one lookup with a second column**: nullable `Code` (`WeatherDependencyCodes`), written by the seeder and never by the CRUD endpoints, which is what ties a renameable row to a weather condition. |
@@ -93,7 +93,7 @@ instead of inheriting it (its `Configure` is not virtual) so it can add the `Cod
 
 ## Endpoints — `application/endpoint/`
 
-58 total, in six families. None of them declare an endpoint group; every route except the three
+59 total, in six families. None of them declare an endpoint group; every route except the three
 leisure ones and the anchor-eligibility picker now comes from a base's `EntityName.Kebaberize()`
 convention rather than a literal string, so renaming one of those entities moves its route.
 
@@ -101,7 +101,7 @@ convention rather than a literal string, so renaming one of those entities moves
 |---|---|---|
 | `backlog/` | 8 | `/api/activity-backlog-profile*` — derived. The only profile family with a `GetAll`; it uses the **plain** `Projection`, so its rows always say "not done", and it scopes by overriding `Filter` because `BaseGetAllEndpoint` has no `ApplyUserScoping` hook |
 | `bucketList/` | 7 | `/api/activity-bucket-list-profile*` — derived |
-| `project/` | 8 | `/api/activity-project-profile*` — derived, except the status-only `PATCH .../{id}/status`, which re-routes off `BasePatchEndpoint`'s `/{id}` in its `Configure` |
+| `project/` | 9 | `/api/activity-project-profile*` — derived, except two patches that re-route off `BasePatchEndpoint`'s `/{id}` in their `Configure`: the status-only `PATCH .../{id}/status`, and `PATCH .../{id}/shopping-item` (FO13), which stores the handoff's to-do item id after checking it through the `todoListItem` ownership verifier (404 when not the caller's) |
 | `memoryAnchor/` | 8 | `/api/memory-anchor/*` — derived, plus the explicit `GET /api/memory-anchor/anchor-eligible-activities` (`GetAnchorEligibleActivitiesEndpoint`): the caller's un-archived activities with a backlog or bucket-list profile, as `SelectOptionResponse`s ordered by name. Already-anchored activities stay listed — the only create-time refusal is the two-per-month ceiling. It reads `Activity` directly, so it is not on any base and scopes by hand |
 | `lookup/{expectedCostTier,experienceType,locationType,weatherDependency}/` | 24 | `/api/activity-*-type/*` etc. — derived |
 | `leisureSuggestion/` | 3 | `POST /api/leisure-suggestion` (the ranked draw), `POST /api/leisure-suggestion/seen` (its outcome, 204) and `GET /api/leisure-weather-fit` (today's matching weather-dependency ids) — explicit routes, hand-written rather than base-derived |
@@ -116,6 +116,13 @@ cannot see and deliberately does not depend on. The three `GetById`s set
 `NotFoundWhenUnauthorized`, so a foreign id is a 404 rather than a 403 that would confirm it exists.
 The two leisure endpoints scope by hand and are not built on any CRUD base — the draw is a read
 expressed as a POST body, and `seen` is an upsert keyed on a composite the bases cannot express.
+
+## Event handler — `application/eventHandler/`
+
+`ProjectShoppingDoneEventHandler` (FO13), on Core's `TodoListItemIsDoneChangedEvent`: a done transition
+on the item a project links through `ShoppingTodoListItemId` moves a `NeedsShopping` project to
+`ReadyToStart`. Scoped by hand on the event's `UserId` (the handler's scope has no principal, so the
+host's profile filter is a no-op there). `ProjectShoppingHandoffTests` asserts on the stored status.
 
 ## DTOs — `application/dto/`
 

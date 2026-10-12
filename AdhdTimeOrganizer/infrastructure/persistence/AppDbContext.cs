@@ -208,7 +208,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     /// here rather than forcing a project reference purely to name the principal.
     /// </summary>
     /// <remarks>
-    /// Three today. The first: <c>PlannerTask.TodolistItemId</c> → <c>TodoListItem</c>. Planning
+    /// Four today. The first: <c>PlannerTask.TodolistItemId</c> → <c>TodoListItem</c>. Planning
     /// keeps the id column; the navigation property was deleted, because nothing read it — every call
     /// site passes the bare id — and it was the only thing that would have forced a
     /// Planning → TodoLists project reference. Configured with no navigation on either end, which is
@@ -221,6 +221,11 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
     /// are what makes the daily recap's per-item time exact instead of inferred from the shared
     /// activity. Same navigation-free shape and the same reasoning — History can see neither
     /// TodoLists nor Routines.
+    /// </para>
+    /// <para>
+    /// The fourth is <c>ActivityProjectProfile.ShoppingTodoListItemId</c> → <c>TodoListItem</c> (FO13): the
+    /// item the shopping handoff created, which <c>ProjectShoppingDoneEventHandler</c> follows to make the
+    /// project ready. ActivityProfiles cannot see TodoLists either.
     /// </para>
     /// </remarks>
     private static void ConfigureCrossSliceRelationships(ModelBuilder modelBuilder)
@@ -257,6 +262,15 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options, ILogge
             .HasForeignKey(h => h.RoutineTodoListId)
             .OnDelete(DeleteBehavior.SetNull)
             .HasConstraintName("fk_activity_history_routine_todo_list_routine_todo_list_id");
+
+        // FO13: the to-do item the shopping handoff created for a project. SetNull — deleting the item only
+        // means ticking nothing will make the project ready; the project itself is the user's and stays.
+        modelBuilder.Entity<ActivityProjectProfile>()
+            .HasOne<TodoListItem>()
+            .WithMany()
+            .HasForeignKey(p => p.ShoppingTodoListItemId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_activity_project_profile_todo_list_item_shopping_todo_list_item_id");
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

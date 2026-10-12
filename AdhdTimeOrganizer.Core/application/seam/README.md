@@ -31,7 +31,7 @@ if the two ever drift apart.
 |---|---|---|---|
 | `ActivityTimeRecordedEvent` | Tracking (heartbeat; Android sync for the user's today — FO9), History (both creates, via `IActivityTimeRecordedPublisher` — FO2) | host `ActivityTimeRecordedEventHandler` | Planning + TodoLists + Routines |
 | `PlannerTaskIsDoneChangedEvent` | Planning, and the host handler above | host | TodoLists + Routines |
-| `TodoListItemIsDoneChangedEvent` | TodoLists | **Planning** | Planning only |
+| `TodoListItemIsDoneChangedEvent` | TodoLists | **Planning**; **ActivityProfiles** (`ProjectShoppingDoneEventHandler`, FO13) | Planning only; ActivityProfiles only — a done shopping item makes its linked `NeedsShopping` project `ReadyToStart`. The two subscribers share no rows and need no ordering |
 | `RoutineTodoListIsDoneChangedEvent` | Routines | **Planning** | Planning only |
 | `ActivityArchivedChangedEvent` | Core (`SetArchivedActivityEndpoint`, on a real change) | **TodoLists** | TodoLists only — re-syncs the due reminders of the activity's to-dos |
 

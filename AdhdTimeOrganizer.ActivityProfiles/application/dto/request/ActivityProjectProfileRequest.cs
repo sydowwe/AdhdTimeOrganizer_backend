@@ -27,6 +27,10 @@ public record ActivityProjectProfileRequest : IMyRequest<ActivityProjectProfile>
         ReadinessStatus = ReadinessStatus
     };
 
+    /// <remarks>
+    /// Deliberately leaves <see cref="ActivityProjectProfile.ShoppingTodoListItemId"/> alone: the form does not
+    /// carry it, so assigning it here would unlink the shopping item on every edit.
+    /// </remarks>
     public void UpdateEntity(ActivityProjectProfile e)
     {
         e.DifficultyLevel = DifficultyLevel;

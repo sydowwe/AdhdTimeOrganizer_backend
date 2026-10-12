@@ -399,6 +399,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("required_tools");
 
+                    b.Property<long?>("ShoppingTodoListItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shopping_todo_list_item_id");
+
                     b.Property<uint>("row_version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -411,6 +415,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("ActivityId")
                         .IsUnique()
                         .HasDatabaseName("ix_activity_project_profile_activity_id");
+
+                    b.HasIndex("ShoppingTodoListItemId")
+                        .HasDatabaseName("ix_activity_project_profile_shopping_todo_list_item_id");
 
                     b.ToTable("activity_project_profile", "activity_profiles");
                 });
@@ -5095,6 +5102,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_activity_project_profile_activities_activity_id");
+
+                    b.HasOne("AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList.TodoListItem", null)
+                        .WithMany()
+                        .HasForeignKey("ShoppingTodoListItemId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_activity_project_profile_todo_list_item_shopping_todo_list_item_id");
 
                     b.Navigation("Activity");
                 });

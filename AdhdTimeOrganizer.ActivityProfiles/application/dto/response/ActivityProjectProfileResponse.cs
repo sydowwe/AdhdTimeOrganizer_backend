@@ -19,6 +19,9 @@ public record ActivityProjectProfileResponse : WithActivityResponse, IProjection
     public required List<string> RequiredTools { get; init; }
     public required ReadinessStatus ReadinessStatus { get; init; }
 
+    /// <summary>The shopping handoff's to-do item, while it exists (FO13). Ticking it done makes the project ready.</summary>
+    public long? ShoppingTodoListItemId { get; init; }
+
     public static IQueryable<ActivityProjectProfileResponse> Projection(IQueryable<ActivityProjectProfile> query)
     {
         return query.Select(e => new ActivityProjectProfileResponse
@@ -51,7 +54,8 @@ public record ActivityProjectProfileResponse : WithActivityResponse, IProjection
             IsMessy = e.IsMessy,
             MaterialsNeeded = e.MaterialsNeeded,
             RequiredTools = e.RequiredTools,
-            ReadinessStatus = e.ReadinessStatus
+            ReadinessStatus = e.ReadinessStatus,
+            ShoppingTodoListItemId = e.ShoppingTodoListItemId
         });
     }
 }
