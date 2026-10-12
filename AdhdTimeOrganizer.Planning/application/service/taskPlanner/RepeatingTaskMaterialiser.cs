@@ -24,14 +24,18 @@ namespace AdhdTimeOrganizer.Planning.application.service.taskPlanner;
 /// deleted or skipped stays deleted or skipped. On top of that, a day that already holds an occurrence of the
 /// rule (whatever its status, and however it got there — say, yesterday's carried over) receives no second one.
 /// There is deliberately no unique index behind that dedupe; see <c>PlannerTaskConfiguration</c>.</item>
-/// <item><b>Conflicts follow <c>UserPlannerSettings.DefaultConflictResolution</c></b>, through
-/// <see cref="PlannerTemplateApplier.StageAgainstDay"/> — the one implementation of the four modes. A
-/// destructive mode can delete or carve the user's own blocks here exactly as a template apply would, which is
-/// why the deleted tasks' reminders are captured before the save and cancelled after it.</item>
+/// <item><b>Conflicts follow <c>UserPlannerSettings.DefaultConflictResolution</c>, but never destructively</b>,
+/// through <see cref="PlannerTemplateApplier.StageAgainstDay"/> — the one implementation of the four modes.
+/// <see cref="NonDestructive"/> turns <c>Overwrite</c> into <c>Ignore</c> and <c>MergeOverwrite</c> into
+/// <c>MergeIgnore</c>: a template apply is a choice the user makes with the day in front of them, but this runs
+/// from a read, and a GET must not delete or carve the blocks the user placed. So an occurrence that collides is
+/// skipped or carved around them, never the other way.</item>
 /// <item><b>Gates.</b> An away day (FO1: <c>Vacation</c>, <c>SickDay</c>) is passed over, as is every day while
 /// <see cref="IsUserAbsentAsync"/> says the user is gone (which, from a user's own read, is never). A passed-over day is still
 /// decided: marking the day as a workday again later does not bring the occurrence back. The suggestion panel
-/// still offers the rule on that day.</item>
+/// still offers the rule on that day. A day marked away <i>after</i> its occurrence was placed loses the
+/// occurrence if it is still untouched (<see cref="WithdrawFromAwayDaysAsync"/>), and it does not come back
+/// either.</item>
 /// <item><b>Concurrency.</b> Home and the planner can read the same day at once. Both stage the same
 /// occurrences, and both advance the same rule rows; the rule's <c>row_version</c> lets exactly one save through,
 /// and the loser's whole save — occurrences included — rolls back.</item>
@@ -90,6 +94,12 @@ public sealed class RepeatingTaskMaterialiser(
     {
         await RunSafelyAsync(rule.UserId, "reconciling an edited rule for",
             async () => await ReconcileCoreAsync(rule, before, await TodayAsync(rule.UserId, ct), ct), ct);
+    }
+
+    public async Task WithdrawFromAwayDaysAsync(long userId, IReadOnlyCollection<DateOnly> dates, CancellationToken ct = default)
+    {
+        await RunSafelyAsync(userId, "withdrawing away-day",
+            async () => await WithdrawCoreAsync(userId, dates, await TodayAsync(userId, ct), ct), ct);
     }
 
     // ------------------------------------------------------------------ placing
@@ -214,12 +224,7 @@ public sealed class RepeatingTaskMaterialiser(
 
         if (occurrences.Count > 0)
         {
-            var ids = occurrences.Select(t => t.Id).ToList();
-            var withReminder = await dbContext.Set<Reminder>()
-                .IgnoreQueryFilters()
-                .Where(r => r.PlannerTaskId != null && ids.Contains(r.PlannerTaskId.Value) && !r.IsAuto)
-                .Select(r => r.PlannerTaskId!.Value)
-                .ToHashSetAsync(ct);
+            var withReminder = await UserWrittenRemindersAsync(occurrences.Select(t => t.Id).ToList(), ct);
 
             foreach (var occurrence in occurrences.Where(t => IsUntouched(t, before, withReminder)))
             {
@@ -261,8 +266,8 @@ public sealed class RepeatingTaskMaterialiser(
     /// hung off it since (no to-do link, no Google event, no reminder). Anything the user did to it, a move inside
     /// the day included, makes it theirs, and an edit to the rule leaves it alone.
     /// <para>
-    /// A block a destructive conflict mode carved on placement counts as touched too, since its span is no longer
-    /// the rule's. That errs the safe way: a carved block is never re-stretched over the task it was carved around.
+    /// An occurrence <c>MergeIgnore</c> carved on placement counts as touched too, since its span is no longer the
+    /// rule's. That errs the safe way: a carved block is never re-stretched over the task it was carved around.
     /// </para>
     /// </summary>
     private static bool IsUntouched(PlannerTask task, RepeatingPlannerTask before, IReadOnlySet<long> withReminder) =>
@@ -294,7 +299,77 @@ public sealed class RepeatingTaskMaterialiser(
         occurrence.ImportanceId = rule.ImportanceId;
     }
 
+    // ------------------------------------------------------------------ withdrawing from away days
+
+    /// <summary>
+    /// The away gate, applied late: an occurrence placed on today or tomorrow before the user marked that day as
+    /// vacation or sick leave goes, if it is still exactly what the rule placed (<see cref="IsUntouched"/>, judged
+    /// against the rule as it stands). One the user moved, started, linked or hung a reminder on is theirs and stays.
+    /// <para>
+    /// From today on only. A past day's blocks are what happened, or the record of what did not, and the
+    /// materialiser never placed there anyway. The watermark is not touched: the day stays decided, so un-marking
+    /// it later does not bring the block back — the same as a day that was away when the rule reached it.
+    /// </para>
+    /// </summary>
+    private async Task WithdrawCoreAsync(long userId, IReadOnlyCollection<DateOnly> dates, DateOnly today, CancellationToken ct)
+    {
+        var upcoming = dates.Where(d => d >= today).Distinct().ToList();
+        if (upcoming.Count == 0)
+            return;
+
+        var onAwayDays = (await dbContext.Set<PlannerTask>()
+                .IgnoreQueryFilters()
+                .Include(t => t.Calendar)
+                .Where(t => t.UserId == userId && t.SourceRepeatingTaskId != null && upcoming.Contains(t.Calendar.Date))
+                .ToListAsync(ct))
+            .Where(t => t.Calendar.DayType.IsAway())
+            .ToList();
+        if (onAwayDays.Count == 0)
+            return;
+
+        var ruleIds = onAwayDays.Select(t => t.SourceRepeatingTaskId!.Value).Distinct().ToList();
+        var rules = await dbContext.Set<RepeatingPlannerTask>()
+            .IgnoreQueryFilters()
+            .Where(r => r.UserId == userId && ruleIds.Contains(r.Id))
+            .ToDictionaryAsync(r => r.Id, ct);
+        var withReminder = await UserWrittenRemindersAsync(onAwayDays.Select(t => t.Id).ToList(), ct);
+
+        var withdrawn = onAwayDays
+            .Where(t => rules.TryGetValue(t.SourceRepeatingTaskId!.Value, out var rule) && IsUntouched(t, rule, withReminder))
+            .ToList();
+        if (withdrawn.Count == 0)
+            return;
+
+        dbContext.Set<PlannerTask>().RemoveRange(withdrawn);
+        await SaveAndCancelOrphanedRemindersAsync(ct);
+
+        logger.LogInformation("Withdrew {Count} repeating-task occurrence(s) from away days for user {UserId}",
+            withdrawn.Count, userId);
+    }
+
     // ------------------------------------------------------------------ shared
+
+    /// <summary>
+    /// The occurrences among <paramref name="taskIds"/> carrying a reminder the user wrote. An automatic one
+    /// (<c>IsAuto</c>) does not count: it is not something the user hung off the block.
+    /// </summary>
+    private async Task<HashSet<long>> UserWrittenRemindersAsync(List<long> taskIds, CancellationToken ct) =>
+        await dbContext.Set<Reminder>()
+            .IgnoreQueryFilters()
+            .Where(r => r.PlannerTaskId != null && taskIds.Contains(r.PlannerTaskId.Value) && !r.IsAuto)
+            .Select(r => r.PlannerTaskId!.Value)
+            .ToHashSetAsync(ct);
+
+    /// <summary>
+    /// The user's conflict mode, made safe for a write nobody asked for at that moment: the two modes that delete
+    /// or carve the user's existing blocks become their twins that only skip or carve the occurrence.
+    /// </summary>
+    private static ApplyTemplateConflictResolutionEnum NonDestructive(ApplyTemplateConflictResolutionEnum mode) => mode switch
+    {
+        ApplyTemplateConflictResolutionEnum.Overwrite => ApplyTemplateConflictResolutionEnum.Ignore,
+        ApplyTemplateConflictResolutionEnum.MergeOverwrite => ApplyTemplateConflictResolutionEnum.MergeIgnore,
+        _ => mode
+    };
 
     private async Task<DateOnly> TodayAsync(long userId, CancellationToken ct) =>
         TaskPlannerHelper.TodayIn(await timeZones.GetAsync(userId, ct));
@@ -308,17 +383,17 @@ public sealed class RepeatingTaskMaterialiser(
             .ToDictionaryAsync(c => c.Date, ct);
 
     private async Task<ApplyTemplateConflictResolutionEnum> ConflictResolutionAsync(long userId, CancellationToken ct) =>
-        await dbContext.Set<UserPlannerSettings>()
-            .IgnoreQueryFilters()
-            .Where(s => s.UserId == userId)
-            .Select(s => (ApplyTemplateConflictResolutionEnum?)s.DefaultConflictResolution)
-            .FirstOrDefaultAsync(ct)
-        ?? ConflictResolutionWithoutSettings;
+        NonDestructive(await dbContext.Set<UserPlannerSettings>()
+                           .IgnoreQueryFilters()
+                           .Where(s => s.UserId == userId)
+                           .Select(s => (ApplyTemplateConflictResolutionEnum?)s.DefaultConflictResolution)
+                           .FirstOrDefaultAsync(ct)
+                       ?? ConflictResolutionWithoutSettings);
 
     /// <summary>
-    /// A destructive conflict mode deletes the user's own blocks, and their portal reminder rows go with them by
-    /// FK cascade, which the Reminders module never sees — so the ids are read off the tracker before the save
-    /// and cancelled after it, the same as a template apply.
+    /// Every deletion here is of an occurrence — removed by a rule edit, or withdrawn from a day marked away — and
+    /// its portal reminder rows go with it by FK cascade, which the Reminders module never sees. So the ids are read
+    /// off the tracker before the save and cancelled after it, the same as a template apply.
     /// <para>
     /// After the save the other two reminder duties run, both against the tracker as it stood before it: the blocks
     /// placed (occurrences and any carved segments) get their automatic reminders (audit N1), and the occurrences a

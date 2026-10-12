@@ -4,6 +4,7 @@ using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.IntegrationTests.Reminders;
+using AdhdTimeOrganizer.Planning.application.dto.@enum;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
@@ -199,6 +200,78 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
         await using (var db = CreateDbContext())
             (await db.Set<PlannerTask>().IgnoreQueryFilters().AnyAsync(t => t.Id == blockerId, CancellationToken))
                 .Should().BeTrue("Ignore never touches the user's own block");
+    }
+
+    /// <summary>
+    /// A template apply honours the user's destructive modes because the user chose to apply it. This runs from a
+    /// GET, so the same modes would delete or carve a block the user placed without anyone asking. The occurrence
+    /// gives way instead: <c>Overwrite</c> places nothing over the block (as <c>Ignore</c>), <c>MergeOverwrite</c>
+    /// carves the occurrence around it (as <c>MergeIgnore</c>).
+    /// </summary>
+    [Theory(DisplayName = "FO6: a destructive conflict mode never deletes or carves the user's own block")]
+    [InlineData(ApplyTemplateConflictResolutionEnum.Overwrite)]
+    [InlineData(ApplyTemplateConflictResolutionEnum.MergeOverwrite)]
+    public async Task DestructiveConflictMode_NeverTouchesTheUsersBlock(ApplyTemplateConflictResolutionEnum mode)
+    {
+        var ruleId = await SeedRuleAsync();
+        long blockerId;
+        await using (var db = CreateDbContext())
+        {
+            db.Set<UserPlannerSettings>().Add(new UserPlannerSettings { UserId = UserId, DefaultConflictResolution = mode });
+            await db.SaveChangesAsync(CancellationToken);
+
+            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, $"blocker-{Guid.NewGuid():N}", UserId, CancellationToken);
+            var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, Today, UserId, CancellationToken);
+            blockerId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
+                db, activityId, calendarId, new TimeOnly(18, 30), new TimeOnly(19, 30), UserId, ct: CancellationToken);
+        }
+
+        await GetDayPlanAsync(Today);
+
+        var blocker = await TaskAsync(blockerId);
+        blocker.StartTime.Should().Be(new TimeOnly(18, 30), "the user's block is never carved");
+        blocker.EndTime.Should().Be(new TimeOnly(19, 30));
+
+        var todays = (await OccurrencesAsync(ruleId)).Where(o => o.Date == Today).Select(o => o.Task).ToList();
+        if (mode == ApplyTemplateConflictResolutionEnum.Overwrite)
+            todays.Should().BeEmpty("Overwrite is read as Ignore: the colliding occurrence is not placed");
+        else
+            todays.Should().ContainSingle("MergeOverwrite is read as MergeIgnore: the occurrence is carved, not the block")
+                .Which.EndTime.Should().Be(new TimeOnly(18, 30));
+    }
+
+    /// <summary>
+    /// The occurrence is placed the moment a day-plan is read, so marking tomorrow as sick leave tonight found the
+    /// gym block already there. Only an untouched one goes: a block the user moved is theirs.
+    /// </summary>
+    [Fact(DisplayName = "FO6: marking a day away after placement withdraws its untouched occurrence, not a moved one")]
+    public async Task MarkingAwayAfterPlacement_WithdrawsTheUntouchedOccurrence()
+    {
+        var untouchedRuleId = await SeedRuleAsync();
+        var movedRuleId = await SeedRuleAsync();
+        await GetDayPlanAsync(Today);
+
+        // The user moves one of tomorrow's occurrences, which makes it theirs.
+        await using (var db = CreateDbContext())
+        {
+            var moved = await db.Set<PlannerTask>().IgnoreQueryFilters()
+                .SingleAsync(t => t.SourceRepeatingTaskId == movedRuleId && t.Calendar.Date == Tomorrow, CancellationToken);
+            moved.StartTime = new TimeOnly(20, 0);
+            moved.EndTime = new TimeOnly(21, 0);
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        await MarkDayTypeAsync(Tomorrow, "SickDay");
+
+        (await OccurrencesAsync(untouchedRuleId)).Select(o => o.Date).Should().BeEquivalentTo([Today],
+            "tomorrow's untouched occurrence is withdrawn; today's, on a day that is not away, stays");
+        (await OccurrencesAsync(movedRuleId)).Select(o => o.Date).Should().BeEquivalentTo([Today, Tomorrow],
+            "a moved occurrence is the user's block now");
+
+        await MarkDayTypeAsync(Tomorrow, Tomorrow.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? "Weekend" : "Workday");
+        await GetDayPlanAsync(Tomorrow);
+        (await OccurrencesAsync(untouchedRuleId)).Select(o => o.Date).Should().BeEquivalentTo([Today],
+            "the day stays decided, as a day that was away when the rule reached it");
     }
 
     [Fact(DisplayName = "FO6: another user's auto-placing rule is never materialised by my read")]
@@ -409,6 +482,20 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
         var calendar = await db.Set<Calendar>().IgnoreQueryFilters().SingleAsync(c => c.Id == calendarId, CancellationToken);
         calendar.DayType = dayType;
         await db.SaveChangesAsync(CancellationToken);
+    }
+
+    /// <summary>Through the bulk bar's endpoint, so the day-type event is really published.</summary>
+    private async Task MarkDayTypeAsync(DateOnly date, string dayType)
+    {
+        long calendarId;
+        await using (var db = CreateDbContext())
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, date, UserId, CancellationToken);
+
+        var response = await CreateClient().PatchAsJsonAsync("api/calendar/day-type/batch",
+            new { CalendarIds = new[] { calendarId }, DayType = dayType }, JsonOpts, CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        body.Should().NotContain("\"succeeded\":false", body);
     }
 
     private static object RuleBody(long activityId, long importanceId, int startHour, bool autoPlace, string[]? days = null) => new

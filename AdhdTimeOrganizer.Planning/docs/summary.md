@@ -54,10 +54,11 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
 
   The reference seam resolves **by string key**, not by type. A missing, misregistered or renamed key
   is silent — no build error, the consumer just quietly stops finding rows.
-- **Two `IEventHandler`s live here**, in `application/eventHandler/`:
-  `RoutineTodoListIsDoneChangedEventHandler` and `TodoListItemIsDoneChangedEventHandler`. The
-  publishers are Routines and TodoLists, but every row they touch is a `PlannerTask`, so the reaction
-  belongs to the slice that owns it. Both event records are declared in Core, so neither slice
+- **Three `IEventHandler`s live here**, in `application/eventHandler/`:
+  `RoutineTodoListIsDoneChangedEventHandler` and `TodoListItemIsDoneChangedEventHandler`, whose
+  publishers are Routines and TodoLists but every row they touch is a `PlannerTask`, so the reaction
+  belongs to the slice that owns it; and `AwayDayOccurrenceWithdrawalHandler` (FO6), which reacts to
+  Planning's own `CalendarDayTypesChangedEvent` beside Routines' handler of the same event. Both event records are declared in Core, so neither slice
   references the other; both handlers resolve a `DbContext` from a **fresh scope**, because the
   publisher's scope is not guaranteed to outlive the dispatch.
 - **Reminders reach `framework/Sydowwe.Reminders` only through `Sydowwe.Framework.Contracts`**
@@ -132,7 +133,12 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   - **No unique `(source_repeating_task_id, calendar_id)`** on purpose: it would 409 a user's PUT that moves an
     occurrence onto a day already holding one. The materialiser dedupes per day instead, and the rule's
     `row_version` serialises two racing reads.
-  - **Conflicts go through `PlannerTemplateApplier.StageAgainstDay`** with the user's `DefaultConflictResolution`.
+  - **Conflicts go through `PlannerTemplateApplier.StageAgainstDay`** with the user's `DefaultConflictResolution`,
+    **made non-destructive**: `Overwrite` is read as `Ignore` and `MergeOverwrite` as `MergeIgnore`, so a GET never
+    deletes or carves a block the user placed — the occurrence is skipped or carved instead.
+  - **A day marked away after placement loses its untouched occurrence** (today on). `AwayDayOccurrenceWithdrawalHandler`
+    takes `CalendarDayTypesChangedEvent` (Planning publishes it from both day-type writes) and calls
+    `WithdrawFromAwayDaysAsync`; the day stays decided, so un-marking it brings nothing back.
   - **A rule edit reconciles** (`ReconcileAfterEditAsync`): *untouched* occurrences from today on (still
     `NotStarted`, no original slot, still the old rule's exact plan, no to-do/Google link and no reminder the
     *user* wrote — an automatic one does not count) follow the edit, or are removed when the rule stops placing

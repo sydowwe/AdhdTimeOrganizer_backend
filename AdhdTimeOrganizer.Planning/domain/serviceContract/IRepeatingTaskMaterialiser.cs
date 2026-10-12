@@ -32,4 +32,11 @@ public interface IRepeatingTaskMaterialiser
     /// edit newly matches. <paramref name="before"/> is the rule as it was before the edit.
     /// </summary>
     Task ReconcileAfterEditAsync(RepeatingPlannerTask rule, RepeatingPlannerTask before, CancellationToken ct = default);
+
+    /// <summary>
+    /// After days were marked away (<c>CalendarDayTypesChangedEvent</c>): removes the <b>untouched</b> occurrences on
+    /// those of <paramref name="dates"/> that are today or later and now away. The days stay decided, so they do
+    /// not come back if the days are un-marked.
+    /// </summary>
+    Task WithdrawFromAwayDaysAsync(long userId, IReadOnlyCollection<DateOnly> dates, CancellationToken ct = default);
 }
