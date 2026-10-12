@@ -65,7 +65,9 @@ touching anything below, because **none of these break the build**.
   `Sydowwe.Framework.Contracts`. **Add a kind to that list whenever you add a producer** — an empty catalog
   means "the whole enum" (so a host that never opts in is unaffected), which also means a *stale* one fails
   silently: the kind still dispatches, it just loses its row on the settings screen. `NotificationCatalogTests`
-  is the guard, and it keeps a second copy of the list on purpose.
+  is the guard, and it keeps a second copy of the list on purpose. The same call declares `HeldWhileAwayTypes`
+  and `PushOffByDefault` — the kinds that reach the bell but not the lock screen until the user ticks push
+  (empty today; a bell-only kind goes there with its producer).
 - **Account deletion fans out over `ISubjectDataEraser`** (`DeleteUserAccountEndpoint.BeforeDeleteAsync`).
   The host FKs cascade only `notification` / `notification_preference` / `push_subscription`; every
   other user-keyed module table is deliberately FK-free and would outlive the account. Erasers mutate

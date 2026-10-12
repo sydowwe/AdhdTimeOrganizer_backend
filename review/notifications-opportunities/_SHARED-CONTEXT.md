@@ -43,7 +43,8 @@ plus parent commit **ec4d0183** (the producer and host wiring).
 5. Email default: `framework/Sydowwe.Notifications/application/NotificationChannelDefaults.cs` — omit = email OFF,
    which is the right answer for almost everything here.
 6. Host catalog: `AdhdTimeOrganizer/config/dependencyInjection/ModuleServiceExtensions.cs` →
-   `AddNotificationCatalog` — add to `SupportedTypes`, decide `HeldWhileAwayTypes`; **and** the deliberate second
+   `AddNotificationCatalog` — add to `SupportedTypes`, decide `HeldWhileAwayTypes` and `PushOffByDefault` (P2-02:
+   a bell-only kind goes in the latter — push off until the user ticks it); **and** the deliberate second
    copy in `AdhdTimeOrganizer.IntegrationTests/Endpoints/NotificationCatalogTests.cs`. Forget it and the kind
    dispatches but has no settings row (unmutable).
 7. Frontend (`AntiProcrastinationApp-frontend`): `src/app/notifications/notificationTypeMeta.ts` (icon, deep link).

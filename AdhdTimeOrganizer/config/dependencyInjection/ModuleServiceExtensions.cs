@@ -235,6 +235,12 @@ public static class ModuleServiceExtensions
                 // user gets the welcome-back card instead (MorningBriefingJobHandler skips them while it is open).
                 NotificationType.MorningBriefing
             ];
+
+            // Bell-only until the user ticks push: low-urgency kinds worth finding the next time the app is open,
+            // not worth a buzz. Every kind raised today is something the user asked for or about a moment, so the
+            // list starts empty; a new bell-only kind goes here together with its producer.
+            o.PushOffByDefault = [];
+
             o.SupportedTypes =
         [
             // Reminders module: the user's own self-set nudge. Its generic DeadlineApproaching and batched
