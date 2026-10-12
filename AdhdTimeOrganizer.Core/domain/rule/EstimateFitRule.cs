@@ -7,8 +7,9 @@ namespace AdhdTimeOrganizer.Core.domain.rule;
 /// <remarks>
 /// <para>
 /// In Core because its three readers sit in three slices that cannot see each other — to-do items (TodoLists,
-/// F3-01), routine items (Routines, F2-06) and timer lengths (History, F2-07). Each keeps its own threshold, and
-/// all of them take the median from here, so the three figures can be read side by side.
+/// F3-01), routine items (Routines, F2-06) and timer lengths (History, F2-07). Each keeps its own threshold here.
+/// The two estimate reads take the median from here, so their figures can be read side by side. The timer read
+/// asks a different question — which length is usually <em>reached</em> — and keeps its share here instead.
 /// </para>
 /// <para>
 /// <b>A median, not a mean.</b> The samples are ratios, and one task that ran six times its estimate would drag a
@@ -35,6 +36,18 @@ public static class EstimateFitRule
     /// weekly item would otherwise need five weeks of timing before it said anything.
     /// </summary>
     public const int RoutineItemMinimumSamples = 3;
+
+    /// <summary>
+    /// Timer sessions of one activity before a focus length is suggested (F2-07), and also the focus stretches that
+    /// must bear on the suggested length itself. Five, so one long Pomodoro cannot carry it alone.
+    /// </summary>
+    public const int TimerLengthMinimumSamples = 5;
+
+    /// <summary>
+    /// The share of focus stretches that must reach a length before it is suggested (F2-07): the largest length
+    /// reached at least this often is the one offered.
+    /// </summary>
+    public const double TimerLengthReachedShare = 0.7;
 
     /// <summary>
     /// The median of <paramref name="samples"/>, or <c>null</c> when there are fewer than

@@ -79,6 +79,11 @@ What is load-bearing:
   and is not the item's time, so stamping it would credit the item with its rests in the recap. Same rules
   as the single create's link: positive, never both, ownership-checked in the handler (404).
   The stopwatch is not a session.
+- **How sessions ended is read back once, for an offer** (F2-07): `GET /activity-history/session/fit` suggests
+  a focus length that usually works for an activity ("Try 15 min"), through `domain/service/TimerLengthFit`. It
+  reads focus rows by `Phase`, never by activity alone, and treats a stretch that ran its length as "at least
+  this long". It returns no share and no failure count, and it never edits a timer preset. See
+  `domain-map.md` → *ActivityHistorySession*.
 
 **`planning.mv_activity_history_pattern` counts sittings too**, in SQL rather than through
 `HistorySittings`: a session's focus rows are one sitting per activity, from the first focus period's start to

@@ -81,6 +81,14 @@ treats a null as a session of one.
   with the account.
 - **`SET NULL` from row to session**, for the reason the item links use it: rows are the record of time,
   the session is a grouping over them.
+- **`GET /activity-history/session/fit` is the one reader of `Outcome` and `CompletedFocusPeriods`** beyond the
+  echo on every row and the GDPR export (F2-07). `domain/service/TimerLengthFit` turns the activity's newest 20
+  sessions in 90 days into focus stretches. A countdown row is one stretch, and so is each Pomodoro *focus* row
+  (told apart by `Phase`, since the rest activity may be the same activity). A stretch that ran its length is
+  censored, meaning "at least this long", and only one Stop cut short counts against a longer length.
+  `RanOutWhileAway` sessions are left out. The offer is the largest 5-minute length that at least 70% of the
+  stretches bearing on it reached, with 5 of them over 5 sessions (`EstimateFitRule`), and otherwise nothing.
+  The response carries no completion share, so the client cannot render one as a score.
 
 ### TimerBoundaryAlarm
 
@@ -114,18 +122,19 @@ recorded time, so a deleted account's pending alarms go with it rather than surv
 nobody. See `summary.md` → *Timer-boundary alarms* for the design constraints; the entity's own XML
 remarks carry the rest.
 
-## Endpoints (19)
+## Endpoints (20)
 
 | Route | Verb | File |
 |---|---|---|
 | `/activity-history` | POST | `command/CreateActivityHistoryEndpoint` |
 | `/activity-history/session` | POST | `command/CreateActivityHistorySessionEndpoint` |
+| `/activity-history/session/fit?activityId=` | GET | `query/GetFitActivityHistorySessionEndpoint` (F2-07) |
 | `/activity-history/{id}` | PUT | `command/UpdateActivityHistoryEndpoint` |
 | `/activity-history/{id}` | DELETE | `command/DeleteActivityHistoryEndpoint` |
 | `/activity-history/{id}` | GET | `query/GetByIdActivityHistoryEndpoint` |
 | `/activity-history/form-select-options?includeArchived=` | GET | `query/FormSelectOptionsActivityHistoryEndpoint` |
 | `/activity-history/filter` | POST | `query/FilterActivityHistoryEndpoint` |
-| `/activity-history/aggregate-by-activity` | POST | `query/AggregateByActivityActivityHistoryEndpoint` |
+| `/activity-history/aggregate-by-activity` | POST | `query/AggregateByActivityActivityHistoryEndpoint`. **No client caller since 2026-10-12**: the SPA's last reader, the routine list's activity-keyed calibration, moved to the item-keyed `TypicalSeconds` (F2-06). A candidate for deletion |
 | `/activity-history/dashboard/detail/{pie-chart,stacked-bars,summary-cards}` | POST | `query/dashboard/detail/*` |
 | `/activity-history/dashboard/summary/{pie-chart,stacked-bars,summary-cards,time-of-day}` | POST | `query/dashboard/summary/*` |
 | `/activity-history/dashboard/calendar` | POST | `CalendarActivityEndpoint` (directly under `endpoint/`) |
