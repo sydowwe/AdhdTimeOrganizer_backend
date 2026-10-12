@@ -1052,10 +1052,6 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("google_o_auth_user_id");
 
-                    b.Property<bool>("HasExtensionAccess")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_extension_access");
-
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

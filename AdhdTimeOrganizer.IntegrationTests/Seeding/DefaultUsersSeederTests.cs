@@ -23,11 +23,11 @@ namespace AdhdTimeOrganizer.IntegrationTests.Seeding;
 /// share its env-var dependency.
 /// <para>
 /// <b>Deviation from review/portal/testingPrompts/DefaultUsersSeeder.md:</b> that prompt's CQ-1
-/// ("failed CreateAsync doesn't return"), CQ-30 ("override path discards IdentityResult.Succeeded")
-/// and CQ-31 ("HasExtensionAccess not refreshed on override") do not reproduce against the current
-/// file — it already has the early <c>return;</c> after a failed <c>CreateAsync</c>, both
-/// <c>UpdateAsync</c>/<c>ResetPasswordAsync</c> results are checked and logged, and
-/// <c>HasExtensionAccess</c> is copied on override. It also references <c>UserRoleEnum</c>, which this
+/// ("failed CreateAsync doesn't return") and CQ-30 ("override path discards IdentityResult.Succeeded") do
+/// not reproduce against the current file — it already has the early <c>return;</c> after a failed
+/// <c>CreateAsync</c>, and both <c>UpdateAsync</c>/<c>ResetPasswordAsync</c> results are checked and logged.
+/// CQ-31 ("HasExtensionAccess not refreshed on override") is moot: the column was dropped (FO7), since every
+/// account may sign a tracker in. The prompt also references <c>UserRoleEnum</c>, which this
 /// solution no longer has — role names live on <see cref="PortalRoleCatalog"/> now (see that class's
 /// own comment on why). Below, those scenarios are written as regression guards for the fixed
 /// behaviour rather than as expected-failing <c>KnownGap</c> tests.
@@ -93,7 +93,6 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         await using var db = (AppDbContext)Fixture.CreateDbContext();
         var admin = await db.Users.SingleAsync(u => u.UserName == email, TestContext.Current.CancellationToken);
         admin.Locale = AvailableLocales.En;
-        admin.HasExtensionAccess = false;
         await db.SaveChangesAsync(CancellationToken);
         var adminId = admin.Id;
 
@@ -110,7 +109,6 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         await using var afterDb = (AppDbContext)Fixture.CreateDbContext();
         var reloaded = await afterDb.Users.SingleAsync(u => u.Id == adminId, TestContext.Current.CancellationToken);
         reloaded.Locale.Should().Be(AvailableLocales.Sk, "UpdateAsync ran and succeeded independently of the failed password reset");
-        reloaded.HasExtensionAccess.Should().BeTrue();
 
         var rootRoleId = await afterDb.Roles.Where(r => r.Name == PortalRoleCatalog.Root).Select(r => r.Id).SingleAsync( TestContext.Current.CancellationToken);
         (await afterDb.UserRoles.AnyAsync(ur => ur.UserId == adminId && ur.RoleId == rootRoleId, TestContext.Current.CancellationToken)).Should().BeTrue(
@@ -164,7 +162,6 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         var admin = await db.Users.SingleAsync(u => u.UserName == email, TestContext.Current.CancellationToken);
         var adminId = admin.Id;
         admin.Locale = AvailableLocales.En;
-        admin.HasExtensionAccess = false;
         await db.SaveChangesAsync(CancellationToken);
 
         Environment.SetEnvironmentVariable("ROOT_ADMIN_PASSWORD", ValidPassword2);
@@ -178,7 +175,6 @@ public class DefaultUsersSeederTests(AppDbContextFixture fixture) : PostgresTest
         var reloaded = await afterDb.Users.SingleAsync(u => u.UserName == email, TestContext.Current.CancellationToken);
         reloaded.Id.Should().Be(adminId, "override must update in place, never delete-and-reinsert");
         reloaded.Locale.Should().Be(AvailableLocales.Sk);
-        reloaded.HasExtensionAccess.Should().BeTrue();
 
         var rootRoleId = await afterDb.Roles.Where(r => r.Name == PortalRoleCatalog.Root).Select(r => r.Id).SingleAsync( TestContext.Current.CancellationToken);
         (await afterDb.UserRoles.AnyAsync(ur => ur.UserId == adminId && ur.RoleId == rootRoleId, TestContext.Current.CancellationToken)).Should().BeTrue(

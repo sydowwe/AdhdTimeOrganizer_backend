@@ -37,7 +37,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task ExtensionLogin_WithExtensionAccess_ReturnsTokens()
     {
         var email = "extension-user@test.com";
-        await CreateUserWithExtensionAccess(email, true);
+        await CreateTrackerUserAsync(email);
 
         var response = await ExtensionLoginAsync(email);
 
@@ -50,15 +50,15 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     }
 
     /// <summary>
-    /// Every account may sign a tracker in (FO7, 2026-10-06): the host no longer overrides the framework's
-    /// <c>HasExtensionAccess</c>, so the column is not read. It used to be, and only seeders ever set it, so
-    /// every tracker worked for the root admin alone.
+    /// Every account may sign a tracker in (FO7, 2026-10-06): the host does not override the framework's
+    /// <c>HasExtensionAccess</c> hook. It used to gate on a <c>User.HasExtensionAccess</c> column that only
+    /// seeders ever set, so every tracker worked for the root admin alone; the column has since been dropped.
     /// </summary>
     [Fact]
-    public async Task ExtensionLogin_WithoutTheExtensionAccessFlag_StillReturnsTokens()
+    public async Task ExtensionLogin_AnyAccount_ReturnsTokens()
     {
         var email = "no-extension-user@test.com";
-        await CreateUserWithExtensionAccess(email, false);
+        await CreateTrackerUserAsync(email);
 
         var response = await ExtensionLoginAsync(email);
 
@@ -71,7 +71,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task Heartbeat_WithExtensionToken_ReturnsOk()
     {
         var email = "heartbeat-user@test.com";
-        await CreateUserWithExtensionAccess(email, true);
+        await CreateTrackerUserAsync(email);
 
         var loginResult = await ExtensionLoginSuccessAsync(email);
 
@@ -108,7 +108,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task AndroidSync_WithExtensionToken_ReturnsOk()
     {
         var email = "android-user@test.com";
-        await CreateUserWithExtensionAccess(email, true);
+        await CreateTrackerUserAsync(email);
 
         var loginResult = await ExtensionLoginSuccessAsync(email);
 
@@ -131,7 +131,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task Heartbeat_WithExtensionToken_ButNoActivityTrackingRole_Returns403()
     {
         var email = "no-role-user@test.com";
-        await CreateUserWithExtensionAccess(email, true, false);
+        await CreateTrackerUserAsync(email, hasRole: false);
 
         var loginResult = await ExtensionLoginSuccessAsync(email);
 
@@ -179,7 +179,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task WebExtensionHeartbeat_WithExtensionToken_ReturnsOk()
     {
         var email = "web-heartbeat-user@test.com";
-        await CreateUserWithExtensionAccess(email, true);
+        await CreateTrackerUserAsync(email);
 
         var loginResult = await ExtensionLoginSuccessAsync(email);
 
@@ -196,7 +196,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task WebExtensionHeartbeat_WithExtensionToken_ButNoActivityTrackingRole_Returns403()
     {
         var email = "web-heartbeat-no-role-user@test.com";
-        await CreateUserWithExtensionAccess(email, true, false);
+        await CreateTrackerUserAsync(email, hasRole: false);
 
         var loginResult = await ExtensionLoginSuccessAsync(email);
 
@@ -251,7 +251,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task ExtensionJwt_CannotAccess_WebOnlyEndpoint_Returns403()
     {
         var email = "extension-webonly-test@test.com";
-        await CreateUserWithExtensionAccess(email, true);
+        await CreateTrackerUserAsync(email);
 
         var loginResult = await ExtensionLoginSuccessAsync(email);
 
@@ -275,7 +275,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task ExtensionJwt_CannotOpen_TheNotificationHub()
     {
         var email = "extension-hub@test.com";
-        await CreateUserWithExtensionAccess(email, true);
+        await CreateTrackerUserAsync(email);
         var loginResult = await ExtensionLoginSuccessAsync(email);
 
         var server = ((WebApplicationFactory<Program>)Fixture.UnauthenticatedFactory).Server;
@@ -327,7 +327,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task Heartbeat_MappedEntry_AttributesTimeAndCompletesPlannerTask()
     {
         var email = "heartbeat-automation@test.com";
-        await CreateUserWithExtensionAccess(email, true);
+        await CreateTrackerUserAsync(email);
 
         long userId;
         long activityId;
@@ -450,7 +450,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     public async Task Heartbeat_AfterTheUsersMidnight_DrivesTheUsersTodayNotUtcs()
     {
         var email = "heartbeat-user-day@test.com";
-        await CreateUserWithExtensionAccess(email, true);
+        await CreateTrackerUserAsync(email);
 
         var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
         var firstWindowStart = utcToday.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddMinutes(-10);
@@ -548,7 +548,7 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
         return await client.SendAsync(request);
     }
 
-    private async Task CreateUserWithExtensionAccess(string email, bool hasExtensionAccess, bool hasRole = true)
+    private async Task CreateTrackerUserAsync(string email, bool hasRole = true)
     {
         using var scope = Fixture.UnauthenticatedFactory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
@@ -563,7 +563,6 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
             Email = email,
             UserName = email,
             EmailConfirmed = true,
-            HasExtensionAccess = hasExtensionAccess,
             Locale = AvailableLocales.En,
             Timezone = TimeZoneInfo.Utc
         };

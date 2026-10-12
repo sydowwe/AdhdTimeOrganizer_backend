@@ -1336,7 +1336,6 @@ public class ActivityExtensionClientDenialTests(AppDbContextFixture fixture) : A
             Email = email,
             UserName = email,
             EmailConfirmed = true,
-            HasExtensionAccess = true,
             Locale = AvailableLocales.En,
             Timezone = TimeZoneInfo.Utc
         };

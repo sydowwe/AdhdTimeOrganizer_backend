@@ -399,7 +399,6 @@ public class E2eFixtureSeeder(
             ConcurrencyStamp = $"e2e-concurrency-stamp-{id}",
             Locale = AvailableLocales.En,
             Timezone = TimeZoneInfo.Utc,
-            HasExtensionAccess = true,
             FirstDayOfWeek = 1
         };
         user.PasswordHash = passwordHasher.HashPassword(user, password);

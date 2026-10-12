@@ -172,7 +172,6 @@ public class CoreEndpointAuthMatrixTests(AppDbContextFixture fixture) : AuthTest
             Email = email,
             UserName = email,
             EmailConfirmed = true,
-            HasExtensionAccess = true,
             Locale = AvailableLocales.En,
             Timezone = TimeZoneInfo.Utc
         };

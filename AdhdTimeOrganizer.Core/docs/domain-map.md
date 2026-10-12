@@ -27,7 +27,7 @@ them, in **every** slice — the one exception in the solution is
 
 | Type | Path | Notes |
 |---|---|---|
-| `User` | `user/User.cs` | `BaseUser` + `IBaseTableEntity`. Google OAuth id + calendar refresh token (encrypted), `HasExtensionAccess`, `FirstDayOfWeek`, `WeatherLocation` (free text, nullable — the leisure weather signal's only input; personal data, never log it). Setting `Email` also sets `UserName`. |
+| `User` | `user/User.cs` | `BaseUser` + `IBaseTableEntity`. Google OAuth id + calendar refresh token (encrypted), `FirstDayOfWeek`, `WeatherLocation` (free text, nullable — the leisure weather signal's only input; personal data, never log it). Setting `Email` also sets `UserName`. |
 | `BaseEntityWithUser` | `user/BaseEntityWithUser.cs` | The portal's closing type over `BaseEntityWithUser<User>`. C# can't infer `TUser` from a constraint, so every user-scoped entity names this shim. |
 | `BaseLookupWithUser` | `base/BaseLookupWithUser.cs` | Same idea for `BaseLookupWithUser<User>`. |
 | `BaseEntityWithIsDone` | `base/BaseEntityWithIsDone.cs` | `BaseEntityWithActivity` + `IsDone`. Base for the done markers the slices build on. |

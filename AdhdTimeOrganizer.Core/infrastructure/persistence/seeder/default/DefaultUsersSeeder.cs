@@ -51,8 +51,7 @@ public class DefaultUsersSeeder(UserManager<User> userManager, DbContext dbConte
 
             EmailConfirmed = true,
             Locale = AvailableLocales.Sk,
-            Timezone = RootAdminTimezone(),
-            HasExtensionAccess = true
+            Timezone = RootAdminTimezone()
         };
 
         var existingAdmin = await dbContext.Set<User>()
@@ -67,7 +66,6 @@ public class DefaultUsersSeeder(UserManager<User> userManager, DbContext dbConte
                     existingAdmin.Locale = adminUser.Locale;
                     existingAdmin.Timezone = adminUser.Timezone;
                     existingAdmin.EmailConfirmed = true;
-                    existingAdmin.HasExtensionAccess = adminUser.HasExtensionAccess;
 
                     var updateResult = await userManager.UpdateAsync(existingAdmin);
                     if (!updateResult.Succeeded)

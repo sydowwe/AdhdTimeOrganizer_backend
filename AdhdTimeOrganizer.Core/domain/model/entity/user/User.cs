@@ -14,7 +14,6 @@ public sealed class User : BaseUser, IBaseTableEntity
 
     [AuditIgnore]
     public string? GoogleCalendarRefreshToken { get; set; }
-    public bool HasExtensionAccess { get; set; } = false;
     public int FirstDayOfWeek { get; set; } = 1;
 
     /// <summary>
