@@ -57,14 +57,6 @@ file static class Seed
         return user.Id;
     }
 
-    public static async Task<long> TimerPresetAsync(DbContext db, long userId, int duration = 25)
-    {
-        var preset = new TimerPreset { UserId = userId, Duration = duration };
-        db.Set<TimerPreset>().Add(preset);
-        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-        return preset.Id;
-    }
-
     public static async Task<long> TodoListAsync(DbContext db, long userId, string name)
     {
         var list = new TodoList { UserId = userId, Name = name };
@@ -72,104 +64,7 @@ file static class Seed
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return list.Id;
     }
-
-    /// <summary>
-    /// One row in every table the export claims to walk, plus the three the erasure has to reach without a
-    /// cascade helping it. Shared by the export-completeness test and the deletion-cascade test so the two
-    /// can never disagree about what "all of a user's data" means.
-    /// </summary>
-    public static async Task<SeededSliceData> EverySliceAsync(DbContext db, long userId, CancellationToken ct)
-    {
-        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, $"Slice Activity {Guid.NewGuid():N}", userId, ct);
-        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, DateOnly.FromDateTime(DateTime.UtcNow), userId, ct);
-        var plannerTaskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
-            db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), userId, ct: ct);
-        var templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, userId, ct: ct);
-
-        var todoListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, userId, $"Slice List {Guid.NewGuid():N}", ct: ct);
-        var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 1, userId, ct: ct);
-        var todoListItemId = await TodoListTestSeedHelper.SeedTodoListItemAsync(
-            db, activityId, priorityId, todoListId, userId, ct: ct);
-
-        var timePeriodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, userId, ct: ct);
-        var routineTodoListId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, timePeriodId, userId, ct: ct);
-
-        // Inside a timer session, so the session table is exported and erased along with its row.
-        var historySession = new ActivityHistorySession
-        {
-            UserId = userId,
-            Kind = TimerSessionKind.Timer,
-            Outcome = TimerSessionOutcome.Completed
-        };
-        var history = new ActivityHistory
-        {
-            UserId = userId,
-            ActivityId = activityId,
-            StartTimestamp = DateTime.UtcNow.AddHours(-1),
-            EndTimestamp = DateTime.UtcNow.AddMinutes(-30),
-            Length = new IntTime(0, 30),
-            Session = historySession
-        };
-        db.Set<ActivityHistory>().Add(history);
-
-        // RecordDate is derived from WindowStart; "now" keeps both entries inside
-        // AppDbContext.CurrentPartitionDate, which the web-extension query filter enforces on reads.
-        var windowStart = DateTime.UtcNow;
-        var webEntry = new WebExtensionActivityEntry
-        {
-            UserId = userId,
-            WindowStart = windowStart,
-            Domain = "slice.example",
-            Url = null,
-            ActiveSeconds = 60,
-            BackgroundSeconds = 0,
-            IsFinal = true
-        };
-        db.Set<WebExtensionActivityEntry>().Add(webEntry);
-
-        var desktopEntry = new DesktopActivityEntry
-        {
-            UserId = userId,
-            WindowStart = windowStart,
-            ProcessName = "slice.exe",
-            ProductName = "Slice",
-            WindowTitle = "t",
-            ExecutablePath = "/usr/bin/slice",
-            IsFullscreen = false,
-            ActiveSeconds = 60,
-            BackgroundSeconds = 0,
-            IsPlayingSound = false,
-            ActiveMonitor = 0
-        };
-        db.Set<DesktopActivityEntry>().Add(desktopEntry);
-
-        // Quiet hours carries no FK to the user table on purpose (see NotificationQuietHours' XML doc), so
-        // only NotificationSubjectDataEraser can ever remove it.
-        var quietHours = new NotificationQuietHours { UserId = userId, StartMinute = 22 * 60, EndMinute = 6 * 60 };
-        db.Set<NotificationQuietHours>().Add(quietHours);
-
-        await db.SaveChangesAsync(ct);
-
-        var timerPresetId = await TimerPresetAsync(db, userId);
-
-        return new SeededSliceData(
-            activityId, calendarId, plannerTaskId, templateId, todoListId, todoListItemId,
-            routineTodoListId, history.Id, historySession.Id, timerPresetId, quietHours.Id);
-    }
 }
-
-file sealed record SeededSliceData(
-    long ActivityId,
-    long CalendarId,
-    long PlannerTaskId,
-    long TemplateId,
-    long TodoListId,
-    long TodoListItemId,
-    long RoutineTodoListId,
-    long ActivityHistoryId,
-    long ActivityHistorySessionId,
-    long TimerPresetId,
-    long QuietHoursId);
 
 // =========================================================================================================
 // GetUserDataExportEndpoint ("user/data-export")
@@ -225,7 +120,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         var callerId = await Seed.SecondUserAsync(Fixture, $"export-full-{Guid.NewGuid():N}@test.com");
 
         await using var db = CreateDbContext();
-        var seeded = await Seed.EverySliceAsync(db, callerId, CancellationToken);
+        var seeded = await UserDataInventory.SeedEverySliceAsync(db, callerId, CancellationToken);
 
         await using var factory = CreateFactory(TestRoles.AdminAndUser, callerId);
         var response = await factory.CreateClient().GetAsync("api/user/data-export", CancellationToken);
@@ -620,7 +515,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            await Seed.EverySliceAsync(db, userId, CancellationToken);
+            await UserDataInventory.SeedEverySliceAsync(db, userId, CancellationToken);
         }
 
         using var cookieClient = CreateCookieClient();
@@ -631,31 +526,9 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            await AssertNoRowsLeftAsync<Activity>(db, userId);
-            await AssertNoRowsLeftAsync<ActivityRole>(db, userId);
-            await AssertNoRowsLeftAsync<Calendar>(db, userId);
-            await AssertNoRowsLeftAsync<PlannerTask>(db, userId);
-            await AssertNoRowsLeftAsync<TaskPlannerDayTemplate>(db, userId);
-            await AssertNoRowsLeftAsync<TodoList>(db, userId);
-            await AssertNoRowsLeftAsync<TodoListItem>(db, userId);
-            await AssertNoRowsLeftAsync<TaskPriority>(db, userId);
-            await AssertNoRowsLeftAsync<RoutineTodoList>(db, userId);
-            await AssertNoRowsLeftAsync<RoutineTimePeriod>(db, userId);
-            await AssertNoRowsLeftAsync<ActivityHistory>(db, userId);
-            await AssertNoRowsLeftAsync<ActivityHistorySession>(db, userId);
-            await AssertNoRowsLeftAsync<WebExtensionActivityEntry>(db, userId);
-            await AssertNoRowsLeftAsync<DesktopActivityEntry>(db, userId);
-            await AssertNoRowsLeftAsync<TimerPreset>(db, userId);
-
-            (await db.Set<NotificationQuietHours>().AnyAsync(q => q.UserId == userId, CancellationToken))
-                .Should().BeFalse("quiet hours has no FK to the user -- only the NotificationSubjectDataEraser fan-out removes it");
+            await UserDataInventory.AssertErasedAsync(db, userId, CancellationToken);
         }
     }
-
-    private static async Task AssertNoRowsLeftAsync<TEntity>(DbContext db, long userId)
-        where TEntity : class, IEntityWithUser =>
-        (await db.Set<TEntity>().IgnoreQueryFilters().AnyAsync(e => e.UserId == userId, CancellationToken))
-            .Should().BeFalse($"{typeof(TEntity).Name} rows for a deleted account must not survive the erasure");
 
     /// <summary>
     /// Reminders keeps its recipient-side rows FK-free from the host on purpose (module boundary), so

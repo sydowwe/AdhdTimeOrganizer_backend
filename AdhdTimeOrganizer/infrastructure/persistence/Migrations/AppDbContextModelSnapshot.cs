@@ -1010,6 +1010,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("concurrency_stamp");
 
+                    b.Property<DateTime?>("ConfirmationReminderSentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmation_reminder_sent_at");
+
                     b.Property<DateTime>("CreatedTimestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")

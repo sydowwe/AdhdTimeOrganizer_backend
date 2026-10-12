@@ -54,12 +54,27 @@ public sealed class PortalScheduledJobsRegistrar(
         Description = "Sends each user their morning briefing — today's plan, carry-overs, due and overdue to-dos, routines — once their own wake-up has come."
     };
 
+    /// <summary>
+    /// Unconfirmed sign-ups: one confirmation reminder a day after sign-up, deletion after two weeks. Hourly, at minute 7
+    /// to stay off the quarter-hour sweeps; the windows are a day and two weeks, so the cadence only bounds how late in
+    /// its hour each step lands.
+    /// </summary>
+    public static RecurringJobRegistration UnconfirmedAccountsRegistration { get; } = new()
+    {
+        JobKey = UnconfirmedAccountJobHandler.HandlerKey,
+        HandlerKey = UnconfirmedAccountJobHandler.HandlerKey,
+        OwnerModule = "Portal",
+        Schedule = ScheduleSpec.FromCron("0 7 * * * ?"),
+        DisallowConcurrent = true,
+        Description = "Resends the confirmation link once to a sign-up still unconfirmed after a day, and deletes it after two weeks."
+    };
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = services.CreateAsyncScope();
         var scheduler = scope.ServiceProvider.GetRequiredService<IScheduler>();
 
-        foreach (var registration in new[] { SuggestionPatternRefreshRegistration, MorningBriefingRegistration })
+        foreach (var registration in new[] { SuggestionPatternRefreshRegistration, MorningBriefingRegistration, UnconfirmedAccountsRegistration })
         {
             try
             {

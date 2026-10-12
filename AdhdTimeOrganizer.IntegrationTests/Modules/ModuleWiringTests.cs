@@ -193,6 +193,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(PlannerSlipNudgeJobHandler.HandlerKey, keys);
         Assert.Contains(SuggestionPatternRefreshJobHandler.HandlerKey, keys);
         Assert.Contains(MorningBriefingJobHandler.HandlerKey, keys);
+        Assert.Contains(UnconfirmedAccountJobHandler.HandlerKey, keys);
     }
 
     /// <summary>
@@ -401,6 +402,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(PlanningScheduledJobsRegistrar.SlipNudgeRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.SuggestionPatternRefreshRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.MorningBriefingRegistration.JobKey, jobKeys);
+        Assert.Contains(PortalScheduledJobsRegistrar.UnconfirmedAccountsRegistration.JobKey, jobKeys);
     }
 
     // ---- GDPR erasure fan-out --------------------------------------------------------------------

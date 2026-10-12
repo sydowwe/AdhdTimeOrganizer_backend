@@ -35,6 +35,15 @@ right one.
   briefing on an empty morning, an away day, or while the welcome-back card is open; held while away; email
   off by default. `User.MorningBriefingEnabled` (Core, default on) is what makes Routines' own suggested-today
   digest step aside. Pinned by `MorningBriefingJobTests`.
+- **Sign-ups that never confirmed (P2-05)** — `RequireConfirmedEmail` means such an account can never sign
+  in, so it is reminded once and then deleted. `infrastructure/jobs/UnconfirmedAccountJobHandler.cs` (hourly,
+  `PortalScheduledJobsRegistrar`) resends the confirmation link a day after `CreatedTimestamp`, marking
+  `User.ConfirmationReminderSentAt`, and deletes the account after 14 days. Confirmed accounts, Google sign-ins
+  and the seeded root admin are never touched. **Deletion has one path:**
+  `application/service/user/UserAccountDeletionService.cs` runs the `ISubjectDataEraser` fan-out and
+  `UserManager.DeleteAsync` for both this purge and `DeleteUserAccountEndpoint` (which uses only its staging half,
+  because the framework base owns the delete). Pinned by `UnconfirmedAccountJobTests`, which checks every
+  user-scoped table in the model through `UserDataInventory`.
 - **The Google integrations** — Sign-In and Calendar sync (`infrastructure/extService/`), deliberately
   portal-only.
 - **The composition root** — `AppDbContext` (framework + every slice's configurations, the global

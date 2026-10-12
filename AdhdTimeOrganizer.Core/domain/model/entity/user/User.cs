@@ -105,6 +105,15 @@ public sealed class User : BaseUser, IBaseTableEntity
     [AuditIgnore]
     public DateOnly? MorningBriefingHandledFor { get; set; }
 
+    /// <summary>
+    /// When the one reminder to confirm the address went out (P2-05) — the host's <c>UnconfirmedAccountJobHandler</c>
+    /// resends the confirmation link a day after sign-up, once, and this is what makes it once. Null for every account
+    /// that confirmed in time, which is nearly all of them; meaningless once <c>EmailConfirmed</c> is set. Written with
+    /// <c>ExecuteUpdateAsync</c> only, like <see cref="LastActiveAt"/>.
+    /// </summary>
+    [AuditIgnore]
+    public DateTime? ConfirmationReminderSentAt { get; set; }
+
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
 
     // Navigation properties.

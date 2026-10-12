@@ -61,6 +61,10 @@ worth copying the shape of:
   category, so a subquery aimed at the neighbouring table lands on the wrong number instead of
   coincidentally the right one, and pins that the web-extension count deliberately reads past the
   partition-window query filter.
+- `UserDataInventory.AssertErasedAsync` — what "the account is gone" means, shared by the self-deletion
+  test and the unconfirmed-account purge (`UnconfirmedAccountJobTests`). One seeded row per slice plus a
+  sweep of **every** `IEntityWithUser` in the model with filters lifted, so a new user-scoped entity, or a
+  per-user default the registration seeders start creating, is covered without anyone editing the list.
 - `ActivityMergeTests.Merge_RepointsEveryReferencingSlice` — one merge, one referencing row per slice,
   asserted on the surviving rows in six projects rather than on the endpoint's `repointedCount`. The
   `IActivityReferenceSource` seam resolves by string key, so a slice dropped from `ModuleAssemblies`

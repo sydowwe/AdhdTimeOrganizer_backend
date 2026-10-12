@@ -270,7 +270,7 @@ something the base classes do not.
 | MoveTodoListItemEndpoint / ChangePriorityTodoListItemEndpoint | Endpoints | Move an item between lists; change its priority rank | `application/endpoint/todoList/todoListItem/command/` |
 | CloneActivityEndpoint / QuickEditActivityEndpoint | Endpoints | Shallow-clone an activity; inline edit from the planner | `application/endpoint/activity/activity/command/` |
 | GetUserDataExportEndpoint | Endpoint | GDPR-style JSON export, 1/min throttle via `IDistributedCache` | `application/endpoint/user/read/GetUserDataExportEndpoint.cs` |
-| DeleteUserAccountEndpoint | Endpoint | Account deletion + `ISubjectDataEraser` fan-out in the same transaction | `application/endpoint/user/command/settings/DeleteUserAccountEndpoint.cs` |
+| DeleteUserAccountEndpoint | Endpoint | Account deletion + `ISubjectDataEraser` fan-out in the same transaction (via `UserAccountDeletionService`) | `application/endpoint/user/command/settings/DeleteUserAccountEndpoint.cs` |
 | GetAccountDeletionSummaryEndpoint | Endpoint | Cold-path per-category counts of what deleting the account destroys, for the SPA's warning card | `application/endpoint/user/read/GetAccountDeletionSummaryEndpoint.cs` |
 | GoogleSignInEndpoint | Endpoint | Federated sign-up/sign-in through `UserRegistrationFlow` | `application/endpoint/user/command/auth/GoogleSignInEndpoint.cs` |
 | Google Calendar endpoints | Endpoints | Auth URL, connect, disconnect, status | `application/endpoint/user/command/googleCalendar/` |
@@ -291,6 +291,8 @@ something the base classes do not.
 | AppDbContext | DbContext | Portal + module DbSets, identity mapping, the `WebExtensionActivityEntry` combined filter | `infrastructure/persistence/AppDbContext.cs` |
 | SuggestionPatternRefreshInterceptor | Interceptor | Marks the matching pattern view dirty after saves touching planner/history/calendar (does not refresh itself) | `infrastructure/persistence/interceptors/SuggestionPatternRefreshInterceptor.cs` |
 | SuggestionPatternRefreshJobHandler | Scheduled job handler | Drains the dirty-view queue every 10s and REFRESHes the pattern views off the request thread; scheduled by `PortalScheduledJobsRegistrar` | `infrastructure/jobs/SuggestionPatternRefreshJobHandler.cs` |
+| UserAccountDeletionService | Service | The one account-deletion path: `ISubjectDataEraser` fan-out + `UserManager.DeleteAsync`, for self-deletion and the unconfirmed purge | `application/service/user/UserAccountDeletionService.cs` |
+| UnconfirmedAccountJobHandler | Scheduled job handler | Hourly: resends the confirmation link once a day after sign-up, deletes the account after 14 days unconfirmed (P2-05) | `infrastructure/jobs/UnconfirmedAccountJobHandler.cs` |
 | PortalScheduledJobsRegistrar | Hosted service | Pushes the portal's own recurring-job registrations to the Scheduler on every boot | `infrastructure/scheduling/PortalScheduledJobsRegistrar.cs` |
 | SuggestionPatternViewInstaller | Installer | Creates missing pattern views at boot from embedded SQL, and re-creates any whose script hash (kept in the view's `COMMENT`) changed | `infrastructure/persistence/SuggestionPatternViewInstaller.cs` |
 | SeedUserIdProvider | Service | `ISeedUserProvider` — how Framework seeders find users | `infrastructure/persistence/seeder/SeedUserIdProvider.cs` |

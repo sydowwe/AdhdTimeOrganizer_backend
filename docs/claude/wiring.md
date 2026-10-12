@@ -74,11 +74,13 @@ touching anything below, because **none of these break the build**.
   `PlannerTaskNotificationActionHandler` (Planning), `TodoItemDueNotificationActionHandler` (TodoLists). A handler
   only resolves if its slice is in `ModuleAssemblies`, and a button without one silently just opens the app:
   `NotificationCatalogTests` pins exactly one handler per declared button and keeps the table's second copy.
-- **Account deletion fans out over `ISubjectDataEraser`** (`DeleteUserAccountEndpoint.BeforeDeleteAsync`).
-  The host FKs cascade only `notification` / `notification_preference` / `push_subscription`; every
-  other user-keyed module table is deliberately FK-free and would outlive the account. Erasers mutate
-  the ambient `DbContext` and never commit — `UserManager.DeleteAsync`'s own `SaveChanges` (same scoped
-  context) is the transaction.
+- **Account deletion fans out over `ISubjectDataEraser`** (`UserAccountDeletionService`, used by
+  `DeleteUserAccountEndpoint.BeforeDeleteAsync` and by the unconfirmed-account purge — delete an account any
+  other way and the module rows outlive it). The host FKs cascade only `notification` /
+  `notification_preference` / `push_subscription`; every other user-keyed module table is deliberately
+  FK-free and would outlive the account. Erasers mutate the ambient `DbContext` and never commit —
+  `UserManager.DeleteAsync`'s own `SaveChanges` (same scoped context) is the transaction, which is also why
+  a caller deleting several accounts gives each its own scope.
 - **Config precedence is env-over-JSON.** `Program.cs` re-adds `appsettings.json` after `CreateBuilder`
   to fix the base path, which put JSON *after* the environment provider; `AddEnvironmentVariables()` is
   re-added last to restore the standard order. Module secrets use `Section__Key`
