@@ -44,7 +44,9 @@ plus parent commit **ec4d0183** (the producer and host wiring).
    which is the right answer for almost everything here.
 6. Host catalog: `AdhdTimeOrganizer/config/dependencyInjection/ModuleServiceExtensions.cs` →
    `AddNotificationCatalog` — add to `SupportedTypes`, decide `HeldWhileAwayTypes` and `PushOffByDefault` (P2-02:
-   a bell-only kind goes in the latter — push off until the user ticks it); **and** the deliberate second
+   a bell-only kind goes in the latter — push off until the user ticks it), and whether it gets push action
+   buttons in `Actions` (P2-03: at most two; every one but Dismiss needs an `INotificationActionHandler` in the
+   owning slice; Snooze shows only on a push the Reminders scan raised); **and** the deliberate second
    copy in `AdhdTimeOrganizer.IntegrationTests/Endpoints/NotificationCatalogTests.cs`. Forget it and the kind
    dispatches but has no settings row (unmutable).
 7. Frontend (`AntiProcrastinationApp-frontend`): `src/app/notifications/notificationTypeMeta.ts` (icon, deep link).

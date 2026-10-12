@@ -45,7 +45,7 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(DbContext dbCont
 
         foreach (var entity in itemsToToggle)
         {
-            IsDoneLogic(entity, request.ForceValue);
+            entity.ApplyIsDoneToggle(request.ForceValue);
             AfterItemToggled(entity, now);
         }
 
@@ -93,72 +93,4 @@ public abstract class BaseToggleIsDoneTodoListEndpoint<TEntity>(DbContext dbCont
     protected virtual Task AfterSave(CancellationToken ct) => Task.CompletedTask;
 
     protected abstract Task PublishEvent(TEntity entity, CancellationToken ct);
-
-    protected void IsDoneLogic(TEntity entity, bool? forceValue = null)
-    {
-        if (entity.TotalCount.HasValue)
-        {
-            if (forceValue == false)
-            {
-                if (entity.IsDone)
-                {
-                    entity.DoneCount = entity.TotalCount - 1;
-                    entity.IsDone = false;
-                }
-                else if (entity.DoneCount > 0)
-                {
-                    entity.DoneCount--;
-                }
-
-                ResetSteps(entity);
-            }
-            else if (forceValue == true)
-            {
-                entity.DoneCount = (entity.DoneCount ?? 0) + 1;
-                if (entity.DoneCount >= entity.TotalCount)
-                {
-                    entity.DoneCount = entity.TotalCount;
-                    entity.IsDone = true;
-                }
-
-                ResetSteps(entity);
-            }
-            else
-            {
-                if (entity.IsDone)
-                {
-                    entity.DoneCount = 0;
-                    entity.IsDone = false;
-                    ResetSteps(entity);
-                }
-                else
-                {
-                    entity.DoneCount = (entity.DoneCount ?? 0) + 1;
-                    // >=, not ==, and clamped — matching the forced arm above and ApplyStepToggle. An item
-                    // whose DoneCount has overshot its TotalCount would otherwise never tick to done; it
-                    // would just keep incrementing, one increment further out of range on every tap.
-                    if (entity.DoneCount >= entity.TotalCount)
-                    {
-                        entity.DoneCount = entity.TotalCount;
-                        entity.IsDone = true;
-                    }
-
-                    ResetSteps(entity);
-                }
-            }
-        }
-        else
-        {
-            entity.IsDone = forceValue ?? !entity.IsDone;
-            if (entity.Steps.Count != 0)
-                foreach (var step in entity.Steps)
-                    step.IsDone = entity.IsDone;
-        }
-    }
-
-    private static void ResetSteps(TEntity entity)
-    {
-        foreach (var step in entity.Steps)
-            step.IsDone = entity.IsDone;
-    }
 }

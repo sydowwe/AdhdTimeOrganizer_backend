@@ -171,6 +171,10 @@ project's bases.
   whose cascade lives in Core and cannot call this slice. Recipients are explicit, not a resolver,
   on purpose: the module hides resolver-backed reminders from `my-upcoming`, snooze and dismiss.
   Pinned by `TodoListItemDueReminderTests` (one test per path, plus the guard at scan level).
+  Its push has **Done · Snooze 1 h** buttons (P2-03): Done is `TodoItemDueNotificationActionHandler`,
+  one tick through `BaseTodoListItem.ApplyIsDoneToggle` (the toggle endpoints' own rule, moved onto the
+  entity) followed by the sync and the done-changed event — never an un-tick, so a retry is harmless;
+  Snooze is the Reminders module's.
 
 ## Extension playbook
 

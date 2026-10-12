@@ -10,11 +10,12 @@ namespace AdhdTimeOrganizer.TodoLists.infrastructure.persistence.interceptor;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This lives in an interceptor rather than at the call sites because there are four of them —
-/// <c>BaseToggleIsDoneTodoListEndpoint.IsDoneLogic</c>, <c>BaseToggleStepIsDoneEndpoint.ApplyStepToggle</c>,
+/// This lives in an interceptor rather than at the call sites because there are five of them —
+/// <c>BaseToggleIsDoneTodoListEndpoint</c> and the to-do push's Done button (both through
+/// <c>BaseTodoListItem.ApplyIsDoneToggle</c>), <c>BaseToggleStepIsDoneEndpoint.ApplyStepToggle</c>,
 /// <c>UpdateTodoListItemEndpoint.AfterMapping</c> and the host's <c>ActivityTimeRecordedEventHandler</c>
-/// — the last two via <c>BaseTodoListItem.SetDone</c>, the shared helper, which is not itself a fifth
-/// site — and a fifth is one feature away. A site that forgot to
+/// — the last two via <c>BaseTodoListItem.SetDone</c>, the shared helper, which is not itself a sixth
+/// site — and a sixth is one feature away. A site that forgot to
 /// stamp would break nothing loudly: the save succeeds, the item shows as done, and it merely never
 /// appears in a daily recap. Keying off the ChangeTracker instead means no writer can miss it and
 /// none of them has to know the rule exists.

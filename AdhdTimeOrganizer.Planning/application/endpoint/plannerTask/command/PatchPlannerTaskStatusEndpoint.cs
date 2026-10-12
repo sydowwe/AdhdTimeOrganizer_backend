@@ -1,9 +1,6 @@
-using AdhdTimeOrganizer.Core.application.@event;
-using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.application.dto;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
-using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -17,8 +14,7 @@ namespace AdhdTimeOrganizer.Planning.application.endpoint.activityPlanning.plann
 
 public class PatchPlannerTaskStatusEndpoint(
     DbContext dbContext,
-    IReminderRegistrationService reminders,
-    IUserTimeZoneResolver timeZones) : Endpoint<PatchPlannerTaskStatusRequest>
+    IPlannerTaskStatusEffects statusEffects) : Endpoint<PatchPlannerTaskStatusRequest>
 {
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
@@ -78,19 +74,8 @@ public class PatchPlannerTaskStatusEndpoint(
             // status patch.
             await dbContext.SaveChangesAsync(ct);
 
-            // Finishing or calling off a task retires the reminder attached to it: a nudge about something
-            // already dealt with is pure noise, and acting on the task is the user cancelling it implicitly.
-            // Moving back to NotStarted/InProgress re-registers it — the same call covers both directions,
-            // because the decision lives in the registration service, not here.
-            await reminders.SyncForPlannerTasksAsync([entity.Id], ct);
-
-            // The user's today, not the server's — see TaskPlannerHelper.TodayIn. This decides whether the
-            // event is published at all, so a UTC boundary would silently drop the fan-out for a task the
-            // user completed after their own midnight.
-            var today = TaskPlannerHelper.TodayIn(await timeZones.GetAsync(entity.UserId, ct));
-            if (entity.Calendar.Date == today)
-                await new PlannerTaskIsDoneChangedEvent(entity.ActivityId, entity.UserId, entity.IsDone, entity.TodolistItemId)
-                    .PublishAsync(Mode.WaitForAll, ct);
+            // The reminder sync and the done-changed fan-out — shared with the push action buttons.
+            await statusEffects.AfterStatusSavedAsync(entity, ct);
 
             await Send.NoContentAsync(ct);
         }

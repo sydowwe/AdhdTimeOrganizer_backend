@@ -4070,6 +4070,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("read_at");
 
+                    b.Property<long?>("ReminderDefinitionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reminder_definition_id");
+
+                    b.Property<DateTimeOffset?>("ReminderOccurrenceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reminder_occurrence_at");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("text")

@@ -67,7 +67,13 @@ touching anything below, because **none of these break the build**.
   silently: the kind still dispatches, it just loses its row on the settings screen. `NotificationCatalogTests`
   is the guard, and it keeps a second copy of the list on purpose. The same call declares `HeldWhileAwayTypes`
   and `PushOffByDefault` — the kinds that reach the bell but not the lock screen until the user ticks push
-  (empty today; a bell-only kind goes there with its producer).
+  (empty today; a bell-only kind goes there with its producer) — and `Actions`, the Web Push action buttons per
+  kind (P2-03: Snooze · Dismiss, Done · Snooze 1 h, Start · Skip, Done · +15 min). A button is carried out by
+  `POST /notification/{id}/action/{action}`, which hands every button but Dismiss to the one
+  `INotificationActionHandler` (Contracts) that answers it — `SnoozeReminderNotificationActionHandler` (Reminders),
+  `PlannerTaskNotificationActionHandler` (Planning), `TodoItemDueNotificationActionHandler` (TodoLists). A handler
+  only resolves if its slice is in `ModuleAssemblies`, and a button without one silently just opens the app:
+  `NotificationCatalogTests` pins exactly one handler per declared button and keeps the table's second copy.
 - **Account deletion fans out over `ISubjectDataEraser`** (`DeleteUserAccountEndpoint.BeforeDeleteAsync`).
   The host FKs cascade only `notification` / `notification_preference` / `push_subscription`; every
   other user-keyed module table is deliberately FK-free and would outlive the account. Erasers mutate

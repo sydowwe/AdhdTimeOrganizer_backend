@@ -285,11 +285,11 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
 
             await notifications.NotifyAsync(
                 NotificationRecipients.User(TestUserId), NotificationType.Test,
-                new TestNotificationPayload("stale"), longAgo, CancellationToken);
+                new TestNotificationPayload("stale"), longAgo, ct: CancellationToken);
 
             await notifications.NotifyAsync(
                 NotificationRecipients.User(UtcUserId), NotificationType.Test,
-                new TestNotificationPayload("punctual"), justNow, CancellationToken);
+                new TestNotificationPayload("punctual"), justNow, ct: CancellationToken);
         }
 
         await using var db = CreateDbContext();

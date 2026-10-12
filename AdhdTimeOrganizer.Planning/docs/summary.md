@@ -169,6 +169,12 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   History). Its marks, `MissedNotifiedAt` / `OverrunNotifiedAt`, cover **one slot**: a block moved or extended later
   can be announced again, and the daily cap counts the distinct missed stamps on the day. A write path needs to do
   nothing for it. Details in `domain-map.md` § *Slip nudges*.
+- **The block pushes have buttons (P2-03).** `PlannerTaskNotificationActionHandler` carries out Start · Skip on
+  `PlannedBlockStarting` and Done · +15 min on `PlannedBlockOverrun`, tapped on the lock screen, with the times on
+  the user's clock. Each applies from one status and is a no-op from the one it leads to; anything else is `Gone`
+  (the app opens). +N is from *now*, capped at 23:59, and only while the end has passed, so a retry adds nothing.
+  The status side effects (reminder sync, done-changed event) live in `IPlannerTaskStatusEffects`, shared with
+  `PatchPlannerTaskStatusEndpoint` — a new status write path should call it too.
 
 - **Pattern suggestions are recent-only, and the numbers live twice (FO11).** `SuggestionPatternWindow` holds
   the windows (weekday: 3+ sittings in 12 weeks, one in the last 4; day of month: 3+ in 12 months, one in the

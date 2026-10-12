@@ -81,6 +81,13 @@ worth copying the shape of:
   set equality **both ways** against a second copy of the list, checks the registration actually happened,
   and pins that a write for an uncatalogued kind is refused *and leaves no row*. The rules live in
   `BaseNotificationCatalogTests` (the module's testing package); only the list is this host's.
+  The same class pins the push **action buttons** (P2-03): the declared table against its second copy, and
+  exactly one `INotificationActionHandler` per declared button resolved from a real request scope — a handler
+  in an unscanned slice compiles and leaves its button merely opening the app.
+- `NotificationPushActionTests` — what each button does, end to end: the buttons in the push document per
+  recipient language (live and quiet-hours flush), and the rows a tap leaves (snooze marker → scan re-delivery
+  → Done ticking the item and cancelling its reminder; planner status and times on a pinned clock; 404/409
+  leaving the notification unread). Copy its shape for a new button.
 - `ReminderDisplayLabelTests` — the reminders' `displayLabel`. The owner's `IReminderLabelResolver` is matched
   by template key over an injected `IEnumerable`, and the label is filled after projection endpoint by
   endpoint, so a resolver the scan missed, a drifted key or a read that skips the step all return a valid 200

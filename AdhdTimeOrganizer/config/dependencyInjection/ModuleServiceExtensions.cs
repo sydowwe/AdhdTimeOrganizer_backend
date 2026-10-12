@@ -13,6 +13,7 @@ using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.action;
 using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Notifications.application;
@@ -240,6 +241,19 @@ public static class ModuleServiceExtensions
             // not worth a buzz. Every kind raised today is something the user asked for or about a moment, so the
             // list starts empty; a new bell-only kind goes here together with its producer.
             o.PushOffByDefault = [];
+
+            // P2-03: what the lock screen lets the user do without opening the app — every extra step between
+            // "reminded" and "handled" is a place an ADHD user drops the task. Two buttons at most (what Chrome and
+            // Android show). Snooze is the Reminders module's and appears only on a push that delivered a reminder
+            // occurrence; Dismiss is the Notifications module's (mark read); the rest are the owning slice's
+            // INotificationActionHandler. NotificationCatalogTests holds the second copy of this table.
+            o.Actions = new()
+            {
+                [NotificationType.PersonalReminder] = [NotificationAction.Snooze(10), NotificationAction.Dismiss],
+                [NotificationType.TodoItemDue] = [NotificationAction.Done, NotificationAction.Snooze(60)],
+                [NotificationType.PlannedBlockStarting] = [NotificationAction.Start, NotificationAction.Skip],
+                [NotificationType.PlannedBlockOverrun] = [NotificationAction.Done, NotificationAction.Extend(15)]
+            };
 
             o.SupportedTypes =
         [

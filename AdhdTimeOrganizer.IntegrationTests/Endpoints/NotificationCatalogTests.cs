@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.action;
 using Sydowwe.Notifications.Testing.baseTests;
 using Xunit;
 
@@ -47,4 +48,19 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         NotificationType.TimerBoundary,
         NotificationType.Test
     };
+
+    protected override IReadOnlyDictionary<NotificationType, IReadOnlyList<NotificationAction>> ExpectedActions => Actions;
+
+    /// <summary>
+    /// P2-03's table — the second copy of <c>NotificationCatalogOptions.Actions</c> in <c>AddNotificationCatalog</c>.
+    /// Shared with <see cref="NotificationPushActionTests"/>, which drives every button in it end to end.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<NotificationType, IReadOnlyList<NotificationAction>> Actions =
+        new Dictionary<NotificationType, IReadOnlyList<NotificationAction>>
+        {
+            [NotificationType.PersonalReminder] = [NotificationAction.Snooze(10), NotificationAction.Dismiss],
+            [NotificationType.TodoItemDue] = [NotificationAction.Done, NotificationAction.Snooze(60)],
+            [NotificationType.PlannedBlockStarting] = [NotificationAction.Start, NotificationAction.Skip],
+            [NotificationType.PlannedBlockOverrun] = [NotificationAction.Done, NotificationAction.Extend(15)]
+        };
 }
