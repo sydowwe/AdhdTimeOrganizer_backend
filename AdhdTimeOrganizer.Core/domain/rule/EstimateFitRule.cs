@@ -30,6 +30,13 @@ public static class EstimateFitRule
     public const int TodoItemGroupMinimumSamples = 5;
 
     /// <summary>
+    /// Timed occurrences of one routine item before its typical length is shown (F2-06). Lower than the to-do
+    /// threshold because the figure describes one item repeating itself, not a group of different tasks, and a
+    /// weekly item would otherwise need five weeks of timing before it said anything.
+    /// </summary>
+    public const int RoutineItemMinimumSamples = 3;
+
+    /// <summary>
     /// The median of <paramref name="samples"/>, or <c>null</c> when there are fewer than
     /// <paramref name="minimumSamples"/>. An even count takes the mean of the two middle values.
     /// </summary>

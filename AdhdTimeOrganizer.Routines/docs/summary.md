@@ -67,6 +67,11 @@ has no knowledge of Planning at all.
   `CalendarDayTypesChangedEventHandler`, for FO1's away-cycle excusal (see `domain-map.md`, *Away cycles*).
   Single-service resolution, so a missing registration throws at activation rather than silently falling
   back to the user's default wake-up or to "never away".
+- **`IRoutineItemLoggedTimeSource` is consumed here too** (implemented by History), by all three routine-item
+  reads through `RoutineItemTypicalDurationFiller`, for F2-06's `TypicalSeconds` / `SampleCount`. It is keyed
+  on `ActivityHistory.RoutineTodoListId` alone and returns raw recordings, which
+  `RoutineItemTypicalDuration` buckets into the period's real cycles (cut at the ledger's `PeriodEnd`
+  instants, not re-derived). It needs no table or migration.
 - **One Core event is consumed here**: `CalendarDayTypesChangedEvent`, published by Planning's two day-type
   writes. Its handler logs and swallows, so `RoutineAwayExcusalFlowTests` asserts on rows.
 
@@ -111,6 +116,13 @@ has no knowledge of Planning at all.
   `NextResetAt`. A new read path that forgets it serves a stale count and refuses a freeze the user is
   owed, with an ordinary 400 and nothing in the logs. The window is a **calendar month**, not one
   period length — "two per period" would hand a daily routine two skips a day.
+
+- **An item's typical length is filled after the projection, on every read that returns an item** (F2-06):
+  the grouped read and both flat reads, through `RoutineItemTypicalDurationFiller`. A flat read matters
+  because the client re-reads one item by id after logging time, and the figure would vanish from that row.
+  One sample is one *occurrence* (every sitting in a cycle summed), the open cycle counts only once the item
+  is done in it, and nothing is said below `EstimateFitRule.RoutineItemMinimumSamples` (3). It is never
+  written back to `SuggestedTime`, which also decides tracker auto-completion.
 
 - **A freeze carries the run; it does not extend it.** `RecomputeStreak` walks the whole completion
   history oldest-first: a met period increments, an unfrozen miss zeroes, and a frozen one — like an

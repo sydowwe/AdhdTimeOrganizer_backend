@@ -253,6 +253,7 @@ tail. `daysWithActivity` still counts by start, so it can be less than `days.len
 | `TimerBoundaryAlarmRegistrar` | `IHostedService` | Re-registers every pending alarm on boot and drops stale ones. **Not optional** — the Quartz store is in-memory; see `summary.md` | `infrastructure/scheduling/TimerBoundaryAlarmRegistrar.cs` |
 | `ActivityHistoryTimeAttributionSink` | Seam impl | Core's `IActivityTimeAttributionSink`: records N seconds against an activity for Tracking. Mutates the caller's `DbContext`, **never** saves; extends a contiguous window instead of inserting — but never a timer-session row, which stays what the timer measured. `TotalSecondsBetweenAsync` sums a half-open `[fromUtc, toUtc)` range the **caller** supplies — the heartbeat passes the user's own midnights, so "the day" is theirs, not UTC's (it used to take a `DateOnly` bounded on UTC midnights, which drove yesterday's planner task for a Bratislava user's first hours) | `application/seam/ActivityHistoryTimeAttributionSink.cs` |
 | `TodoListItemLoggedTimeSource` | Seam impl | Core's `ITodoListItemLoggedTimeSource` for TodoLists' daily recap. Keys on `TodoListItemId` **alone** | `application/seam/TodoListItemLoggedTimeSource.cs` |
+| `RoutineItemLoggedTimeSource` | Seam impl | Core's `IRoutineItemLoggedTimeSource` for Routines' typical item length (F2-06): the recordings per routine item in a UTC range, one entry per row. Keys on `RoutineTodoListId` **alone** | `application/seam/RoutineItemLoggedTimeSource.cs` |
 | `ActivityHistoryActivityReferenceSource` | Seam impl | Core's `IActivityReferenceSource`: reports/repoints this slice's references to an activity for merge and delete | `application/seam/ActivityHistoryActivityReferenceSource.cs` |
 | `ActivityHistoryReferencedIds` | Helper | The create/update ownership check over the three client-supplied ids. Needs the request scope and the principal, which is why it is not in the validator | `application/endpoint/command/ActivityHistoryReferencedIds.cs` |
 | `ActivityHistoryValidator` | Validator | Create/update rules, incl. the mutual exclusion of `TodoListItemId` and `RoutineTodoListId` | `application/validator/ActivityHistoryValidator.cs` |
@@ -318,15 +319,17 @@ AdhdTimeOrganizer.History
                                       shared enums, IActivityMembershipSource,
                                       ICalendarDayLookup, IActivityTimeAttributionSink,
                                       IActivityReferenceSource, ITodoListItemLoggedTimeSource,
+                                      IRoutineItemLoggedTimeSource,
                                       IReferencedIdOwnershipService (over
                                       IUserOwnedReferenceVerifier)
 ```
 
-This slice **implements** two seams as well as consuming one: `ActivityHistoryTimeAttributionSink`
-(`IActivityTimeAttributionSink`, for Tracking) and `TodoListItemLoggedTimeSource`
-(`ITodoListItemLoggedTimeSource`, for TodoLists' daily recap) — both in `application/seam/`. The
-second must key on `TodoListItemId` alone; matching on the activity instead would credit the same
-seconds to two items that share one. See `summary.md` → Gotchas.
+This slice **implements** seams as well as consuming them. Three of them are
+`ActivityHistoryTimeAttributionSink` (`IActivityTimeAttributionSink`, for Tracking),
+`TodoListItemLoggedTimeSource` (`ITodoListItemLoggedTimeSource`, for TodoLists' daily recap and estimate
+fit) and `RoutineItemLoggedTimeSource` (`IRoutineItemLoggedTimeSource`, for Routines' typical item length),
+all in `application/seam/`. The two item sources must key on their own item link alone. Matching on the
+activity instead would credit the same seconds to two items that share one. See `summary.md` → Gotchas.
 
 Inbound (host → slice, the correct direction) — and **only** the host: `Program.cs` (the FastEndpoints
 assembly scan and `AddHostedService<TimerBoundaryAlarmRegistrar>()`), `ModuleServiceExtensions`

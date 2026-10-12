@@ -1,12 +1,15 @@
+using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Routines.application.dto.response.todoList;
 using AdhdTimeOrganizer.Routines.application.service.routine;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using Sydowwe.Framework.application.endpoint.@base.read;
+using Sydowwe.Framework.application.extensions;
 
 namespace AdhdTimeOrganizer.Routines.application.endpoint.todoList.routineTodoList.query;
 
 public class GetAllRoutineTodoListEndpoint(
-    DbContext dbContext)
+    DbContext dbContext,
+    IRoutineItemLoggedTimeSource loggedTime)
     : BaseGetAllEndpoint<RoutineTodoList, RoutineTodoListResponse>(dbContext)
 {
     // Own field rather than the captured primary-ctor parameter: the read bases have no `protected DbContext`
@@ -23,13 +26,17 @@ public class GetAllRoutineTodoListEndpoint(
         List<RoutineTodoListResponse> items,
         CancellationToken ct)
     {
+        var now = DateTime.UtcNow;
         var refreshed = await RoutineTimePeriodReadRefresher.RefreshAndRenderAsync(
-            _dbContext, items.Select(i => i.RoutineTimePeriod.Id), DateTime.UtcNow, ct);
+            _dbContext, items.Select(i => i.RoutineTimePeriod.Id), now, ct);
 
-        return items
+        var withPeriods = items
             .Select(i => refreshed.TryGetValue(i.RoutineTimePeriod.Id, out var period)
                 ? i with { RoutineTimePeriod = period }
                 : i)
             .ToList();
+
+        // F2-06 — the projection cannot compute the typical occurrence either.
+        return await RoutineItemTypicalDurationFiller.FillAsync(withPeriods, _dbContext, loggedTime, User.GetId(), now, ct);
     }
 }

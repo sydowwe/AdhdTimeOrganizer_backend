@@ -236,6 +236,7 @@ one fails). Summary:
 | `IActivityTimeAttributionSink` | Seam (write, single) | Records observed time into the activity ledger — History implements, Tracking consumes | `IActivityTimeAttributionSink.cs` |
 | `ICalendarDayLookup` | Seam (read, single) | Calendar-day metadata for a range — Planning implements, History consumes | `ICalendarDayLookup.cs` |
 | `ITodoListItemLoggedTimeSource` | Seam (read, single) | Seconds logged per to-do item on a day, keyed on `ActivityHistory.TodoListItemId` **only** | `ITodoListItemLoggedTimeSource.cs` |
+| `IRoutineItemLoggedTimeSource` | Seam (read, single) | The recordings logged against routine items in a UTC range (F2-06), keyed on `ActivityHistory.RoutineTodoListId` **only** — History implements, Routines consumes | `IRoutineItemLoggedTimeSource.cs` |
 | `IUserOwnedReferenceVerifier` | Seam (read, keyed) | "Is this row of yours the caller's?" for a client-supplied id — TodoLists/Routines implement, History's write path consumes. **Fails closed** | `IUserOwnedReferenceVerifier.cs` |
 | `TimerPresetActivityReferenceSource` | Implementation | Core's own reference source: the three nullable activity columns on the two preset entities | `TimerPresetActivityReferenceSource.cs` |
 | `ActivityMembershipSourceKeys` / `ActivityReferenceSourceKeys` / `UserOwnedReferenceKeys` | Constants | The known keys. Read the constant, never retype the literal — a typo is a silent no-op | `*Keys.cs` |

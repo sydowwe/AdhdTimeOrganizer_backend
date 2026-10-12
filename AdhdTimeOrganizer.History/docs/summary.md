@@ -231,6 +231,10 @@ Archived activities pass; archival is not ownership. Guarded by
   and the same seconds would be credited to both. Its second method, `LatestStartBetweenAsync`, is the
   one that *does* key on `ActivityId`, on purpose: it answers "was the paired leisure activity started
   after this item was done", and that recording is never linked to the item. Don't unify the two.
+- **`RoutineItemLoggedTimeSource` (`application/seam/`) is its routine twin, and keys on `RoutineTodoListId`
+  only**, for the same reason: two routine items in two periods may share one activity. It serves Routines'
+  typical item length (F2-06) through Core's `IRoutineItemLoggedTimeSource`, and returns the individual
+  recordings, not a sum, because Routines buckets them into its own cycles.
 - **`TimerBoundaryAlarmRunningTimerLookup` (`application/seam/`) answers Core's `IRunningTimerLookup`** for
   Planning's overrun nudge (audit N5): "running" is a pending `TimerBoundaryAlarm` whose `BoundaryAt` is still
   ahead. Keep the `BoundaryAt > now` predicate — a stale row the boot registrar has not swept yet would otherwise

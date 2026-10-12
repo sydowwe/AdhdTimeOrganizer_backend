@@ -19,6 +19,7 @@ if the two ever drift apart.
 | `IActivityTimeAttributionSink` | **write**, in the caller's transaction | single | History | Tracking — `DesktopActivityHeartbeatEndpoint` (`AttributeAsync`), `AndroidSyncEndpoint` (`AttributeSpanAsync`, FO9) |
 | `ICalendarDayLookup` | read | single | Planning | History — `CalendarActivityEndpoint`; Routines — `RoutineSuggestedTodayJobHandler`, for the day's `WakeUpTime` |
 | `IFocusIntervalSource` | read | single | History | Tracking — `DesktopMappingSuggestionsEndpoint` (FO9), which learns process → activity from timer focus phases |
+| `IRoutineItemLoggedTimeSource` | read | single | History | Routines — `GetAllGroupedRoutineTodoListEndpoint`, `GetAllRoutineTodoListEndpoint`, `GetByIdRoutineTodoListEndpoint`, all through `RoutineItemTypicalDurationFiller`, for each item's `TypicalSeconds` (F2-06) |
 | `IRunningTimerLookup` | read | single | History (pending `TimerBoundaryAlarm` rows) | Planning — `PlannerSlipNudgeJobHandler`, which holds the overrun nudge while the user has a timer running (audit N5) |
 | `ITodoListItemLoggedTimeSource` | read | single | History | TodoLists — `GetDailyRecapTodoListItemEndpoint`; `GetEstimateFitTodoListItemEndpoint` (F3-01), over all days |
 | `ITodoListItemPlanSource` | read | single | Planning | TodoLists — `GetAllTodoListItemEndpoint`, `GetByIdTodoListItemEndpoint`, through `TodoListItemPlannedSlotFiller`, for `NextPlannedSlot`; the same two plus `GetDashboardTodoListItemEndpoint` for `PlanHelp` (`PlanHistoryAsync`, FO3); `GetEstimateFitTodoListItemEndpoint` for each item's first block (`FirstPlannedSecondsAsync`, F3-01) |
@@ -128,6 +129,12 @@ None of these break the build, and only one of them throws.
   leisure activity started after the item was done", and that recording carries no item link.
   `TodoListItemDailyRecapTests.RewardTaken_OnlyByARecordingOfThePairedActivity_StartingAfterCompletion`
   guards it. Both methods take the day as UTC instants the caller resolved in the user's zone.
+- **`IRoutineItemLoggedTimeSource` fails the same way as its to-do twin**, keyed on
+  `ActivityHistory.RoutineTodoListId`. Widened to the activity, two routine items sharing one would each be
+  credited the other's time, and so would every tracker-attributed row of that activity.
+  `Endpoints.RoutineItemTypicalDurationTests.Time_IsKeyedOnTheItem_NotTheActivity` asserts on the returned
+  figures with unlinked rows seeded in every cycle. It returns rows, not sums, because the cycles they fall
+  into are the Routines slice's to define.
 - **`ITodoListItemPlanSource` fails silently if it answers wrongly.** It is what "this to-do is
   scheduled" means since the planner stopped stamping `DueDate`; an implementation that dropped the
   status or the from-date predicate would report every item as scheduled forever (or none ever), and

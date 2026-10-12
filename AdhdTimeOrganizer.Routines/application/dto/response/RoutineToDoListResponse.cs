@@ -20,6 +20,18 @@ public record RoutineTodoListResponse : BaseTodoListResponse,
     public List<DayOfWeek> SuggestedDays { get; init; } = [];
     public int? SuggestedDayOfMonth { get; init; }
 
+    /// <summary>
+    /// F2-06: how long one occurrence of this item usually takes — the median of the time logged against the item per
+    /// cycle of its period, over its newest timed cycles. <c>null</c> below
+    /// <c>EstimateFitRule.RoutineItemMinimumSamples</c> occurrences. Information only: it never rewrites
+    /// <c>SuggestedTime</c>, which also decides tracker auto-completion. Not part of <see cref="Projection"/> — every
+    /// read fills it afterwards through <c>RoutineItemTypicalDurationFiller</c>.
+    /// </summary>
+    public long? TypicalSeconds { get; init; }
+
+    /// <summary>The occurrences behind <see cref="TypicalSeconds"/>; <c>null</c> whenever that is.</summary>
+    public int? SampleCount { get; init; }
+
     public static IQueryable<RoutineTodoListResponse> Projection(IQueryable<RoutineTodoList> q)
     {
         return q.Select(ProjectionExpression);

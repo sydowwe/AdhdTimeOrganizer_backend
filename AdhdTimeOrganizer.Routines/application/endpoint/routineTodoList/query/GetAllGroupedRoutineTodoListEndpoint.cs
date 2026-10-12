@@ -1,4 +1,6 @@
+using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.Routines.application.dto.response.todoList;
+using AdhdTimeOrganizer.Routines.application.service.routine;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.Routines.domain.serviceContract;
@@ -11,7 +13,8 @@ namespace AdhdTimeOrganizer.Routines.application.endpoint.todoList.routineTodoLi
 public class GetAllGroupedRoutineTodoListEndpoint(
     DbContext dbContext,
     IRoutinePeriodNotificationService notifier,
-    IRoutineAwayDaysReader awayDaysReader) : EndpointWithoutRequest<IEnumerable<RoutineTodoListGroupedResponse>>
+    IRoutineAwayDaysReader awayDaysReader,
+    IRoutineItemLoggedTimeSource loggedTime) : EndpointWithoutRequest<IEnumerable<RoutineTodoListGroupedResponse>>
 {
     public override void Configure()
     {
@@ -115,6 +118,15 @@ public class GetAllGroupedRoutineTodoListEndpoint(
                 completionsByPeriod[g.Key] = g.OrderBy(c => c.PeriodStart).ToList();
         }
 
+        // F2-06: each item's typical occurrence, over every period's items in one pass (two queries in all).
+        var rendered = periods
+            .SelectMany(tp => tp.RoutineTodoListColl)
+            .Select(RoutineTodoListResponse.From)
+            .ToList();
+        var itemsById = (await RoutineItemTypicalDurationFiller.FillAsync(
+                rendered, periods, dbContext, loggedTime, loggedUserId, now, ct))
+            .ToDictionary(i => i.Id);
+
         var data = periods
             .Select(tp => new RoutineTodoListGroupedResponse
             {
@@ -124,7 +136,7 @@ public class GetAllGroupedRoutineTodoListEndpoint(
                     now),
                 Items = tp.RoutineTodoListColl
                     .OrderBy(e => e.IsDone).ThenBy(e => e.DisplayOrder)
-                    .Select(RoutineTodoListResponse.From)
+                    .Select(e => itemsById[e.Id])
                     .ToList()
             })
             .ToList();

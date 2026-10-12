@@ -57,6 +57,7 @@ below.
 | `TimerBoundaryAlarmTests` (9 tests) | The alarm lifecycle end to end: one row per *future* boundary, idempotent by session, cancel removes the session and is a no-op on an unknown one, the handler fires then self-drains, a cancelled alarm does nothing, the push envelope carries `tag` + `url` at top level (and omits `tag` for kinds supplying none), and `TimerBoundary` is exempt from quiet-hours deferral |
 | `ActivityHistorySessionTests` (23 tests) | B3 timer sessions. The counting tests assert exact numbers on one fixture (a three-phase Pomodoro plus a plain row) where rows and sittings differ on `aggregate-by-activity`, the pie and the calendar — a row count is a well-formed wrong answer. Atomicity is pinned at both layers: an unowned activity on the *second* record writes nothing, and a unique-index collision on the second record rolls back the first. Also: the eleven malformed shapes write nothing, delete keeps the session until its last row, an edit keeps the row in its session, and the heartbeat never extends a session row |
 | `TodoListItemDailyRecapTests.TimeIsAttributedByItem_NotByActivity` | `TodoListItemLoggedTimeSource` keys on `TodoListItemId` **alone**. Widening it to the activity looks like it can only find *more* rows and in fact double-counts two items sharing one activity |
+| `Endpoints.RoutineItemTypicalDurationTests.Time_IsKeyedOnTheItem_NotTheActivity` | The same guard for `RoutineItemLoggedTimeSource`: two routine items on one activity, plus unlinked tracker-style rows of that activity in every cycle, and only the item's own time counts |
 | `TodoListItemDailyRecapTests.DeletingTheItem_KeepsTheRecording_AndUnlinksIt` | The host-side `SET NULL` on `TodoListItemId`. A cascade here would delete recorded time when a task is deleted |
 | `SuggestionPatternRefreshTests.Save_ActivityHistory_MarksOnlyActivityHistoryDirty` | The host interceptor fires on saves touching `ActivityHistory` and dirties only that view. Owned by the host, but this slice is what triggers it |
 | `ModuleSchemaTests` | Every entity in this assembly resolves to the `history` schema. A new entity fails it until it is added to the suite's `history` table list |
@@ -64,7 +65,8 @@ below.
 | `ActivityForeignKeyInventoryTests` | The frozen inventory of FKs into `Activity` and their delete behaviours — including the fact that `TimerBoundaryAlarm.ActivityId` carries **no** FK |
 
 Also relevant, though owned elsewhere: `SeamWiringTests` (this slice implements
-`IActivityTimeAttributionSink`, `ITodoListItemLoggedTimeSource` and `IActivityReferenceSource`, and
+`IActivityTimeAttributionSink`, `ITodoListItemLoggedTimeSource`, `IRoutineItemLoggedTimeSource` and
+`IActivityReferenceSource`, and
 each single seam must resolve exactly once), `NamedQueryFilterTests`, `UserScopingQueryFilterTests`,
 and the scheduler suites under `Infrastructure/` that the alarms ride on.
 
