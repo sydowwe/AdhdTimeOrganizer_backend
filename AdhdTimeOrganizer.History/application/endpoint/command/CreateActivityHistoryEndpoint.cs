@@ -16,6 +16,9 @@ public class CreateActivityHistoryEndpoint(
     IActivityTimeRecordedPublisher timeRecorded)
     : BaseCreateEndpoint<ActivityHistory, ActivityHistoryRequest>(dbContext)
 {
+    /// <summary>Per-request state; FastEndpoints builds an endpoint instance per request.</summary>
+    private bool _countsAsRepetition;
+
     public override void Configure()
     {
         base.Configure();
@@ -29,6 +32,10 @@ public class CreateActivityHistoryEndpoint(
     /// </summary>
     protected override async Task<bool> BeforeMapping(ActivityHistoryRequest req, CancellationToken ct = default)
     {
+        // Kept for AfterSave, which sees only the entity. The flag is not a column: it says what this request
+        // meant, and the row outlives the request.
+        _countsAsRepetition = req.CountsAsRepetition;
+
         var unowned = await ActivityHistoryReferencedIds.FirstUnownedAsync(req, ownership, DbContext, User.GetId(), ct);
         if (unowned == null)
             return true;
@@ -44,5 +51,5 @@ public class CreateActivityHistoryEndpoint(
     /// this cannot reach the base's catch and turn a committed row into an error.
     /// </summary>
     protected override Task AfterSave(ActivityHistory entity, CancellationToken ct = default) =>
-        timeRecorded.PublishAsync(DbContext, User.GetId(), [entity], ct);
+        timeRecorded.PublishAsync(DbContext, User.GetId(), [entity], _countsAsRepetition, ct);
 }

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
+using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -140,7 +141,174 @@ public class HistoryTicksOffThePlanTests(AppDbContextFixture fixture) : Postgres
         (await LoadTaskAsync(taskId)).Status.Should().Be(PlannerTaskStatus.Completed);
     }
 
+    // ---- a sitting logged as doing the item (CountsAsRepetition) ----------------------------------
+
+    /// <summary>
+    /// The bug FO2 left open: the 25-minute sitting reached the item's suggested time, and the fallback set
+    /// <c>DoneCount = TotalCount</c>, so one pomodoro finished a four-repetition item.
+    /// </summary>
+    [Fact(DisplayName = "FO2: a pomodoro logged as one sitting of a 4× item is one repetition, and the fourth finishes it")]
+    public async Task Repetition_StepsACountedItemOncePerSitting()
+    {
+        var focusId = await SeedActivityAsync("rep-focus");
+        var restId = await SeedActivityAsync("rep-rest");
+        var itemId = await SeedTodoItemAsync(focusId, totalCount: 4, suggestedTime: new IntTime(0, 25));
+
+        for (var sitting = 0; sitting < 4; sitting++)
+        {
+            await PostCreatedAsync("api/activity-history/session", new
+            {
+                kind = "Pomodoro",
+                outcome = "Completed",
+                plannedFocusPeriods = 1,
+                completedFocusPeriods = 1,
+                todoListItemId = itemId,
+                countsAsRepetition = true,
+                records = new[]
+                {
+                    Record(focusId, UtcAt(8 + sitting), 25, "Focus"),
+                    Record(restId, UtcAt(8 + sitting, 25), 5, "ShortBreak")
+                }
+            });
+
+            var item = await LoadTodoItemAsync(itemId);
+            item.DoneCount.Should().Be(sitting + 1, "each sitting is one repetition, however much time the day holds");
+            item.IsDone.Should().Be(sitting == 3);
+        }
+    }
+
+    [Fact(DisplayName = "FO2: a sitting logged as doing a plain item finishes it, however short")]
+    public async Task Repetition_FinishesAPlainItem()
+    {
+        var activityId = await SeedActivityAsync("rep-plain");
+        var itemId = await SeedTodoItemAsync(activityId, suggestedTime: new IntTime(1, 0));
+
+        await PostCreatedAsync("api/activity-history", new
+        {
+            activityId,
+            startTimestamp = UtcAt(11),
+            length = new { hours = 0, minutes = 5 },
+            todoListItemId = itemId,
+            countsAsRepetition = true
+        });
+
+        (await LoadTodoItemAsync(itemId)).IsDone.Should().BeTrue("logging time from the item says it happened");
+    }
+
+    /// <summary>
+    /// The publisher cuts a row at the user's midnight and raises one event per day. Only the first may count, or
+    /// a late session would be two repetitions.
+    /// </summary>
+    [Fact(DisplayName = "FO2: a sitting that crosses midnight is still one repetition")]
+    public async Task Repetition_AcrossMidnight_CountsOnce()
+    {
+        var activityId = await SeedActivityAsync("rep-midnight");
+        var itemId = await SeedTodoItemAsync(activityId, totalCount: 4);
+
+        await PostCreatedAsync("api/activity-history", new
+        {
+            activityId,
+            startTimestamp = UtcToday.ToDateTime(new TimeOnly(23, 40), DateTimeKind.Utc).AddDays(-1),
+            length = new { hours = 0, minutes = 40 },
+            todoListItemId = itemId,
+            countsAsRepetition = true
+        });
+
+        (await LoadTodoItemAsync(itemId)).DoneCount.Should().Be(1);
+    }
+
+    /// <summary>
+    /// Home's planner-block timer links the row to the block's to-do only so the recap credits it; the block
+    /// decides the item. Time alone never finishes a counted item, however far past its suggested time.
+    /// </summary>
+    [Fact(DisplayName = "FO2: time linked to a counted item only for the recap ticks nothing")]
+    public async Task RecapOnlyLink_LeavesACountedItemAlone()
+    {
+        var activityId = await SeedActivityAsync("rep-recap-only");
+        var itemId = await SeedTodoItemAsync(activityId, totalCount: 4, suggestedTime: new IntTime(0, 25));
+
+        await PostCreatedAsync("api/activity-history", new
+        {
+            activityId,
+            startTimestamp = UtcAt(12),
+            length = new { hours = 1, minutes = 0 },
+            todoListItemId = itemId
+        });
+
+        var item = await LoadTodoItemAsync(itemId);
+        item.DoneCount.Should().Be(0);
+        item.IsDone.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "FO2: a sitting logged as doing a counted routine item is one repetition")]
+    public async Task Repetition_StepsACountedRoutineItem()
+    {
+        var activityId = await SeedActivityAsync("rep-routine");
+        long itemId;
+        await using (var db = CreateDbContext())
+        {
+            var periodId = await TodoListTestSeedHelper.SeedRoutineTimePeriodAsync(db, ct: CancellationToken);
+            itemId = await TodoListTestSeedHelper.SeedRoutineTodoListAsync(db, activityId, periodId, totalCount: 3, doneCount: 0,
+                ct: CancellationToken);
+        }
+
+        await PostCreatedAsync("api/activity-history", new
+        {
+            activityId,
+            startTimestamp = UtcAt(13),
+            length = new { hours = 0, minutes = 20 },
+            routineTodoListId = itemId,
+            countsAsRepetition = true
+        });
+
+        await using var read = CreateDbContext();
+        var routineItem = await read.Set<RoutineTodoList>()
+            .SingleAsync(r => r.Id == itemId, CancellationToken);
+        routineItem.DoneCount.Should().Be(1);
+        routineItem.IsDone.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "FO2: countsAsRepetition without an item link is a 400 on both creates")]
+    public async Task Repetition_WithoutALink_IsRejected()
+    {
+        var activityId = await SeedActivityAsync("rep-no-link");
+        var client = CreateUserRoleClient();
+
+        var single = await client.PostAsJsonAsync("api/activity-history", new
+        {
+            activityId,
+            startTimestamp = UtcAt(15),
+            length = new { hours = 0, minutes = 10 },
+            countsAsRepetition = true
+        }, JsonOpts, CancellationToken);
+        single.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var session = await client.PostAsJsonAsync("api/activity-history/session", new
+        {
+            kind = "Timer",
+            outcome = "Completed",
+            countsAsRepetition = true,
+            records = new[] { Record(activityId, UtcAt(16), 10, null) }
+        }, JsonOpts, CancellationToken);
+        session.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ---- helpers ---------------------------------------------------------------------------------
+
+    private async Task<long> SeedTodoItemAsync(long activityId, int? totalCount = null, IntTime? suggestedTime = null)
+    {
+        await using var db = CreateDbContext();
+        var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 1, ct: CancellationToken);
+        var listId = await TodoListTestSeedHelper.SeedTodoListAsync(db, ct: CancellationToken);
+        return await TodoListTestSeedHelper.SeedTodoListItemAsync(db, activityId, priorityId, listId,
+            totalCount: totalCount, doneCount: totalCount is null ? null : 0, ct: CancellationToken, suggestedTime: suggestedTime);
+    }
+
+    private async Task<TodoListItem> LoadTodoItemAsync(long itemId)
+    {
+        await using var db = CreateDbContext();
+        return await db.Set<TodoListItem>().SingleAsync(i => i.Id == itemId, CancellationToken);
+    }
 
     private static object Record(long activityId, DateTime start, int minutes, string? phase) => new
     {

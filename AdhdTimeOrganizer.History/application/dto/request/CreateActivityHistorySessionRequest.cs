@@ -41,6 +41,12 @@ public record CreateActivityHistorySessionRequest
     /// <summary>Same as <see cref="TodoListItemId"/>, for a routine item. Never both.</summary>
     public long? RoutineTodoListId { get; init; }
 
+    /// <summary>
+    /// The session is one sitting of the linked item, so the server ticks the item once — see
+    /// <see cref="ActivityHistoryRequest.CountsAsRepetition"/>. Requires a link. Not stored.
+    /// </summary>
+    public bool CountsAsRepetition { get; init; }
+
     /// <summary>In start order. At least one; exactly one for a Timer.</summary>
     public required List<ActivityHistorySessionRecordRequest> Records { get; init; }
 

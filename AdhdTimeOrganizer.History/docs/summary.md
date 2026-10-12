@@ -79,6 +79,11 @@ What is load-bearing:
   and is not the item's time, so stamping it would credit the item with its rests in the recap. Same rules
   as the single create's link: positive, never both, ownership-checked in the handler (404).
   The stopwatch is not a session.
+- **`countsAsRepetition` is what ticks the item, not the link** (FO2). Both creates take it; it needs a link, is
+  not stored, and makes the publisher flag the *first* event carrying the link, so the host's handler ticks the
+  item once — one repetition of a counted item, done for a plain one — even when the sitting crosses midnight.
+  The to-do timer sends it; home's planner-block timer does not, because its link is recap credit and the block
+  decides the item. Time alone never finishes a counted item. Pinned by `HistoryTicksOffThePlanTests`.
 - **How sessions ended is read back once, for an offer** (F2-07): `GET /activity-history/session/fit` suggests
   a focus length that usually works for an activity ("Try 15 min"), through `domain/service/TimerLengthFit`. It
   reads focus rows by `Phase`, never by activity alone, and treats a stretch that ran its length as "at least

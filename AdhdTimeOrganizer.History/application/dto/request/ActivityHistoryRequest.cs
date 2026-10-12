@@ -26,6 +26,14 @@ public record ActivityHistoryRequest : ActivityIdRequest, IMyRequest<ActivityHis
     /// <summary>Same as <see cref="TodoListItemId"/>, for a routine to-do item.</summary>
     public long? RoutineTodoListId { get; init; }
 
+    /// <summary>
+    /// This recording is one sitting of the linked item, logged from the item itself, so the server ticks the item
+    /// once: one repetition of a counted item, done for a plain one (FO2). Requires a link. Not stored — it is what
+    /// this request means, not a fact about the row; an edit never sends it. Left false where the link is only
+    /// recap credit, such as home's planner-block timer, whose block decides the item.
+    /// </summary>
+    public bool CountsAsRepetition { get; init; }
+
     public ActivityHistory ToEntity => new()
     {
         UserId = 0,

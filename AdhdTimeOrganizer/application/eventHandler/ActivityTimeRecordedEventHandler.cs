@@ -8,6 +8,7 @@ using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
+using AdhdTimeOrganizer.Routines.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using FastEndpoints;
@@ -49,7 +50,8 @@ public class ActivityTimeRecordedEventHandler(
             scope.ServiceProvider.GetRequiredService<IReminderRegistrationService>(),
             scope.ServiceProvider.GetRequiredService<IActivityTimeAttributionSink>(),
             scope.ServiceProvider.GetRequiredService<IUserTimeZoneResolver>(),
-            scope.ServiceProvider.GetRequiredService<ITodoListItemDueReminderSync>());
+            scope.ServiceProvider.GetRequiredService<ITodoListItemDueReminderSync>(),
+            scope.ServiceProvider.GetRequiredService<IRoutineAwayDaysReader>());
 
         foreach (var total in eventModel.Totals)
         {
@@ -79,6 +81,11 @@ public class ActivityTimeRecordedEventHandler(
     /// Time tracked <em>anywhere</em> in the day counts toward a block, not only time inside it: work done at
     /// 10:00 for a block planned at 14:00 still got done, and a rule that says otherwise teaches an ADHD user
     /// that the plan is a trap. What it may not do is count twice — see <see cref="UnclaimedSecondsAsync"/>.
+    /// <para>
+    /// A sitting the user logged <em>as doing</em> an item (<see cref="ActivityDayTotal.CountsAsRepetition"/>) also
+    /// ticks that item, after the planner part — see <see cref="CountRepetitionAsync"/>. It replaces the
+    /// time-threshold fallback for that event, which would otherwise decide the same item a second way.
+    /// </para>
     /// </remarks>
     private static async Task AutomateActivityAsync(
         Collaborators services,
@@ -100,11 +107,26 @@ public class ActivityTimeRecordedEventHandler(
             .ThenBy(pt => pt.Id)
             .ToListAsync(ct);
 
-        if (openTasks.Count == 0)
-        {
+        PlannerTask? completedBlock = null;
+        if (openTasks.Count > 0)
+            completedBlock = await AutomatePlannerTaskAsync(services, eventModel, total, openTasks, ct);
+        else if (!total.CountsAsRepetition)
             await AutomateWithoutPlannerTaskAsync(services, userId, total, ct);
-            return;
-        }
+
+        if (total.CountsAsRepetition)
+            await CountRepetitionAsync(services, userId, total, completedBlock, ct);
+    }
+
+    /// <summary>Moves the block the time belongs to. Returns it when this event completed it, otherwise null.</summary>
+    private static async Task<PlannerTask?> AutomatePlannerTaskAsync(
+        Collaborators services,
+        ActivityTimeRecordedEvent eventModel,
+        ActivityDayTotal total,
+        List<PlannerTask> openTasks,
+        CancellationToken ct)
+    {
+        var dbContext = services.Db;
+        var userId = eventModel.UserId;
 
         // The block the user is in right now, if any; otherwise the earliest one still open. IsBetween is
         // half-open and midnight-wrap aware, like the task spans it is reading.
@@ -119,14 +141,14 @@ public class ActivityTimeRecordedEventHandler(
         // "Coding" block is completed by the planner (claiming up to now), and the history row it then logs is
         // inside that claim — it must not flip the afternoon "Coding" block to InProgress (FO2).
         if (availableSeconds <= 0)
-            return;
+            return null;
 
         var wasCompleted = durationSeconds > 0 && availableSeconds >= durationSeconds;
         var newStatus = wasCompleted ? PlannerTaskStatus.Completed : PlannerTaskStatus.InProgress;
 
         // An InProgress task that is still short of its threshold has nothing to record.
         if (plannerTask.Status == newStatus)
-            return;
+            return null;
 
         plannerTask.ApplyStatus(newStatus);
         // The first window that moved the task is when work on it began. A task completed straight from
@@ -142,9 +164,91 @@ public class ActivityTimeRecordedEventHandler(
 
         await services.Reminders.SyncForPlannerTasksAsync([plannerTask.Id], ct);
 
-        if (wasCompleted)
-            await new PlannerTaskIsDoneChangedEvent(total.ActivityId, userId, true, plannerTask.TodolistItemId)
-                .PublishAsync(Mode.WaitForAll, ct);
+        if (!wasCompleted)
+            return null;
+
+        await new PlannerTaskIsDoneChangedEvent(total.ActivityId, userId, true, plannerTask.TodolistItemId)
+            .PublishAsync(Mode.WaitForAll, ct);
+        return plannerTask;
+    }
+
+    /// <summary>
+    /// One repetition of the item the sitting was logged as doing (FO2): the tick <c>toggle-is-done</c> makes with
+    /// <c>forceValue: true</c>, which the client used to send itself after the save. One more of a counted item, so a
+    /// "4×" item takes four sittings; done for a plain one. However long the sitting ran — logging it from the item
+    /// is the statement that it happened.
+    /// <para>
+    /// Skipped when this same event just completed a block that already decides the item, because the block → item
+    /// fan-out (<see cref="PlannerTaskIsDoneChangedEventHandler"/>) has set it and a second tick would count the
+    /// sitting twice. For a to-do item that is a block linked to it. For a routine item it is any completed block:
+    /// that fan-out finds routine items by activity, not by link.
+    /// </para>
+    /// </summary>
+    private static async Task CountRepetitionAsync(
+        Collaborators services, long userId, ActivityDayTotal total, PlannerTask? completedBlock, CancellationToken ct)
+    {
+        if (total.TodoListItemId is { } todoItemId)
+        {
+            if (completedBlock?.TodolistItemId != todoItemId)
+                await TickTodoItemAsync(services, userId, todoItemId, ct);
+        }
+        else if (total.RoutineTodoListId is { } routineItemId && completedBlock is null)
+        {
+            await TickRoutineItemAsync(services, userId, routineItemId, ct);
+        }
+    }
+
+    /// <remarks>
+    /// The done-changed event goes out only when the tick finished the item. One more of a counted item is not
+    /// something its planner block follows, and the block reads every such event as "done" or "not done".
+    /// </remarks>
+    private static async Task TickTodoItemAsync(Collaborators services, long userId, long itemId, CancellationToken ct)
+    {
+        var item = await services.Db.Set<TodoListItem>()
+            .Include(i => i.Steps)
+            .FirstOrDefaultAsync(i => i.Id == itemId && i.UserId == userId, ct);
+        if (item is null || item.IsDone)
+            return;
+
+        item.ApplyIsDoneToggle(forceValue: true);
+        await services.Db.SaveChangesAsync(ct);
+
+        await services.DueReminders.SyncAsync([item.Id], ct);
+        if (item.IsDone)
+            await new TodoListItemIsDoneChangedEvent(item.Id, userId, true).PublishAsync(Mode.WaitForAll, ct);
+    }
+
+    /// <remarks>
+    /// The same lazy single-item reset <see cref="PlannerTaskIsDoneChangedEventHandler"/> and the toggle endpoints
+    /// run first, so a sitting landing after the period elapsed ticks the new cycle, not the closed one.
+    /// </remarks>
+    private static async Task TickRoutineItemAsync(Collaborators services, long userId, long itemId, CancellationToken ct)
+    {
+        var dbContext = services.Db;
+        var item = await dbContext.Set<RoutineTodoList>()
+            .Include(r => r.RoutineTimePeriod)
+            .Include(r => r.Steps)
+            .FirstOrDefaultAsync(r => r.Id == itemId && r.UserId == userId, ct);
+        if (item is null)
+            return;
+
+        var now = DateTime.UtcNow;
+        var awayDays = (await services.AwayDays.ForDueCyclesAsync(dbContext, [item.RoutineTimePeriod], now, ct))
+            .GetValueOrDefault(item.UserId);
+        RoutineResetService.CheckGrace(item.RoutineTimePeriod, now);
+        RoutineResetService.TryReset(item.RoutineTimePeriod, item, now, awayDays);
+
+        var ticked = !item.IsDone;
+        if (ticked)
+        {
+            item.ApplyIsDoneToggle(forceValue: true);
+            RoutineResetService.UpdateItemStreak(item, now);
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+
+        if (ticked && item.IsDone)
+            await new RoutineTodoListIsDoneChangedEvent(item.ActivityId, userId, true).PublishAsync(Mode.WaitForAll, ct);
     }
 
     /// <summary>
@@ -202,7 +306,8 @@ public class ActivityTimeRecordedEventHandler(
         IReminderRegistrationService Reminders,
         IActivityTimeAttributionSink Sink,
         IUserTimeZoneResolver TimeZones,
-        ITodoListItemDueReminderSync DueReminders);
+        ITodoListItemDueReminderSync DueReminders,
+        IRoutineAwayDaysReader AwayDays);
 
     /// <remarks>
     /// When the time was logged <em>for</em> an item (<see cref="ActivityDayTotal.TodoListItemId"/> /
@@ -210,6 +315,12 @@ public class ActivityTimeRecordedEventHandler(
     /// not touched. Otherwise the open item for the activity, oldest first: two open items sharing an activity
     /// used to be settled by whichever Postgres returned first, which is a visible wrong tick once a deliberate
     /// timer can trigger it rather than only background tracking.
+    /// <para>
+    /// <b>Plain items only.</b> A counted item ("4×") takes one tick per repetition, so reaching its suggested
+    /// time cannot stand for all of them: it used to jump straight to done (<c>DoneCount = TotalCount</c>), and one
+    /// pomodoro finished a four-repetition item (FO2). A repetition is counted by <see cref="CountRepetitionAsync"/>,
+    /// from a sitting the user logged as one.
+    /// </para>
     /// </remarks>
     private static async Task AutomateWithoutPlannerTaskAsync(Collaborators services, long userId, ActivityDayTotal total, CancellationToken ct)
     {
@@ -226,7 +337,7 @@ public class ActivityTimeRecordedEventHandler(
     {
         var dbContext = services.Db;
         var candidates = dbContext.Set<TodoListItem>()
-            .Where(i => i.UserId == userId && !i.IsDone && i.SuggestedTime != null);
+            .Where(i => i.UserId == userId && !i.IsDone && i.SuggestedTime != null && i.TotalCount == null);
         var todoItem = await (total.TodoListItemId is { } itemId
                 ? candidates.Where(i => i.Id == itemId)
                 : candidates.Where(i => i.ActivityId == total.ActivityId).OrderBy(i => i.Id))
@@ -235,8 +346,6 @@ public class ActivityTimeRecordedEventHandler(
         if (todoItem != null && total.TotalSecondsOnDay >= todoItem.SuggestedTime!.TotalSeconds)
         {
             todoItem.IsDone = true;
-            if (todoItem.TotalCount.HasValue)
-                todoItem.DoneCount = todoItem.TotalCount;
             await dbContext.SaveChangesAsync(ct);
 
             // Finished by tracked time is finished: its due reminder is withdrawn like a manual tick's.
@@ -247,7 +356,7 @@ public class ActivityTimeRecordedEventHandler(
     private static async Task CompleteRoutineItemAsync(AppDbContext dbContext, long userId, ActivityDayTotal total, CancellationToken ct)
     {
         var candidates = dbContext.Set<RoutineTodoList>()
-            .Where(r => r.UserId == userId && !r.IsDone && r.SuggestedTime != null);
+            .Where(r => r.UserId == userId && !r.IsDone && r.SuggestedTime != null && r.TotalCount == null);
         var routineItem = await (total.RoutineTodoListId is { } itemId
                 ? candidates.Where(r => r.Id == itemId)
                 : candidates.Where(r => r.ActivityId == total.ActivityId).OrderBy(r => r.Id))
@@ -256,8 +365,6 @@ public class ActivityTimeRecordedEventHandler(
         if (routineItem != null && total.TotalSecondsOnDay >= routineItem.SuggestedTime!.TotalSeconds)
         {
             routineItem.IsDone = true;
-            if (routineItem.TotalCount.HasValue)
-                routineItem.DoneCount = routineItem.TotalCount;
             RoutineResetService.UpdateItemStreak(routineItem, DateTime.UtcNow);
             await dbContext.SaveChangesAsync(ct);
         }

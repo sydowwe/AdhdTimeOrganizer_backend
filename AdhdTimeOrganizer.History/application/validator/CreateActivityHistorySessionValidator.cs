@@ -67,6 +67,10 @@ public class CreateActivityHistorySessionValidator : Validator<CreateActivityHis
             .WithMessage("A session cannot be linked to both a to-do item and a routine item.")
             .WithName(nameof(CreateActivityHistorySessionRequest.TodoListItemId));
 
+        RuleFor(x => x.CountsAsRepetition)
+            .Must((req, counts) => !counts || req.TodoListItemId.HasValue || req.RoutineTodoListId.HasValue)
+            .WithMessage("CountsAsRepetition needs the item it is a repetition of (TodoListItemId or RoutineTodoListId).");
+
         // ---- records ----------------------------------------------------------------------------------
 
         RuleFor(x => x.Records)

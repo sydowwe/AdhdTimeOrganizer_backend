@@ -101,7 +101,7 @@ public class CreateActivityHistorySessionEndpoint(
 
         // Past the commit, before the 201 — see CreateActivityHistoryEndpoint.AfterSave (FO2). Every row goes,
         // breaks included: a break is time on the rest activity, and only the work rows carry the item link.
-        await timeRecorded.PublishAsync(dbContext, userId, session.Records.ToList(), ct);
+        await timeRecorded.PublishAsync(dbContext, userId, session.Records.ToList(), req.CountsAsRepetition, ct);
 
         await Send.ResponseAsync(new CreateActivityHistorySessionResponse
         {

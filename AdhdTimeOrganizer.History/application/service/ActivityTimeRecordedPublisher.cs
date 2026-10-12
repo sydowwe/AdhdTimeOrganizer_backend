@@ -36,6 +36,11 @@ namespace AdhdTimeOrganizer.History.application.service;
 /// activity. A session stamps the link on its work rows only, so the rest activity never inherits it.
 /// </para>
 /// <para>
+/// <b>A repetition is counted once per request.</b> When the caller says the rows are one sitting of their item
+/// (<c>countsAsRepetition</c>), only the first event carrying the link says so; a sitting that crosses midnight
+/// publishes a second event for the next day, and that one must not tick the item again.
+/// </para>
+/// <para>
 /// <b>Failures are logged, not thrown.</b> The rows are committed before this runs; a 500 now would make the
 /// client retry a save that succeeded, and the retry would 409 on the row's unique key.
 /// </para>
@@ -45,7 +50,8 @@ public sealed class ActivityTimeRecordedPublisher(
     IUserTimeZoneResolver timeZones,
     ILogger<ActivityTimeRecordedPublisher> logger) : IActivityTimeRecordedPublisher, IScopedService
 {
-    public async Task PublishAsync(DbContext db, long userId, IReadOnlyCollection<ActivityHistory> rows, CancellationToken ct)
+    public async Task PublishAsync(
+        DbContext db, long userId, IReadOnlyCollection<ActivityHistory> rows, bool countsAsRepetition, CancellationToken ct)
     {
         if (rows.Count == 0)
             return;
@@ -60,6 +66,8 @@ public sealed class ActivityTimeRecordedPublisher(
                 .OrderBy(g => g.Key.Day)
                 .ThenBy(g => g.Min(x => x.Segment.Start));
 
+            var repetitionPending = countsAsRepetition;
+
             foreach (var group in groups)
             {
                 var (day, activityId) = group.Key;
@@ -71,12 +79,16 @@ public sealed class ActivityTimeRecordedPublisher(
                     .Select(x => x.Row)
                     .FirstOrDefault(r => r.TodoListItemId is not null || r.RoutineTodoListId is not null);
 
+                var countsHere = repetitionPending && linked is not null;
+                if (countsHere)
+                    repetitionPending = false;
+
                 await new ActivityTimeRecordedEvent(
                         userId,
                         day,
                         TimeOnly.FromDateTime(group.Min(x => x.Segment.Start)),
                         TimeOnly.FromDateTime(group.Max(x => x.Segment.End)),
-                        [new ActivityDayTotal(activityId, totalSeconds, linked?.TodoListItemId, linked?.RoutineTodoListId)])
+                        [new ActivityDayTotal(activityId, totalSeconds, linked?.TodoListItemId, linked?.RoutineTodoListId, countsHere)])
                     .PublishAsync(Mode.WaitForAll, ct);
             }
         }

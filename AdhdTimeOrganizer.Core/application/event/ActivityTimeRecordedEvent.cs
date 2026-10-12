@@ -58,8 +58,16 @@ public record ActivityTimeRecordedEvent(
 /// the activity. Null from the heartbeat, which only ever knows the activity.
 /// </param>
 /// <param name="RoutineTodoListId">Same as <paramref name="TodoListItemId"/>, for a routine item. Never both.</param>
+/// <param name="CountsAsRepetition">
+/// The time is one deliberate sitting the user logged <em>as</em> doing the linked item — a timer or a log started
+/// from the item's own row — so the handler ticks that item once: one repetition of a counted item, done for a plain
+/// one, however long it ran. True on at most one total per request, so a sitting that crosses midnight is still one
+/// repetition. False for time logged against an item only so the recap credits it (home's planner-block timer, where
+/// the block decides), and always false from the trackers. FO2.
+/// </param>
 public record ActivityDayTotal(
     long ActivityId,
     int TotalSecondsOnDay,
     long? TodoListItemId = null,
-    long? RoutineTodoListId = null);
+    long? RoutineTodoListId = null,
+    bool CountsAsRepetition = false);
