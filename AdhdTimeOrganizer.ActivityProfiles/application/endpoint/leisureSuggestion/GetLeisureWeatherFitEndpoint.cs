@@ -2,7 +2,6 @@ using AdhdTimeOrganizer.ActivityProfiles.application.dto.response;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.service;
-using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.extensions;
@@ -22,23 +21,20 @@ namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.leisureSuggest
 ///
 /// <para><b>Every failure is an empty set, deliberately.</b> No location set, a place that does not geocode, a
 /// provider outage — all answer 200 with nothing matching. The client reads an empty set and a failed call
-/// identically ("no weather opinion"): nothing ranks up, no badge renders, nothing is excluded. A 500 here would
-/// buy the caller no information it could act on and would put an error in front of a user who merely never
-/// filled in a setting.</para>
+/// identically ("no weather opinion"): no badge renders. A 500 here would buy the caller no information it could
+/// act on and would put an error in front of a user who merely never filled in a setting.</para>
 ///
-/// <para><b>Nothing here blocks the draw.</b> This is its own GET precisely so the picker's first cards do not
-/// wait on a third party; the client fires it alongside the draw and never retries.</para>
+/// <para><b>Since F2-04 this only paints the badge.</b> The ranking reads the same signal inside the draw
+/// (<see cref="ILeisureWeatherSignal"/>), so the two cannot disagree about today's weather. This stays its own GET
+/// so the badge on the backlog table, which has no draw, can still ask.</para>
 /// </summary>
-public class GetLeisureWeatherFitEndpoint(
-    DbContext dbContext,
-    IDailyWeatherProvider weatherProvider,
-    ILogger<GetLeisureWeatherFitEndpoint> logger)
+public class GetLeisureWeatherFitEndpoint(DbContext dbContext, ILeisureWeatherSignal weatherSignal)
     : EndpointWithoutRequest<LeisureWeatherFitResponse>
 {
     /// <summary>
-    /// A fresh instance per call, not a shared static one: this DTO leaves the endpoint on both empty paths
-    /// and a single instance handed to every caller is one <c>PostProcess</c> hook away from one request
-    /// mutating another's response. The paths that use it make no DB call at all, so the allocation is free.
+    /// A fresh instance per call, not a shared static one: this DTO leaves the endpoint on the empty path, and a
+    /// single instance handed to every caller is one <c>PostProcess</c> hook away from one request mutating
+    /// another's response.
     /// </summary>
     private static LeisureWeatherFitResponse NoSignal() => new() { MatchingWeatherDependencyIds = [] };
 
@@ -60,41 +56,12 @@ public class GetLeisureWeatherFitEndpoint(
     {
         var userId = User.GetId();
 
-        // User is not IEntityWithUser and carries no global query filter, so the id predicate is the scoping.
-        var location = await dbContext.Set<User>()
-            .Where(u => u.Id == userId)
-            .Select(u => u.WeatherLocation)
-            .FirstOrDefaultAsync(ct);
-
-        if (string.IsNullOrWhiteSpace(location))
+        var matchingCodes = await weatherSignal.TodayMatchingCodesAsync(userId, maxWait: null, ct);
+        if (matchingCodes is null)
         {
             await Send.OkAsync(NoSignal(), ct);
             return;
         }
-
-        // IDailyWeatherProvider promises never to throw; this catch is what makes "this endpoint is never an
-        // error" true of the endpoint rather than merely of the implementation currently registered. The
-        // location itself stays out of the log line — it is the user's town.
-        DailyWeather? weather;
-        try
-        {
-            weather = await weatherProvider.GetTodayAsync(location, ct);
-        }
-        catch (Exception exception) when (!ct.IsCancellationRequested)
-        {
-            logger.LogWarning(exception,
-                "The weather provider threw rather than returning no signal; user {UserId} gets no weather opinion today",
-                userId);
-            weather = null;
-        }
-
-        if (weather is null)
-        {
-            await Send.OkAsync(NoSignal(), ct);
-            return;
-        }
-
-        var matchingCodes = WeatherFitRule.MatchingCodes(weather);
 
         var rows = await dbContext.Set<ActivityWeatherDependency>()
             .Where(d => d.UserId == userId)

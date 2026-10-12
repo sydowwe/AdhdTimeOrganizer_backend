@@ -34,14 +34,25 @@ namespace AdhdTimeOrganizer.ActivityProfiles.application.endpoint.leisureSuggest
 /// <para>The rule itself is <see cref="LeisureDrawRanker"/>. This endpoint only decides which rows reach it,
 /// and turns what comes back into cards.</para>
 /// </summary>
-public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
+public class DrawLeisureSuggestionEndpoint(DbContext dbContext, ILeisureWeatherSignal weatherSignal)
     : Endpoint<LeisureSuggestionDrawRequest, LeisureSuggestionDrawResponse>
 {
     /// <summary>
-    /// One candidate, split into the facts the rule reads and the one fact only the card reads. Keeping them
+    /// How long the draw waits on today's weather before ranking without it (F2-04). Short on purpose: the
+    /// provider caches the day, and the picker's own <c>/leisure-weather-fit</c> call warms that cache, so this
+    /// only bites on a cold cache during a slow provider — and then the cards should come anyway.
+    /// </summary>
+    private static readonly TimeSpan WeatherMaxWait = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// One candidate, split into the facts the rule reads and the facts only the card reads. Keeping them
     /// apart is what stops the ranking from quietly starting to depend on a label.
     /// </summary>
-    private sealed record DrawRow(LeisureCandidate Candidate, string? ContextLabel);
+    /// <param name="WeatherDependencyId">
+    /// The backlog row's weather-dependency lookup id, only when it is a real dependency — the card compares it
+    /// with <c>/leisure-weather-fit</c>'s ids to say <i>why</i> it matched. The rule reads the code instead.
+    /// </param>
+    private sealed record DrawRow(LeisureCandidate Candidate, string? ContextLabel, long? WeatherDependencyId = null);
 
     public override void Configure()
     {
@@ -81,6 +92,13 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
         if (req.Minutes >= LeisureDrawRanker.BucketListMinMinutes)
             rows.AddRange(await ReadBucketListAsync(userId, ct));
 
+        // Weather only matters to a backlog row filed under a real dependency, so a pool without one costs no
+        // outbound call. The same flag tells the picker whether "set your town" would change anything.
+        var hasWeatherDependentCandidates = rows.Any(row => row.Candidate.WeatherCode is not null);
+        var weatherMatchCodes = hasWeatherDependentCandidates
+            ? await weatherSignal.TodayMatchingCodesAsync(userId, WeatherMaxWait, ct)
+            : null;
+
         var context = new LeisureRankingContext(
             constraints,
             await ReadHistoryAsync(userId, ct),
@@ -88,7 +106,8 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
             DateTime.UtcNow,
             // The seed is a uint32 the client keeps in the page URL; the validator pins it to that range, so
             // this cast never loses a bit it was given.
-            unchecked((uint)req.Seed));
+            unchecked((uint)req.Seed),
+            weatherMatchCodes);
 
         var (chosen, eligibleCount) = LeisureDrawRanker.Draw(rows.Select(row => row.Candidate), context, req.Count);
 
@@ -104,7 +123,8 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
                 .Select(candidate => Map(byKey[candidate.Key], activities[candidate.ActivityId]))
                 .ToList(),
             PoolCount = poolCount,
-            EligibleCount = eligibleCount
+            EligibleCount = eligibleCount,
+            HasWeatherDependentCandidates = hasWeatherDependentCandidates
         }, ct);
     }
 
@@ -120,6 +140,8 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
         EnergyIsDerived = row.Candidate.EnergyIsDerived,
         EffortType = LeisureSuggestionTokens.Token(row.Candidate.EffortType),
         MinParticipants = row.Candidate.MinParticipants,
+        MaxParticipants = row.Candidate.MaxParticipants,
+        WeatherDependencyId = row.WeatherDependencyId,
         ReadinessStatus = row.Candidate.ReadinessStatus is { } status ? LeisureSuggestionTokens.Token(status) : null,
         ComfortZoneStep = row.Candidate.ComfortZoneStep,
         RequiresTravel = row.Candidate.RequiresTravel,
@@ -196,7 +218,11 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
                 p.EnergyLevel,
                 p.EffortType,
                 p.MinParticipants,
+                p.MaxParticipants,
                 p.DurationMinutes,
+                p.WeatherDependencyId,
+                WeatherCode = p.WeatherDependency.Code,
+                WeatherText = p.WeatherDependency.Text,
                 ContextLabel = p.LocationType.Text
             })
             .ToListAsync(ct);
@@ -206,6 +232,10 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
             // A backlog row with no duration recorded is not a row that takes no time — it is one the user
             // never filled in. It must not be excluded as "0 minutes does not fit", nor shown as "takes 0 min".
             var duration = row.DurationMinutes > 0 ? row.DurationMinutes : (int?)null;
+            // The same code the backlog response and /leisure-weather-fit resolve, label inference included.
+            // "none" and an unrecognised label both become null: no weather opinion on this row.
+            var effectiveCode = WeatherDependencyCodes.Effective(row.WeatherCode, row.WeatherText);
+            var realCode = effectiveCode is null || effectiveCode == WeatherDependencyCodes.None ? null : effectiveCode;
             return new DrawRow(
                 new LeisureCandidate(
                     LeisureSuggestionSource.Backlog,
@@ -218,8 +248,11 @@ public class DrawLeisureSuggestionEndpoint(DbContext dbContext)
                     row.MinParticipants,
                     ReadinessStatus: null,
                     ComfortZoneStep: null,
-                    RequiresTravel: false),
-                NullIfBlank(row.ContextLabel));
+                    RequiresTravel: false,
+                    row.MaxParticipants,
+                    realCode),
+                NullIfBlank(row.ContextLabel),
+                realCode is null ? null : row.WeatherDependencyId);
         }).ToList();
     }
 

@@ -16,7 +16,10 @@ namespace AdhdTimeOrganizer.ActivityProfiles.domain.service;
 /// <list type="bullet">
 /// <item><b>Backlog</b>: a stated duration longer than the time available, or a <c>MinParticipants</c>
 /// above the people available. Cost tier and location type are excluded in SQL before candidates get
-/// here — the query can express them, so it should.</item>
+/// here — the query can express them, so it should. When today's weather is known
+/// (<see cref="LeisureRankingContext.WeatherMatchCodes"/> is non-null), a real weather dependency today does not
+/// fit is excluded too — an activity that needs snow in July is not a suggestion, it is a taunt. Unknown weather
+/// excludes nothing: absence of the signal must never read as a mismatch.</item>
 /// <item><b>Project</b>: <c>NeedsShopping</c> is not a suggestion, it is an errand. And a project session
 /// needs a real block of time — under <see cref="ProjectMinMinutes"/> there is no point starting one.
 /// <c>EstimatedHours</c> is deliberately NOT a hard constraint: it estimates the whole project, not one
@@ -32,7 +35,9 @@ namespace AdhdTimeOrganizer.ActivityProfiles.domain.service;
 /// as derived everywhere it reaches the UI.</para>
 ///
 /// <para><b>Soft signals (<see cref="Score"/>) rank.</b> Energy fit (asymmetric: too demanding is worse
-/// than too easy), duration fit (using most of the free time beats a five-minute filler), effort variety
+/// than too easy), duration fit (using most of the free time beats a five-minute filler), weather fit (a real
+/// dependency today's conditions match is a happy coincidence worth surfacing), party size (more people around
+/// than the activity takes — doable, but leaves someone out), effort variety
 /// against the last thing committed to, staleness (the same three every visit is the failure mode of a
 /// top-3), source weight (the bucket list is a rare treat, not the daily driver), project readiness,
 /// comfort step, and jitter — because a deterministic top-3 is invisible after a week.</para>
@@ -88,6 +93,15 @@ public static class LeisureDrawRanker
 
     /// <summary>Sources that state no duration sit at the middle of that range rather than losing to it.</summary>
     private const double DurationFitNeutral = 1;
+
+    /// <summary>A backlog entry whose real weather dependency today's conditions match — a happy coincidence.</summary>
+    private const double WeatherMatchBonus = 1.5;
+
+    /// <summary>
+    /// Flat, not per extra person: the picker's top "people" answer means "a group" (4+), so the distance past
+    /// the cap is not a number it actually knows.
+    /// </summary>
+    private const double PartyTooBigPenalty = -2;
 
     private const double EffortVarietyBonus = 1;
     private const double StalenessNeverSuggested = 3;
@@ -174,7 +188,8 @@ public static class LeisureDrawRanker
     /// A candidate that fails one of these is not shown at all, however well it would score: an activity
     /// that does not fit the time available is not a suggestion, it is a taunt.
     /// </summary>
-    public static bool IsEligible(LeisureCandidate candidate, LeisureDrawConstraints constraints)
+    public static bool IsEligible(LeisureCandidate candidate, LeisureDrawConstraints constraints,
+        IReadOnlySet<string>? weatherMatchCodes = null)
     {
         if (candidate.MinParticipants is { } minParticipants && minParticipants > constraints.People)
             return false;
@@ -182,7 +197,8 @@ public static class LeisureDrawRanker
         return candidate.Source switch
         {
             LeisureSuggestionSource.Backlog =>
-                candidate.StatedDurationMinutes is null || candidate.StatedDurationMinutes <= constraints.Minutes,
+                !WeatherRulesOut(candidate, weatherMatchCodes)
+                && (candidate.StatedDurationMinutes is null || candidate.StatedDurationMinutes <= constraints.Minutes),
             LeisureSuggestionSource.Project =>
                 candidate.ReadinessStatus != ReadinessStatus.NeedsShopping && constraints.Minutes >= ProjectMinMinutes,
             LeisureSuggestionSource.BucketList =>
@@ -191,6 +207,13 @@ public static class LeisureDrawRanker
             _ => false
         };
     }
+
+    /// <summary>A real dependency, a known day, and the day does not fit it. Every other combination is "no opinion".</summary>
+    private static bool WeatherRulesOut(LeisureCandidate candidate, IReadOnlySet<string>? weatherMatchCodes) =>
+        candidate.WeatherCode is { } code && weatherMatchCodes is not null && !weatherMatchCodes.Contains(code);
+
+    private static bool WeatherFits(LeisureCandidate candidate, IReadOnlySet<string>? weatherMatchCodes) =>
+        candidate.WeatherCode is { } code && weatherMatchCodes is not null && weatherMatchCodes.Contains(code);
 
     /// <summary>
     /// How long to book for when the user commits. Never longer than they said they had, never longer than
@@ -238,6 +261,12 @@ public static class LeisureDrawRanker
         score += Staleness(candidate, context);
         score += SourceWeight(candidate.Source);
 
+        if (WeatherFits(candidate, context.WeatherMatchCodes))
+            score += WeatherMatchBonus;
+
+        if (candidate.MaxParticipants is { } maxParticipants && context.Constraints.People > maxParticipants)
+            score += PartyTooBigPenalty;
+
         if (candidate.EffortType is { } effort && context.LastCommittedEffort is { } lastEffort && effort != lastEffort)
             score += EffortVarietyBonus;
 
@@ -260,7 +289,7 @@ public static class LeisureDrawRanker
         IEnumerable<LeisureCandidate> candidates, LeisureRankingContext context, int count)
     {
         var ranked = candidates
-            .Where(candidate => IsEligible(candidate, context.Constraints))
+            .Where(candidate => IsEligible(candidate, context.Constraints, context.WeatherMatchCodes))
             .Select(candidate => (Candidate: candidate, Score: Score(candidate, context)))
             // The key tiebreak is what makes the seed contract hold: scores can tie exactly (two backlog
             // rows with the same duration and energy, both never suggested), and without it the order

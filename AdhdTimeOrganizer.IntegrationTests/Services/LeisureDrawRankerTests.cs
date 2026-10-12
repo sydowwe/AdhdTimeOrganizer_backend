@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.ActivityProfiles.domain.model;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.ActivityProfiles.domain.service;
 using FluentAssertions;
@@ -187,6 +188,79 @@ public class LeisureDrawRankerTests
         var sameAgain = Backlog(1, effort: EffortType.Physical);
 
         LeisureDrawRanker.Score(variety, context).Should().BeGreaterThan(LeisureDrawRanker.Score(sameAgain, context));
+    }
+
+    // ─── weather and party size (F2-04: the two signals only the client's ranker had) ─────────────────
+    //
+    // Ported from the client's leisureScoring.test.ts when the picker moved onto this rule, with the client's
+    // weights: a 1.5 bonus for a matching real dependency, a flat -2 when more people are around than the
+    // activity takes. Same candidate key on both sides of each comparison, so the jitter cancels and the
+    // difference is the signal alone.
+
+    private static readonly IReadOnlySet<string> FineDay =
+        new HashSet<string> { WeatherDependencyCodes.None, WeatherDependencyCodes.Dry, WeatherDependencyCodes.Sunny };
+
+    private static LeisureCandidate WeatherBacklog(long id, string? weatherCode) =>
+        new(LeisureSuggestionSource.Backlog, id, 30, 30, EnergyLevel.Low, false, null, 1, null, null, false,
+            WeatherCode: weatherCode);
+
+    private static LeisureRankingContext WeatherContext(IReadOnlySet<string>? codes) =>
+        new(new LeisureDrawConstraints(240, EnergyLevel.Low, 1), new Dictionary<string, DateTime>(), null, Now, 1837465239,
+            codes);
+
+    [Fact]
+    public void ARealDependencyTodayDoesNotFit_IsNotOffered_OnlyWhenTheSignalIsKnown()
+    {
+        var constraints = new LeisureDrawConstraints(240, EnergyLevel.Low, 1);
+        var wantsSnow = WeatherBacklog(1, WeatherDependencyCodes.Snow);
+
+        LeisureDrawRanker.IsEligible(wantsSnow, constraints, FineDay).Should().BeFalse("snow in July is a taunt");
+        LeisureDrawRanker.IsEligible(wantsSnow, constraints, weatherMatchCodes: null)
+            .Should().BeTrue("no signal is no opinion, never a mismatch");
+        LeisureDrawRanker.IsEligible(WeatherBacklog(2, WeatherDependencyCodes.Sunny), constraints, FineDay).Should().BeTrue();
+    }
+
+    [Fact]
+    public void AnEntryWithNoRealDependency_IsNeverExcludedOnWeather()
+    {
+        // The endpoint passes null for a "none" row and for a label that infers nothing.
+        var snowDay = new HashSet<string> { WeatherDependencyCodes.None, WeatherDependencyCodes.Snow };
+
+        LeisureDrawRanker.IsEligible(WeatherBacklog(1, weatherCode: null), new LeisureDrawConstraints(240, EnergyLevel.Low, 1), snowDay)
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void AMatchingRealDependency_RanksUpByTheBonus()
+    {
+        var sunny = WeatherBacklog(1, WeatherDependencyCodes.Sunny);
+
+        var withSignal = LeisureDrawRanker.Score(sunny, WeatherContext(FineDay));
+        var withoutSignal = LeisureDrawRanker.Score(sunny, WeatherContext(null));
+
+        (withSignal - withoutSignal).Should().BeApproximately(1.5, 1e-9);
+    }
+
+    [Fact]
+    public void AnEntryWithNoRealDependency_GetsNoWeatherBonus()
+    {
+        var indoor = WeatherBacklog(1, weatherCode: null);
+
+        LeisureDrawRanker.Score(indoor, WeatherContext(FineDay))
+            .Should().Be(LeisureDrawRanker.Score(indoor, WeatherContext(null)),
+                "a none row is in every fit set, so boosting it would boost every indoor activity");
+    }
+
+    [Fact]
+    public void MorePeopleThanTheActivityTakes_IsDemotedNotDropped()
+    {
+        var twoPlayer = new LeisureCandidate(LeisureSuggestionSource.Backlog, 1, 30, 30, EnergyLevel.Low, false, null, 1,
+            null, null, false, MaxParticipants: 2);
+        var constraints = new LeisureDrawConstraints(240, EnergyLevel.Low, 4);
+
+        LeisureDrawRanker.IsEligible(twoPlayer, constraints).Should().BeTrue("a two-player game is still something to do");
+        (LeisureDrawRanker.Score(twoPlayer, Context(people: 4)) - LeisureDrawRanker.Score(twoPlayer, Context(people: 2)))
+            .Should().BeApproximately(-2, 1e-9, "flat, not per extra person");
     }
 
     // ─── source caps ─────────────────────────────────────────────────────────────────────────────────

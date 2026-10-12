@@ -48,15 +48,19 @@ is not an API break, and a new member cannot reach the wire unspelled: the mappe
   decision, written down where the diff will show it.
 - `LeisureCandidate` — the facts the rule reads, flattened out of whichever profile the row came from.
 - `LeisureDrawConstraints` / `LeisureRankingContext` — what the user has available, and the history +
-  reference instant + seed the ranking reads.
+  reference instant + seed + today's weather codes (`null` = no signal) the ranking reads.
 
 `LeisureDrawRankerTests` (no database) is the guard on all of it.
 
 The weather signal is a second, much smaller pure rule in the same folder:
 
 - `WeatherFitRule` — which of the four `WeatherDependencyCodes` a day fits. Thresholds are deliberately
-  generous: the signal only ever ranks **up** and paints a badge, so a false negative costs the feature
-  while a false positive costs one odd card.
+  generous: a false negative costs the feature while a false positive costs one odd card. Since F2-04 a
+  known day also **excludes** a backlog row whose real dependency it does not fit (inside the draw), so a
+  wrong "wet" now hides a walk for the day rather than only skipping its badge.
+- `ILeisureWeatherSignal` — user → today's matching codes, or `null`. Implemented by
+  `application/service/LeisureWeatherSignal` (location read, bounded wait, the never-throw `catch`); both the
+  weather-fit route and the draw go through it, so the badge and the ranking cannot disagree.
 - `DailyWeather` — the four numbers the rule reads, and the whole of what a provider must supply.
 - `IDailyWeatherProvider` — place name → today's numbers, **or null; never an exception**. The
   implementation lives in `infrastructure/extService/weather/` (Open-Meteo, no API key, two cached calls).
@@ -104,7 +108,7 @@ convention rather than a literal string, so renaming one of those entities moves
 | `project/` | 9 | `/api/activity-project-profile*` — derived, except two patches that re-route off `BasePatchEndpoint`'s `/{id}` in their `Configure`: the status-only `PATCH .../{id}/status`, and `PATCH .../{id}/shopping-item` (FO13), which stores the handoff's to-do item id after checking it through the `todoListItem` ownership verifier (404 when not the caller's) |
 | `memoryAnchor/` | 8 | `/api/memory-anchor/*` — derived, plus the explicit `GET /api/memory-anchor/anchor-eligible-activities` (`GetAnchorEligibleActivitiesEndpoint`): the caller's un-archived activities with a backlog or bucket-list profile, as `SelectOptionResponse`s ordered by name. Already-anchored activities stay listed — the only create-time refusal is the two-per-month ceiling. It reads `Activity` directly, so it is not on any base and scopes by hand |
 | `lookup/{expectedCostTier,experienceType,locationType,weatherDependency}/` | 24 | `/api/activity-*-type/*` etc. — derived |
-| `leisureSuggestion/` | 3 | `POST /api/leisure-suggestion` (the ranked draw), `POST /api/leisure-suggestion/seen` (its outcome, 204) and `GET /api/leisure-weather-fit` (today's matching weather-dependency ids) — explicit routes, hand-written rather than base-derived |
+| `leisureSuggestion/` | 3 | `POST /api/leisure-suggestion` (the ranked draw; the picker's only source since F2-04), `POST /api/leisure-suggestion/seen` (its outcome, 204) and `GET /api/leisure-weather-fit` (today's matching weather-dependency ids, for the badge) — explicit routes, hand-written rather than base-derived |
 
 Every profile endpoint is built on a Framework base and states its ownership through the base's own
 hook: the three `Grid*ProfileEndpoint`s override `ApplyUserScoping`, `GetAll…` and the three

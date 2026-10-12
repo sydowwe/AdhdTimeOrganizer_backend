@@ -46,6 +46,16 @@ public record LeisureSuggestionItemResponse
     /// <summary>Backlog only; null elsewhere.</summary>
     public int? MinParticipants { get; init; }
 
+    /// <summary>Backlog only, and optional there; null elsewhere. The rule demotes a row with fewer seats than people.</summary>
+    public int? MaxParticipants { get; init; }
+
+    /// <summary>
+    /// Backlog only: the weather-dependency lookup id, and only when it is a real dependency (not <c>none</c>, not
+    /// an unrecognised label). The card compares it with <c>/leisure-weather-fit</c>'s ids to say the activity
+    /// fits today's weather.
+    /// </summary>
+    public long? WeatherDependencyId { get; init; }
+
     /// <summary>Project only: <c>planning</c> | <c>readyToStart</c>. <c>needsShopping</c> never appears in a draw.</summary>
     public string? ReadinessStatus { get; init; }
 
@@ -79,6 +89,13 @@ public record LeisureSuggestionDrawResponse
 
     /// <summary>Candidates that survived the constraints.</summary>
     public required int EligibleCount { get; init; }
+
+    /// <summary>
+    /// Some backlog row this draw read is filed under a real weather dependency, so a weather signal would change
+    /// the draw. Gates the picker's "set your town" hint: without such a row, asking for a location promises an
+    /// effect the user would never see.
+    /// </summary>
+    public required bool HasWeatherDependentCandidates { get; init; }
 
     // These two are not statistics, they are what the empty state says: PoolCount == 0 renders "you have
     // nothing filed yet, go add some", while PoolCount > 0 with no items renders "nothing matches, try

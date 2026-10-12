@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using AdhdTimeOrganizer.ActivityProfiles.domain.model;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
+using AdhdTimeOrganizer.ActivityProfiles.domain.service;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.@base;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
@@ -13,6 +15,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.Testing;
 using Xunit;
@@ -535,6 +538,129 @@ public class LeisureSuggestionTests(AppDbContextFixture fixture) : PostgresTestB
             "ApplyStatus clears the actual times for NotStarted, so storing one would be a value the next status change drops");
     }
 
+    // ─── weather (F2-04): the signal the client's ranker had and this one did not ──────────────────
+    //
+    // The rule's weather semantics are pinned in LeisureDrawRankerTests. These pin the plumbing that fails
+    // quietly: that the draw really reads the user's location through the provider, that a row's stored code
+    // (not its label) decides, that the card carries the id the badge compares, and that a pool with nothing
+    // weather-dependent never costs an outbound call.
+
+    private static readonly DailyWeather FineDay = new(PrecipitationMm: 0, SnowfallCm: 0, MaxTemperatureC: 24, SunshineHours: 9);
+
+    [Fact]
+    public async Task OnAFineDay_ASnowActivityIsDropped_AndASunnyOneCarriesItsWeatherId()
+    {
+        await using var db = CreateDbContext();
+        await SetLocationAsync(db, "Bratislava, SK");
+        var snowId = await SeedWeatherAsync(db, "Wants snow", WeatherDependencyCodes.Snow);
+        var sunnyId = await SeedWeatherAsync(db, "Wants sun", WeatherDependencyCodes.Sunny);
+        var sledging = await SeedBacklogAsync(db, UserId, "Sledging", weatherDependencyId: snowId);
+        var picnic = await SeedBacklogAsync(db, UserId, "Picnic", weatherDependencyId: sunnyId);
+
+        var (draw, calls) = await DrawWithWeatherAsync(FineDay);
+
+        calls.Should().Be(1);
+        draw.HasWeatherDependentCandidates.Should().BeTrue();
+        draw.Items.Select(i => i.ActivityId).Should().Contain(picnic).And.NotContain(sledging, "snow on a fine day is a taunt");
+        draw.Items.Single(i => i.ActivityId == picnic).WeatherDependencyId.Should().Be(sunnyId);
+    }
+
+    [Fact]
+    public async Task WithNoLocation_WeatherExcludesNothing_AndCostsNoCall()
+    {
+        await using var db = CreateDbContext();
+        var snowId = await SeedWeatherAsync(db, "Wants snow", WeatherDependencyCodes.Snow);
+        var sledging = await SeedBacklogAsync(db, UserId, "Sledging", weatherDependencyId: snowId);
+
+        var (draw, calls) = await DrawWithWeatherAsync(FineDay);
+
+        calls.Should().Be(0, "no town, no question to ask the provider");
+        draw.HasWeatherDependentCandidates.Should().BeTrue("the hint to set a town is exactly for this user");
+        draw.Items.Select(i => i.ActivityId).Should().Contain(sledging, "no signal is no opinion, never a mismatch");
+    }
+
+    [Fact]
+    public async Task WhenTheProviderHasNoAnswer_WeatherExcludesNothing()
+    {
+        await using var db = CreateDbContext();
+        await SetLocationAsync(db, "Nowhere-in-particular");
+        var snowId = await SeedWeatherAsync(db, "Wants snow", WeatherDependencyCodes.Snow);
+        var sledging = await SeedBacklogAsync(db, UserId, "Sledging", weatherDependencyId: snowId);
+
+        var (draw, calls) = await DrawWithWeatherAsync(weather: null);
+
+        calls.Should().Be(1);
+        draw.Items.Select(i => i.ActivityId).Should().Contain(sledging);
+    }
+
+    [Fact]
+    public async Task APoolWithNoRealDependency_CostsNoCall_AndAsksForNoTown()
+    {
+        await using var db = CreateDbContext();
+        await SetLocationAsync(db, "Bratislava, SK");
+        var noneId = await SeedWeatherAsync(db, "Any weather", WeatherDependencyCodes.None);
+        var reading = await SeedBacklogAsync(db, UserId, "Reading", weatherDependencyId: noneId);
+
+        var (draw, calls) = await DrawWithWeatherAsync(FineDay);
+
+        calls.Should().Be(0, "a none row fits every day, so the weather cannot change this draw");
+        draw.HasWeatherDependentCandidates.Should().BeFalse();
+        draw.Items.Single(i => i.ActivityId == reading).WeatherDependencyId
+            .Should().BeNull("a none row would otherwise badge every indoor activity");
+    }
+
+    [Fact]
+    public async Task ABacklogCard_CarriesItsMaxParticipants()
+    {
+        await using var db = CreateDbContext();
+        var chess = await SeedBacklogAsync(db, UserId, "Chess", maxParticipants: 2);
+
+        var draw = await DrawAsync(minutes: 60, energy: "low", people: 4);
+
+        draw.Items.Single(i => i.ActivityId == chess).MaxParticipants
+            .Should().Be(2, "demoted for leaving two people out, never dropped");
+    }
+
+    private async Task<(DrawResponse Draw, int ProviderCalls)> DrawWithWeatherAsync(DailyWeather? weather)
+    {
+        var provider = new StubWeatherProvider(weather);
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configureServices: services =>
+        {
+            services.RemoveAll<IDailyWeatherProvider>();
+            services.AddSingleton<IDailyWeatherProvider>(provider);
+        });
+
+        var response = await factory.CreateClient().PostAsJsonAsync(DrawRoute, DrawBody(240, "low"), JsonOpts, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return ((await response.Content.ReadFromJsonAsync<DrawResponse>(JsonOpts, CancellationToken))!, provider.Calls);
+    }
+
+    private static async Task SetLocationAsync(DbContext db, string location)
+    {
+        var user = await db.Set<User>().IgnoreQueryFilters().SingleAsync(u => u.Id == UserId, CancellationToken);
+        user.WeatherLocation = location;
+        await db.SaveChangesAsync(CancellationToken);
+    }
+
+    private static async Task<long> SeedWeatherAsync(DbContext db, string text, string code)
+    {
+        var row = new ActivityWeatherDependency { UserId = UserId, Text = text, Code = code };
+        db.Set<ActivityWeatherDependency>().Add(row);
+        await db.SaveChangesAsync(CancellationToken);
+        return row.Id;
+    }
+
+    private sealed class StubWeatherProvider(DailyWeather? weather) : IDailyWeatherProvider
+    {
+        public int Calls { get; private set; }
+
+        public Task<DailyWeather?> GetTodayAsync(string location, CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(weather);
+        }
+    }
+
     // ─── helpers ────────────────────────────────────────────────────────────────────────────────────
 
     private record ActivityInfo(long Id, string Name, string? CategoryName, string? Icon, string? Color);
@@ -553,9 +679,11 @@ public class LeisureSuggestionTests(AppDbContextFixture fixture) : PostgresTestB
         string? ReadinessStatus,
         int? ComfortZoneStep,
         bool RequiresTravel,
-        string? ContextLabel);
+        string? ContextLabel,
+        int? MaxParticipants = null,
+        long? WeatherDependencyId = null);
 
-    private record DrawResponse(List<Item> Items, int PoolCount, int EligibleCount);
+    private record DrawResponse(List<Item> Items, int PoolCount, int EligibleCount, bool HasWeatherDependentCandidates = false);
 
     private record DrawRequestBody(int Minutes, string Energy, int People, long? MaxCostTierId, long? LocationTypeId,
         long Seed, int Count);
@@ -631,7 +759,7 @@ public class LeisureSuggestionTests(AppDbContextFixture fixture) : PostgresTestB
     /// </remarks>
     private static async Task<long> SeedBacklogAsync(DbContext db, long userId, string name, int duration = 30,
         EnergyLevel energy = EnergyLevel.Low, EffortType? effort = null, string? locationText = null,
-        long? locationTypeId = null, long? costTierId = null)
+        long? locationTypeId = null, long? costTierId = null, long? weatherDependencyId = null, int? maxParticipants = null)
     {
         var activityId = await SeedActivityAsync(db, userId, name);
 
@@ -640,11 +768,13 @@ public class LeisureSuggestionTests(AppDbContextFixture fixture) : PostgresTestB
             ActivityId = activityId,
             LocationTypeId = locationTypeId
                              ?? await SeedLookupAsync<ActivityLocationType>(db, userId, locationText ?? $"{name} location"),
-            WeatherDependencyId = await SeedLookupAsync<ActivityWeatherDependency>(db, userId, $"{name} weather"),
+            WeatherDependencyId = weatherDependencyId
+                                  ?? await SeedLookupAsync<ActivityWeatherDependency>(db, userId, $"{name} weather"),
             ExpectedCostTierId = costTierId ?? await SeedLookupAsync<ActivityExpectedCostTier>(db, userId, $"{name} cost"),
             EnergyLevel = energy,
             EffortType = effort,
             MinParticipants = 1,
+            MaxParticipants = maxParticipants,
             DurationMinutes = duration
         });
         await db.SaveChangesAsync(CancellationToken);

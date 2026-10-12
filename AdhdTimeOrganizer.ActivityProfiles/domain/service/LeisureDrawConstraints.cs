@@ -28,9 +28,14 @@ public readonly record struct LeisureDrawConstraints(int Minutes, EnergyLevel En
 /// The draw. Same seed + same pool + same history ⇒ the same cards in the same order, which is what makes
 /// a reloaded <c>?seed=</c> URL show the user the three things they were deciding between.
 /// </param>
+/// <param name="WeatherMatchCodes">
+/// The weather codes today fits (<see cref="ILeisureWeatherSignal"/>), or <c>null</c> when there is no signal.
+/// <c>null</c> must never be read as "nothing fits": it excludes nothing and boosts nothing.
+/// </param>
 public sealed record LeisureRankingContext(
     LeisureDrawConstraints Constraints,
     IReadOnlyDictionary<string, DateTime> LastSuggestedAt,
     EffortType? LastCommittedEffort,
     DateTime Now,
-    uint Seed);
+    uint Seed,
+    IReadOnlySet<string>? WeatherMatchCodes = null);

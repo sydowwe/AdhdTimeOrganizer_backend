@@ -138,8 +138,20 @@ Does **not** own: `Activity`, `ActivityRole`, `ActivityCategory`, `User` — all
   breaks its own never-throw promise — all of them come back as "no weather opinion". The client cannot
   tell them apart and does not try: nothing ranks up, no badge renders, **nothing is ever excluded**. So
   the failure mode to watch for is not an error, it is the badge quietly never appearing — which is why
-  `LeisureWeatherFitTests` asserts on the resolved id set rather than on a 200, and why the endpoint has
-  its own `catch` around the provider on top of the provider's own.
+  `LeisureWeatherFitTests` asserts on the resolved id set rather than on a 200, and why
+  `LeisureWeatherSignal` has its own `catch` around the provider on top of the provider's own.
+
+- **The draw reads the same weather signal, and with a signal it does exclude (F2-04).**
+  `ILeisureWeatherSignal` is the one place a user becomes today's matching codes; the weather-fit route maps
+  them to ids for the badge, and the draw hands them to `LeisureDrawRanker`. There, a backlog row whose
+  *real* dependency (`sunny` / `dry` / `snow`, after label inference) today does not fit is excluded, and one
+  that fits gets +1.5. A `none` row and an unrecognised label are "no opinion", and a missing signal
+  (`null`) excludes nothing — the same semantics the browser ranker had before the picker moved onto this
+  endpoint. The draw asks only when some backlog row it read has a real dependency, and waits at most 2 s
+  (the provider caches the day, and the picker's own weather-fit call warms that cache). A timed-out wait
+  ranks without weather, which is the one way a reloaded seed can come back differently, and only on a
+  cold cache. `LeisureSuggestionTests` (weather block) and `LeisureDrawRankerTests` pin both halves. The
+  client's party-size penalty (`MaxParticipants`, flat -2) came across in the same change.
 
 - **`ActivityWeatherDependency.Code` is what the signal matches on; `Text` is the user's to rename.**
   The lookup is per-user and editable, so matching a row to a condition by its label would break on the
