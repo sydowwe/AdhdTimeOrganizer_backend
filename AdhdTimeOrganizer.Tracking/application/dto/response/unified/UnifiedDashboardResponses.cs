@@ -31,6 +31,13 @@ public record UnifiedSourceStatusDto
     /// further is not wanted.
     /// </summary>
     public required string? DisplacedTo { get; init; }
+
+    /// <summary>
+    /// When this tracker last reported at all (UTC), independent of the span — "desktop agent: last report
+    /// 3 days ago" is how a user tells a quiet day from a tracker that stopped (P2-04). Accurate to the hour:
+    /// the stamp is throttled. <c>null</c> for a tracker never heard from since the stamp existed.
+    /// </summary>
+    public DateTime? LastSeenAt { get; init; }
 }
 
 /// <summary>

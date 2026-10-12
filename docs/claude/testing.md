@@ -88,6 +88,12 @@ worth copying the shape of:
   recipient language (live and quiet-hours flush), and the rows a tap leaves (snooze marker → scan re-delivery
   → Done ticking the item and cancelling its reminder; planner status and times on a pinned clock; 404/409
   leaving the notification unread). Copy its shape for a new button.
+- `TrackerSilenceTests` — "tracker went silent" (P2-04). Two silent halves: an ingest route that forgets
+  `ITrackerLastSeenStamp` leaves its tracker unstamped — never reported silent, never "last seen" — and a
+  sweep that stops marking repeats itself hourly, each repeat a fresh bell row because dismiss is a hard
+  delete. So one request per ingest route asserts the `tracker_source_status` row for *that* source, and the
+  sweep cases assert the mark beside what the notifier double was handed. Note the stamp's in-memory throttle
+  expires on the real clock, not the pinned `TimeProvider` — "an hour later" is a fresh host there.
 - `ReminderDisplayLabelTests` — the reminders' `displayLabel`. The owner's `IReminderLabelResolver` is matched
   by template key over an injected `IEnumerable`, and the label is filled after projection endpoint by
   endpoint, so a resolver the scan missed, a drifted key or a read that skips the step all return a valid 200

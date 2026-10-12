@@ -3276,6 +3276,64 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.ToTable("android_session_data", "tracking");
                 });
 
+            modelBuilder.Entity("AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.TrackerSourceStatus", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("SilenceNotifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("silence_notified_at");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tracker_source_status");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_tracker_source_status_user_id");
+
+                    b.HasIndex("UserId", "Source")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tracker_source_status_user_id_source");
+
+                    b.ToTable("tracker_source_status", "tracking");
+                });
+
             modelBuilder.Entity("AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.WebExtensionActivityEntry", b =>
                 {
                     b.Property<long>("Id")
@@ -5833,6 +5891,18 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_android_session_data_user_user_id");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.TrackerSourceStatus", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tracker_source_status_user_user_id");
 
                     b.Navigation("User");
                 });

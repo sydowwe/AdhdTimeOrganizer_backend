@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Tracking.domain.helper.unified;
 using Sydowwe.Notifications.application.text;
 
 namespace AdhdTimeOrganizer.infrastructure.notification;
@@ -131,6 +132,24 @@ public class SkPortalNotificationTexts : SkNotificationTexts
     public override string MorningBriefingOverdue(int count) => $"{count} po termíne";
     public override string MorningBriefingRoutines(int count) => $"{count} {Plural(count, "úloha", "úlohy", "úloh")} z rutín na dnes";
     public override string MorningBriefingBody(IReadOnlyList<string> sections) => string.Join(" · ", sections);
+
+    // Operational, not a reproach: what stopped, and the two things that usually fixed it. No "for 2 days" — the
+    // payload carries the last report as an instant, and only the client knows the user's zone to word it.
+    public override string TrackerSilentTitle => "Sledovanie aktivity stíchlo";
+
+    public override string TrackerSilentFallbackBody =>
+        "Jeden z vašich sledovačov prestal posielať aktivitu. Skontrolujte, či beží a či ste v ňom prihlásení.";
+
+    public override string TrackerSilentBody(string source) => source switch
+    {
+        TrackingSourceNames.Desktop =>
+            "Desktopová aplikácia prestala posielať vašu aktivitu. Skontrolujte, či beží a či ste v nej prihlásení.",
+        TrackingSourceNames.WebExtension =>
+            "Rozšírenie prehliadača prestalo posielať vašu aktivitu. Skontrolujte, či je zapnuté a či ste v ňom prihlásení.",
+        TrackingSourceNames.Android =>
+            "Aplikácia v telefóne prestala posielať vašu aktivitu. Skontrolujte, či je nainštalovaná a či ste v nej prihlásení.",
+        _ => TrackerSilentFallbackBody
+    };
 
     private static string Lead(int minutes) => (minutes / 60, minutes % 60) switch
     {

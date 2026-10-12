@@ -416,7 +416,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         Exported.Intersect(KnownGaps).Should().BeEmpty("an entity is either exported or it is not");
     }
 
-    /// <summary>The ten entities <c>GetUserDataExportEndpoint</c> actually reads.</summary>
+    /// <summary>The eleven entities <c>GetUserDataExportEndpoint</c> actually reads.</summary>
     private static readonly string[] Exported =
     [
         nameof(ActivityHistory),
@@ -428,6 +428,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         nameof(TaskPlannerDayTemplate),
         nameof(TodoList),
         nameof(TodoListItem),
+        nameof(TrackerSourceStatus),
         nameof(WebExtensionActivityEntry)
     ];
 

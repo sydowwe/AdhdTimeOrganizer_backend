@@ -69,7 +69,7 @@ public class ModuleSchemaTests(AppDbContextFixture fixture) : PostgresTestBase(f
         [ModuleSchemas.Tracking] =
         [
             "desktop_activity_entry", "web_extension_activity_entry", "android_session_data",
-            "tracker_desktop_mapping_by_pattern", "tracker_android_mapping_by_pattern"
+            "tracker_desktop_mapping_by_pattern", "tracker_android_mapping_by_pattern", "tracker_source_status"
         ],
         [ModuleSchemas.ActivityProfiles] =
         [

@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.Tracking.application.dto.response.activityTracking.unifi
 using AdhdTimeOrganizer.Tracking.application.service.unified;
 using AdhdTimeOrganizer.Tracking.application.validator.unified;
 using AdhdTimeOrganizer.Tracking.domain.helper.unified;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
 
@@ -47,6 +48,11 @@ public class UnifiedSourcesEndpoint(DbContext db, IUserTimeZoneResolver timeZone
         var loads = await UnifiedActivityLoader.LoadAsync(db, userId, windows, TrackingSourceNames.All, ct);
         var span = UnifiedSpan.From(loads, selected);
 
+        var lastSeen = await db.Set<TrackerSourceStatus>()
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .ToDictionaryAsync(s => s.Source, s => s.LastSeenAt, ct);
+
         var response = TrackingSourceNames.All
             .Select(source => new UnifiedSourceStatusDto
             {
@@ -56,7 +62,8 @@ public class UnifiedSourcesEndpoint(DbContext db, IUserTimeZoneResolver timeZone
                 // it appears in no item's `sources` array.
                 CountedSeconds = selected.Contains(source) ? span.Ledger.CountedSeconds[source] : 0,
                 DisplacedSeconds = selected.Contains(source) ? span.Ledger.DisplacedSeconds[source] : 0,
-                DisplacedTo = selected.Contains(source) ? span.Ledger.DisplacedTo[source] : null
+                DisplacedTo = selected.Contains(source) ? span.Ledger.DisplacedTo[source] : null,
+                LastSeenAt = lastSeen.TryGetValue(source, out var seenAt) ? seenAt : null
             })
             .ToList();
 

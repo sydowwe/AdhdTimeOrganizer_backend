@@ -16,8 +16,8 @@ Tables live in the **`tracking`** schema (`ModuleSchemas.cs`, keyed on this asse
 Owns:
 
 - **Entities** — `DesktopActivityEntry`, `WebExtensionActivityEntry`, `AndroidSessionData`,
-  `TrackerDesktopMappingByPattern`, `TrackerAndroidMappingByPattern` (under `domain/model/entity/`,
-  with `desktop/` and `android/` subfolders), and their five EF configurations under
+  `TrackerDesktopMappingByPattern`, `TrackerAndroidMappingByPattern`, `TrackerSourceStatus` (under
+  `domain/model/entity/`, with `desktop/` and `android/` subfolders), and their six EF configurations under
   `infrastructure/persistence/configuration/`. ⚠ Three of those configurations used to live in the host's
   `infrastructure/persistence/configuration/activityHistory/` folder. **The folder name lied** — they
   were always Tracking's, and they moved with their entities. Do not assign files to projects by
@@ -32,6 +32,10 @@ Owns:
 - **Validators** (one per dashboard, not one per source — `StackedBarsValidator` and
   `BaseTimelineValidator` each cover all three), the tracking request/response DTOs,
   `WebExtensionDataFilterRequest`.
+- **Tracker-went-silent (P2-04)** — `TrackerSourceStatus` (one row per user and source: `LastSeenAt`,
+  `SilenceNotifiedAt`), stamped by all three ingest routes through `ITrackerLastSeenStamp`, and the hourly
+  `TrackerSilenceJobHandler` that raises `TrackerSilent` through `ITrackerSilenceNotifier` — this slice's only
+  notification producer. See the gotcha below.
 - **Retention** — `PurgeExpiredActivityTrackingEntriesJobHandler` (a keyed `IScheduledJobHandler` on the
   Scheduler module's substrate, so this slice references no Quartz), its `TrackingScheduledJobsRegistrar`
   and `ActivityTrackingRetentionOptions`. It covers **all three** ledgers: the two partitioned ones age
@@ -173,6 +177,23 @@ would only make the agent re-send the window. That makes a break here silent;
   appeared in (`MappingSuggestionRule.MinFill`), because a phone in the foreground during a focus timer
   is as often the distraction as the work. `AndroidMappingSuggestionsTests` is its guard.
 
+- **"Tracker went silent" reads a last-seen table, never the ledgers (P2-04).** Each ingest route calls
+  `ITrackerLastSeenStamp.StampAsync` **first** — a validated request is the tracker alive, even an android sync
+  with nothing new in it — which moves `TrackerSourceStatus.LastSeenAt` and clears `SilenceNotifiedAt`. It is
+  throttled twice, like `LastActiveStampMiddleware`: an in-memory key per user and source for an hour, then a
+  conditional `UPDATE` that will not move a stamp under an hour old (a restart empties the cache). So
+  `LastSeenAt` is accurate to the hour. A first report inserts on the request's own context and is detached
+  again, so it never rides into the batch save. The rule (`domain/helper/TrackerSilenceRule.cs`): reported
+  within 30 days, nothing for 48 h, and `User.LastActiveAt` within 24 h — the person is here, the tracker isn't.
+  `TrackerSilenceJobHandler` runs hourly and sends only inside the user's own waking day
+  (`DefaultWakeUpTime`…`DefaultBedTime` in their zone), once per silence, marking right after a successful send
+  and only if the stamp it read is unchanged. `TrackerSilent` is **not** held while away (the rule already
+  needs the user present) and is push + bell, email off. The `20261012091557_TrackerSourceStatus` migration
+  backfilled `LastSeenAt` from the ledgers and marked sources already silent at deploy as notified, so no
+  pre-existing silence is announced. `unified/sources` carries `lastSeenAt` per source, and the GDPR export
+  carries the rows. `TrackerSilenceTests` is the guard. A new ingest route that forgets the stamp leaves its
+  tracker invisible to the rule — never silent, never "last seen".
+
 - **Seeder `Order` is banded.** Tracking's `WebExtensionDataSeeder` sits at 600. See
   `AdhdTimeOrganizer.Core/infrastructure/persistence/seeder/SeederOrderBands.md` before adding a seeder
   anywhere in the solution.
@@ -220,6 +241,11 @@ would only make the agent re-send the window. That makes a break here silent;
    spent in a browser showing no browser at all; and rounding each item on its own quietly breaks the
    two arithmetic identities the page prints side by side. `TrackingUnifiedDashboardTests` is the guard
    and asserts on seconds; the rule itself lives on `domain/helper/unified/UnifiedMinuteMerger.cs`.
+
+9. **An ingest route that stops stamping `TrackerSourceStatus`, or a sweep that stops marking.** The first
+   leaves a tracker that can never be reported silent; the second repeats the same notification every hour —
+   and a dismissed bell row is a hard delete, so each repeat is a fresh one. Both answer 200 / run green.
+   `TrackerSilenceTests` asserts the rows for every ingest route and the mark after a send.
 
 `TrackingRouteSmokeTests` covers 1, 4 and 5; `CoreRouteSmokeTests`' seeder-duplication test already
 covers 2 over every registered seeder; `ExtensionActivityTrackingTests` covers 3 and the end-to-end

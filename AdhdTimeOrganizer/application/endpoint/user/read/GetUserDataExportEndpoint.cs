@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -122,6 +123,15 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
             .Select(e => new { e.Id, e.CreatedTimestamp })
             .ToListAsync(ct);
 
+        // P2-04: when each tracker last reported, and whether its silence was notified — about the person's own
+        // devices, so it travels. Like lastActiveAt, accurate to the hour.
+        var trackerSources = await dbContext.Set<TrackerSourceStatus>()
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .OrderBy(s => s.Id)
+            .Select(s => new { s.Source, s.LastSeenAt, s.SilenceNotifiedAt })
+            .ToListAsync(ct);
+
         // Both the stamp in the payload and the one in the filename are read on the account's own clocks, so
         // "the export I took on the 18th" names the same file the user would name. DateTimeOffset keeps the
         // instant unambiguous while still showing the offset the user lives in.
@@ -159,7 +169,7 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
             routineTodoLists,
             templates,
             calendars,
-            activityTracking = new { activityHistories, activityHistorySessions, webTracking, desktopTracking }
+            activityTracking = new { activityHistories, activityHistorySessions, webTracking, desktopTracking, trackerSources }
         };
 
         var json = JsonSerializer.Serialize(export, new JsonSerializerOptions

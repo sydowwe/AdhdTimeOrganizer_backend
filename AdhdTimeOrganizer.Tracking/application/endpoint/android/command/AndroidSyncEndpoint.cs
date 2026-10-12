@@ -9,7 +9,9 @@ using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.helper.mapping;
+using AdhdTimeOrganizer.Tracking.domain.helper.unified;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.Tracking.domain.serviceContract;
 using AdhdTimeOrganizer.Tracking.infrastructure.persistence.retention;
 using FastEndpoints;
 using Microsoft.Extensions.Options;
@@ -46,7 +48,8 @@ public class AndroidSyncEndpoint(
     DbContext dbContext,
     IOptions<ActivityTrackingRetentionOptions> retentionOptions,
     IActivityTimeAttributionSink attributionSink,
-    IUserTimeZoneResolver timeZones)
+    IUserTimeZoneResolver timeZones,
+    ITrackerLastSeenStamp lastSeen)
     : Endpoint<AndroidSyncRequest, AndroidSyncResponse>
 {
     public override void Configure()
@@ -63,6 +66,9 @@ public class AndroidSyncEndpoint(
         var userId = User.GetId();
         var accepted = 0;
         var duplicatesSkipped = 0;
+
+        // P2-04: first — a sync with nothing new in it (the early return below) is still the phone app alive.
+        await lastSeen.StampAsync(userId, TrackingSource.Android, ct);
 
         // SEC-5: the instants come from a phone's clock and are stored permanently, so they are bounded
         // here — the validator can only bound the stated DurationSeconds, not the span the two strings

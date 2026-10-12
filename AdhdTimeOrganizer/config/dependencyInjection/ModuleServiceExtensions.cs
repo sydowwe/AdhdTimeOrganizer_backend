@@ -292,6 +292,11 @@ public static class ModuleServiceExtensions
             // History slice: TimerBoundaryAlarmJobHandler, on every pomodoro boundary.
             NotificationType.TimerBoundary,
 
+            // Tracking slice: TrackerSilenceJobHandler, through TrackerSilenceNotifier (P2-04). Not held while away —
+            // the rule only fires for a user the app saw within a day, and it is operational, not a nudge. Push on,
+            // email off (NotificationChannelDefaults): the user should hear about it, but it is not worth a mail.
+            NotificationType.TrackerSilent,
+
             // Raised on demand by SendTestNotificationEndpoint (admin-only, see AdminOnlyTypes above).
             NotificationType.Test
         ];

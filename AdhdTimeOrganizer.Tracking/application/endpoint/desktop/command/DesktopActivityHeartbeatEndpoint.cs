@@ -7,7 +7,9 @@ using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.endpointGroups;
 using AdhdTimeOrganizer.Tracking.application.validator;
 using AdhdTimeOrganizer.Tracking.domain.helper.mapping;
+using AdhdTimeOrganizer.Tracking.domain.helper.unified;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking.desktop;
+using AdhdTimeOrganizer.Tracking.domain.serviceContract;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.helper;
@@ -36,7 +38,8 @@ namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.deskt
 public class DesktopActivityHeartbeatEndpoint(
     DbContext dbContext,
     IActivityTimeAttributionSink attributionSink,
-    IUserTimeZoneResolver timeZones)
+    IUserTimeZoneResolver timeZones,
+    ITrackerLastSeenStamp lastSeen)
     : Endpoint<DesktopActivityWindowDto>
 {
     public override void Configure()
@@ -59,6 +62,9 @@ public class DesktopActivityHeartbeatEndpoint(
         var userId = User.GetId();
         var processedCount = 0;
         var attributedActivityIds = new HashSet<long>();
+
+        // P2-04: first, before anything is tracked — a validated request is the agent alive, whatever the batch holds.
+        await lastSeen.StampAsync(userId, TrackingSource.Desktop, ct);
 
         // The one matcher: active rules, specificity order, first match wins (CQ-16). The distinct-entries
         // grid resolves its coveredBy chip through the same class, so what it shows is what happens here.

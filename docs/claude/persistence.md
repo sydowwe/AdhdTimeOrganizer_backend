@@ -94,7 +94,7 @@ Every module's tables live in their own Postgres schema. `public` holds almost n
 | `history` | `AdhdTimeOrganizer.History` (3) |
 | `planning` | `AdhdTimeOrganizer.Planning` (8) **and the three `mv_*` materialized views** |
 | `routines` | `AdhdTimeOrganizer.Routines` (4) |
-| `tracking` | `AdhdTimeOrganizer.Tracking` (5, two partitioned) |
+| `tracking` | `AdhdTimeOrganizer.Tracking` (6, two partitioned) |
 | `activity_profiles` | `AdhdTimeOrganizer.ActivityProfiles` (9) |
 | `notifications` / `reminders` / `scheduler` | the three framework modules |
 | `audit` | `business_audit_log` — the one entity that names its own schema, unchanged |

@@ -2,7 +2,9 @@ using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.heartbeat;
 using AdhdTimeOrganizer.Tracking.application.endpoint.extensions;
 using AdhdTimeOrganizer.Tracking.application.validator;
+using AdhdTimeOrganizer.Tracking.domain.helper.unified;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
+using AdhdTimeOrganizer.Tracking.domain.serviceContract;
 using FastEndpoints;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.infrastructure.security;
@@ -10,7 +12,8 @@ using Sydowwe.Framework.infrastructure.security;
 namespace AdhdTimeOrganizer.Tracking.application.endpoint.activityTracking.webExtension.command;
 
 [AllowExtensionClients]
-public class WebExtensionDataHeartbeatEndpoint(DbContext dbContext) : Endpoint<WebExtensionHeartbeatRequest, int>
+public class WebExtensionDataHeartbeatEndpoint(DbContext dbContext, ITrackerLastSeenStamp lastSeen)
+    : Endpoint<WebExtensionHeartbeatRequest, int>
 {
     public override void Configure()
     {
@@ -34,6 +37,9 @@ public class WebExtensionDataHeartbeatEndpoint(DbContext dbContext) : Endpoint<W
     {
         var userId = User.GetId();
         var processedCount = 0;
+
+        // P2-04: first, before the window's rows are tracked — a validated heartbeat is the extension alive.
+        await lastSeen.StampAsync(userId, TrackingSource.WebExtension, ct);
 
         // CQ-5: one read for the whole window, keyed by domain, instead of a FirstOrDefaultAsync per
         // activity inside the loop. This is the highest-frequency write path in the module — once a minute,

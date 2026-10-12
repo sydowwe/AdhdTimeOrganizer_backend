@@ -35,6 +35,7 @@ by storing the verdict on the entry.
 | `AndroidSessionData` | `android_session_data` | Per-session android usage, deduplicated on sync by the unique `(UserId, DeviceId, PackageName, SessionStartUtc)`. The only ledger storing real sessions rather than windows, and the only one that is not RANGE-partitioned — its retention purge ages on `SessionStartUtc`. | `domain/model/entity/` |
 | `TrackerDesktopMappingByPattern` | `tracker_desktop_mapping_by_pattern` | Pattern → `Activity`/`Role`/`Category`, or `IsIgnored`. Matched in-memory by `MatchesPattern`. **Many** patterns to one activity; `activity_id` is `Cascade` with a pinned constraint name. The unique key is the pattern: `(UserId, ProcessName, ProductName, WindowTitle)`, `NULLS NOT DISTINCT`. | `domain/model/entity/desktop/` |
 | `TrackerAndroidMappingByPattern` | `tracker_android_mapping_by_pattern` | Android equivalent; unique on `(UserId, PackageName, AppLabel)`. | `domain/model/entity/android/` |
+| `TrackerSourceStatus` | `tracker_source_status` | P2-04: when each tracker last reported, one row per `(UserId, Source)` (unique). `Source` is `TrackingSource` stored by name. `LastSeenAt` is accurate to the hour (throttled stamp); `SilenceNotifiedAt` marks a silence already told and is cleared by the next report. | `domain/model/entity/` |
 
 Four enums: `TrackerMappingTypeEnum` (`domain/model/enum/`) — the mapping's target shape, a filter-side
 convenience over the check constraint below, and **shared by both mapping tables** (it was
@@ -125,7 +126,8 @@ undefined value is a 400 from the grid validators' `IsInEnum` rather than a fall
 
 ## EF configurations
 
-`infrastructure/persistence/configuration/` (with `desktop/` and `android/` subfolders) — all five.
+`infrastructure/persistence/configuration/` (with `desktop/` and `android/` subfolders) — all six
+(`TrackerSourceStatusConfiguration`, P2-04, is the newest).
 Three of them
 (`DesktopActivityEntryConfiguration`, `WebExtensionActivityEntryConfiguration`,
 `AndroidSessionDataConfiguration`) came from the host's `configuration/activityHistory/` folder, which
@@ -317,6 +319,10 @@ and is therefore denied to extension clients by the `Program.cs` configurator's 
 | `IMappingTargetRequest` · `MappingTargetRules` | DTO contract + validator rules | The mapping target group, and its two shape rules in one copy across the four mapping validators | `application/dto/request/` · `application/validator/` |
 | `IngestBatchSaveExtensions` | Endpoint helper | The save all three ingest routes end on — a `23505` becomes a 409 rather than a 500 an unattended client re-posts forever | `application/endpoint/extensions/` |
 | `PurgeExpiredActivityTrackingEntriesJobHandler` | Scheduled job | The retention purge (see Infrastructure below) | `infrastructure/jobs/` |
+| `TrackerSilenceRule` | Domain helper | P2-04's thresholds (48 h silent, 30 d horizon, 24 h present, 1 h stamp) and the waking-day test | `domain/helper/TrackerSilenceRule.cs` |
+| `ITrackerLastSeenStamp` · `TrackerLastSeenStamp` | Service | The throttled last-seen upsert all three ingest routes call first | `domain/serviceContract/` · `application/service/` |
+| `ITrackerSilenceNotifier` · `TrackerSilenceNotifier` | Service | The slice's one notification producer: `TrackerSilentPayload(source wire name, lastSeenAt)`, best effort, ids-only logs | `domain/serviceContract/` · `application/service/` |
+| `TrackerSilenceJobHandler` | Scheduled job | Hourly; notifies a silent source of a present user inside their waking day, once per silence | `infrastructure/jobs/` |
 
 ## Seams (all declared in `AdhdTimeOrganizer.Core`)
 
@@ -332,6 +338,7 @@ and is therefore denied to extension clients by the `Program.cs` configurator's 
 |---|---|
 | Retention purge (GDPR Art. 5(1)(e)) | `infrastructure/jobs/PurgeExpiredActivityTrackingEntriesJobHandler.cs` — a keyed `IScheduledJobHandler` (**not** a Quartz `IJob`; this slice references no Quartz). `ExecuteDeleteAsync` with `IgnoreQueryFilters`, so it purges every user's rows. All three ledgers: `desktop_activity_entry` / `web_extension_activity_entry` on `RecordDate` (partition-pruned), `android_session_data` on `SessionStartUtc` (unpartitioned, so a real sweep) |
 | Its 03:30-daily schedule | `infrastructure/scheduling/TrackingScheduledJobsRegistrar.cs` — pushed to the Scheduler module on every boot through `IScheduler` (the RAM job store drops triggers on restart) |
+| Tracker-went-silent sweep (P2-04) | `infrastructure/jobs/TrackerSilenceJobHandler.cs`, hourly at :10 UTC, registered by the same registrar |
 | Retention policy | `infrastructure/persistence/retention/ActivityTrackingRetentionOptions.cs` — bound in `Program.cs` |
 | Dev fixture | `infrastructure/persistence/seeder/dev/WebExtensionDataSeeder.cs` — truncates, so it is a dev seeder, not a default one |
 
@@ -349,6 +356,8 @@ Open these when changing tracking, even though they are not in this project:
 | `ActivityTracking` policy definition | `config/IdentityServiceExtensions.cs` |
 | `ActivityTracking` role grant | `infrastructure/extService/user/auth/ExtensionRoleClaimsProvider.cs` |
 | Completion automation | `application/eventHandler/ActivityTimeRecordedEventHandler.cs` |
+| `TrackerSilent` in the notification catalog (not held while away) and its SK/EN wording | `config/dependencyInjection/ModuleServiceExtensions.cs` (`AddNotificationCatalog`) · `infrastructure/notification/{Sk,En}PortalNotificationTexts.cs` |
+| `TrackerSourceStatus` in the GDPR export | `application/endpoint/user/read/GetUserDataExportEndpoint.cs` |
 | Hosted registrar that schedules the purge | `Program.cs` (`AddHostedService<TrackingScheduledJobsRegistrar>()`) — dropping it builds fine and the purge silently never fires |
 
 ⚠ The policy name, the role name, and the `AutoTagOverride("ActivityTracking")` Swagger tag in
