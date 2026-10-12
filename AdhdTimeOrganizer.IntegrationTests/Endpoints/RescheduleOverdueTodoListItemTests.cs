@@ -151,7 +151,107 @@ public class RescheduleOverdueTodoListItemTests(AppDbContextFixture fixture) : P
                 "the help is offered without the score that led to it");
     }
 
+    [Fact(DisplayName = "FO3: undo puts the dates back and takes the postponement back with them")]
+    public async Task Undo_RestoresDatesAndTheSlipRecord()
+    {
+        var firstSlip = await SeedItemAsync("undo-first-slip", Today.AddDays(-3));
+        var slippedBefore = await SeedItemAsync("undo-second-slip", Today.AddDays(-1));
+        await SetSlipAsync(slippedBefore, postponeCount: 1, firstDueDate: Today.AddDays(-4));
+
+        var result = await RescheduleAsync(_listId, 7);
+        result.UndoToken.Should().NotBeNullOrEmpty();
+        (await LoadAsync(firstSlip)).PostponeCount.Should().Be(1);
+        (await LoadAsync(slippedBefore)).PostponeCount.Should().Be(2);
+
+        var restored = await UndoAsync(result.UndoToken!);
+
+        restored.RestoredIds.Should().BeEquivalentTo([firstSlip, slippedBefore]);
+
+        var first = await LoadAsync(firstSlip);
+        first.DueDate.Should().Be(Today.AddDays(-3));
+        first.PostponeCount.Should().Be(0, "the move the user took back is not a slip");
+        first.FirstDueDate.Should().BeNull("it was set by the move that was taken back");
+
+        var second = await LoadAsync(slippedBefore);
+        second.DueDate.Should().Be(Today.AddDays(-1));
+        second.PostponeCount.Should().Be(1, "only the undone move is taken back, not the earlier one");
+        second.FirstDueDate.Should().Be(Today.AddDays(-4));
+    }
+
+    [Fact(DisplayName = "FO3: undo leaves an item re-dated or ticked off since as the user left it")]
+    public async Task Undo_SkipsItemsChangedSince()
+    {
+        var redated = await SeedItemAsync("undo-redated", Today.AddDays(-2));
+        var ticked = await SeedItemAsync("undo-ticked", Today.AddDays(-2));
+        var untouched = await SeedItemAsync("undo-untouched", Today.AddDays(-2));
+        var result = await RescheduleAsync(_listId, 0);
+
+        await BackdateAsync(redated, Today.AddDays(3));
+        await using (var db = CreateDbContext())
+        {
+            var item = await db.Set<TodoListItem>().IgnoreQueryFilters().SingleAsync(i => i.Id == ticked, CancellationToken);
+            item.IsDone = true;
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        var restored = await UndoAsync(result.UndoToken!);
+
+        restored.RestoredIds.Should().BeEquivalentTo([untouched]);
+        var keptRedated = await LoadAsync(redated);
+        keptRedated.DueDate.Should().Be(Today.AddDays(3));
+        keptRedated.PostponeCount.Should().Be(1);
+        (await LoadAsync(ticked)).DueDate.Should().Be(Today);
+        (await LoadAsync(untouched)).DueDate.Should().Be(Today.AddDays(-2));
+    }
+
+    [Fact(DisplayName = "FO3: a spent or unknown undo token is a 404 and restores nothing")]
+    public async Task Undo_SpentOrUnknownToken_Is404()
+    {
+        var item = await SeedItemAsync("undo-twice", Today.AddDays(-2));
+        var result = await RescheduleAsync(_listId, 0);
+        await UndoAsync(result.UndoToken!);
+        await RescheduleAsync(_listId, 0);
+
+        var again = await CreateClient().PostAsJsonAsync("api/todo-list-item/reschedule-overdue/undo",
+            new { UndoToken = result.UndoToken }, JsonOpts, CancellationToken);
+        again.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await LoadAsync(item)).DueDate.Should().Be(Today, "the second renegotiation stands");
+
+        var unknown = await CreateClient().PostAsJsonAsync("api/todo-list-item/reschedule-overdue/undo",
+            new { UndoToken = Guid.NewGuid().ToString("N") }, JsonOpts, CancellationToken);
+        unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact(DisplayName = "FO3: nothing overdue moves nothing and offers no undo")]
+    public async Task Reschedule_NothingOverdue_HasNoUndoToken()
+    {
+        await SeedItemAsync("not-overdue", Today.AddDays(1));
+
+        var result = await RescheduleAsync(_listId, 0);
+
+        result.MovedIds.Should().BeEmpty();
+        result.UndoToken.Should().BeNull();
+    }
+
     // ---------------------------------------------------------------- helpers
+
+    private async Task<UndoRescheduleOverdueTodoListItemResponse> UndoAsync(string token)
+    {
+        var response = await CreateClient().PostAsJsonAsync("api/todo-list-item/reschedule-overdue/undo",
+            new { UndoToken = token }, JsonOpts, CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonSerializer.Deserialize<UndoRescheduleOverdueTodoListItemResponse>(body, JsonOpts)!;
+    }
+
+    private async Task SetSlipAsync(long itemId, int postponeCount, DateOnly firstDueDate)
+    {
+        await using var db = CreateDbContext();
+        var item = await db.Set<TodoListItem>().IgnoreQueryFilters().SingleAsync(i => i.Id == itemId, CancellationToken);
+        item.PostponeCount = postponeCount;
+        item.FirstDueDate = firstDueDate;
+        await db.SaveChangesAsync(CancellationToken);
+    }
 
     /// <summary>One activity per item: <c>todo_list_item</c> is unique on <c>(UserId, ActivityId, TodoListId)</c>.</summary>
     private async Task<long> SeedItemAsync(string name, DateOnly? dueDate, bool isDone = false, long? listId = null)

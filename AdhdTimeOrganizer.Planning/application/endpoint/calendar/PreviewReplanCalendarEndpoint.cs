@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.response.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.helper;
@@ -76,6 +77,16 @@ public class PreviewReplanCalendarEndpoint(
         var (calendar, tasks) = await DayReplanPlanner.LoadDayAsync(dbContext, userId, date, track: false, ct);
         var plan = DayReplanPlanner.Compute(calendar, tasks, date, DayReplanPlanner.PackedFromNow(utcNow, zone));
 
+        // A day with no row has nothing to move, so `Compute` reports the generic window rather than read the user's
+        // default for it. The preview still says when the user's own day ends (FO10), the same window
+        // `next-free-slot` packs into for such a day.
+        var windowEnd = plan.WindowEnd;
+        if (calendar is null)
+        {
+            var sleepWindow = await UserSleepWindow.ForUserAsync(dbContext, userId, ct);
+            windowEnd = DayPacking.WindowEnd(sleepWindow.WakeUpTime, sleepWindow.BedTime);
+        }
+
         var ids = plan.Moves.Select(m => m.TaskId).Concat(plan.WontFit.Select(w => w.TaskId)).ToList();
         var responses = ids.Count == 0
             ? new Dictionary<long, PlannerTaskResponse>()
@@ -89,7 +100,7 @@ public class PreviewReplanCalendarEndpoint(
             PreviewToken = plan.Token,
             // 1440 only in the last minute of the day; shown as 23:59, which is when the window closes anyway.
             PackedFrom = ToDto(DayPacking.TimeOf(Math.Min(plan.PackedFrom, DayPacking.LastEndMinute))),
-            WindowEnd = ToDto(DayPacking.TimeOf(plan.WindowEnd)),
+            WindowEnd = ToDto(DayPacking.TimeOf(windowEnd)),
             Moves = plan.Moves.Select(m => new DayReplanMoveResponse
             {
                 Task = responses[m.TaskId],

@@ -6,6 +6,7 @@ using AdhdTimeOrganizer.TodoLists.application.validator;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using FastEndpoints;
+using Microsoft.Extensions.Caching.Memory;
 using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.extensions;
 using Sydowwe.Framework.domain.helper;
@@ -26,11 +27,16 @@ namespace AdhdTimeOrganizer.TodoLists.application.endpoint.todoList.todoListItem
 /// The list id is optional so a later "coming back" screen (F1-04) can clear every list at once. A list id that
 /// is not the caller's moves nothing, exactly like an empty list of their own.
 /// </para>
+/// <para>
+/// The response's <c>UndoToken</c> takes it back through <see cref="UndoRescheduleOverdueTodoListItemEndpoint"/>,
+/// postponements included (<see cref="RescheduleOverdueUndo"/>).
+/// </para>
 /// </summary>
 public class RescheduleOverdueTodoListItemEndpoint(
     DbContext dbContext,
     IUserTimeZoneResolver timeZones,
-    ITodoListItemDueReminderSync dueReminders)
+    ITodoListItemDueReminderSync dueReminders,
+    IMemoryCache undoStore)
     : Endpoint<RescheduleOverdueTodoListItemRequest, RescheduleOverdueTodoListItemResponse>
 {
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
@@ -70,6 +76,11 @@ public class RescheduleOverdueTodoListItemEndpoint(
                             && (req.ListId == null || i.TodoListId == req.ListId))
                 .ToListAsync(ct);
 
+            // The before-image for the undo, taken before the rule writes the slip record.
+            var before = items
+                .Select(i => new RescheduleOverdueUndo.ItemBefore(i.Id, i.DueDate, i.FirstDueDate, i.PostponeCount))
+                .ToList();
+
             foreach (var item in items)
             {
                 var from = item.DueDate;
@@ -79,6 +90,10 @@ public class RescheduleOverdueTodoListItemEndpoint(
 
             await dbContext.SaveChangesAsync(ct);
 
+            var undoToken = items.Count == 0
+                ? null
+                : RescheduleOverdueUndo.Store(undoStore, new RescheduleOverdueUndo.Snapshot(userId, dueDate, before));
+
             // Every moved item, not the first: a timed item lands on its new date with its time of day kept, so
             // its reminder moves with it. One batched call after the commit.
             await dueReminders.SyncAsync(items.Select(i => i.Id).ToList(), ct);
@@ -86,7 +101,8 @@ public class RescheduleOverdueTodoListItemEndpoint(
             await Send.OkAsync(new RescheduleOverdueTodoListItemResponse
             {
                 DueDate = dueDate,
-                MovedIds = items.Select(i => i.Id).ToList()
+                MovedIds = items.Select(i => i.Id).ToList(),
+                UndoToken = undoToken
             }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

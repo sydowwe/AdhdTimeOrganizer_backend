@@ -21,7 +21,8 @@ right one.
   (`application/endpoint/user/welcomeBack/`). The pile is defined once in
   `application/service/welcomeBack/WelcomeBackPile.cs` and reads TodoLists, Planning, Routines and
   Notifications directly, for the reason `GetAccountDeletionSummaryEndpoint` gives. The thresholds are
-  Core's `UserPresence`. **The back-off:** `RecipientEngagementReader` (same folder) is the framework's
+  Core's `UserPresence`. Each broken routine carries `canFreeze`, Routines' `DescribeBreak` over its whole
+  history, so the card points to a skip only where the freeze endpoint would grant one. **The back-off:** `RecipientEngagementReader` (same folder) is the framework's
   `IRecipientEngagementReader`, and the catalog in `ModuleServiceExtensions` lists the four routine kinds
   as `HeldWhileAwayTypes`. A user away three days or more gets those in the bell only, never pushed or
   mailed; their own reminders, the timer alarm and the scheduler alerts still go out.

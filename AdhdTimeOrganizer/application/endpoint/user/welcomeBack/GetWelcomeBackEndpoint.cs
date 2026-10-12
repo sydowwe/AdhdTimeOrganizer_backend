@@ -52,6 +52,15 @@ public class GetWelcomeBackEndpoint(AppDbContext dbContext, ICalendarDayLookup c
         var todos = WelcomeBackPile.OverdueTodos(dbContext, userId, window).AsNoTracking();
         var tasks = WelcomeBackPile.PastTasks(dbContext, userId, window).AsNoTracking();
 
+        // Each with its whole history: whether a skip can still bring the run back is DescribeBreak's answer, the
+        // same one the broken-streak notification and the freeze endpoint give, so the card cannot promise a
+        // rescue the routines page would then refuse. A handful of routines, so the walk is cheap.
+        var broken = await WelcomeBackPile.BrokenRoutines(dbContext, userId, window)
+            .AsNoTracking()
+            .Include(p => p.CompletionHistoryColl)
+            .ToListAsync(ct);
+        var now = time.GetUtcNow().UtcDateTime;
+
         var response = new WelcomeBackResponse
         {
             AwayFrom = window.AwayFrom,
@@ -74,10 +83,11 @@ public class GetWelcomeBackEndpoint(AppDbContext dbContext, ICalendarDayLookup c
                     .Select(t => new WelcomeBackItemResponse(t.Id, t.Activity.Name, t.Calendar.Date))
                     .ToListAsync(ct)
             },
-            BrokenRoutines = await WelcomeBackPile.BrokenRoutines(dbContext, userId, window)
-                .AsNoTracking()
-                .Select(p => new WelcomeBackRoutineResponse(p.Id, p.Text, p.Color))
-                .ToListAsync(ct),
+            BrokenRoutines = broken
+                .Select(p => new WelcomeBackRoutineResponse(p.Id, p.Text, p.Color,
+                    RoutineStreakFreezeService.DescribeBreak(
+                        p, p.CompletionHistoryColl.OrderBy(c => c.PeriodStart).ToList(), now).CanFreeze))
+                .ToList(),
             UnreadNotifications = await WelcomeBackPile.UnreadNotifications(dbContext, userId).CountAsync(ct)
         };
 

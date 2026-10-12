@@ -154,6 +154,7 @@ public class WelcomeBackTests(AppDbContextFixture fixture) : PostgresTestBase(fi
         card.PastTasks.Preview[1].Date.Should().Be(D(6));
 
         card.BrokenRoutines.Select(r => r.Id).Should().Equal(pile.BrokenRoutine);
+        card.BrokenRoutines.Single().CanFreeze.Should().BeFalse("its only cycle is the miss, so a skip would bring back no run");
         card.UnreadNotifications.Should().Be(3);
 
         // The wire contract the client codes against.
@@ -165,6 +166,33 @@ public class WelcomeBackTests(AppDbContextFixture fixture) : PostgresTestBase(fi
         root.GetProperty("pastTasks").GetProperty("preview")[0].GetProperty("date").GetString().Should().Be("2030-03-04");
         root.GetProperty("brokenRoutines")[0].GetProperty("text").GetString().Should().Be("Daily-broken");
         root.GetProperty("unreadNotifications").GetInt32().Should().Be(3);
+    }
+
+    [Fact(DisplayName = "FO5: a broken routine a skip can still bring back says so, and stops saying so once the budget is spent")]
+    public async Task BrokenRoutine_SaysWhetherASkipCanStillSaveIt()
+    {
+        var pile = await SeedPileAsync();
+        // A met cycle before the miss: a run of one, which a skip on the miss would carry on.
+        await using (var db = CreateDbContext())
+            await TodoListTestSeedHelper.SeedRoutinePeriodCompletionAsync(
+                db, pile.BrokenRoutine, D(7), D(8), completedCount: 2, totalCount: 2, ct: CancellationToken);
+        await SetLastActiveAsync(LeftAt);
+        await using var host = Host();
+        var client = host.CreateClient();
+
+        var card = (await GetCardAsync(client))!;
+        card.BrokenRoutines.Single().CanFreeze.Should().BeTrue();
+        using (var json = JsonDocument.Parse(await (await client.GetAsync("api/welcome-back", CancellationToken))
+                   .Content.ReadAsStringAsync(CancellationToken)))
+            json.RootElement.GetProperty("brokenRoutines")[0].GetProperty("canFreeze").GetBoolean().Should().BeTrue();
+
+        await using (var db = CreateDbContext())
+            await db.Set<RoutineTimePeriod>().Where(p => p.Id == pile.BrokenRoutine)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.FreezesRemaining, 0)
+                    .SetProperty(p => p.FreezeBudgetResetsAt, Now.AddDays(10)), CancellationToken);
+
+        (await GetCardAsync(client))!.BrokenRoutines.Single().CanFreeze.Should().BeFalse("no skips left this month");
     }
 
     [Fact(DisplayName = "FO5: an absence mostly marked as vacation is announced on the card — FO1's at-least-half rule")]

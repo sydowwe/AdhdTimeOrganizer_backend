@@ -13,8 +13,9 @@ public class ActivityHistory : BaseEntityWithActivity
 
     /// <summary>
     /// The to-do item this stretch of time was recorded for, or null when it was not recorded from a
-    /// to-do item — which is most rows: everything the desktop / web-extension heartbeat attributes
-    /// arrives keyed by activity alone.
+    /// to-do item — which is most rows: everything the trackers attribute (the desktop heartbeat and the
+    /// Android sync; the web extension attributes nothing, having no mapping rules) arrives keyed by
+    /// activity alone.
     /// </summary>
     /// <remarks>
     /// Stamped when the user accepts the save-to-history prompt raised on completing an item, and on

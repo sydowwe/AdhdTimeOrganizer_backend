@@ -11,3 +11,9 @@ public record RescheduleOverdueTodoListItemRequest
     /// </summary>
     public int Days { get; init; }
 }
+
+/// <summary><c>POST /todo-list-item/reschedule-overdue/undo</c>: the token the renegotiation returned.</summary>
+public record UndoRescheduleOverdueTodoListItemRequest
+{
+    public required string UndoToken { get; init; }
+}

@@ -15,3 +15,15 @@ public class RescheduleOverdueTodoListItemValidator : Validator<RescheduleOverdu
         RuleFor(x => x.ListId).GreaterThan(0).When(x => x.ListId is not null);
     }
 }
+
+/// <summary>
+/// Its own type because FastEndpoints resolves validators by exact request type: without it the undo request would
+/// be silently unvalidated.
+/// </summary>
+public class UndoRescheduleOverdueTodoListItemValidator : Validator<UndoRescheduleOverdueTodoListItemRequest>
+{
+    public UndoRescheduleOverdueTodoListItemValidator()
+    {
+        RuleFor(x => x.UndoToken).NotEmpty().MaximumLength(64);
+    }
+}

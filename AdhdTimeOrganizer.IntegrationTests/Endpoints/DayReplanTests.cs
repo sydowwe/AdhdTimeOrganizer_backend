@@ -121,6 +121,34 @@ public class DayReplanTests(AppDbContextFixture fixture) : PostgresTestBase(fixt
         (await SnapshotAsync()).Should().Equal(before);
     }
 
+    [Fact(DisplayName = "FO10: on a day with no row the preview reports the user's own bed time, not the generic one")]
+    public async Task Preview_DayWithNoRow_ReportsTheUsersBedTime()
+    {
+        await SetDefaultBedTimeAsync(new TimeOnly(22, 0));
+        try
+        {
+            await using var host = Host(At(11, 30));
+
+            var preview = await PreviewAsync(host.CreateClient(), Day);
+
+            preview.Moves.Should().BeEmpty("a day with no row has no tasks");
+            Slot(preview.PackedFrom, preview.WindowEnd).Should().Be("11:30-22:00",
+                "the same window next-free-slot packs into for such a day");
+        }
+        finally
+        {
+            await SetDefaultBedTimeAsync(UserSleepWindow.Fallback.BedTime);
+        }
+    }
+
+    private async Task SetDefaultBedTimeAsync(TimeOnly bedTime)
+    {
+        await using var db = CreateDbContext();
+        var user = await db.Set<User>().IgnoreQueryFilters().SingleAsync(u => u.Id == UserId, CancellationToken);
+        user.DefaultBedTime = bedTime;
+        await db.SaveChangesAsync(CancellationToken);
+    }
+
     [Fact(DisplayName = "FO4: when time runs out optional blocks give way first, and what still has no room comes back")]
     public async Task OptionalGivesWayFirst()
     {

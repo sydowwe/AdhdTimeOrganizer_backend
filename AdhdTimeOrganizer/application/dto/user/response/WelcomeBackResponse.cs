@@ -38,8 +38,8 @@ public record WelcomeBackResponse
 
     /// <summary>
     /// Routines whose streak ended while the user was gone: a cycle closing in the absence missed its threshold,
-    /// was neither frozen nor excused, and the streak now stands at 0. Nothing to decide here; the card says they
-    /// start fresh today.
+    /// was neither frozen nor excused, and the streak now stands at 0. Nothing to decide on the card itself; it says
+    /// they start fresh today, and points to the skip for each one a skip can still bring back (<c>CanFreeze</c>).
     /// </summary>
     public required IReadOnlyList<WelcomeBackRoutineResponse> BrokenRoutines { get; init; }
 
@@ -64,4 +64,9 @@ public record WelcomeBackItemResponse(long Id, string Name, DateOnly Date);
 /// <param name="Id">The routine period's id (<c>RoutineTimePeriod</c>).</param>
 /// <param name="Text">Its name, e.g. "Daily".</param>
 /// <param name="Color">Its colour, as the routines screen draws it.</param>
-public record WelcomeBackRoutineResponse(long Id, string Text, string Color);
+/// <param name="CanFreeze">
+/// Whether spending a skip (a streak freeze) on its newest cycle would succeed now and bring the run back —
+/// <c>RoutineStreakFreezeService.DescribeBreak</c>, the rule the freeze endpoint and the broken-streak notification
+/// share (F1-04: "whether a freeze can still cover one").
+/// </param>
+public record WelcomeBackRoutineResponse(long Id, string Text, string Color, bool CanFreeze);

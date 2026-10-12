@@ -160,7 +160,7 @@ project's bases.
   default 30, `GET/PUT /todo-list/settings`); a date-only item never is. All of it lives in
   `application/service/reminder/`: `TodoListItemDueReminderSync` (behind
   `ITodoListItemDueReminderSync`) is the one place that knows the key, offsets and payload, and is
-  called **after the save** by create, update, both toggles, move, reschedule-overdue, item delete,
+  called **after the save** by create, update, both toggles, move, reschedule-overdue and its undo, item delete,
   list delete (ids read in `BeforeDeleteAsync` — the cascade never passes through), and on the host
   side by the fresh start and its undo, `ActivityTimeRecordedEventHandler`,
   `PlannerTaskIsDoneChangedEventHandler`, the lead setting and the user's time-zone change. A new
