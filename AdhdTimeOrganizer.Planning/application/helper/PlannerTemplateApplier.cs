@@ -167,7 +167,7 @@ public static class PlannerTemplateApplier
     /// <summary>
     /// <paramref name="task"/> cut down to the stretches where it would be at most a second block among
     /// <paramref name="sameKind"/>. The span is sliced at every start and end that falls inside it; between two
-    /// consecutive cuts the set of blocks it meets cannot change, so <see cref="PlannerTaskLaneRule.ExceedsLaneLimit"/>
+    /// consecutive cuts the set of blocks it meets cannot change, so <see cref="PlannerTaskLaneRule.ExceedsLaneLimit(TimeOnly, TimeOnly, IEnumerable{ValueTuple{TimeOnly, TimeOnly}})"/>
     /// on each slice is exact, and adjacent slices that fit are joined back into one segment. Only called for a task
     /// that exceeds somewhere, which a span with <c>end &lt;= start</c> never does.
     /// </summary>
