@@ -9,16 +9,20 @@ using FastEndpoints;
 using Google;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
+using Google.Apis.Util;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.application.extensions;
+using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.domain.result;
 
 namespace AdhdTimeOrganizer.application.endpoint.activityPlanning.calendar.command;
 
 /// <param name="SyncedCount">Events inserted or updated on Google — the tasks now showing there.</param>
-/// <param name="RemovedCount">Events deleted because their task was skipped or made background since the last sync.</param>
+/// <param name="RemovedCount">
+/// Events deleted because their task was skipped, made background, deleted or moved to another day since the last sync.
+/// </param>
 public record SyncCalendarToGoogleResponse(int SyncedCount, int RemovedCount);
 
 public class SyncCalendarToGoogleEndpoint(
@@ -71,7 +75,7 @@ public class SyncCalendarToGoogleEndpoint(
             .ToHashSetAsync(ct);
 
         using var calendarService = googleCalendarService.GetCalendarService(user.GoogleCalendarRefreshToken);
-        var tzOffset = user.Timezone.GetUtcOffset(DateTime.UtcNow);
+        var zone = user.Timezone;
         var syncedCount = 0;
         var removedCount = 0;
 
@@ -94,36 +98,34 @@ public class SyncCalendarToGoogleEndpoint(
                     continue;
                 }
 
-                var startDto = new DateTimeOffset(
-                    calendar.Date.Year, calendar.Date.Month, calendar.Date.Day,
-                    task.StartTime.Hour, task.StartTime.Minute, 0, tzOffset);
-
-                var endDto = new DateTimeOffset(
-                    calendar.Date.Year, calendar.Date.Month, calendar.Date.Day,
-                    task.EndTime.Hour, task.EndTime.Minute, 0, tzOffset);
+                // Each instant through the user's zone on the calendar's own date. Taking today's offset instead put
+                // every day across a DST switch an hour off. An end before the start belongs to a row that predates
+                // the ordering rule and wrapped past midnight (DayPacking.Occupancy reads it the same way).
+                var start = WallClockZone.ToUtc(calendar.Date, task.StartTime, zone);
+                var end = WallClockZone.ToUtc(task.EndTime < task.StartTime ? calendar.Date.AddDays(1) : calendar.Date, task.EndTime, zone);
 
                 var googleEvent = new Event
                 {
                     Summary = task.Activity.Name,
                     Description = task.Notes,
                     Location = task.Location,
-                    Start = new EventDateTime { DateTimeDateTimeOffset = startDto, TimeZone = user.Timezone.Id },
-                    End = new EventDateTime { DateTimeDateTimeOffset = endDto, TimeZone = user.Timezone.Id },
-                    Reminders = GoogleReminders(remindedTaskIds.Contains(task.Id))
+                    Start = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(start), TimeZone = zone.Id },
+                    End = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(end), TimeZone = zone.Id },
+                    Reminders = GoogleReminders(remindedTaskIds.Contains(task.Id)),
+                    ExtendedProperties = Tag(task.Id),
+                    // An update restores an event Google holds as cancelled rather than leaving it hidden.
+                    Status = "confirmed"
                 };
 
-                if (task.GoogleEventId is null)
-                {
-                    var created = await calendarService.Events.Insert(googleEvent, "primary").ExecuteAsync(ct);
-                    task.GoogleEventId = created.Id;
-                }
-                else
-                {
-                    await calendarService.Events.Update(googleEvent, "primary", task.GoogleEventId).ExecuteAsync(ct);
-                }
-
+                task.GoogleEventId = await UpsertEventAsync(calendarService, googleEvent, task.GoogleEventId, ct);
                 syncedCount++;
             }
+
+            // Last, so the events just inserted are listed with their ids already recorded and kept.
+            var dayStart = WallClockZone.ToUtc(calendar.Date, TimeOnly.MinValue, zone);
+            var dayEnd = WallClockZone.ToUtc(calendar.Date.AddDays(1), TimeOnly.MinValue, zone);
+            var kept = calendar.Tasks.Where(IsPushable).Select(t => t.GoogleEventId).OfType<string>().ToHashSet();
+            removedCount += await RemoveOrphanedEventsAsync(calendarService, user.Id, calendar.Id, kept, dayStart, dayEnd, ct);
         }
         catch (GoogleApiException e) when (e.HttpStatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
@@ -143,8 +145,88 @@ public class SyncCalendarToGoogleEndpoint(
         await Send.OkAsync(new SyncCalendarToGoogleResponse(syncedCount, removedCount), ct);
     }
 
+    /// <summary>
+    /// Marks the events this sync owns, so a day's sync can find the ones whose block is gone. The list query filters
+    /// on the marker, so an event the user made in Google is never read, let alone deleted.
+    /// </summary>
+    private const string MarkerKey = "adhdTimeOrganizer";
+
+    private const string MarkerValue = "plannerTask";
+    private const string TaskIdKey = "plannerTaskId";
+
     private static bool IsPushable(PlannerTask task) =>
         task.Status != PlannerTaskStatus.Cancelled && !task.IsBackground;
+
+    private static Event.ExtendedPropertiesData Tag(long taskId) => new()
+    {
+        Private__ = new Dictionary<string, string> { [MarkerKey] = MarkerValue, [TaskIdKey] = taskId.ToString() }
+    };
+
+    /// <summary>
+    /// Inserts, or updates the event the task already has. An event Google no longer has — deleted there by hand, or by
+    /// the orphan sweep of the day the task moved off — is inserted afresh rather than failing the whole sync.
+    /// </summary>
+    private static async Task<string> UpsertEventAsync(CalendarService calendarService, Event googleEvent, string? eventId, CancellationToken ct)
+    {
+        if (eventId is not null)
+        {
+            try
+            {
+                await calendarService.Events.Update(googleEvent, "primary", eventId).ExecuteAsync(ct);
+                return eventId;
+            }
+            catch (GoogleApiException e) when (e.HttpStatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
+            {
+            }
+        }
+
+        var created = await calendarService.Events.Insert(googleEvent, "primary").ExecuteAsync(ct);
+        return created.Id;
+    }
+
+    /// <summary>
+    /// Deletes this sync's events on the day that no pushable task of the day owns any more: a block deleted in the
+    /// app, or by a cascade (an activity's delete, a template replacing the day), which no code path reports to Google.
+    /// Found by listing the day on Google rather than by remembering deletions, so every delete path is covered,
+    /// including the ones that bypass EF. Events synced before the marker existed carry none and are left alone — an
+    /// untagged event cannot be told apart from one the user made.
+    /// <para>
+    /// A task elsewhere still pointing at a removed event (moved to another day and not synced there yet) forgets it, so
+    /// its own day's sync inserts a fresh event instead of updating a deleted one. This day's own tasks are excluded:
+    /// they are tracked and saved by the caller, and a set-based write under them would fail that save on its
+    /// concurrency token.
+    /// </para>
+    /// </summary>
+    private async Task<int> RemoveOrphanedEventsAsync(
+        CalendarService calendarService, long userId, long calendarId, IReadOnlySet<string> kept,
+        DateTime dayStartUtc, DateTime dayEndUtc, CancellationToken ct)
+    {
+        var orphans = new List<string>();
+        string? pageToken = null;
+        do
+        {
+            var request = calendarService.Events.List("primary");
+            request.TimeMinDateTimeOffset = new DateTimeOffset(dayStartUtc);
+            request.TimeMaxDateTimeOffset = new DateTimeOffset(dayEndUtc);
+            request.PrivateExtendedProperty = new Repeatable<string>([$"{MarkerKey}={MarkerValue}"]);
+            request.PageToken = pageToken;
+
+            var page = await request.ExecuteAsync(ct);
+            orphans.AddRange((page.Items ?? []).Select(e => e.Id).OfType<string>().Where(id => !kept.Contains(id)));
+            pageToken = page.NextPageToken;
+        } while (pageToken is not null);
+
+        foreach (var eventId in orphans)
+            await DeleteEventAsync(calendarService, eventId, ct);
+
+        if (orphans.Count > 0)
+            await dbContext.PlannerTasks
+                .Where(t => t.UserId == userId && t.CalendarId != calendarId
+                            && t.GoogleEventId != null && orphans.Contains(t.GoogleEventId))
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.GoogleEventId, (string?)null), ct);
+
+        return orphans.Count;
+    }
 
     /// <summary>
     /// Google's own popups for a synced block. A task the portal already reminds about gets none — without this

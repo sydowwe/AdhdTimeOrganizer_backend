@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.application.service.reminder;
@@ -9,8 +10,10 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.reminders;
 using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.@enum;
+using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Notifications.application;
 using Sydowwe.Notifications.domain.entity;
@@ -446,6 +449,69 @@ public class ReminderRegistrationTests(AppDbContextFixture fixture) : PostgresTe
         definition.Status.Should().Be(ReminderStatus.Active);
         definition.NextOccurrenceAt.Should().NotBeNull("the calculator walks a past anchor forward to the next occurrence");
         definition.NextOccurrenceAt!.Value.Should().BeAfter(DateTimeOffset.UtcNow);
+    }
+
+    // ---- wall clock --------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The plumbing half of <see cref="ReminderIntervalWallClockTests"/>: the portal hands the owner's zone to the
+    /// registry, so "daily at 08:00" is 08:00 on their clock whichever side of a DST switch the test runs on. Anchored
+    /// in winter, so for the summer half of the year the old fixed-offset arithmetic answered 09:00.
+    /// </summary>
+    [Fact(DisplayName = "A recurring reminder is registered on its owner's clock: daily 08:00 stays 08:00 in Bratislava")]
+    public async Task RecurringReminder_IsRegisteredInOwnersZone()
+    {
+        var bratislava = TimeZoneInfo.FindSystemTimeZoneById("Europe/Bratislava");
+        await using (var seed = CreateDbContext())
+        {
+            var user = await seed.Set<User>().SingleAsync(u => u.Id == TestUserId, CancellationToken);
+            user.Timezone = bratislava;
+            await seed.SaveChangesAsync(CancellationToken);
+        }
+
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        var response = await factory.CreateClient().PostAsJsonAsync("api/reminder", new
+        {
+            Title = "Take the meds",
+            // 08:00 CET.
+            RemindAt = new DateTime(2026, 1, 15, 7, 0, 0, DateTimeKind.Utc),
+            LeadOffsetsMinutes = new[] { 0 },
+            Recurrence = nameof(ReminderRecurrence.Daily)
+        }, JsonOpts, CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var reminderId = await response.Content.ReadFromJsonAsync<long>(CancellationToken);
+
+        await using var db = CreateDbContext();
+        var definition = await SingleDefinitionAsync(db, reminderId);
+        definition.TimeZoneId.Should().Be(bratislava.Id);
+        WallClockZone.FromUtc(definition.NextOccurrenceAt!.Value.UtcDateTime, bratislava).TimeOfDay
+            .Should().Be(new TimeSpan(8, 0, 0), "the next ring is 08:00 local, in summer and in winter alike");
+    }
+
+    [Fact(DisplayName = "The registry refuses an interval whose zone does not exist instead of storing a drifting one")]
+    public async Task UnknownZone_IsRefusedAtRegistration()
+    {
+        await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: EmailOff);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var registry = scope.ServiceProvider.GetRequiredService<IReminderRegistry>();
+
+        var register = () => registry.RegisterAsync(new ReminderRegistration
+        {
+            Key = new ReminderKey("WallClockTest", "Subject", "1", "Kind"),
+            Schedule = ReminderSchedule.RecurringInterval(
+                ReminderIntervalPreset.Daily, DateTimeOffset.UtcNow.AddDays(1), timeZoneId: "Not/AZone"),
+            TemplateKey = ReminderRegistrationService.TemplateKey,
+            NotificationType = NotificationType.PersonalReminder,
+            RecipientMode = RecipientMode.ExplicitUsers,
+            ExplicitRecipientUserIds = [TestUserId]
+        }, CancellationToken);
+
+        await register.Should().ThrowAsync<ArgumentException>().WithMessage("*Not/AZone*");
+
+        await using var db = CreateDbContext();
+        (await db.Set<ReminderDefinition>().AnyAsync(d => d.OwnerModule == "WallClockTest", CancellationToken))
+            .Should().BeFalse("a refused registration writes nothing");
     }
 
     // ---- IDOR --------------------------------------------------------------------------------------

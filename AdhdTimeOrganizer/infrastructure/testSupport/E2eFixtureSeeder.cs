@@ -1696,6 +1696,9 @@ public class E2eFixtureSeeder(
                 // A recurring schedule has no lead-offset concept, so the single offset is folded into the
                 // anchor — the same fold BuildSchedule performs.
                 AnchorDate = isRecurring ? firstOccurrence : null,
+
+                // BuildSchedule passes the owner's zone for a recurring one; every fixture user is on UTC.
+                TimeZoneId = isRecurring ? TimeZoneInfo.Utc.Id : null,
                 LeadOffsets = isRecurring
                     ? []
                     : [.. reminder.LeadOffsetsMinutes.Select(offset => new ReminderLeadOffset { OffsetMinutes = offset })],

@@ -105,7 +105,11 @@ public class ReminderRegistrationService(
                 await dbContext.SaveChangesAsync(ct);
         }
 
-        await RegisterAsync(reminder, ct);
+        // A recurring reminder keeps the owner's wall clock, so it needs their zone even when no task does.
+        if (reminder.Recurrence is not null)
+            timezone ??= await ResolveTimezoneAsync(reminder.UserId, ct);
+
+        await RegisterAsync(reminder, timezone, ct);
     }
 
     /// <summary>
@@ -162,9 +166,10 @@ public class ReminderRegistrationService(
     /// The registration for one row. An automatic reminder (<see cref="Reminder.IsAuto"/>) is its own kind, template
     /// and <see cref="NotificationType.PlannedBlockStarting"/>; everything else about the two is the same mapping.
     /// </summary>
-    private Task RegisterAsync(Reminder reminder, CancellationToken ct)
+    /// <param name="timezone">The owner's zone; required for a recurring reminder (see <see cref="BuildSchedule"/>).</param>
+    private Task RegisterAsync(Reminder reminder, TimeZoneInfo? timezone, CancellationToken ct)
     {
-        var schedule = BuildSchedule(reminder);
+        var schedule = BuildSchedule(reminder, timezone);
         var auto = reminder is { IsAuto: true, PlannerTaskId: not null };
 
         return registry.RegisterAsync(new ReminderRegistration
@@ -312,7 +317,7 @@ public class ReminderRegistrationService(
         // After the save, never before: the registration carries the schedule built from RemindAt, so
         // registering first would publish an instant the database might still reject.
         foreach (var reminder in toRegister)
-            await RegisterAsync(reminder, ct);
+            await RegisterAsync(reminder, timezones.GetValueOrDefault(reminder.UserId, TimeZoneInfo.Utc), ct);
     }
 
     public async Task<IReadOnlyList<long>> GetReminderIdsForPlannerTasksAsync(IReadOnlyCollection<long> plannerTaskIds, CancellationToken ct = default)
@@ -335,14 +340,19 @@ public class ReminderRegistrationService(
     /// single offset a recurring reminder is allowed to carry is folded into the anchor instead. That is why
     /// <c>ReminderValidator</c> caps a recurring reminder at one offset — with two there would be no way to
     /// express the second.
+    /// <para>
+    /// A recurring one also carries the owner's zone, so "daily at 08:00" stays 08:00 on their clock across a DST
+    /// change instead of riding the anchor's UTC offset to 07:00 for half the year. The zone is the one current at
+    /// registration: a user who moves keeps the old zone until the reminder is next saved, as before.
+    /// </para>
     /// </summary>
-    private static ReminderSchedule BuildSchedule(Reminder reminder)
+    private static ReminderSchedule BuildSchedule(Reminder reminder, TimeZoneInfo? timezone)
     {
         var offsets = NormalizeOffsets(reminder.LeadOffsetsMinutes);
         var remindAt = AsUtc(reminder.RemindAt);
 
         return reminder.Recurrence is { } recurrence
-            ? ReminderSchedule.RecurringInterval(ToPreset(recurrence), remindAt.AddMinutes(offsets[0]))
+            ? ReminderSchedule.RecurringInterval(ToPreset(recurrence), remindAt.AddMinutes(offsets[0]), timeZoneId: timezone?.Id)
             : ReminderSchedule.OneShot(remindAt, offsets);
     }
 

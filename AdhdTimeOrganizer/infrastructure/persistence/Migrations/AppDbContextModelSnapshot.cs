@@ -4466,6 +4466,11 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("template_key");
 
+                    b.Property<string>("TimeZoneId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("time_zone_id");
+
                     b.Property<uint>("row_version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

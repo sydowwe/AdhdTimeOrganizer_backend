@@ -87,6 +87,11 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   `IReminderRegistrationService.SyncForPlannerTasksAsync`, or the reminder keeps firing at the old
   time with nothing in the logs.
 
+- **A recurring reminder is registered with its owner's zone** (`ReminderSchedule.TimeZoneId`), so
+  "daily at 08:00" stays 08:00 across a DST switch. Without it the module adds days to the anchor's
+  fixed UTC offset and the reminder rings an hour off for half the year. The zone is the one current
+  at registration; a user who moves keeps the old one until the reminder is next saved.
+
 - **The `Reminder` → `PlannerTask` cascade does not reach the module.** Deleting a task takes its
   portal reminder rows with it by FK, but the module-side `ReminderDefinition` is not in that graph —
   which is why every delete path reads the reminder ids *before* deleting and calls `CancelManyAsync`
@@ -106,7 +111,10 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   is the existing `SyncForPlannerTasksAsync` / `CancelManyAsync` story, and
   `PlannedBlockStartingGuard` retires at fire time what a path missed (gone, started, moved).
   `SyncCalendarToGoogleEndpoint` (host) turns Google's own popups off for any block with a portal
-  reminder, or the phone rings twice. Pinned by `PlannedBlockAutoReminderTests`.
+  reminder, or the phone rings twice. Pinned by `PlannedBlockAutoReminderTests`. The same sync tags
+  every event it pushes with a private extended property and, per synced day, deletes its tagged
+  events no pushable block owns any more — the only way a deleted or moved block (cascades included)
+  leaves the user's phone. Events pushed before the tag existed are untagged and left alone.
 
 - **`ICalendarProvisioner.EnsureForDateAsync` commits.** Call it *before* staging your own writes —
   anything already pending on the ambient `DbContext` goes in with the calendar. All three callers
