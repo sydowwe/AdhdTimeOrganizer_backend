@@ -155,9 +155,10 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   - **A rule edit reconciles** (`ReconcileAfterEditAsync`): *untouched* occurrences from today on (still
     `NotStarted`, no original slot, still the old rule's exact plan, no to-do/Google link and no reminder the
     *user* wrote — an automatic one does not count) follow the edit, or are removed when the rule stops placing
-    there; a decided day the edit newly matches gets its block. Both obey the lanes: an untouched occurrence the edit
-    would move (new span or kind) into a third block is replaced by what a fresh placement would leave (nothing, or
-    the stretches where it is a second); an edit that keeps the span is never judged, like the single-task writes.
+    there; a decided day the edit newly matches gets its block. Both obey the lanes, judged like the single-task
+    writes on the minutes the edit **newly covers** (the whole span on a change of kind): an untouched occurrence
+    whose new minutes would make it a third block is replaced by what a fresh placement would leave (nothing, or the
+    stretches where it is a second); an edit that keeps, shrinks or extends-into-free-time the span follows the rule.
   - **It never fails its caller** and clears the tracker on failure; it **commits**, so the same ordering rule as
     `EnsureForDateAsync` applies.
   - **Day matching is `RepeatingPlannerTaskSchedule.FallsOn`**, shared with the suggestion endpoint, so the
@@ -186,9 +187,13 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
 - **At most two blocks of a kind at any minute (planner lanes, 2026-10-13).** The SPA draws two overlapping
   foreground blocks side by side, and separately two background ones; `PlannerTaskLaneRule` refuses a third with a
   409 `Conflict` on `startTime`. It is checked on **create, the PUT and the span PATCH only**, through
-  `PlannerTaskLaneExtensions.EnsureWithinLanesAsync` in `AfterMapping`. It judges only a write that *moves* a block
-  (new, or a changed day / start / end / kind), so a day already holding three still accepts a rename or a status
-  tick. The bulk paths (both template applies, copy-to-days, FO4's re-plan apply, carry-over) are deliberately
+  `PlannerTaskLaneExtensions.EnsureWithinLanesAsync` in `AfterMapping`. A write is judged **only on the minutes it
+  newly covers** (`PlannerTaskLaneRule.NewlyCovered`, read off the change tracker's original values): a new block, or
+  one moved to another day or kind, covers its whole span; otherwise it is the new span minus the old one — an
+  extension is judged on `[oldEnd, newEnd)`, a drag on the minutes it slides onto, and a shrink, a move inside the
+  old span, a rename or a status tick is never refused. So a block already in a three-way clash can be extended into
+  free time, which is what the SPA offers (it judges only the added stretch too — `useWrapUpBlock.extendableMinutes`,
+  home's `extendRoom.ts`); the clash it sits in stays. The bulk paths (both template applies, copy-to-days, FO4's re-plan apply, carry-over) are deliberately
   unchecked; the SPA draws a third block as a marked clash. FO6's materialiser is not refused by the rule but
   **places by it** (the FO6 bullet above). A new single-task write that moves a block should call it too. Pinned by
   `PlannerTaskLaneRuleTests`, and for the materialiser by `RepeatingTaskMaterialisationTests`.

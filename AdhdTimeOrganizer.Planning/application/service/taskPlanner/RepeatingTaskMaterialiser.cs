@@ -302,24 +302,30 @@ public sealed class RepeatingTaskMaterialiser(
         && task.ImportanceId == before.ImportanceId;
 
     /// <summary>
-    /// Whether the edited <paramref name="rule"/> moves <paramref name="occurrence"/> — a new span or kind — to where
-    /// it would be a third block of its kind at some minute. An edit that leaves the span and kind alone is never
-    /// judged, the same as <see cref="PlannerTaskLaneRule.PlacementChanged"/>: a day that already holds three
-    /// (from before the lanes, or a bulk path) must still let a rename or a new note reach the occurrence.
+    /// Whether the edited <paramref name="rule"/> moves <paramref name="occurrence"/> to where it would be a third
+    /// block of its kind at some minute <b>it newly covers</b> — the same rule as the single-task writes
+    /// (<see cref="PlannerTaskLaneRule.NewlyCovered(ValueTuple{TimeOnly, TimeOnly}?, TimeOnly, TimeOnly)"/>): a
+    /// change of kind judges the whole new span, otherwise only the new span minus the occurrence's current one.
+    /// So an edit that keeps the span, shrinks it or moves it inside itself is never judged — a day that already
+    /// holds three (from before the lanes, or a bulk path) must still let a rename or a new note reach the
+    /// occurrence — and an extension into free time follows the rule even when the old span already clashes.
     /// </summary>
     private bool MovesOutOfItsLanes(RepeatingPlannerTask rule, PlannerTask occurrence)
     {
-        if (rule.StartTime == occurrence.StartTime && rule.EndTime == occurrence.EndTime
-                                                   && rule.IsBackground == occurrence.IsBackground)
+        var stretches = PlannerTaskLaneRule.NewlyCovered(
+            rule.IsBackground == occurrence.IsBackground ? (occurrence.StartTime, occurrence.EndTime) : null,
+            rule.StartTime, rule.EndTime);
+        if (stretches.Count == 0)
             return false;
 
         var others = occurrence.Calendar.Tasks
             .Where(t => t != occurrence
                         && t.IsBackground == rule.IsBackground
                         && dbContext.Entry(t).State is not (EntityState.Deleted or EntityState.Detached))
-            .Select(t => (t.StartTime, t.EndTime));
+            .Select(t => (t.StartTime, t.EndTime))
+            .ToList();
 
-        return PlannerTaskLaneRule.ExceedsLaneLimit(rule.StartTime, rule.EndTime, others);
+        return PlannerTaskLaneRule.ExceedsLaneLimit(stretches, others);
     }
 
     /// <summary>

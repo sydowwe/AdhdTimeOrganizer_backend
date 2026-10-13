@@ -460,8 +460,11 @@ conflict for a block nobody placed by hand:
 Occurrences placed in one run count against each other, in rule-id order (two rules and a user block at 18:00 are
 three, and the newer rule gives way). The destructive modes are never honoured: this runs from a GET, so the user's
 blocks are never deleted, moved or carved. A rule edit (`ReconcileAfterEditAsync`) follows the same rule: an
-untouched occurrence it would move into a third block is replaced by what a fresh placement would leave, and a newly
-matched day is placed the same way. An edit that keeps the occurrence's span and kind is not judged.
+untouched occurrence whose **newly covered** minutes would make it a third block is replaced by what a fresh placement
+would leave, and a newly matched day is placed the same way. Newly covered is `PlannerTaskLaneRule.NewlyCovered`, the
+one the single-task writes use: the whole span on a change of kind, otherwise the new span minus the old. So an edit
+that keeps, shrinks or moves the span inside itself is not judged, and one that extends it into free time follows
+the rule even when the old span already sits among three.
 
 Why the fallback carve removes only the full-lane minutes, not every overlapped block as `MergeIgnore` does for a
 template: carving around a block that leaves a lane free would cut out time the lanes already allow, so a

@@ -19,9 +19,14 @@ namespace AdhdTimeOrganizer.Planning.application.helper;
 /// only one that would be a third falls back to the user's (non-destructive) conflict mode.
 /// </para>
 /// <para>
-/// Only a write that <b>moves</b> a block is judged — a new block, or a changed day, start, end or kind. A day
-/// that already holds three (from a bulk path, or from before this rule) must still let the user rename one of
-/// them, tick it or write it a note.
+/// <b>A write is judged only on the minutes it newly covers</b> (<see cref="NewlyCovered(DbContext, PlannerTask)"/>).
+/// A new block, or one moved to another day or to the other kind, covers its whole span anew. A block staying on
+/// its day and kind newly covers only its new span minus its old one: an extension is judged on the added
+/// stretch, a drag on the minutes it slides onto, and a shrink, a move inside the old span or a write that leaves
+/// the span alone (a rename, a tick, a note) is never refused. So a block already in a three-way clash (left by
+/// a bulk path, or from before this rule) can still be extended into free time — the SPA offers exactly that,
+/// judging only the added stretch (<c>useWrapUpBlock.extendableMinutes</c>, home's <c>extendRoom.ts</c>) — while
+/// the clash it already sits in is left as it is.
 /// </para>
 /// </summary>
 public static class PlannerTaskLaneRule
@@ -64,12 +69,71 @@ public static class PlannerTaskLaneRule
     }
 
     /// <summary>
-    /// Whether <paramref name="task"/>, at its current day, span and kind, would be a third block at some minute.
-    /// Reads only the blocks that meet its span; <paramref name="task"/> itself is left out by id (a new one has
-    /// id 0, which no row has).
+    /// Whether any of <paramref name="stretches"/> would share some minute with <see cref="MaxLanes"/> or more of
+    /// <paramref name="others"/> — the single-span <c>ExceedsLaneLimit</c> per stretch. No stretches (nothing newly
+    /// covered) never exceeds.
+    /// </summary>
+    public static bool ExceedsLaneLimit(
+        IEnumerable<(TimeOnly Start, TimeOnly End)> stretches, IReadOnlyCollection<(TimeOnly Start, TimeOnly End)> others) =>
+        stretches.Any(s => ExceedsLaneLimit(s.Start, s.End, others));
+
+    /// <summary>
+    /// The minutes of <c>[start, end)</c> that <paramref name="before"/> did not cover: 0, 1 or 2 stretches, in
+    /// order. <paramref name="before"/> is the block's old span on the <b>same day and kind</b>; pass <c>null</c>
+    /// for a new block or one moved to another day or kind, whose whole span is new. An extension yields
+    /// <c>[oldEnd, newEnd)</c>, a drag down <c>[max(oldEnd, newStart), newEnd)</c>, a drag up
+    /// <c>[newStart, min(oldStart, newEnd))</c>, a growth at both ends two stretches, and a shrink or a move
+    /// inside the old span nothing. A span with <c>end &lt;= start</c> covers nothing, as in <c>ExceedsLaneLimit</c>.
+    /// </summary>
+    public static IReadOnlyList<(TimeOnly Start, TimeOnly End)> NewlyCovered(
+        (TimeOnly Start, TimeOnly End)? before, TimeOnly start, TimeOnly end)
+    {
+        if (end <= start)
+            return [];
+        if (before is not { } old || old.End <= old.Start)
+            return [(start, end)];
+
+        var stretches = new List<(TimeOnly Start, TimeOnly End)>(2);
+        if (start < old.Start)
+            stretches.Add((start, end < old.Start ? end : old.Start));
+        if (end > old.End)
+            stretches.Add((start > old.End ? start : old.End, end));
+        return stretches;
+    }
+
+    /// <summary>
+    /// What this write newly covers of <paramref name="task"/>'s span, read off the change tracker: the whole span
+    /// for a new (or detached) block or one whose day or kind changed, otherwise the current span minus the span
+    /// it was loaded with. Compares original and current values directly rather than trusting <c>IsModified</c>,
+    /// which a full update's <c>Update()</c> would set on every column anyway.
+    /// </summary>
+    public static IReadOnlyList<(TimeOnly Start, TimeOnly End)> NewlyCovered(DbContext db, PlannerTask task)
+    {
+        var entry = db.Entry(task);
+        (TimeOnly, TimeOnly)? before = null;
+        if (entry.State is not (EntityState.Detached or EntityState.Added)
+            && !Changed(entry.Property(t => t.CalendarId))
+            && !Changed(entry.Property(t => t.IsBackground)))
+            before = (entry.Property(t => t.StartTime).OriginalValue, entry.Property(t => t.EndTime).OriginalValue);
+
+        return NewlyCovered(before, task.StartTime, task.EndTime);
+
+        static bool Changed<T>(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry<PlannerTask, T> property) =>
+            !EqualityComparer<T>.Default.Equals(property.OriginalValue, property.CurrentValue);
+    }
+
+    /// <summary>
+    /// Whether the minutes this write newly covers (<see cref="NewlyCovered(DbContext, PlannerTask)"/>) would make
+    /// <paramref name="task"/> a third block of its kind at some minute of its day. Nothing newly covered is never
+    /// refused and reads nothing. Reads only the same-kind blocks that meet the task's span; <paramref name="task"/>
+    /// itself is left out by id (a new one has id 0, which no row has).
     /// </summary>
     public static async Task<bool> WouldExceedAsync(DbContext db, PlannerTask task, CancellationToken ct)
     {
+        var stretches = NewlyCovered(db, task);
+        if (stretches.Count == 0)
+            return false;
+
         var others = await db.Set<PlannerTask>()
             .Where(t => t.CalendarId == task.CalendarId
                         && t.Id != task.Id
@@ -79,26 +143,6 @@ public static class PlannerTaskLaneRule
             .Select(t => new { t.StartTime, t.EndTime })
             .ToListAsync(ct);
 
-        return ExceedsLaneLimit(task.StartTime, task.EndTime, others.Select(o => (o.StartTime, o.EndTime)));
-    }
-
-    /// <summary>
-    /// A new block, or a tracked one whose day, start, end or kind differs from what was loaded. Compares the
-    /// original and current values directly rather than trusting <c>IsModified</c>, which a full update's
-    /// <c>Update()</c> would set on every column anyway.
-    /// </summary>
-    public static bool PlacementChanged(DbContext db, PlannerTask task)
-    {
-        var entry = db.Entry(task);
-        if (entry.State is EntityState.Detached or EntityState.Added)
-            return true;
-
-        return Changed(entry.Property(t => t.CalendarId))
-               || Changed(entry.Property(t => t.StartTime))
-               || Changed(entry.Property(t => t.EndTime))
-               || Changed(entry.Property(t => t.IsBackground));
-
-        static bool Changed<T>(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry<PlannerTask, T> property) =>
-            !EqualityComparer<T>.Default.Equals(property.OriginalValue, property.CurrentValue);
+        return ExceedsLaneLimit(stretches, others.Select(o => (o.StartTime, o.EndTime)).ToList());
     }
 }

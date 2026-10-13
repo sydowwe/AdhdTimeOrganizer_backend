@@ -535,6 +535,30 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
         kept.StartTime.Should().Be(new TimeOnly(18, 0));
     }
 
+    /// <summary>
+    /// The lanes judge only the minutes an edit newly covers, the same as the single-task writes: an occurrence
+    /// already among three at 18:00–19:00 follows an edit that extends it into a free 19:00–20:00. Judged on its
+    /// whole new span it would be a third and, under the default <c>Ignore</c>, be removed.
+    /// </summary>
+    [Fact(DisplayName = "FO6: an edit extending an occurrence among three into free time is judged on the added stretch")]
+    public async Task Edit_ExtendingIntoFreeTime_IsJudgedOnTheAddedStretchOnly()
+    {
+        var (activityId, importanceId) = await SeedReferencesAsync();
+        var ruleId = await SeedRuleAsync(activityId: activityId, importanceId: importanceId);
+        await GetDayPlanAsync(Today);
+        var todays = (await OccurrencesAsync(ruleId)).Single(o => o.Date == Today).Task;
+        var firstId = await SeedBlockAsync(Today, new TimeOnly(18, 0), new TimeOnly(19, 0));
+        var secondId = await SeedBlockAsync(Today, new TimeOnly(18, 0), new TimeOnly(19, 0));
+
+        await PutRuleAsync(ruleId, activityId, importanceId, startHour: 18, autoPlace: true, endHour: 20);
+
+        var extended = await TaskAsync(todays.Id);
+        (extended.StartTime, extended.EndTime).Should().Be((new TimeOnly(18, 0), new TimeOnly(20, 0)),
+            "only 19:00-20:00 is new, and it is free");
+        await ShouldBeUntouchedAsync(firstId, new TimeOnly(18, 0), new TimeOnly(19, 0));
+        await ShouldBeUntouchedAsync(secondId, new TimeOnly(18, 0), new TimeOnly(19, 0));
+    }
+
     [Fact(DisplayName = "FO6: copying a day does not carry the occurrence's rule onto the copy")]
     public async Task CopyToDays_DropsTheSource()
     {
@@ -675,12 +699,13 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
         body.Should().NotContain("\"succeeded\":false", body);
     }
 
-    private static object RuleBody(long activityId, long importanceId, int startHour, bool autoPlace, string[]? days = null) => new
+    private static object RuleBody(
+        long activityId, long importanceId, int startHour, bool autoPlace, string[]? days = null, int? endHour = null) => new
     {
         ActivityId = activityId,
         ImportanceId = importanceId,
         StartTime = new { Hours = startHour, Minutes = 0 },
-        EndTime = new { Hours = startHour + 1, Minutes = 0 },
+        EndTime = new { Hours = endHour ?? startHour + 1, Minutes = 0 },
         IsBackground = false,
         IsActive = true,
         RecurrenceType = "DayOfWeek",
@@ -688,10 +713,11 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
         AutoPlace = autoPlace
     };
 
-    private async Task PutRuleAsync(long ruleId, long activityId, long importanceId, int startHour, bool autoPlace, string[]? days = null)
+    private async Task PutRuleAsync(
+        long ruleId, long activityId, long importanceId, int startHour, bool autoPlace, string[]? days = null, int? endHour = null)
     {
         var response = await CreateClient().PutAsJsonAsync($"api/repeating-planner-task/{ruleId}",
-            RuleBody(activityId, importanceId, startHour, autoPlace, days), JsonOpts, CancellationToken);
+            RuleBody(activityId, importanceId, startHour, autoPlace, days, endHour), JsonOpts, CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(CancellationToken));
     }
 

@@ -13,7 +13,8 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// <summary>
 /// Planner lanes: at most two blocks of one kind at any minute (<see cref="PlannerTaskLaneRule"/>), refused on
 /// create, the full update and the span patch with a 409 <c>Conflict</c>. Two side by side are allowed — that is
-/// the point of the lanes — and a day that already holds three still lets the user edit a block in place.
+/// the point of the lanes — and a write is judged only on the minutes it newly covers, so a day that already holds
+/// three still lets the user edit, shrink or extend-into-free-time a block among them.
 /// </summary>
 [Collection("Postgres")]
 public class PlannerTaskLaneRuleTests(AppDbContextFixture fixture) : PostgresTestBase(fixture)
@@ -102,6 +103,118 @@ public class PlannerTaskLaneRuleTests(AppDbContextFixture fixture) : PostgresTes
         (await LoadAsync(elsewhere)).StartTime.Should().Be(new TimeOnly(14, 0));
     }
 
+    [Theory(DisplayName = "Newly covered: a move on the same day and kind adds only the minutes the old span did not have")]
+    [InlineData(9, 0, 10, 0, 9, 0, 10, 30, "10:00-10:30")] // extension
+    [InlineData(9, 0, 10, 0, 9, 30, 10, 30, "10:00-10:30")] // drag down, overlapping
+    [InlineData(9, 0, 10, 0, 8, 30, 9, 30, "08:30-09:00")] // drag up, overlapping
+    [InlineData(9, 0, 10, 0, 11, 0, 12, 0, "11:00-12:00")] // drag clear of the old span
+    [InlineData(9, 0, 10, 0, 8, 0, 9, 0, "08:00-09:00")] // drag up, touching the old start
+    [InlineData(9, 0, 10, 0, 8, 30, 10, 30, "08:30-09:00,10:00-10:30")] // growth at both ends
+    [InlineData(9, 0, 10, 0, 9, 15, 9, 45, "")] // shrink
+    [InlineData(9, 0, 10, 0, 9, 0, 10, 0, "")] // unchanged
+    public void NewlyCovered_IsTheNewSpanMinusTheOld(int os, int osm, int oe, int oem, int ns, int nsm, int ne, int nem, string expected)
+    {
+        var stretches = PlannerTaskLaneRule.NewlyCovered(
+            (new TimeOnly(os, osm), new TimeOnly(oe, oem)), new TimeOnly(ns, nsm), new TimeOnly(ne, nem));
+        string.Join(",", stretches.Select(s => $"{s.Start:HH:mm}-{s.End:HH:mm}")).Should().Be(expected);
+    }
+
+    [Fact(DisplayName = "Newly covered: a new block, or one moved to another day or kind, covers its whole span")]
+    public void NewlyCovered_WithoutAnOldSpan_IsTheWholeSpan() =>
+        PlannerTaskLaneRule.NewlyCovered(null, new TimeOnly(9, 0), new TimeOnly(10, 0))
+            .Should().ContainSingle().Which.Should().Be((new TimeOnly(9, 0), new TimeOnly(10, 0)));
+
+    [Fact(DisplayName = "Extend: a block among three extends into free time, but not into a stretch two others hold")]
+    public async Task Extend_AClashingBlock_IsJudgedOnlyOnTheAddedStretch()
+    {
+        var (activityId, calendarId) = await SeedDayAsync("lanes-extend");
+        await using var db = CreateDbContext();
+        // Three at once, as a template apply or copy-to-days can leave a day, and a full pair later on.
+        var first = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+        var second = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+        var third = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+        await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(11, 0), new TimeOnly(12, 0), ct: CancellationToken);
+        await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(11, 0), new TimeOnly(12, 0), ct: CancellationToken);
+
+        (await PutAsync(first, activityId, calendarId, (9, 0), (10, 30))).StatusCode.Should().Be(HttpStatusCode.OK,
+            "only 10:00-10:30 is new, and nothing else is there; the clash it already sits in is not this write's");
+        (await LoadAsync(first)).EndTime.Should().Be(new TimeOnly(10, 30));
+
+        (await PutAsync(second, activityId, calendarId, (9, 0), (11, 30))).StatusCode.Should().Be(HttpStatusCode.Conflict,
+            "11:00-11:30 is new and both lanes are already taken there");
+        (await LoadAsync(second)).EndTime.Should().Be(new TimeOnly(10, 0), "the refused update must not have been applied");
+
+        (await PatchSpanAsync(second, (9, 0), (10, 30))).StatusCode.Should().Be(HttpStatusCode.NoContent,
+            "beside the first block's extension, 10:00-10:30 holds one other");
+        (await LoadAsync(second)).EndTime.Should().Be(new TimeOnly(10, 30));
+
+        (await PatchSpanAsync(third, (9, 0), (10, 15))).StatusCode.Should().Be(HttpStatusCode.Conflict,
+            "10:00-10:15 is new and the two extensions already hold it");
+        (await LoadAsync(third)).EndTime.Should().Be(new TimeOnly(10, 0), "the refused patch must not have been applied");
+    }
+
+    [Fact(DisplayName = "Shrink: a block among three can shrink, by the span patch and by the PUT")]
+    public async Task Shrink_OfAClashingBlock_Saves()
+    {
+        var (activityId, calendarId) = await SeedDayAsync("lanes-shrink");
+        await using var db = CreateDbContext();
+        var first = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+        var second = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+        await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+
+        (await PatchSpanAsync(first, (9, 15), (9, 45))).StatusCode.Should().Be(HttpStatusCode.NoContent,
+            "a shrink covers no minute it did not already cover");
+        (await LoadAsync(first)).StartTime.Should().Be(new TimeOnly(9, 15));
+
+        (await PutAsync(second, activityId, calendarId, (9, 0), (9, 30))).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await LoadAsync(second)).EndTime.Should().Be(new TimeOnly(9, 30));
+    }
+
+    [Fact(DisplayName = "Drag: a block among three is judged on the minutes it slides onto")]
+    public async Task Drag_OfAClashingBlock_IsJudgedOnItsNewMinutes()
+    {
+        var (activityId, calendarId) = await SeedDayAsync("lanes-drag");
+        await using var db = CreateDbContext();
+        var moving = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+        await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+        await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+        await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(10, 0), new TimeOnly(11, 0), ct: CancellationToken);
+        await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(10, 0), new TimeOnly(11, 0), ct: CancellationToken);
+
+        (await PatchSpanAsync(moving, (9, 30), (10, 30))).StatusCode.Should().Be(HttpStatusCode.Conflict,
+            "10:00-10:30 is new and the 10:00-11:00 pair holds it");
+        (await LoadAsync(moving)).StartTime.Should().Be(new TimeOnly(9, 0), "the refused patch must not have been applied");
+
+        (await PatchSpanAsync(moving, (8, 30), (9, 30))).StatusCode.Should().Be(HttpStatusCode.NoContent,
+            "dragged up, only 08:30-09:00 is new, and it is free");
+        (await LoadAsync(moving)).StartTime.Should().Be(new TimeOnly(8, 30));
+    }
+
+    [Fact(DisplayName = "Move: to another day or the other kind, the whole span is new even when it is unchanged")]
+    public async Task Move_ToAnotherDayOrKind_IsJudgedOnItsWholeSpan()
+    {
+        var (activityId, calendarId) = await SeedDayAsync("lanes-move");
+        long otherDayId;
+        long moving;
+        await using (var db = CreateDbContext())
+        {
+            otherDayId = await PlanningTestSeedHelper.SeedCalendarAsync(db, new DateOnly(2027, 5, 4), ct: CancellationToken);
+            moving = await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, otherDayId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+            await PlanningTestSeedHelper.SeedPlannerTaskAsync(db, activityId, otherDayId, new TimeOnly(9, 0), new TimeOnly(10, 0), ct: CancellationToken);
+        }
+        (await CreateAsync(activityId, calendarId, (9, 0), (10, 0), background: true)).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await CreateAsync(activityId, calendarId, (9, 0), (10, 0), background: true)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        (await PutAsync(moving, activityId, otherDayId, (9, 0), (10, 0))).StatusCode.Should().Be(HttpStatusCode.Conflict,
+            "on the other day all of 09:00-10:00 is new, and both lanes are taken there");
+        (await LoadAsync(moving)).CalendarId.Should().Be(calendarId, "the refused move must not have been applied");
+
+        (await PutAsync(moving, activityId, calendarId, (9, 0), (10, 0), background: true)).StatusCode.Should().Be(HttpStatusCode.Conflict,
+            "as a background block it covers all of 09:00-10:00 anew, where both background lanes are taken");
+        (await LoadAsync(moving)).IsBackground.Should().BeFalse();
+    }
+
     private async Task<(long ActivityId, long CalendarId)> SeedDayAsync(string name)
     {
         await using var db = CreateDbContext();
@@ -121,12 +234,13 @@ public class PlannerTaskLaneRuleTests(AppDbContextFixture fixture) : PostgresTes
             CalendarId = calendarId
         }, JsonOpts, CancellationToken);
 
-    private Task<HttpResponseMessage> PutAsync(long id, long activityId, long calendarId, (int H, int M) start, (int H, int M) end, string? notes = null) =>
+    private Task<HttpResponseMessage> PutAsync(
+        long id, long activityId, long calendarId, (int H, int M) start, (int H, int M) end, string? notes = null, bool background = false) =>
         CreateClient().PutAsJsonAsync($"api/planner-task/{id}", new
         {
             StartTime = new { Hours = start.H, Minutes = start.M },
             EndTime = new { Hours = end.H, Minutes = end.M },
-            IsBackground = false,
+            IsBackground = background,
             ActivityId = activityId,
             Status = "NotStarted",
             CalendarId = calendarId,
