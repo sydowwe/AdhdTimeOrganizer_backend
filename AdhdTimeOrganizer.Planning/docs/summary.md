@@ -168,6 +168,15 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   - **Bed time 00:00 (or after midnight) means 23:59**, the last end a block can have. FO10 changed only the
     input (the day's bed time now starts as the user's default), not this rule.
 
+- **At most two blocks of a kind at any minute (planner lanes, 2026-10-13).** The SPA draws two overlapping
+  foreground blocks side by side, and separately two background ones; `PlannerTaskLaneRule` refuses a third with a
+  409 `Conflict` on `startTime`. It is checked on **create, the PUT and the span PATCH only**, through
+  `PlannerTaskLaneExtensions.EnsureWithinLanesAsync` in `AfterMapping`. It judges only a write that *moves* a block
+  (new, or a changed day / start / end / kind), so a day already holding three still accepts a rename or a status
+  tick. The bulk paths (both template applies, copy-to-days, FO4's re-plan apply, FO6's materialiser, carry-over)
+  are deliberately unchecked; the SPA draws a third block as a marked clash. A new single-task write that moves a
+  block should call it too. Pinned by `PlannerTaskLaneRuleTests`.
+
 - **The slip nudges (audit N5) are a sweep that only notifies.** `PlannerSlipNudgeJobHandler`, every five minutes,
   sends `PlannedBlocksMissed` (today's missed blocks — one notification per user per sweep, at most two a day, none on
   an away day or for a block created after its end) and `PlannedBlockOverrun` (a started, non-auto-complete block 5+

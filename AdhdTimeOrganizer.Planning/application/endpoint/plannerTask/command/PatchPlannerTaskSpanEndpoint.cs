@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
+using AdhdTimeOrganizer.Planning.application.endpoint.extensions;
 using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
@@ -26,9 +27,16 @@ public class PatchPlannerTaskSpanEndpoint(
         entity.EndTime = new TimeOnly(req.EndTime.Hours, req.EndTime.Minutes);
     }
 
-    /// <summary>Dragging an overdue block later in its day is a postponement too (FO3).</summary>
+    /// <summary>
+    /// The grid's drag, resize and arrow moves: refused when they would make a third overlapping block
+    /// (<see cref="PlannerTaskLaneRule"/>), the same check the grid makes first. Dragging an overdue block later in
+    /// its day is a postponement too (FO3).
+    /// </summary>
     protected override async Task<bool> AfterMapping(PlannerTask entity, PlannerTaskChangeSpanRequest req, CancellationToken ct = default)
     {
+        if (!await this.EnsureWithinLanesAsync(DbContext, entity, ct))
+            return false;
+
         await PlannerTaskMoveRecorder.RecordPostponementAsync(DbContext, entity, timeZones, ct);
         return true;
     }

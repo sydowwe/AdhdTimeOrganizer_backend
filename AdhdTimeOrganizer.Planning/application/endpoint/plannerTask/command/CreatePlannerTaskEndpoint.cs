@@ -1,6 +1,7 @@
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.application.dto.request.taskPlanner;
 using AdhdTimeOrganizer.Planning.application.endpoint.extensions;
+using AdhdTimeOrganizer.Planning.application.helper;
 using AdhdTimeOrganizer.Planning.application.validator;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
@@ -56,13 +57,14 @@ public class CreatePlannerTaskEndpoint(
         return true;
     }
 
+    /// <summary>Lands the resolved day, then refuses a third overlapping block (<see cref="PlannerTaskLaneRule"/>).</summary>
     protected override Task<bool> AfterMapping(PlannerTask entity, PlannerTaskRequest req, CancellationToken ct = default)
     {
         // ToEntity leaves this at 0 when the caller named a date — a DTO property cannot reach the database.
         if (_resolvedCalendarId is { } calendarId)
             entity.CalendarId = calendarId;
 
-        return Task.FromResult(true);
+        return this.EnsureWithinLanesAsync(_dbContext, entity, ct);
     }
 
     protected override Task AfterSave(PlannerTask entity, CancellationToken ct = default) =>

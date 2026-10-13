@@ -49,15 +49,19 @@ public class UpdatePlannerTaskEndpoint(
     }
 
     /// <summary>
-    /// Lands the resolved day, then asks whether the move was a postponement (FO3). Home's <i>Move later</i> and
-    /// the day view's reschedule are both this PUT, so this is where most slips are recorded. Must run after the
-    /// calendar id is final.
+    /// Lands the resolved day, refuses a move that would make a third overlapping block
+    /// (<see cref="PlannerTaskLaneRule"/>), then asks whether the move was a postponement (FO3). Home's
+    /// <i>Move later</i> and the day view's reschedule are both this PUT, so this is where most slips are recorded.
+    /// Must run after the calendar id is final.
     /// </summary>
     protected override async Task<bool> AfterMapping(PlannerTask entity, PlannerTaskRequest req, CancellationToken ct = default)
     {
         // UpdateEntity leaves CalendarId alone when the caller named a date instead; this is where that lands.
         if (_resolvedCalendarId is { } calendarId)
             entity.CalendarId = calendarId;
+
+        if (!await this.EnsureWithinLanesAsync(_dbContext, entity, ct))
+            return false;
 
         await PlannerTaskMoveRecorder.RecordPostponementAsync(_dbContext, entity, timeZones, ct);
         return true;
