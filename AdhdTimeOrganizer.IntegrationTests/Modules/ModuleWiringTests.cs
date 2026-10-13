@@ -403,6 +403,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(PortalScheduledJobsRegistrar.SuggestionPatternRefreshRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.MorningBriefingRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.UnconfirmedAccountsRegistration.JobKey, jobKeys);
+        Assert.Contains(PortalScheduledJobsRegistrar.RefreshTokenCleanupRegistration.JobKey, jobKeys);
     }
 
     // ---- GDPR erasure fan-out --------------------------------------------------------------------

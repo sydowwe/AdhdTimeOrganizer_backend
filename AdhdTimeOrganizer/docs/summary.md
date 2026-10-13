@@ -65,7 +65,8 @@ scheduling) — those live in the `framework/` submodule and are consumed throug
   notifications), `IReminderRegistry` (personal reminders), `IScheduler` (module job registration),
   `ISubjectDataEraser` (account-deletion fan-out).
 - **Consumes (framework):** every entity base, endpoint base, `DbContextHelper`, seeder interfaces
-  and managers, `PasswordSignInFlow` / `UserRegistrationFlow`, `RefreshTokenCleanupService`.
+  and managers, `PasswordSignInFlow` / `UserRegistrationFlow`, `IRefreshTokenService` (its cleanup runs as
+  the `RefreshTokenCleanupJobHandler` Scheduler job).
 - **Exposes to the framework/modules:** `User` (the concrete `TUser`), `IUserDefaultsService`
   (`UserDefaultsService`), `ISeedUserProvider` (`SeedUserIdProvider`),
   `IAdditionalUserClaimsProvider<User>` (`ExtensionRoleClaimsProvider`), and `DbContext` →

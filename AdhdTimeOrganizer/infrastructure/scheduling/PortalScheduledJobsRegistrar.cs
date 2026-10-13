@@ -69,12 +69,31 @@ public sealed class PortalScheduledJobsRegistrar(
         Description = "Resends the confirmation link once to a sign-up still unconfirmed after a day, and deletes it after two weeks."
     };
 
+    /// <summary>
+    /// Dead refresh tokens, once a day at 04:00 UTC — a fixed time rather than 24 hours after each boot, so the cadence no
+    /// longer depends on how often the app is deployed. The tokens it deletes are already a month past use, so a missed
+    /// night costs nothing; the overdue alert covers a run that stops happening at all.
+    /// </summary>
+    public static RecurringJobRegistration RefreshTokenCleanupRegistration { get; } = new()
+    {
+        JobKey = RefreshTokenCleanupJobHandler.HandlerKey,
+        HandlerKey = RefreshTokenCleanupJobHandler.HandlerKey,
+        OwnerModule = "Portal",
+        Schedule = ScheduleSpec.FromCron("0 0 4 * * ?"),
+        DisallowConcurrent = true,
+        Description = "Deletes refresh tokens that were revoked or expired and are more than 30 days old."
+    };
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = services.CreateAsyncScope();
         var scheduler = scope.ServiceProvider.GetRequiredService<IScheduler>();
 
-        foreach (var registration in new[] { SuggestionPatternRefreshRegistration, MorningBriefingRegistration, UnconfirmedAccountsRegistration })
+        foreach (var registration in new[]
+                 {
+                     SuggestionPatternRefreshRegistration, MorningBriefingRegistration, UnconfirmedAccountsRegistration,
+                     RefreshTokenCleanupRegistration
+                 })
         {
             try
             {

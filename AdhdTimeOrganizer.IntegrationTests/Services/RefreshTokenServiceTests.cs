@@ -1,10 +1,12 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.infrastructure.jobs;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.entity.user;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
@@ -318,5 +320,56 @@ public class RefreshTokenServiceTests(AppDbContextFixture fixture) : PostgresTes
         var count = await service.CleanupExpiredTokensAsync();
 
         count.Should().Be(0);
+    }
+
+    /// <summary>
+    /// P2-06 — the cleanup runs as a Scheduler job now, not a hosted loop. Resolved the way the dispatcher resolves it
+    /// (by key, out of every registered handler), so a handler that never made it into DI fails here too.
+    /// </summary>
+    [Fact]
+    public async Task RefreshTokenCleanupJob_DeletesTheDeadTokenAndKeepsTheLiveOne()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        Guid deadSession, liveSession;
+        using (var scope = Scope())
+        {
+            var service = scope.ServiceProvider.GetRequiredService<IRefreshTokenService>();
+            deadSession = (await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password)).SessionId;
+            liveSession = (await service.GenerateRefreshTokenAsync(UserId, AuthMethodEnum.Password)).SessionId;
+        }
+
+        await using (var db = (AppDbContext)Fixture.CreateDbContext())
+        {
+            // Issued 40 days ago and expired 39 days ago: past the service's 30-day grace.
+            var issuedAt = DateTime.UtcNow.AddDays(-40);
+            await db.RefreshTokens.IgnoreQueryFilters()
+                .Where(r => r.SessionId == deadSession)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.CreatedTimestamp, issuedAt)
+                    .SetProperty(r => r.ExpiresAt, issuedAt.AddDays(1)), ct);
+        }
+
+        using (var scope = Scope())
+        {
+            var handler = scope.ServiceProvider.GetServices<IScheduledJobHandler>()
+                .Single(h => h.Key == RefreshTokenCleanupJobHandler.HandlerKey);
+            var now = DateTime.UtcNow;
+            await handler.ExecuteAsync(new ScheduledJobContext
+            {
+                ScheduledFireTimeUtc = now,
+                ActualFireTimeUtc = now,
+                JobKey = handler.Key,
+                CorrelationId = "refresh-token-cleanup-job-test",
+                TriggerSource = TriggerSource.Manual
+            }, ct);
+        }
+
+        await using var check = (AppDbContext)Fixture.CreateDbContext();
+        var sessions = await check.RefreshTokens.IgnoreQueryFilters()
+            .Where(r => r.UserId == UserId)
+            .Select(r => r.SessionId)
+            .ToListAsync(ct);
+        sessions.Should().NotContain(deadSession, "a token expired a month ago is a dead credential");
+        sessions.Should().Contain(liveSession, "the cleanup must never sign anyone out");
     }
 }

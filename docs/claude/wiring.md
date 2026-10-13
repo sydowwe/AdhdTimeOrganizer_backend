@@ -184,11 +184,13 @@ refresh, leaving the access token good for its remaining 15 minutes. The pieces:
   too. Don't merge the two branches back: `SessionRevocationTests.RevokeSession_ThenTheRevokedDeviceRefreshes_…`
   and `RefreshTokenServiceTests.ValidateRefreshToken_*` pin both sides.
 
-**Refresh-token cleanup — `framework/Sydowwe.Framework/infrastructure/extService/user/auth/RefreshTokenCleanupService.cs`.**
-`BackgroundService` next to the `RefreshTokenService` it drives; hosts register it with
-`AddHostedService<RefreshTokenCleanupService>()`. First sweep runs at **startup**, then every `Interval`
-(`protected virtual`, 24h) — a host restarting more often than the interval would otherwise never clean
-up at all. Logs counts only, never a token owner.
+**Refresh-token cleanup — `AdhdTimeOrganizer/infrastructure/jobs/RefreshTokenCleanupJobHandler.cs`.**
+A Scheduler job (`Portal.RefreshTokenCleanup`, daily 04:00 UTC, registered by `PortalScheduledJobsRegistrar`)
+calling `IRefreshTokenService.CleanupExpiredTokensAsync`, so it has a run log and failure/overdue alerts. The
+framework's `RefreshTokenCleanupService` (a `BackgroundService` loop, first sweep at startup then every 24h)
+is for hosts **without** the Scheduler — don't register it here as well. The handler can't live beside it:
+`Sydowwe.Framework` doesn't reference Contracts, so it can't see `IScheduledJobHandler`. Logs counts only,
+never a token owner.
 
 ## Email templates
 

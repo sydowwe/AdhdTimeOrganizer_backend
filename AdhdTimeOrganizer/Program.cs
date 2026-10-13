@@ -50,7 +50,6 @@ using Sydowwe.Framework.domain.helper;
 using Sydowwe.Framework.domain.serviceContract;
 using Sydowwe.Framework.infrastructure.extService;
 using Sydowwe.Framework.infrastructure.extService.user;
-using Sydowwe.Framework.infrastructure.extService.user.auth;
 using Sydowwe.Framework.infrastructure.persistence;
 using Sydowwe.Framework.infrastructure.persistence.seeder.@interface.manager;
 using Sydowwe.Framework.infrastructure.security;
@@ -355,9 +354,6 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     services.AddMemoryCache();
     services.AddHttpClient<IDailyWeatherProvider, OpenMeteoWeatherProvider>(client =>
         client.Timeout = TimeSpan.FromSeconds(5));
-
-    // Background services
-    services.AddHostedService<RefreshTokenCleanupService>();
 
     // The whole scheduling substrate, owned by Sydowwe.Scheduler: the single AddQuartz call, the generic
     // dispatcher job every IScheduler-registered trigger points at, and the Quartz hosted service. Nothing
