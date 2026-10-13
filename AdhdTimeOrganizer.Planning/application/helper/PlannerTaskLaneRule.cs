@@ -9,9 +9,14 @@ namespace AdhdTimeOrganizer.Planning.application.helper;
 /// <para>
 /// <b>Enforced on the three single-task writes only</b> — create, the full update and the span patch, through
 /// <c>PlannerTaskLaneExtensions.EnsureWithinLanesAsync</c>. The bulk paths are not checked: both template
-/// applies, copy-to-days, FO4's re-plan apply (whose packing already keeps to free time), FO6's materialiser and
-/// the carry-over. Each has its own conflict story, and refusing a whole batch over one block would be worse
-/// than the SPA drawing that block as a clash, which it does.
+/// applies, copy-to-days, FO4's re-plan apply (whose packing already keeps to free time) and the carry-over.
+/// Each has its own conflict story, and refusing a whole batch over one block would be worse than the SPA
+/// drawing that block as a clash, which it does.
+/// </para>
+/// <para>
+/// <b>FO6's materialiser places by this rule rather than being refused by it</b>
+/// (<c>PlannerTemplateApplier.StageWithinLanes</c>): an occurrence that fits as a second block goes on whole, and
+/// only one that would be a third falls back to the user's (non-destructive) conflict mode.
 /// </para>
 /// <para>
 /// Only a write that <b>moves</b> a block is judged — a new block, or a changed day, start, end or kind. A day

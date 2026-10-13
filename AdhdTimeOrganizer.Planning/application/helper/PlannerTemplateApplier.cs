@@ -79,9 +79,8 @@ public static class PlannerTemplateApplier
     /// <paramref name="newTasks"/> against the day's existing tasks and stages the adds/removes.
     /// <paramref name="calendar"/> must be loaded with its <c>Tasks</c>.
     /// <para>
-    /// Public for <c>RepeatingTaskMaterialiser</c> (FO6), whose auto-placed occurrences follow the user's
-    /// <c>DefaultConflictResolution</c> exactly as a template apply does. Everything said about
-    /// <see cref="StagedTaskDeletions"/> holds for it too.
+    /// A template apply's semantics: in <c>Ignore</c> any overlap drops the new task, whatever either task's kind.
+    /// FO6's materialiser does not come through here; it places by lanes, through <see cref="StageWithinLanes"/>.
     /// </para>
     /// </summary>
     public static void StageAgainstDay(
@@ -115,6 +114,91 @@ public static class PlannerTemplateApplier
         }
 
         dbContext.Set<PlannerTask>().AddRange(newTasks);
+    }
+
+    /// <summary>
+    /// FO6's placement, for blocks nobody placed by hand at that moment (<c>RepeatingTaskMaterialiser</c>). Each of
+    /// <paramref name="newTasks"/>, in the order given, is staged <b>whole</b> if it leaves at most
+    /// <see cref="PlannerTaskLaneRule.MaxLanes"/> blocks <b>of its own kind</b> at every minute — beside the day's
+    /// blocks, the way the SPA draws two lanes. Blocks of the other kind never stand in its way. Only a block that
+    /// would be a third somewhere falls back to <paramref name="fallback"/>:
+    /// <list type="bullet">
+    /// <item><c>Ignore</c> — it is not placed.</item>
+    /// <item><c>MergeIgnore</c> — it is cut down to the stretches where it would still be at most a second block,
+    /// and only the minutes where both lanes are already taken are cut out. A stretch beside one block survives;
+    /// the old carve around <i>every</i> overlapping block would have cut it too, which the lanes made needless.</item>
+    /// </list>
+    /// Blocks staged earlier in the same call count against later ones, so two occurrences and one user block at
+    /// the same minute are three. Existing blocks are never deleted, moved or carved, and only the two
+    /// non-destructive modes are accepted. <paramref name="calendar"/> must be loaded with its <c>Tasks</c>; any of
+    /// them already staged for deletion no longer counts.
+    /// </summary>
+    public static void StageWithinLanes(
+        DbContext dbContext,
+        Calendar calendar,
+        ApplyTemplateConflictResolutionEnum fallback,
+        IEnumerable<PlannerTask> newTasks)
+    {
+        if (fallback is not (ApplyTemplateConflictResolutionEnum.Ignore or ApplyTemplateConflictResolutionEnum.MergeIgnore))
+            throw new ArgumentOutOfRangeException(nameof(fallback), fallback,
+                "Placing within lanes never deletes or carves an existing block; only Ignore and MergeIgnore apply.");
+
+        var onDay = calendar.Tasks
+            .Where(t => dbContext.Entry(t).State is not (EntityState.Deleted or EntityState.Detached))
+            .ToList();
+        var staged = new List<PlannerTask>();
+
+        foreach (var newTask in newTasks)
+        {
+            var sameKind = onDay.Concat(staged)
+                .Where(t => t.IsBackground == newTask.IsBackground)
+                .Select(t => (t.StartTime, t.EndTime))
+                .ToList();
+
+            if (!PlannerTaskLaneRule.ExceedsLaneLimit(newTask.StartTime, newTask.EndTime, sameKind))
+                staged.Add(newTask);
+            else if (fallback == ApplyTemplateConflictResolutionEnum.MergeIgnore)
+                staged.AddRange(SegmentsWithinLanes(newTask, sameKind));
+        }
+
+        dbContext.Set<PlannerTask>().AddRange(staged);
+    }
+
+    /// <summary>
+    /// <paramref name="task"/> cut down to the stretches where it would be at most a second block among
+    /// <paramref name="sameKind"/>. The span is sliced at every start and end that falls inside it; between two
+    /// consecutive cuts the set of blocks it meets cannot change, so <see cref="PlannerTaskLaneRule.ExceedsLaneLimit"/>
+    /// on each slice is exact, and adjacent slices that fit are joined back into one segment. Only called for a task
+    /// that exceeds somewhere, which a span with <c>end &lt;= start</c> never does.
+    /// </summary>
+    private static List<PlannerTask> SegmentsWithinLanes(PlannerTask task, List<(TimeOnly Start, TimeOnly End)> sameKind)
+    {
+        var cuts = sameKind
+            .SelectMany(s => new[] { s.Start, s.End })
+            .Where(at => at > task.StartTime && at < task.EndTime)
+            .Append(task.StartTime)
+            .Append(task.EndTime)
+            .Distinct()
+            .Order()
+            .ToList();
+
+        var segments = new List<PlannerTask>();
+        TimeOnly? segmentStart = null;
+        for (var i = 0; i + 1 < cuts.Count; i++)
+        {
+            if (!PlannerTaskLaneRule.ExceedsLaneLimit(cuts[i], cuts[i + 1], sameKind))
+                segmentStart ??= cuts[i];
+            else if (segmentStart is { } start)
+            {
+                segments.Add(CloneTaskWithNewTimes(task, start, cuts[i]));
+                segmentStart = null;
+            }
+        }
+
+        if (segmentStart is { } last)
+            segments.Add(CloneTaskWithNewTimes(task, last, task.EndTime));
+
+        return segments;
     }
 
     /// <summary>

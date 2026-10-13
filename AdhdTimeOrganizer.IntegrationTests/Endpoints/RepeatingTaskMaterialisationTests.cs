@@ -181,63 +181,124 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
         (await OccurrencesAsync(ruleId)).Select(o => o.Date).Should().BeEquivalentTo([Tomorrow]);
     }
 
-    [Fact(DisplayName = "FO6: under the default Ignore mode, an occurrence that would overlap a block is not placed")]
-    public async Task Conflict_FollowsDefaultConflictResolution()
+    /// <summary>
+    /// Planner lanes: two blocks of a kind may share a minute, drawn side by side. So an occurrence that would be
+    /// only the second block anywhere goes on whole, in every mode — before the lanes, any overlap skipped it
+    /// (<c>Ignore</c>) or carved it (<c>MergeIgnore</c>).
+    /// </summary>
+    [Theory(DisplayName = "FO6: an occurrence that would be a second block is placed whole beside it, in every mode")]
+    [InlineData(null)]
+    [InlineData(ApplyTemplateConflictResolutionEnum.Ignore)]
+    [InlineData(ApplyTemplateConflictResolutionEnum.Overwrite)]
+    [InlineData(ApplyTemplateConflictResolutionEnum.MergeIgnore)]
+    [InlineData(ApplyTemplateConflictResolutionEnum.MergeOverwrite)]
+    public async Task BesideOneBlock_IsPlacedWhole(ApplyTemplateConflictResolutionEnum? mode)
     {
+        await SetConflictModeAsync(mode);
         var ruleId = await SeedRuleAsync();
-        long blockerId;
-        await using (var db = CreateDbContext())
-        {
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, $"blocker-{Guid.NewGuid():N}", UserId, CancellationToken);
-            var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, Today, UserId, CancellationToken);
-            blockerId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
-                db, activityId, calendarId, new TimeOnly(18, 30), new TimeOnly(19, 30), UserId, ct: CancellationToken);
-        }
+        var blockerId = await SeedBlockAsync(Today, new TimeOnly(18, 30), new TimeOnly(19, 30));
 
         await GetDayPlanAsync(Today);
 
-        (await OccurrencesAsync(ruleId)).Select(o => o.Date).Should().BeEquivalentTo([Tomorrow]);
-        await using (var db = CreateDbContext())
-            (await db.Set<PlannerTask>().IgnoreQueryFilters().AnyAsync(t => t.Id == blockerId, CancellationToken))
-                .Should().BeTrue("Ignore never touches the user's own block");
+        (await OccurrencesAsync(ruleId)).Where(o => o.Date == Today).Should().ContainSingle()
+            .Which.Task.Should().Match<PlannerTask>(t => t.StartTime == new TimeOnly(18, 0) && t.EndTime == new TimeOnly(19, 0));
+        await ShouldBeUntouchedAsync(blockerId, new TimeOnly(18, 30), new TimeOnly(19, 30));
     }
 
     /// <summary>
-    /// A template apply honours the user's destructive modes because the user chose to apply it. This runs from a
-    /// GET, so the same modes would delete or carve a block the user placed without anyone asking. The occurrence
-    /// gives way instead: <c>Overwrite</c> places nothing over the block (as <c>Ignore</c>), <c>MergeOverwrite</c>
-    /// carves the occurrence around it (as <c>MergeIgnore</c>).
+    /// Both lanes are taken for 18:30–19:00, so the occurrence would be a third block there. <c>Ignore</c> (and
+    /// <c>Overwrite</c>, read as <c>Ignore</c> because this runs from a GET) skips it; neither block is touched.
     /// </summary>
-    [Theory(DisplayName = "FO6: a destructive conflict mode never deletes or carves the user's own block")]
+    [Theory(DisplayName = "FO6: under Ignore, an occurrence that would be a third block is not placed")]
+    [InlineData(null)]
+    [InlineData(ApplyTemplateConflictResolutionEnum.Ignore)]
     [InlineData(ApplyTemplateConflictResolutionEnum.Overwrite)]
-    [InlineData(ApplyTemplateConflictResolutionEnum.MergeOverwrite)]
-    public async Task DestructiveConflictMode_NeverTouchesTheUsersBlock(ApplyTemplateConflictResolutionEnum mode)
+    public async Task ThirdBlock_UnderIgnore_IsSkipped(ApplyTemplateConflictResolutionEnum? mode)
     {
+        await SetConflictModeAsync(mode);
         var ruleId = await SeedRuleAsync();
-        long blockerId;
-        await using (var db = CreateDbContext())
-        {
-            db.Set<UserPlannerSettings>().Add(new UserPlannerSettings { UserId = UserId, DefaultConflictResolution = mode });
-            await db.SaveChangesAsync(CancellationToken);
-
-            var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, $"blocker-{Guid.NewGuid():N}", UserId, CancellationToken);
-            var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, Today, UserId, CancellationToken);
-            blockerId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
-                db, activityId, calendarId, new TimeOnly(18, 30), new TimeOnly(19, 30), UserId, ct: CancellationToken);
-        }
+        var firstId = await SeedBlockAsync(Today, new TimeOnly(18, 0), new TimeOnly(19, 0));
+        var secondId = await SeedBlockAsync(Today, new TimeOnly(18, 30), new TimeOnly(19, 30));
 
         await GetDayPlanAsync(Today);
 
-        var blocker = await TaskAsync(blockerId);
-        blocker.StartTime.Should().Be(new TimeOnly(18, 30), "the user's block is never carved");
-        blocker.EndTime.Should().Be(new TimeOnly(19, 30));
+        (await OccurrencesAsync(ruleId)).Select(o => o.Date).Should().BeEquivalentTo([Tomorrow],
+            "today's would be a third block; tomorrow is free");
+        await ShouldBeUntouchedAsync(firstId, new TimeOnly(18, 0), new TimeOnly(19, 0));
+        await ShouldBeUntouchedAsync(secondId, new TimeOnly(18, 30), new TimeOnly(19, 30));
+        (await RuleAsync(ruleId)).MaterialisedThrough.Should().Be(Tomorrow, "a skipped day is still decided");
+    }
 
-        var todays = (await OccurrencesAsync(ruleId)).Where(o => o.Date == Today).Select(o => o.Task).ToList();
-        if (mode == ApplyTemplateConflictResolutionEnum.Overwrite)
-            todays.Should().BeEmpty("Overwrite is read as Ignore: the colliding occurrence is not placed");
-        else
-            todays.Should().ContainSingle("MergeOverwrite is read as MergeIgnore: the occurrence is carved, not the block")
-                .Which.EndTime.Should().Be(new TimeOnly(18, 30));
+    /// <summary>
+    /// Both lanes are taken only for 18:30–18:45. <c>MergeIgnore</c> (and <c>MergeOverwrite</c>, read as it) cuts
+    /// exactly those minutes out, keeping 18:00–18:30 and 18:45–19:00 beside one block each. The old carve around
+    /// every overlapping block would have left nothing, since the two blocks between them cover the whole hour.
+    /// </summary>
+    [Theory(DisplayName = "FO6: under MergeIgnore, a third block is cut to the stretches where it is a second, never the user's")]
+    [InlineData(ApplyTemplateConflictResolutionEnum.MergeIgnore)]
+    [InlineData(ApplyTemplateConflictResolutionEnum.MergeOverwrite)]
+    public async Task ThirdBlock_UnderMergeIgnore_IsCutToItsLanes(ApplyTemplateConflictResolutionEnum mode)
+    {
+        await SetConflictModeAsync(mode);
+        var ruleId = await SeedRuleAsync();
+        var earlyId = await SeedBlockAsync(Today, new TimeOnly(18, 0), new TimeOnly(18, 45));
+        var lateId = await SeedBlockAsync(Today, new TimeOnly(18, 30), new TimeOnly(19, 30));
+
+        await GetDayPlanAsync(Today);
+
+        var todays = (await OccurrencesAsync(ruleId)).Where(o => o.Date == Today).Select(o => o.Task)
+            .OrderBy(t => t.StartTime).Select(t => (t.StartTime, t.EndTime)).ToList();
+        todays.Should().Equal(
+            (new TimeOnly(18, 0), new TimeOnly(18, 30)),
+            (new TimeOnly(18, 45), new TimeOnly(19, 0)));
+        await ShouldBeUntouchedAsync(earlyId, new TimeOnly(18, 0), new TimeOnly(18, 45));
+        await ShouldBeUntouchedAsync(lateId, new TimeOnly(18, 30), new TimeOnly(19, 30));
+        (await OccurrencesAsync(ruleId)).Where(o => o.Date == Tomorrow).Should().ContainSingle(
+            "tomorrow is free, so its occurrence is whole");
+    }
+
+    /// <summary>
+    /// Foreground and background blocks have a lane pair each. Today's two foreground blocks fill the foreground
+    /// lanes and leave the background ones empty; tomorrow is the other way round.
+    /// </summary>
+    [Fact(DisplayName = "FO6: background and foreground blocks are counted separately")]
+    public async Task Kinds_AreCountedSeparately()
+    {
+        var foregroundRule = await SeedRuleAsync();
+        var backgroundRule = await SeedRuleAsync(isBackground: true);
+        await SeedBlockAsync(Today, new TimeOnly(18, 0), new TimeOnly(19, 0));
+        await SeedBlockAsync(Today, new TimeOnly(18, 0), new TimeOnly(19, 0));
+        await SeedBlockAsync(Tomorrow, new TimeOnly(18, 0), new TimeOnly(19, 0), isBackground: true);
+        await SeedBlockAsync(Tomorrow, new TimeOnly(18, 0), new TimeOnly(19, 0), isBackground: true);
+
+        await GetDayPlanAsync(Today);
+
+        (await OccurrencesAsync(foregroundRule)).Select(o => o.Date).Should().BeEquivalentTo([Tomorrow],
+            "today's foreground lanes are full; tomorrow's background blocks are not in its way");
+        (await OccurrencesAsync(backgroundRule)).Select(o => o.Date).Should().BeEquivalentTo([Today],
+            "today's foreground blocks are not in its way; tomorrow's background lanes are full");
+        (await OccurrencesAsync(backgroundRule)).Should().OnlyContain(o => o.Task.IsBackground
+                                                                          && o.Task.StartTime == new TimeOnly(18, 0)
+                                                                          && o.Task.EndTime == new TimeOnly(19, 0));
+    }
+
+    /// <summary>
+    /// The occurrences one run places count against each other, in rule order: with a user block at 18:00, the
+    /// older rule takes the second lane and the newer would be the third. Tomorrow has no block, so both fit.
+    /// </summary>
+    [Fact(DisplayName = "FO6: two occurrences and a user block at one minute are three — the newer rule gives way")]
+    public async Task TwoOccurrencesAndABlock_InOneRun_AreThree()
+    {
+        var olderRule = await SeedRuleAsync();
+        var newerRule = await SeedRuleAsync();
+        var blockerId = await SeedBlockAsync(Today, new TimeOnly(18, 0), new TimeOnly(19, 0));
+
+        await GetDayPlanAsync(Today);
+
+        (await OccurrencesAsync(olderRule)).Select(o => o.Date).Should().BeEquivalentTo([Today, Tomorrow]);
+        (await OccurrencesAsync(newerRule)).Select(o => o.Date).Should().BeEquivalentTo([Tomorrow],
+            "beside the user's block and the older rule's occurrence, today's would be a third");
+        await ShouldBeUntouchedAsync(blockerId, new TimeOnly(18, 0), new TimeOnly(19, 0));
     }
 
     /// <summary>
@@ -398,6 +459,82 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
             "today is newly matched; tomorrow matched before and its occurrence was deleted");
     }
 
+    [Fact(DisplayName = "FO6: an edit moving an untouched occurrence beside one block moves it in place")]
+    public async Task Edit_MovingBesideOneBlock_MovesInPlace()
+    {
+        var (activityId, importanceId) = await SeedReferencesAsync();
+        var ruleId = await SeedRuleAsync(activityId: activityId, importanceId: importanceId);
+        await GetDayPlanAsync(Today);
+        var todays = (await OccurrencesAsync(ruleId)).Single(o => o.Date == Today).Task;
+        await SeedBlockAsync(Today, new TimeOnly(7, 0), new TimeOnly(8, 0));
+
+        await PutRuleAsync(ruleId, activityId, importanceId, startHour: 7, autoPlace: true);
+
+        var moved = await TaskAsync(todays.Id);
+        (moved.StartTime, moved.EndTime).Should().Be((new TimeOnly(7, 0), new TimeOnly(8, 0)),
+            "a second block fits beside the user's, so the occurrence follows the rule");
+        (await OccurrencesAsync(ruleId)).Should().HaveCount(2);
+    }
+
+    /// <summary>
+    /// An edit moving an untouched occurrence to where it would be a third block leaves what placing the edited
+    /// rule fresh would leave: nothing under <c>Ignore</c>, the stretch where it is a second block under
+    /// <c>MergeIgnore</c>. Tomorrow has no block, so its occurrence just moves.
+    /// </summary>
+    [Theory(DisplayName = "FO6: an edit moving an untouched occurrence into a third block falls back to the conflict mode")]
+    [InlineData(ApplyTemplateConflictResolutionEnum.Ignore)]
+    [InlineData(ApplyTemplateConflictResolutionEnum.MergeIgnore)]
+    public async Task Edit_MovingIntoAThirdBlock_FallsBackToTheMode(ApplyTemplateConflictResolutionEnum mode)
+    {
+        await SetConflictModeAsync(mode);
+        var (activityId, importanceId) = await SeedReferencesAsync();
+        var ruleId = await SeedRuleAsync(activityId: activityId, importanceId: importanceId);
+        await GetDayPlanAsync(Today);
+        var occurrences = await OccurrencesAsync(ruleId);
+        var todays = occurrences.Single(o => o.Date == Today).Task;
+        var tomorrows = occurrences.Single(o => o.Date == Tomorrow).Task;
+        var shortId = await SeedBlockAsync(Today, new TimeOnly(7, 0), new TimeOnly(7, 30));
+        var longId = await SeedBlockAsync(Today, new TimeOnly(7, 0), new TimeOnly(8, 0));
+
+        await PutRuleAsync(ruleId, activityId, importanceId, startHour: 7, autoPlace: true);
+
+        var onToday = (await OccurrencesAsync(ruleId)).Where(o => o.Date == Today).Select(o => o.Task).ToList();
+        onToday.Should().NotContain(t => t.Id == todays.Id, "the untouched occurrence is replaced, not stretched into a third lane");
+        if (mode == ApplyTemplateConflictResolutionEnum.Ignore)
+            onToday.Should().BeEmpty();
+        else
+            onToday.Should().ContainSingle().Which.Should().Match<PlannerTask>(t =>
+                t.StartTime == new TimeOnly(7, 30) && t.EndTime == new TimeOnly(8, 0));
+
+        (await TaskAsync(tomorrows.Id)).StartTime.Should().Be(new TimeOnly(7, 0), "tomorrow is free");
+        await ShouldBeUntouchedAsync(shortId, new TimeOnly(7, 0), new TimeOnly(7, 30));
+        await ShouldBeUntouchedAsync(longId, new TimeOnly(7, 0), new TimeOnly(8, 0));
+    }
+
+    /// <summary>
+    /// The lanes judge a move, not a rename: a day already holding three blocks at the occurrence's own span (a bulk
+    /// path, or from before the lanes) still lets an edit that keeps the span reach it.
+    /// </summary>
+    [Fact(DisplayName = "FO6: an edit that keeps the span reaches an occurrence already among three")]
+    public async Task Edit_KeepingTheSpan_IsNotJudgedByTheLanes()
+    {
+        var (activityId, importanceId) = await SeedReferencesAsync();
+        var ruleId = await SeedRuleAsync(activityId: activityId, importanceId: importanceId);
+        await GetDayPlanAsync(Today);
+        var todays = (await OccurrencesAsync(ruleId)).Single(o => o.Date == Today).Task;
+        await SeedBlockAsync(Today, new TimeOnly(18, 0), new TimeOnly(19, 0));
+        await SeedBlockAsync(Today, new TimeOnly(18, 0), new TimeOnly(19, 0));
+
+        long otherActivityId;
+        await using (var db = CreateDbContext())
+            otherActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, $"fo6-{Guid.NewGuid():N}", UserId, CancellationToken);
+        await PutRuleAsync(ruleId, otherActivityId, importanceId, startHour: 18, autoPlace: true);
+
+        var kept = await TaskAsync(todays.Id);
+        kept.ActivityId.Should().Be(otherActivityId, "the span did not change, so the edit is not a move");
+        kept.StartTime.Should().Be(new TimeOnly(18, 0));
+    }
+
     [Fact(DisplayName = "FO6: copying a day does not carry the occurrence's rule onto the copy")]
     public async Task CopyToDays_DropsTheSource()
     {
@@ -423,7 +560,7 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
 
     private async Task<long> SeedRuleAsync(
         long userId = UserId, bool autoPlace = true, bool isActive = true, string[]? days = null,
-        long? activityId = null, long? importanceId = null)
+        long? activityId = null, long? importanceId = null, bool isBackground = false)
     {
         await using var db = CreateDbContext();
         var rule = new RepeatingPlannerTask
@@ -434,7 +571,7 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
             ImportanceId = importanceId,
             StartTime = new TimeOnly(18, 0),
             EndTime = new TimeOnly(19, 0),
-            IsBackground = false,
+            IsBackground = isBackground,
             IsActive = isActive,
             AutoPlace = autoPlace,
             RecurrenceType = RecurrenceType.DayOfWeek,
@@ -473,6 +610,46 @@ public class RepeatingTaskMaterialisationTests(AppDbContextFixture fixture) : Po
         db.Set<PlannerTask>().Add(task);
         await db.SaveChangesAsync(CancellationToken);
         return task.Id;
+    }
+
+    /// <summary>A block the user placed, written straight to the table so no lane check stands in the way.</summary>
+    private async Task<long> SeedBlockAsync(DateOnly date, TimeOnly start, TimeOnly end, bool isBackground = false)
+    {
+        await using var db = CreateDbContext();
+        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, $"blocker-{Guid.NewGuid():N}", UserId, CancellationToken);
+        var calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, date, UserId, CancellationToken);
+        var task = new PlannerTask
+        {
+            UserId = UserId,
+            CalendarId = calendarId,
+            ActivityId = activityId,
+            StartTime = start,
+            EndTime = end,
+            IsBackground = isBackground,
+            Status = PlannerTaskStatus.NotStarted
+        };
+        db.Set<PlannerTask>().Add(task);
+        await db.SaveChangesAsync(CancellationToken);
+        return task.Id;
+    }
+
+    /// <summary>Null leaves the user without a settings row, which reads as <c>Ignore</c>.</summary>
+    private async Task SetConflictModeAsync(ApplyTemplateConflictResolutionEnum? mode)
+    {
+        if (mode is not { } chosen)
+            return;
+        await using var db = CreateDbContext();
+        db.Set<UserPlannerSettings>().Add(new UserPlannerSettings { UserId = UserId, DefaultConflictResolution = chosen });
+        await db.SaveChangesAsync(CancellationToken);
+    }
+
+    private async Task ShouldBeUntouchedAsync(long taskId, TimeOnly start, TimeOnly end)
+    {
+        await using var db = CreateDbContext();
+        var task = await db.Set<PlannerTask>().IgnoreQueryFilters().AsNoTracking()
+            .SingleOrDefaultAsync(t => t.Id == taskId, CancellationToken);
+        task.Should().NotBeNull("the materialiser never deletes the user's block");
+        (task!.StartTime, task.EndTime).Should().Be((start, end), "the materialiser never moves or carves the user's block");
     }
 
     private async Task SetDayTypeAsync(DateOnly date, DayType dayType)

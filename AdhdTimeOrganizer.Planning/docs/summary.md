@@ -133,16 +133,23 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   - **No unique `(source_repeating_task_id, calendar_id)`** on purpose: it would 409 a user's PUT that moves an
     occurrence onto a day already holding one. The materialiser dedupes per day instead, and the rule's
     `row_version` serialises two racing reads.
-  - **Conflicts go through `PlannerTemplateApplier.StageAgainstDay`** with the user's `DefaultConflictResolution`,
-    **made non-destructive**: `Overwrite` is read as `Ignore` and `MergeOverwrite` as `MergeIgnore`, so a GET never
-    deletes or carves a block the user placed — the occurrence is skipped or carved instead.
+  - **Conflicts are decided by the planner lanes first** (`PlannerTemplateApplier.StageWithinLanes`, over
+    `PlannerTaskLaneRule.ExceedsLaneLimit`). An occurrence that leaves at most two blocks **of its own kind** at every
+    minute goes on whole, beside them, in every mode; a block of the other kind never stands in its way. Occurrences
+    placed in one run count against each other, older rule (lower id) first. Only a would-be **third** falls back to
+    the user's `DefaultConflictResolution`, **made non-destructive** (`Overwrite` read as `Ignore`, `MergeOverwrite`
+    as `MergeIgnore`): `Ignore` skips it, `MergeIgnore` cuts out only the minutes where both lanes are taken (not
+    every overlapped block, as a template apply's carve does). A GET never deletes, moves or carves a block the user
+    placed. Template applies keep `StageAgainstDay`'s semantics, where any overlap counts.
   - **A day marked away after placement loses its untouched occurrence** (today on). `AwayDayOccurrenceWithdrawalHandler`
     takes `CalendarDayTypesChangedEvent` (Planning publishes it from both day-type writes) and calls
     `WithdrawFromAwayDaysAsync`; the day stays decided, so un-marking it brings nothing back.
   - **A rule edit reconciles** (`ReconcileAfterEditAsync`): *untouched* occurrences from today on (still
     `NotStarted`, no original slot, still the old rule's exact plan, no to-do/Google link and no reminder the
     *user* wrote — an automatic one does not count) follow the edit, or are removed when the rule stops placing
-    there; a decided day the edit newly matches gets its block.
+    there; a decided day the edit newly matches gets its block. Both obey the lanes: an untouched occurrence the edit
+    would move (new span or kind) into a third block is replaced by what a fresh placement would leave (nothing, or
+    the stretches where it is a second); an edit that keeps the span is never judged, like the single-task writes.
   - **It never fails its caller** and clears the tracker on failure; it **commits**, so the same ordering rule as
     `EnsureForDateAsync` applies.
   - **Day matching is `RepeatingPlannerTaskSchedule.FallsOn`**, shared with the suggestion endpoint, so the
@@ -173,9 +180,10 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   409 `Conflict` on `startTime`. It is checked on **create, the PUT and the span PATCH only**, through
   `PlannerTaskLaneExtensions.EnsureWithinLanesAsync` in `AfterMapping`. It judges only a write that *moves* a block
   (new, or a changed day / start / end / kind), so a day already holding three still accepts a rename or a status
-  tick. The bulk paths (both template applies, copy-to-days, FO4's re-plan apply, FO6's materialiser, carry-over)
-  are deliberately unchecked; the SPA draws a third block as a marked clash. A new single-task write that moves a
-  block should call it too. Pinned by `PlannerTaskLaneRuleTests`.
+  tick. The bulk paths (both template applies, copy-to-days, FO4's re-plan apply, carry-over) are deliberately
+  unchecked; the SPA draws a third block as a marked clash. FO6's materialiser is not refused by the rule but
+  **places by it** (the FO6 bullet above). A new single-task write that moves a block should call it too. Pinned by
+  `PlannerTaskLaneRuleTests`, and for the materialiser by `RepeatingTaskMaterialisationTests`.
 
 - **The slip nudges (audit N5) are a sweep that only notifies.** `PlannerSlipNudgeJobHandler`, every five minutes,
   sends `PlannedBlocksMissed` (today's missed blocks — one notification per user per sweep, at most two a day, none on
@@ -278,8 +286,9 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   If it needs "is this block missed?" or "where is the next free slot?", call `PlannerTaskMissedRule` /
   `DayPacking` (through `DayReplanPlanner`) rather than writing a second copy.
 - **Add a conflict-resolution mode:** it goes in `PlannerTemplateApplier.StageAgainstDay` and nowhere else —
-  the single-day and the batched apply route through it (via `Stage`), and so does FO6's materialiser, and `StagedTaskDeletions` reads the
-  ChangeTracker so a new mode's deletions are captured without threading a list through.
+  the single-day and the batched apply route through it (via `Stage`), and `StagedTaskDeletions` reads the
+  ChangeTracker so a new mode's deletions are captured without threading a list through. FO6's materialiser uses
+  `StageWithinLanes` beside it in the same file, which accepts only the two non-destructive modes as its fallback.
 - **Add a per-user default:** subclass `BasePerUserDefaultSeeder<T>`, pick an `Order` in 400–499, and
   make `Collides` match the entity's **unique index**, not its display text.
 - **Add a user-scoped entity:** it will fail `UserDataExportAndDeletionTests` until it is listed as

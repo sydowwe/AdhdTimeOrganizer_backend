@@ -24,12 +24,16 @@ namespace AdhdTimeOrganizer.Planning.application.service.taskPlanner;
 /// deleted or skipped stays deleted or skipped. On top of that, a day that already holds an occurrence of the
 /// rule (whatever its status, and however it got there — say, yesterday's carried over) receives no second one.
 /// There is deliberately no unique index behind that dedupe; see <c>PlannerTaskConfiguration</c>.</item>
-/// <item><b>Conflicts follow <c>UserPlannerSettings.DefaultConflictResolution</c>, but never destructively</b>,
-/// through <see cref="PlannerTemplateApplier.StageAgainstDay"/> — the one implementation of the four modes.
-/// <see cref="NonDestructive"/> turns <c>Overwrite</c> into <c>Ignore</c> and <c>MergeOverwrite</c> into
-/// <c>MergeIgnore</c>: a template apply is a choice the user makes with the day in front of them, but this runs
-/// from a read, and a GET must not delete or carve the blocks the user placed. So an occurrence that collides is
-/// skipped or carved around them, never the other way.</item>
+/// <item><b>Placed by lanes first</b> (<see cref="PlannerTemplateApplier.StageWithinLanes"/>). An occurrence that
+/// leaves at most two blocks of its own kind (foreground, or separately background) at every minute goes on
+/// whole, beside what is there, whatever the conflict mode — the SPA draws the two side by side. Occurrences
+/// placed in the same run count against each other, the older rule (lower id) first.</item>
+/// <item><b>Only a third block falls back to <c>UserPlannerSettings.DefaultConflictResolution</c>, and never
+/// destructively.</b> <see cref="NonDestructive"/> turns <c>Overwrite</c> into <c>Ignore</c> and
+/// <c>MergeOverwrite</c> into <c>MergeIgnore</c>: a template apply is a choice the user makes with the day in front
+/// of them, but this runs from a read, and a GET must not delete or carve the blocks the user placed. So an
+/// occurrence that would be a third is skipped, or cut down to the stretches where it would be a second, never
+/// the other way.</item>
 /// <item><b>Gates.</b> An away day (FO1: <c>Vacation</c>, <c>SickDay</c>) is passed over, as is every day while
 /// <see cref="IsUserAbsentAsync"/> says the user is gone (which, from a user's own read, is never). A passed-over day is still
 /// decided: marking the day as a workday again later does not bring the occurrence back. The suggestion panel
@@ -120,10 +124,11 @@ public sealed class RepeatingTaskMaterialiser(
             await calendars.EnsureForDateAsync(userId, date, ct);
 
         var days = await LoadDaysAsync(userId, today, lastDay, ct);
-        var rules = await DueRules(userId, lastDay).ToListAsync(ct);
+        // Ordered, because placing by lanes is first come: when two rules and a user block meet, the older rule
+        // takes the second lane and the newer one is the third.
+        var rules = await DueRules(userId, lastDay).OrderBy(r => r.Id).ToListAsync(ct);
         var conflictResolution = await ConflictResolutionAsync(userId, ct);
 
-        var placed = 0;
         for (var date = today; date <= lastDay; date = date.AddDays(1))
         {
             var calendar = days[date];
@@ -143,14 +148,13 @@ public sealed class RepeatingTaskMaterialiser(
             if (occurrences.Count == 0)
                 continue;
 
-            PlannerTemplateApplier.StageAgainstDay(dbContext, calendar, conflictResolution, occurrences);
-            placed += occurrences.Count;
+            PlannerTemplateApplier.StageWithinLanes(dbContext, calendar, conflictResolution, occurrences);
         }
 
-        await SaveAndCancelOrphanedRemindersAsync(ct);
+        var placed = await SaveAndCancelOrphanedRemindersAsync(ct);
 
         if (placed > 0)
-            logger.LogInformation("Placed {Count} repeating-task occurrence(s) for user {UserId} on {From}..{Until}",
+            logger.LogInformation("Placed {Count} repeating-task block(s) for user {UserId} on {From}..{Until}",
                 placed, userId, today, lastDay);
     }
 
@@ -215,23 +219,36 @@ public sealed class RepeatingTaskMaterialiser(
         var userId = rule.UserId;
         var stillPlaces = rule.AutoPlace && rule.IsActive;
 
-        // 1. Untouched occurrences from today on follow the rule; on a day it no longer places, they go.
+        // 1. Untouched occurrences from today on follow the rule; on a day it no longer places, they go. The day's
+        // other blocks come along, because a move that would make the occurrence a third block of its kind is
+        // decided by the lanes, the same as a fresh placement (see MovesOutOfItsLanes).
         var occurrences = await dbContext.Set<PlannerTask>()
             .IgnoreQueryFilters()
-            .Include(t => t.Calendar)
+            .Include(t => t.Calendar).ThenInclude(c => c.Tasks)
             .Where(t => t.UserId == userId && t.SourceRepeatingTaskId == rule.Id && t.Calendar.Date >= today)
             .ToListAsync(ct);
 
+        ApplyTemplateConflictResolutionEnum? conflictResolution = null;
         if (occurrences.Count > 0)
         {
             var withReminder = await UserWrittenRemindersAsync(occurrences.Select(t => t.Id).ToList(), ct);
 
             foreach (var occurrence in occurrences.Where(t => IsUntouched(t, before, withReminder)))
             {
-                if (stillPlaces && RepeatingPlannerTaskSchedule.FallsOn(rule, occurrence.Calendar.Date, occurrence.Calendar.DayType))
+                if (!stillPlaces || !RepeatingPlannerTaskSchedule.FallsOn(rule, occurrence.Calendar.Date, occurrence.Calendar.DayType))
+                    dbContext.Set<PlannerTask>().Remove(occurrence);
+                else if (!MovesOutOfItsLanes(rule, occurrence))
                     CopyPlanOnto(rule, occurrence);
                 else
+                {
+                    // Where the edited rule would now be a third block, its untouched occurrence is replaced by
+                    // what placing the edited rule fresh would leave: nothing under Ignore, the stretches where it
+                    // is still a second block under MergeIgnore. The user's blocks are not touched either way.
                     dbContext.Set<PlannerTask>().Remove(occurrence);
+                    conflictResolution ??= await ConflictResolutionAsync(userId, ct);
+                    PlannerTemplateApplier.StageWithinLanes(dbContext, occurrence.Calendar, conflictResolution.Value,
+                        [OccurrenceOf(rule, occurrence.Calendar)]);
+                }
             }
         }
 
@@ -243,7 +260,7 @@ public sealed class RepeatingTaskMaterialiser(
         {
             var days = await LoadDaysAsync(userId, today, through, ct);
             var userAbsent = await IsUserAbsentAsync(userId, ct);
-            var conflictResolution = await ConflictResolutionAsync(userId, ct);
+            conflictResolution ??= await ConflictResolutionAsync(userId, ct);
 
             foreach (var calendar in days.Values.OrderBy(c => c.Date))
             {
@@ -253,7 +270,7 @@ public sealed class RepeatingTaskMaterialiser(
                     || HoldsOccurrenceOf(calendar, rule.Id))
                     continue;
 
-                PlannerTemplateApplier.StageAgainstDay(dbContext, calendar, conflictResolution, [OccurrenceOf(rule, calendar)]);
+                PlannerTemplateApplier.StageWithinLanes(dbContext, calendar, conflictResolution.Value, [OccurrenceOf(rule, calendar)]);
             }
         }
 
@@ -285,8 +302,29 @@ public sealed class RepeatingTaskMaterialiser(
         && task.ImportanceId == before.ImportanceId;
 
     /// <summary>
-    /// An edited rule's new plan onto an untouched occurrence, in place. No conflict resolution: the block was
-    /// already on the day, and an overlap the day view shows is recoverable where a silent carve is not.
+    /// Whether the edited <paramref name="rule"/> moves <paramref name="occurrence"/> — a new span or kind — to where
+    /// it would be a third block of its kind at some minute. An edit that leaves the span and kind alone is never
+    /// judged, the same as <see cref="PlannerTaskLaneRule.PlacementChanged"/>: a day that already holds three
+    /// (from before the lanes, or a bulk path) must still let a rename or a new note reach the occurrence.
+    /// </summary>
+    private bool MovesOutOfItsLanes(RepeatingPlannerTask rule, PlannerTask occurrence)
+    {
+        if (rule.StartTime == occurrence.StartTime && rule.EndTime == occurrence.EndTime
+                                                   && rule.IsBackground == occurrence.IsBackground)
+            return false;
+
+        var others = occurrence.Calendar.Tasks
+            .Where(t => t != occurrence
+                        && t.IsBackground == rule.IsBackground
+                        && dbContext.Entry(t).State is not (EntityState.Deleted or EntityState.Detached))
+            .Select(t => (t.StartTime, t.EndTime));
+
+        return PlannerTaskLaneRule.ExceedsLaneLimit(rule.StartTime, rule.EndTime, others);
+    }
+
+    /// <summary>
+    /// An edited rule's new plan onto an untouched occurrence, in place, once <see cref="MovesOutOfItsLanes"/> has
+    /// said it still fits beside the day's blocks. No carving of anything else: the block was already on the day.
     /// </summary>
     private static void CopyPlanOnto(RepeatingPlannerTask rule, PlannerTask occurrence)
     {
@@ -399,11 +437,12 @@ public sealed class RepeatingTaskMaterialiser(
     /// placed (occurrences and any carved segments) get their automatic reminders (audit N1), and the occurrences a
     /// rule edit moved in place re-sync theirs, which would otherwise keep firing at the old start.
     /// </para>
+    /// Answers how many blocks were placed (occurrences and segments).
     /// </summary>
-    private async Task SaveAndCancelOrphanedRemindersAsync(CancellationToken ct)
+    private async Task<int> SaveAndCancelOrphanedRemindersAsync(CancellationToken ct)
     {
         if (!dbContext.ChangeTracker.HasChanges())
-            return;
+            return 0;
 
         var orphanedReminderIds = await reminders.GetReminderIdsForPlannerTasksAsync(
             PlannerTemplateApplier.StagedTaskDeletions(dbContext), ct);
@@ -421,6 +460,8 @@ public sealed class RepeatingTaskMaterialiser(
             await reminders.SyncForPlannerTasksAsync(moved, ct);
         if (placed.Count > 0)
             await autoReminders.CreateForNewBlocksAsync(placed.Select(t => t.Id).ToList(), ct);
+
+        return placed.Count;
     }
 
     /// <summary>

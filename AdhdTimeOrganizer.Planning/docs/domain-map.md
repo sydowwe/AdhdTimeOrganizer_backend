@@ -276,7 +276,8 @@ change tracker and hands them to `PlannerTaskPostponeRule`, the one place that d
 | A new path that moves a task? | Must call `PlannerTaskMoveRecorder.RecordPostponementAsync` from its mapping step, before the save, or its moves leave no trace — nothing fails. FO4's re-plan apply does, for every block it moves (the `utcNow` overload, so the whole set is judged against the request's one injected clock) |
 
 `SourceRepeatingTaskId` (FK to `repeating_planner_task`, `SET NULL`) and `RepeatingPlannerTask.AutoPlace` arrived
-in the same migration for FO6, so `planner_task` is altered once. Nothing reads or writes them yet.
+in the same migration for FO6, so `planner_task` is altered once. `RepeatingTaskMaterialiser` writes them (see
+§ *Applying a day template* for how it places beside existing blocks).
 | Streak? | The task leaves its old day, so that day no longer counts it — the same neutral outcome a skip has |
 | Which tasks does the client offer? | `GET /planner-task/carry-over-candidates`: `NotStarted` / `InProgress`, non-background tasks on the user's previous seven days (their zone), newest day first, each with its date. The rule is `PlannerTaskCarryOverRule` (`domain/service/`), which the host's morning briefing and welcome-back pile read too — change it there, not in the endpoint |
 
@@ -446,6 +447,27 @@ cascaded-away tasks are captured.
 | `MergeOverwrite` | Existing tasks are carved around the new ones (removed and re-added as segments) |
 | *(both merge modes)* | **A carved segment carries the plan, not its execution.** Span, lane, location, notes, activity, importance and `SourceTemplateTaskId` come across; `Status` resets to `NotStarted`, and the actual times, skip reason, Google event id and **`TodolistItemId`** do not. Same ruling as `CopyToDaysPlannerTaskEndpoint.CopyOnto`, and forced by the same two facts: a segment that kept `Completed` would claim to be finished at times it never carried, and a to-do id on both halves of a split fans every done-toggle across both |
 
+**FO6's materialiser does not use these four modes as they stand.** It places through `StageWithinLanes`, in the same
+file, because the planner lanes (two blocks of a kind side by side, `PlannerTaskLaneRule`) changed what counts as a
+conflict for a block nobody placed by hand:
+
+| Occurrence would be… | What happens |
+|---|---|
+| at most a second block of **its own kind** at every minute | Placed **whole**, beside them, in every mode. A background block never stands in a foreground occurrence's way, nor the reverse |
+| a **third** at some minute, mode `Ignore` (or `Overwrite`, read as it) | Not placed. The day is still decided |
+| a **third** at some minute, mode `MergeIgnore` (or `MergeOverwrite`, read as it) | Cut down to the stretches where it would be a second: only the minutes where both lanes are taken are removed. The span is sliced at every same-kind start and end inside it and each slice asked `ExceedsLaneLimit`, so there is no second depth count. A segment is a new block, as in the merge modes above |
+
+Occurrences placed in one run count against each other, in rule-id order (two rules and a user block at 18:00 are
+three, and the newer rule gives way). The destructive modes are never honoured: this runs from a GET, so the user's
+blocks are never deleted, moved or carved. A rule edit (`ReconcileAfterEditAsync`) follows the same rule: an
+untouched occurrence it would move into a third block is replaced by what a fresh placement would leave, and a newly
+matched day is placed the same way. An edit that keeps the occurrence's span and kind is not judged.
+
+Why the fallback carve removes only the full-lane minutes, not every overlapped block as `MergeIgnore` does for a
+template: carving around a block that leaves a lane free would cut out time the lanes already allow, so a
+one-block overlap would carve under the fallback and stay whole under the main rule. Cutting only the full-lane
+minutes means every segment it keeps is something the main rule would have placed.
+
 **Both merge modes refuse to carve a task whose `EndTime` is not after its `StartTime`.** The carving walk
 assumes a strictly-forward same-day span; given a negative one it emits no segments at all, and the
 `MergeOverwrite` branch had already staged the original for removal — so the task was deleted, nothing was
@@ -543,7 +565,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 |---|---|---|
 | Day / calendar day | One user's one date, with its metadata and sleep window | `Calendar` |
 | Planner task | A planned block on a day: start, end, activity, importance | `PlannerTask` |
-| Repeating task | A recurrence the user wants on matching days — **not** materialised into planner tasks by anything today | `RepeatingPlannerTask` |
+| Repeating task | A recurrence the user wants on matching days; an `AutoPlace` one is materialised onto today and tomorrow (FO6), the rest are only suggested | `RepeatingPlannerTask`, `RepeatingTaskMaterialiser` |
 | Day template | A named plan the user stamps onto days ("Office day") | `TaskPlannerDayTemplate` |
 | Template task | One line inside a day template | `TemplatePlannerTask` |
 | Background task | Scaffolding, not work — excluded from the streak, the trend and the ring | `BasePlannerTask.IsBackground` |
@@ -650,7 +672,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `ReminderRegistrationService` | Application service | The **only** seam to `Sydowwe.Reminders`: key format (two kinds — `PersonalReminder`, and `PlannedBlockStarting` for `IsAuto` rows), schedule mapping, cancel-vs-register (a cancel withdraws **both** kinds' keys), user defaults, and the one task-instant composition (`ComposeTaskInstant`) | `application/service/ReminderRegistrationService.cs` |
 | `PlannedBlockAutoReminders` | Application service | Audit N1: creates and registers the automatic `Reminder` of each **new** block that qualifies under `AutoReminderMode`. Called after the save by every create path; never throws; scopes by hand so it works unauthenticated | `application/service/PlannedBlockAutoReminders.cs` |
 | `PlannedBlockStartingGuard` | Dispatch guard (`IReminderDispatchGuard`) | Retires an automatic reminder at fire time when its row is gone or no longer automatic, or its block is gone, not `NotStarted`, or starts at another instant than registered | `application/service/PlannedBlockStartingGuard.cs` |
-| `PlannerTemplateApplier` | Helper (static) | The template stamp and the four conflict modes. Stages only, never saves | `application/helper/PlannerTemplateApplier.cs` |
+| `PlannerTemplateApplier` | Helper (static) | The template stamp and the four conflict modes, plus FO6's lane-aware placement (`StageWithinLanes`). Stages only, never saves | `application/helper/PlannerTemplateApplier.cs` |
 | `CalendarDayTypeRule` | Helper (static) | The one weekday/day-type rule, returning a message rather than throwing | `application/helper/CalendarDayTypeRule.cs` |
 | `PlannerBatchLimits` | Helper (constants) | `MaxCalendarIds` / `MaxSummaryRangeDays`, both 366 | `application/helper/PlannerBatchLimits.cs` |
 | `TaskPlannerHelper` | Helper (extensions) | `WithIncludes` (importance + activity/role/category), `TasksOverlap` (assumes non-wrapping spans), `TodayIn` (the one definition of "today" — the user's, never UTC's) and `InTimeWindow` (the one definition of the day planner's time-of-day filter, shared by both filter endpoints) | `application/helper/TaskPlannerHelper.cs` |
