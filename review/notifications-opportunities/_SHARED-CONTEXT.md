@@ -3,7 +3,8 @@
 Read this before any `P*.md` here. `CLAUDE.md` auto-loads and covers solution-wide conventions; this file
 carries only what the notification / reminder / scheduler work needs. Framework paths were read at
 **5646e89** — check that `framework/` is checked out there (`git -C framework log -1`), see
-[`README.md`](README.md#framework-revision).
+[`README.md`](README.md#framework-revision). The `P3-0*` prompts were read later, at framework **423569f**
+(2026-10-13). The frontend repo is `C:\Users\jakub\WebstormProjects\AntiProcrastinationApp-frontend`.
 
 ## Build and test
 

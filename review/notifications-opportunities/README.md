@@ -59,7 +59,16 @@ about a moment → held; asked for, or operational → not held.
 | P2-04 | [Tracker went silent](P2-04-tracker-went-silent.md) | feature | Tracking | yes (1 kind) | — |
 | P2-05 | [Unconfirmed accounts: remind, then purge](P2-05-unconfirmed-accounts.md) | GDPR / housekeeping | host (+ framework) | maybe | — |
 | P2-06 | [Token cleanup onto the scheduler](P2-06-token-cleanup-on-scheduler.md) | housekeeping | framework / host | small | — |
-| P3 | [Backlog](P3-backlog.md) — 15 smaller ideas | ideas | various | various | mostly P2-02 |
+| P3 | [Backlog](P3-backlog.md) — 15 smaller ideas; 11 promoted below, 4 not | ideas | various | various | — |
+| P3-01 | [Quiet hours follow the sleep window](P3-01-sleep-window-quiet-hours.md) | feature | Notifications, host | yes (flag) | — |
+| P3-02 | [Streak milestones and new bests](P3-02-streak-milestones.md) | feature | Routines | yes (payload) | — |
+| P3-03 | [Stopwatch check-in](P3-03-stopwatch-check-in.md) | feature | History, frontend | yes (1 kind) | — |
+| P3-04 | [Evening shutdown](P3-04-evening-shutdown.md) | feature | host | yes (1 kind) | P2-01 frontend |
+| P3-05 | [Weekly lines in the morning briefing](P3-05-briefing-weekly-lines.md) | feature | host, Tracking | yes (payload) | P2-01 frontend |
+| P3-06 | [Routine items with a time of day](P3-06-timed-routine-items.md) | feature | Routines | yes (1 kind) | — |
+| P3-07 | [Account deletion grace period](P3-07-account-deletion-grace.md) | GDPR / lifecycle | host | no | — |
+| P3-08 | [Daily activity budgets](P3-08-activity-budgets.md) | feature | History | yes (1 kind) | — |
+| P3-09 | [Google Calendar auto-sync](P3-09-google-calendar-auto-sync.md) | feature | host | yes (1 kind) | — |
 
 ## Suggested order
 
