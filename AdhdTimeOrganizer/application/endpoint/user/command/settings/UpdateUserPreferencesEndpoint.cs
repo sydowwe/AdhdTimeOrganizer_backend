@@ -4,15 +4,17 @@ using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.application.endpoint.user.command.settings;
 
 namespace AdhdTimeOrganizer.application.endpoint.user.command.settings;
 
 public class UpdateUserPreferencesEndpoint(
     UserManager<User> userManager,
+    DbContext dbContext,
     ITodoListItemDueReminderSync dueReminders,
     ICalendarSleepWindowSync sleepWindowSync)
-    : BaseUpdateUserPreferencesEndpoint<User, UpdateUserPreferencesRequest>(userManager)
+    : BaseUpdateUserPreferencesEndpoint<User, UpdateUserPreferencesRequest>(userManager, dbContext)
 {
     /// <summary>
     /// A to-do's due instant is its date and time read in the user's zone, and the registered reminder froze the

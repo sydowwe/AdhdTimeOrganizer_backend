@@ -199,6 +199,16 @@ It exposes `DbContextHelper` — Result-returning CRUD helpers that wrap `SaveCh
 - `DeleteEntityAsync`, `DeleteRangeAsync`, `DeleteByIdAsync`
 - `SetActiveStatusAsync`, `SetActiveStatusRangeAsync` — for `ISoftDeletable` (`IsActive`).
 
+Beside it, `RetryDbConcurrencyHelper.ExecuteWithRetryAsync` (same folder) — **the one tool for a write that
+should survive losing a race rather than answer 409**. It runs the operation in a transaction and re-runs it,
+up to 3 attempts, on a `DbUpdateConcurrencyException` **or** a failed `Result` of type `DbConcurrencyError`
+(Identity answers a moved row with `IdentityResult.Failed(ConcurrencyFailure)`, not an exception — map it with
+`IdentityResultExtensions.ToResult()`). Between attempts it clears the whole ChangeTracker, so **load what you
+write inside the operation**; `FindAsync` / `UserManager.FindByIdAsync` then read the database again. Only right
+for a partial update whose re-application to the winner's row is what the caller meant. First caller:
+`BaseUpdateUserPreferencesEndpoint` (`PUT /user/preferences`), where the frontend's time-zone sync and a settings
+toggle collided into a 400.
+
 ## User-scoping query filters
 
 ⚠ **A query filter must read the current-user id off the DbContext, never off a captured service.** EF
