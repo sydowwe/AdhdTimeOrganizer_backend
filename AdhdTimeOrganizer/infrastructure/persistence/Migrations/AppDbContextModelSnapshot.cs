@@ -1480,6 +1480,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("notes");
 
+                    b.Property<long?>("TimeAwayId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("time_away_id");
+
                     b.Property<long>("UserId")
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");
@@ -1505,6 +1509,9 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                     b.HasIndex("Date")
                         .HasDatabaseName("ix_calendar_date");
 
+                    b.HasIndex("TimeAwayId")
+                        .HasDatabaseName("ix_calendar_time_away_id");
+
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_calendar_user_id");
 
@@ -1513,6 +1520,84 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasDatabaseName("ix_calendar_user_id_date");
 
                     b.ToTable("calendar", "planning");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.TimeAway", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseSerialColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("text")
+                        .HasColumnName("location");
+
+                    b.Property<DateTime>("ModifiedTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_timestamp")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<long?>("TemplateId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("template_id");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("row_version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_time_away");
+
+                    b.HasIndex("TemplateId")
+                        .HasDatabaseName("ix_time_away_template_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_time_away_user_id");
+
+                    b.HasIndex("UserId", "StartDate")
+                        .HasDatabaseName("ix_time_away_user_id_start_date");
+
+                    b.ToTable("time_away", "planning");
                 });
 
             modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning.PlannerTask", b =>
@@ -5397,12 +5482,40 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
             modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.Calendar", b =>
                 {
+                    b.HasOne("AdhdTimeOrganizer.Planning.domain.model.entity.TimeAway", "TimeAway")
+                        .WithMany()
+                        .HasForeignKey("TimeAwayId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_calendar_time_away_time_away_id");
+
                     b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_calendar_user_user_id");
+
+                    b.Navigation("TimeAway");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdhdTimeOrganizer.Planning.domain.model.entity.TimeAway", b =>
+                {
+                    b.HasOne("AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning.TaskPlannerDayTemplate", "Template")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_time_away_task_planner_day_templates_template_id");
+
+                    b.HasOne("AdhdTimeOrganizer.Core.domain.model.entity.user.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_time_away_user_user_id");
+
+                    b.Navigation("Template");
 
                     b.Navigation("User");
                 });

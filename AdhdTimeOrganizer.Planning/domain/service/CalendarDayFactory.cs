@@ -30,7 +30,7 @@ public static class CalendarDayFactory
         {
             UserId = userId,
             Date = date,
-            DayType = DayTypeFor(date),
+            DayType = NaturalDayType(date),
             // Holidays do not override the day type — a holiday on a Tuesday is still a Workday row with a
             // HolidayName, which is what the seeder has always produced and what the day view renders.
             // Key and name are written together, from the same table entry, so they cannot disagree.
@@ -41,6 +41,11 @@ public static class CalendarDayFactory
         };
     }
 
-    private static DayType DayTypeFor(DateOnly date) =>
+    /// <summary>
+    /// The type a day has when nobody has said otherwise: <see cref="DayType.Weekend"/> on Saturday and Sunday,
+    /// <see cref="DayType.Workday"/> on the rest. Public because un-stamping a stretch of time away
+    /// (<c>TimeAwayStamper</c>) returns its days to exactly this, not to a second copy of the rule.
+    /// </summary>
+    public static DayType NaturalDayType(DateOnly date) =>
         date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? DayType.Weekend : DayType.Workday;
 }

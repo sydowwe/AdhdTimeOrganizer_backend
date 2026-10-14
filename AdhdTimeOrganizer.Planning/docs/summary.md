@@ -10,8 +10,8 @@ rather than a project of their own.
 Owns: `Calendar`, `BasePlannerTask` and its three concrete shapes (`PlannerTask`,
 `RepeatingPlannerTask`, `TemplatePlannerTask`), `TaskPlannerDayTemplate`, `TaskImportance`,
 `UserPlannerSettings`, `Reminder`, the three `PlannerSuggestionFrom*` read-models and FO11's
-`PlannerSuggestionDismissal`, their EF
-configurations, ~62 endpoints, their DTOs and 16 validator files, the domain services
+`PlannerSuggestionDismissal`, F4-02's `TimeAway` (a named stretch of time away) and its `TimeAwayStamper`, their EF
+configurations, ~67 endpoints, their DTOs and 17 validator files, the domain services
 (`PlannerStreakService`, `PlanVsActualTrendService`, `SkipSummaryService`, `CalendarDayFactory`,
 `HolidayCalendar`, `PlannerTaskPostponeRule`, `RepeatingPlannerTaskSchedule`, FO11's `SuggestionPatternWindow`,
 and FO4's `PlannerTaskMissedRule` + `DayPacking`), the
@@ -150,7 +150,8 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
     every overlapped block, as a template apply's carve does). A GET never deletes, moves or carves a block the user
     placed. Template applies keep `StageAgainstDay`'s semantics, where any overlap counts.
   - **A day marked away after placement loses its untouched occurrence** (today on). `AwayDayOccurrenceWithdrawalHandler`
-    takes `CalendarDayTypesChangedEvent` (Planning publishes it from both day-type writes) and calls
+    takes `CalendarDayTypesChangedEvent` (Planning publishes it from both day-type writes and the three time-away
+    writes) and calls
     `WithdrawFromAwayDaysAsync`; the day stays decided, so un-marking it brings nothing back.
   - **A rule edit reconciles** (`ReconcileAfterEditAsync`): *untouched* occurrences from today on (still
     `NotStarted`, no original slot, still the old rule's exact plan, no to-do/Google link and no reminder the
@@ -183,6 +184,19 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
     `utcNow` overload, so every move is judged against one clock — and the tests can fix it.
   - **Bed time 00:00 (or after midnight) means 23:59**, the last end a block can have. FO10 changed only the
     input (the day's bed time now starts as the user's default), not this rule.
+
+- **A stretch of time away stamps its days; nothing reads the stretch to decide whether a day is away (F4-02).**
+  `TimeAway` (`/time-away`) is "Barcelona, 12–20 Aug" marked once. `TimeAwayStamper` — the only implementation, behind
+  create, resize and delete, staging only so the stretch and its stamp are **one** `SaveChanges` — links each day
+  (`Calendar.TimeAwayId`), writes the stretch's `Kind` onto days that are natural or already that kind, fills an
+  unset `Location`, and creates missing days in bulk through `CalendarDayFactory` (not `EnsureForDateAsync`, which
+  commits per date). Un-stamping is keyed on the link plus equality with what was written, so a day the user
+  overrode keeps its override. So every away reader (FO1's excusal, FO6's withdrawal, suggestion ranking, the
+  nudges) keeps reading `Calendar.DayType`; after each commit the write publishes `CalendarDayTypesChangedEvent`
+  for the dates whose type really moved, which is how Routines and FO6 hear of it. Stretches of one user never
+  overlap (400 on `startDate`), which is what lets a day carry one id. A delete touches no task and re-scores no
+  routine cycle (F4 Q7). The stretch's template is only *suggested* first on its days (pattern type 4), never
+  applied (F4 Q8). Details in `domain-map.md` § *Time away*.
 
 - **At most two blocks of a kind at any minute (planner lanes, 2026-10-13).** The SPA draws two overlapping
   foreground blocks side by side, and separately two background ones; `PlannerTaskLaneRule` refuses a third with a
@@ -306,6 +320,9 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   make `Collides` match the entity's **unique index**, not its display text.
 - **Add a user-scoped entity:** it will fail `UserDataExportAndDeletionTests` until it is listed as
   exported or as a deliberate gap. That is the test working.
+- **Add a write that changes a day's type:** publish `CalendarDayTypesChangedEvent` after the commit, for the dates
+  whose type really moved — the two day-type endpoints and the three time-away writes are the five that do. A write
+  that forgets answers 200, and Routines never excuses the cycles nor FO6 withdraws the blocks; nothing logs.
 
 ## Deeper reference
 

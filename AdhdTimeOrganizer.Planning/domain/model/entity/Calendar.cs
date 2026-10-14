@@ -64,6 +64,15 @@ public class Calendar : BaseEntityWithUser
     // Location
     public Location? Location { get; set; }
 
+    /// <summary>
+    /// F4-02: the stretch of time away this day belongs to, or null. Written only by <c>TimeAwayStamper</c>, which
+    /// is also what un-writes it — keyed on this id, so a stretch's delete or resize reverts exactly its own days.
+    /// A day can carry it and still keep a type of its own: a sick day inside a vacation is that one day's
+    /// override, and it stays part of the trip. <c>SET NULL</c> is the database's backstop for the delete.
+    /// </summary>
+    public long? TimeAwayId { get; set; }
+    public TimeAway? TimeAway { get; set; }
+
     // Day-specific notes
     public string? Weather { get; set; }
     public string? Notes { get; set; }

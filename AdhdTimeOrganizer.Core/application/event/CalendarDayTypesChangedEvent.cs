@@ -4,7 +4,8 @@ namespace AdhdTimeOrganizer.Core.application.@event;
 
 /// <summary>
 /// Raised after the day type of one or more of a user's calendar days has been committed with a different
-/// value. Published by Planning (the single-day update and the batch day-type endpoint). Handled by Routines,
+/// value. Published by Planning (the single-day update, the batch day-type endpoint, and F4-02's stretch of time
+/// away on create, update and delete — once per request, after its one commit). Handled by Routines,
 /// which excuses closed cycles that are now mostly away — the user typically marks a sick week only once they
 /// are back, after the cycles it covered have already been scored — and by Planning itself, which withdraws an
 /// untouched auto-placed repeating occurrence from a day that is now away (FO6).

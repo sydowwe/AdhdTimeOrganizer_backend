@@ -35,6 +35,7 @@ if the two ever drift apart.
 | `TodoListItemIsDoneChangedEvent` | TodoLists | **Planning**; **ActivityProfiles** (`ProjectShoppingDoneEventHandler`, FO13) | Planning only; ActivityProfiles only — a done shopping item makes its linked `NeedsShopping` project `ReadyToStart`. The two subscribers share no rows and need no ordering |
 | `RoutineTodoListIsDoneChangedEvent` | Routines | **Planning** | Planning only |
 | `ActivityArchivedChangedEvent` | Core (`SetArchivedActivityEndpoint`, on a real change) | **TodoLists** | TodoLists only — re-syncs the due reminders of the activity's to-dos |
+| `CalendarDayTypesChangedEvent` | Planning — `UpdateCalendarEndpoint`, `BatchUpdateDayTypeCalendarEndpoint`, and the three time-away writes (F4-02), each only for the dates whose type really moved | **Routines** (`CalendarDayTypesChangedEventHandler`, FO1); **Planning** (`AwayDayOccurrenceWithdrawalHandler`, FO6) | Routines excuses closed cycles that are now mostly away (never un-excuses); Planning withdraws untouched auto-placed occurrences from today on. Disjoint rows, no ordering needed |
 
 **A handler belongs to the slice it writes into, not to the host and not to the publisher.** The two
 Planning-side handlers each touch only `PlannerTask` (and, for the to-do one, Planning's own
@@ -48,7 +49,7 @@ would silently double-complete an activity holding both.
 A handler in a slice needs that slice's assembly in the FastEndpoints `o.Assemblies` list in
 `Program.cs`. A missing one is not a build error — the event simply publishes into nothing.
 
-All five are published `Mode.WaitForAll` — the publisher blocks on the handler, so these are
+All six are published `Mode.WaitForAll` — the publisher blocks on the handler, so these are
 synchronous in-process calls, not background work. Every handler runs **after** the publisher's own
 commit, in its own scope, and logs-and-swallows rather than failing the request that raised it.
 

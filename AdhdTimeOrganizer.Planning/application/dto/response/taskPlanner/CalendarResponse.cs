@@ -30,6 +30,14 @@ public record CalendarResponse : IdResponse, IProjectionResponse<CalendarRespons
 
     public Location? Location { get; init; }
 
+    /// <summary>
+    /// F4-02: the stretch of time away the day belongs to, and its name for the chip — null on an ordinary day. The
+    /// day's <see cref="DayType"/> is still the thing to read for "is this day away": a day can belong to a stretch
+    /// and keep a type of its own.
+    /// </summary>
+    public long? TimeAwayId { get; init; }
+    public string? TimeAwayName { get; init; }
+
     public string? Weather { get; init; }
     public string? Notes { get; init; }
 
@@ -64,6 +72,8 @@ public record CalendarResponse : IdResponse, IProjectionResponse<CalendarRespons
             AppliedTemplateId = c.AppliedTemplateId,
             AppliedTemplateName = c.AppliedTemplateName,
             Location = c.Location,
+            TimeAwayId = c.TimeAwayId,
+            TimeAwayName = c.TimeAway != null ? c.TimeAway.Name : null,
             Weather = c.Weather,
             Notes = c.Notes,
             TotalTasks = c.Tasks.Count(),

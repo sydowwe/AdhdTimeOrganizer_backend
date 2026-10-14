@@ -137,6 +137,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         AssertContainsId(body, "routineTodoLists", seeded.RoutineTodoListId);
         AssertContainsId(body, "templates", seeded.TemplateId);
         AssertContainsId(body, "calendars", seeded.CalendarId);
+        AssertContainsId(body, "timeAway", seeded.TimeAwayId);
 
         var tracking = body.GetProperty("activityTracking");
         AssertContainsId(tracking, "activityHistories", seeded.ActivityHistoryId);
@@ -311,7 +312,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         Exported.Intersect(KnownGaps).Should().BeEmpty("an entity is either exported or it is not");
     }
 
-    /// <summary>The eleven entities <c>GetUserDataExportEndpoint</c> actually reads.</summary>
+    /// <summary>The twelve entities <c>GetUserDataExportEndpoint</c> actually reads.</summary>
     private static readonly string[] Exported =
     [
         nameof(ActivityHistory),
@@ -321,6 +322,7 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
         nameof(PlannerTask),
         nameof(RoutineTodoList),
         nameof(TaskPlannerDayTemplate),
+        nameof(TimeAway),
         nameof(TodoList),
         nameof(TodoListItem),
         nameof(TrackerSourceStatus),

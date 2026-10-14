@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AdhdTimeOrganizer.infrastructure.persistence;
+using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
@@ -90,6 +91,14 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
             .Select(c => new { c.Id, c.Date, c.CreatedTimestamp })
             .ToListAsync(ct);
 
+        // F4-02: the person's own record of trips and sick spells — authored by them, so it travels.
+        var timeAway = await dbContext.Set<TimeAway>()
+            .AsNoTracking()
+            .Where(t => t.UserId == userId)
+            .OrderBy(t => t.StartDate)
+            .Select(t => new { t.Id, t.Name, t.Kind, t.StartDate, t.EndDate, t.TemplateId, t.Location, t.Notes, t.CreatedTimestamp })
+            .ToListAsync(ct);
+
         var activityHistories = await dbContext.ActivityHistories
             .AsNoTracking()
             .Where(a => a.UserId == userId)
@@ -169,6 +178,7 @@ public class GetUserDataExportEndpoint(AppDbContext dbContext, IDistributedCache
             routineTodoLists,
             templates,
             calendars,
+            timeAway,
             activityTracking = new { activityHistories, activityHistorySessions, webTracking, desktopTracking, trackerSources }
         };
 

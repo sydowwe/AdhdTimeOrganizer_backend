@@ -73,7 +73,9 @@ has no knowledge of Planning at all.
   `RoutineItemTypicalDuration` buckets into the period's real cycles (cut at the ledger's `PeriodEnd`
   instants, not re-derived). It needs no table or migration.
 - **One Core event is consumed here**: `CalendarDayTypesChangedEvent`, published by Planning's two day-type
-  writes. Its handler logs and swallows, so `RoutineAwayExcusalFlowTests` asserts on rows.
+  writes and its three time-away writes (F4-02). Its handler logs and swallows, so `RoutineAwayExcusalFlowTests`
+  (and, for the stretch, Planning's `TimeAwayTests`) assert on rows. Deleting a stretch publishes too, and must
+  find nothing to do: excusal is one-way.
 
 ## Gotchas — things that will bite you
 

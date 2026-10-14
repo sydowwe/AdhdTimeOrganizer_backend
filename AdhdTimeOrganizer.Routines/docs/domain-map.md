@@ -115,7 +115,8 @@ no grace window opened, undone items keep their streaks, and no end-of-period su
 excused. Every reset site pre-reads the away days through `IRoutineAwayDaysReader` (Planning's
 `ICalendarDayLookup.GetAwayDatesAsync` underneath) — the job, the grouped read, both toggles and the host's
 `PlannerTaskIsDoneChangedEventHandler`. **Retroactively**, Planning publishes Core's
-`CalendarDayTypesChangedEvent` from both day-type writes, and `CalendarDayTypesChangedEventHandler` excuses
+`CalendarDayTypesChangedEvent` from both day-type writes and from F4-02's stretch of time away (create, resize,
+delete), and `CalendarDayTypesChangedEventHandler` excuses
 the closed cycles that now qualify, clears the grace window if the newest one did, and re-walks the streak.
 Excusal is one-way (un-marking a day never un-excuses), and item streaks cannot come back retroactively. The
 cycle's days are UTC boundary dates, the away days user-local; the majority rule absorbs the off-by-one.

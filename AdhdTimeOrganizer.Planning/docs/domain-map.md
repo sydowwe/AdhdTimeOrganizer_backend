@@ -20,6 +20,9 @@ erDiagram
     Activity ||--o{ TemplatePlannerTask : "is what"
     PlannerTask ||--o{ Reminder : "nudges before"
     User ||--o{ Reminder : owns
+    User ||--o{ TimeAway : "marks (F4-02)"
+    TimeAway |o--o{ Calendar : "stamps its days"
+    TaskPlannerDayTemplate |o--o{ TimeAway : "suggested on"
 ```
 
 `User` and `Activity` are Core's. `TodoListItem` is TodoLists' and is **not referenced by this
@@ -28,6 +31,7 @@ project** — see [the one cross-slice relationship](#the-one-cross-slice-relati
 | Type | File |
 |---|---|
 | `Calendar` | `domain/model/entity/Calendar.cs` |
+| `TimeAway` (F4-02) | `domain/model/entity/TimeAway.cs` |
 | `BasePlannerTask` | `domain/model/entity/activityPlanning/BasePlannerTask.cs` |
 | `PlannerTask` | `domain/model/entity/activityPlanning/PlannerTask.cs` |
 | `RepeatingPlannerTask` | `domain/model/entity/activityPlanning/RepeatingPlannerTask.cs` |
@@ -130,6 +134,11 @@ keys to the latest date).
 | A template line's `TemplateId` belongs to the same user | **App only** — the same two endpoints. Not integrity alone: unchecked, the line lands *inside* a stranger's day template and changes what applying it does to their day |
 | `UserPlannerSettings.DefaultApplyTemplateId` belongs to the same user | **App only** — `UpdatePlannerSettingsEndpoint`. Integrity, not disclosure: the response returns the bare id |
 | Every entity's schema is `planning` | **Model build** — `ModuleSchemas.Resolve` throws for an unmapped assembly |
+| A user's stretches of time away do not overlap (so a day carries at most one `TimeAwayId`) | **App only** — `TimeAwayWriteRules` on create and update, a 400 on `startDate`. Not race-proof alone; two racing creates collide on the days they both stamp (`row_version` / `(user_id, date)`, a 409) |
+| `TimeAway.Kind` is `Vacation` or `SickDay`; `StartDate ≤ EndDate`; at most 366 days | **App only** — `TimeAwayValidator` (`DayTypeExtensions.IsAway`, `PlannerBatchLimits.MaxCalendarIds`) |
+| `TimeAway.TemplateId` belongs to the same user | **App only** — `TimeAwayWriteRules`, through `EnsureOwnsDayTemplateAsync` (404) |
+| A stretch and its stamp commit together | **App** — `TimeAwayStamper` only stages; each write endpoint makes one `SaveChanges` |
+| Deleting a template leaves the stretches that named it; deleting a stretch leaves its days | **DB** — `time_away.template_id` and `calendar.time_away_id` are both `SetNull` |
 
 ## Business rules
 
@@ -540,6 +549,33 @@ real — a phone and a desktop starting the same morning's first task; the loser
 `CalendarSeeder`'s year list is now `{ this year, next year }`, resolved when it runs. That is
 hygiene, not the fix — it only helps users created from now on.
 
+### Time away (F4-02)
+
+"Barcelona, 12–20 Aug", marked once across any month boundary, instead of a bulk day-type action per visible month.
+Designed in the frontend repo's `docs/feature-discovery/F4-day-type-periods.md`; the owner chose the full entity on
+2026-10-12. **A stretch imposes its kind on its days; nothing reads the stretch to decide whether a day is away.**
+Every away reader — FO1's routine excusal, FO6's withdrawal, both suggestion endpoints' ranking, the nudges — keeps
+reading `Calendar.DayType`.
+
+| Question | Answer |
+|---|---|
+| What does a stamp write? | Per day of the inclusive range: `TimeAwayId`; `DayType = Kind` if the day is `Workday`/`Weekend` or already `Kind`; `Location` if the day has none. Weekends included — a Saturday in Barcelona is away |
+| A day with a type of the user's own? | Keeps it, and still belongs to the stretch. A sick day inside a vacation is that day's override, not a nested stretch (stretches never overlap). The response reports it as `keptOwnDayType` |
+| Missing days? | Created in the same transaction, in bulk, through `CalendarDayFactory` |
+| What does an un-stamp undo? | On days linked to the stretch: the link; the type, if it still equals the kind (back to `CalendarDayFactory.NaturalDayType`); the location, if it still equals the stretch's. A day that carried the kind or the location *before* the stretch arrived cannot be told apart and reverts too — accepted rather than storing a per-day "before" |
+| A resize, rename or change of kind? | `PUT`: un-stamp the held days by what was written last time (`TimeAwayStamp`, captured before the mapping), stamp the new range by the new values. Released days come back in `releasedDates` |
+| A delete? | Un-stamps in the same save as the row goes. **Touches no task**, and the routine cycles the stretch excused **stay excused** (F4 Q7) — Routines' excusal is one-way |
+| How do Routines and FO6 hear of it? | `CalendarDayTypesChangedEvent` after each commit, for the dates whose type differs from before (a re-stamp with the same kind moves nothing; a created day counts from its natural type) |
+| The template? | Suggested first on every day of the stretch — `TemplateSuggestionResponse.PatternType` 4, label = the stretch's name — if it is active. **Never applied** by the stretch (F4 Q8) |
+| The list? | `POST /time-away/filter`, oldest first, optionally bounded by `from` / `until`. No count, no totals: a quiet record, never "12 sick days this year" |
+| Day reads? | `CalendarResponse.TimeAwayId` / `TimeAwayName`, on every calendar read (filter, by-id, by-date, day-plan) |
+
+| Type | Role |
+|---|---|
+| `TimeAwayStamper` (`application/helper/`) | The stamp and un-stamp; stages only. `StageAsync` (create / update), `StageRemovalAsync` (delete) |
+| `TimeAwayWriteRules` (`application/endpoint/extensions/`) | No overlap (400), template ownership (404) |
+| `TimeAwayValidator` / `TimeAwayFilterValidator` | Kind, range, cap; `from ≤ until` |
+
 ### Reminders
 
 `Reminder` owns **user intent** only: the title, the instant, the lead offsets, the recurrence, and
@@ -567,6 +603,8 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | Term | Meaning | Code |
 |---|---|---|
 | Day / calendar day | One user's one date, with its metadata and sleep window | `Calendar` |
+| Time away / stretch | A named, dated run of `Vacation` or `SickDay` days the user marks once (F4-02). Not "period", which is Routines' | `TimeAway` |
+| Stamp (time away) | Writing a stretch's link, kind and location onto its days; the un-stamp reverts exactly that | `TimeAwayStamper` |
 | Planner task | A planned block on a day: start, end, activity, importance | `PlannerTask` |
 | Repeating task | A recurrence the user wants on matching days; an `AutoPlace` one is materialised onto today and tomorrow (FO6), the rest are only suggested | `RepeatingPlannerTask`, `RepeatingTaskMaterialiser` |
 | Day template | A named plan the user stamps onto days ("Office day") | `TaskPlannerDayTemplate` |
@@ -638,12 +676,22 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `GetAllTaskPlannerDayTemplateEndpoint` | Query (`BaseGetAllEndpoint`) | Pinned first, then last-used/name | `taskPlannerDayTemplate/query/` |
 | `GetSelectOptionsTaskPlannerDayTemplateEndpoint` | Query (`BaseGetSelectOptionsEndpoint`) | Template picker options | `taskPlannerDayTemplate/query/` |
 | `SetPinnedTaskPlannerDayTemplateEndpoint` | Command (`BasePatchEndpoint`) | `PATCH /task-planner-day-template/{id}/pinned` — **absolute**, not a toggle, so two devices converge. Suffixed route leaves the base's generic `/{id}` patch free | `taskPlannerDayTemplate/command/` |
-| `GetSuggestionsTaskPlannerDayTemplateEndpoint` | Query (custom) | `/task-planner-day-template/suggestions/{calendarId}` over `mv_template_suggestion_pattern`, then active templates whose `ScheduledDays` / `SuggestedForDayType` match the day; one entry per template | `taskPlannerDayTemplate/query/` |
+| `GetSuggestionsTaskPlannerDayTemplateEndpoint` | Query (custom) | `/task-planner-day-template/suggestions/{calendarId}`: first the template of the day's stretch of time away (type 4, F4-02), then `mv_template_suggestion_pattern`, then active templates whose `ScheduledDays` / `SuggestedForDayType` match the day; one entry per template | `taskPlannerDayTemplate/query/` |
 | `Create/Update/Delete/GetById/GetAllTaskImportanceEndpoint` | CRUD (Framework bases) | Importance-level CRUD; `(user_id, importance)` is unique | `taskImportance/{command,query}/` |
 | `GridTaskImportanceEndpoint` | Query (`BaseGridEndpoint`) | The importance admin grid | `taskImportance/query/GridTaskImportanceEndpoint.cs` |
 | `GetSelectOptionsTaskImportanceEndpoint` | Query (`BaseGetSelectOptionsEndpoint`) | Importance picker options | `taskImportance/query/` |
 | `GetPlannerSettingsEndpoint` | Query (custom) | `GET /planner/settings` — **get-or-create**, one row per user | `plannerSettings/GetPlannerSettingsEndpoint.cs` |
 | `UpdatePlannerSettingsEndpoint` | Command (custom) | `PUT /planner/settings` — creates the row if the user has none | `plannerSettings/UpdatePlannerSettingsEndpoint.cs` |
+
+### Endpoints — time away (`application/endpoint/timeAway/`, F4-02)
+
+| Name | Kind | Responsibility | Path |
+|---|---|---|---|
+| `CreateTimeAwayEndpoint` | Command (custom) | `POST /time-away` — the stretch and its stamp in one save; 201 with `TimeAwayStampResponse` (id, one entry per day, `releasedDates` empty). Custom because the base answers a bare id | `command/CreateTimeAwayEndpoint.cs` |
+| `UpdateTimeAwayEndpoint` | Command (custom) | `PUT /time-away/{id}` — un-stamp by the old values, stamp by the new; 200 with the same report | `command/UpdateTimeAwayEndpoint.cs` |
+| `DeleteTimeAwayEndpoint` | Command (`BaseDeleteEndpoint`) | Un-stamps in `BeforeDeleteAsync`, publishes in `AfterSave`; 204 | `command/DeleteTimeAwayEndpoint.cs` |
+| `GetByIdTimeAwayEndpoint` | Query (`BaseGetByIdEndpoint`) | One stretch | `query/GetByIdTimeAwayEndpoint.cs` |
+| `FilterTimeAwayEndpoint` | Query (`BaseFilterEndpoint`) | `POST /time-away/filter` — stretches touching `[from, until]` (either optional), oldest first | `query/FilterTimeAwayEndpoint.cs` |
 
 ### Endpoints — reminders (`application/endpoint/reminder/`)
 
@@ -677,6 +725,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `PlannedBlockStartingGuard` | Dispatch guard (`IReminderDispatchGuard`) | Retires an automatic reminder at fire time when its row is gone or no longer automatic, or its block is gone, not `NotStarted`, or starts at another instant than registered | `application/service/PlannedBlockStartingGuard.cs` |
 | `PlannerTemplateApplier` | Helper (static) | The template stamp and the four conflict modes, plus FO6's lane-aware placement (`StageWithinLanes`). Stages only, never saves | `application/helper/PlannerTemplateApplier.cs` |
 | `CalendarDayTypeRule` | Helper (static) | The one weekday/day-type rule, returning a message rather than throwing | `application/helper/CalendarDayTypeRule.cs` |
+| `TimeAwayStamper` | Helper (static) | F4-02's stamp and un-stamp of a stretch's days, with bulk day creation. Stages only, never saves | `application/helper/TimeAwayStamper.cs` |
 | `PlannerBatchLimits` | Helper (constants) | `MaxCalendarIds` / `MaxSummaryRangeDays`, both 366 | `application/helper/PlannerBatchLimits.cs` |
 | `TaskPlannerHelper` | Helper (extensions) | `WithIncludes` (importance + activity/role/category), `TasksOverlap` (assumes non-wrapping spans), `TodayIn` (the one definition of "today" — the user's, never UTC's) and `InTimeWindow` (the one definition of the day planner's time-of-day filter, shared by both filter endpoints) | `application/helper/TaskPlannerHelper.cs` |
 | `PlannerTaskActivityReferenceSource` | Core seam (keyed) | Publishes and repoints `ActivityId` across **all three** task tables and FO11's dismissals (collapsing duplicate keys to the latest). The suggestion views are deliberately absent — they'd double-count | `application/seam/PlannerTaskActivityReferenceSource.cs` |
@@ -711,4 +760,5 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 `GetByDateCalendarValidator` · `PatchPlannerTaskStatusValidator` · `PlannerTaskChangeSpanValidator` ·
 `PlannerTaskValidator` · `PlanVsActualTrendValidator` · `ReminderValidator` ·
 `RepeatingPlannerTaskValidator` · `TaskImportanceValidator` · `TaskPlannerDayTemplateValidator` ·
-`TemplatePlannerTaskValidator` · `UserPlannerSettingsValidator`
+`TemplatePlannerTaskValidator` · `TimeAwayValidators` (`TimeAwayValidator`, `TimeAwayFilterValidator`) ·
+`UserPlannerSettingsValidator`

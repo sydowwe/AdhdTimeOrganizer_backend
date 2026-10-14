@@ -1,6 +1,7 @@
 using System.Reflection;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.timer;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
@@ -31,6 +32,20 @@ internal static class UserDataInventory
         var plannerTaskId = await PlanningTestSeedHelper.SeedPlannerTaskAsync(
             db, activityId, calendarId, new TimeOnly(9, 0), new TimeOnly(10, 0), userId, ct: ct);
         var templateId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, userId, ct: ct);
+
+        // A stretch of time away holding the seeded day, so both the row and the day's link to it are in the set.
+        var timeAway = new TimeAway
+        {
+            UserId = userId,
+            Name = "Slice trip",
+            Kind = DayType.Vacation,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            TemplateId = templateId
+        };
+        db.Set<TimeAway>().Add(timeAway);
+        await db.SaveChangesAsync(ct);
+        (await db.Set<Calendar>().IgnoreQueryFilters().SingleAsync(c => c.Id == calendarId, ct)).TimeAwayId = timeAway.Id;
 
         var todoListId = await TodoListTestSeedHelper.SeedTodoListAsync(db, userId, $"Slice List {Guid.NewGuid():N}", ct: ct);
         var priorityId = await TodoListTestSeedHelper.SeedTaskPriorityAsync(db, 1, userId, ct: ct);
@@ -101,7 +116,7 @@ internal static class UserDataInventory
 
         return new SeededUserData(
             activityId, calendarId, plannerTaskId, templateId, todoListId, todoListItemId,
-            routineTodoListId, history.Id, historySession.Id, timerPreset.Id, quietHours.Id);
+            routineTodoListId, history.Id, historySession.Id, timerPreset.Id, quietHours.Id, timeAway.Id);
     }
 
     /// <summary>
@@ -119,6 +134,7 @@ internal static class UserDataInventory
         await AssertNoRowsLeftAsync<Calendar>(db, userId, ct);
         await AssertNoRowsLeftAsync<PlannerTask>(db, userId, ct);
         await AssertNoRowsLeftAsync<TaskPlannerDayTemplate>(db, userId, ct);
+        await AssertNoRowsLeftAsync<TimeAway>(db, userId, ct);
         await AssertNoRowsLeftAsync<TodoList>(db, userId, ct);
         await AssertNoRowsLeftAsync<TodoListItem>(db, userId, ct);
         await AssertNoRowsLeftAsync<TaskPriority>(db, userId, ct);
@@ -185,4 +201,5 @@ internal sealed record SeededUserData(
     long ActivityHistoryId,
     long ActivityHistorySessionId,
     long TimerPresetId,
-    long QuietHoursId);
+    long QuietHoursId,
+    long TimeAwayId);

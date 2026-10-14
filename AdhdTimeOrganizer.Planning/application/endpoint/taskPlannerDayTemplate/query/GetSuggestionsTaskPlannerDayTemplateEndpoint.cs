@@ -16,11 +16,13 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(DbContext dbContext)
     private static readonly string[] DayNames =
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-    // TemplateSuggestionResponse.PatternType. 0 and 1 are the view's own values; 2 and 3 carry no history.
+    // TemplateSuggestionResponse.PatternType. 0 and 1 are the view's own values; 2 and 3 carry no history; 4 is the
+    // stretch of time away the day belongs to (F4-02).
     private const int HistoryDayOfWeek = 0;
     private const int HistoryDayType = 1;
     private const int MetadataScheduledDay = 2;
     private const int MetadataDayType = 3;
+    private const int PlannedForTimeAway = 4;
 
     protected virtual string[] AllowedRoles() => this.GetDefaultRoles();
 
@@ -32,10 +34,12 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(DbContext dbContext)
         Summary(s =>
         {
             s.Summary = "Get template suggestions for a date";
-            s.Description = "Returns active templates suggested for the calendar day, one entry per template: first those " +
-                            "applied on this weekday or day type before (by occurrence count), then those whose " +
-                            "ScheduledDays or SuggestedForDayType match the day. On an away day (Vacation, SickDay) " +
-                            "every day-type match ranks above every weekday match";
+            s.Description = "Returns active templates suggested for the calendar day, one entry per template. On a day " +
+                            "inside a stretch of time away that names a template, that template comes first " +
+                            "(pattern type 4, label = the stretch's name). Then those applied on this weekday or day " +
+                            "type before (by occurrence count), then those whose ScheduledDays or SuggestedForDayType " +
+                            "match the day. On an away day (Vacation, SickDay) every day-type match ranks above every " +
+                            "weekday match";
             s.Response<List<TemplateSuggestionResponse>>(200, "Success");
             s.Response(400, "Invalid date format");
         });
@@ -74,6 +78,32 @@ public class GetSuggestionsTaskPlannerDayTemplateEndpoint(DbContext dbContext)
 
         var result = new List<TemplateSuggestionResponse>();
         var coveredTemplateIds = new HashSet<long>();
+
+        // 0. The template the user chose for the stretch of time away this day belongs to (F4-02): an explicit choice
+        // for exactly these days, so it outranks any history. Only suggested — the stretch never applies it. Held to
+        // the same active-template set as every other tier, so a template the user switched off is not offered here
+        // either. Before the away/not-away split: a sick day inside a vacation still belongs to the trip.
+        if (calendar.TimeAwayId is { } timeAwayId)
+        {
+            var stretch = await dbContext.Set<TimeAway>()
+                .Where(t => t.Id == timeAwayId)
+                .Select(t => new { t.Name, t.TemplateId })
+                .FirstOrDefaultAsync(ct);
+
+            if (stretch?.TemplateId is { } stretchTemplateId
+                && templates.TryGetValue(stretchTemplateId, out var stretchTemplate)
+                && coveredTemplateIds.Add(stretchTemplateId))
+            {
+                result.Add(new TemplateSuggestionResponse
+                {
+                    Template = stretchTemplate,
+                    PatternType = PlannedForTimeAway,
+                    // The user's own words, not an invariant member name: "Planned for Barcelona".
+                    PatternLabel = stretch.Name,
+                    OccurrenceCount = 0
+                });
+            }
+        }
 
         if (!calendar.DayType.IsAway())
         {

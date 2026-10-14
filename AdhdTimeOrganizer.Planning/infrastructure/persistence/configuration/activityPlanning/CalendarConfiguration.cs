@@ -25,6 +25,19 @@ public class CalendarConfiguration : IEntityTypeConfiguration<Calendar>
         builder.Property(c => c.Notes).HasMaxLength(1000);
         builder.Property(c => c.HasCustomSleepWindow).HasDefaultValue(false).IsRequired();
 
+        // F4-02's link to the stretch of time away the day belongs to. SET NULL, so a stretch deleted outside its own
+        // endpoint (the account going) never takes days with it; the endpoint un-stamps before that ever matters.
+        // The constraint name is pinned for the reason PlannerTaskConfiguration pins its cross-slice one: EF derives
+        // the name from configuration order, which shifts as slices move, and a rename is a DROP + ADD on this table.
+        // A nullable column with no default is a metadata-only change in Postgres, even on calendar.
+        builder.HasOne(c => c.TimeAway)
+            .WithMany()
+            .HasForeignKey(c => c.TimeAwayId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_calendar_time_away_time_away_id");
+        builder.HasIndex(c => c.TimeAwayId);
+
         builder.HasIndex(c => new { c.UserId, c.Date }).IsUnique();
         // The one cross-user read by date: PlannerSlipNudgeJobHandler, every five minutes, wants the three dates around
         // UTC today for everyone. The unique index above leads with user_id and cannot serve it, and CalendarSeeder fills
