@@ -129,6 +129,7 @@ public class GetByDateReminderEndpoint(DbContext dbContext) : Endpoint<GetRemind
         OccursAt = occursAt,
         LeadOffsetsMinutes = reminder.LeadOffsetsMinutes,
         Recurrence = reminder.Recurrence,
-        PlannerTaskId = reminder.PlannerTaskId
+        PlannerTaskId = reminder.PlannerTaskId,
+        IsAuto = reminder.IsAuto
     };
 }

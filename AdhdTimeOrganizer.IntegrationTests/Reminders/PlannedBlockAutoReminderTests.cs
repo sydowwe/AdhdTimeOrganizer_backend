@@ -355,6 +355,31 @@ public class PlannedBlockAutoReminderTests(AppDbContextFixture fixture) : Postgr
         (await PersonalDefinitionCountAsync(reminderId, activeOnly: true)).Should().Be(1);
     }
 
+    [Fact(DisplayName = "N1: the day's reminder list marks the automatic one, and stops marking it once the user edits it")]
+    public async Task ByDate_CarriesIsAuto()
+    {
+        var client = CreateClient();
+        await PutSettingsAsync(client, "All");
+        var taskId = await CreateBlockAsync(client, await ActivityAsync("listed"), BlockDay, Noon);
+        var reminderId = (await AutoReminderAsync(taskId))!.Id;
+
+        (await ByDateEntryAsync(client, reminderId)).GetProperty("isAuto").GetBoolean()
+            .Should().BeTrue("the block's reminder list tells the planner's own apart from the user's");
+
+        var put = await client.PutAsJsonAsync($"api/reminder/{reminderId}", new
+        {
+            Title = "Mine now",
+            RemindAt = Utc(BlockDay, Noon).UtcDateTime,
+            LeadOffsetsMinutes = new[] { -5 },
+            PlannerTaskId = taskId
+        }, JsonOpts, CancellationToken);
+        put.StatusCode.Should().Be(HttpStatusCode.OK, await put.Content.ReadAsStringAsync(CancellationToken));
+
+        var edited = await ByDateEntryAsync(client, reminderId);
+        edited.GetProperty("isAuto").GetBoolean().Should().BeFalse("an edited automatic reminder is the user's own");
+        edited.GetProperty("plannerTaskId").GetInt64().Should().Be(taskId);
+    }
+
     // ---- the sweep: no signed-in user ------------------------------------------------------------------
 
     [Fact(DisplayName = "N1 × FO6: the sweep, unauthenticated, places tomorrow's occurrence and its reminder with the owner's UserId")]
@@ -593,6 +618,14 @@ public class PlannedBlockAutoReminderTests(AppDbContextFixture fixture) : Postgr
             reminder.Should().NotBeNull($"block {taskId} was created by this request");
             (await DefinitionAsync(reminder!.Id))!.Status.Should().Be(ReminderStatus.Active);
         }
+    }
+
+    private async Task<JsonElement> ByDateEntryAsync(HttpClient client, long reminderId)
+    {
+        var response = await client.GetAsync($"api/reminder/by-date/{BlockDay:yyyy-MM-dd}", CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(CancellationToken));
+        var list = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOpts, CancellationToken);
+        return list.EnumerateArray().Should().ContainSingle(r => r.GetProperty("id").GetInt64() == reminderId).Which;
     }
 
     private async Task<List<Reminder>> RemindersOfAsync(long taskId)

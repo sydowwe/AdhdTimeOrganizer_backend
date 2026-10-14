@@ -24,4 +24,10 @@ public record ReminderOnDateResponse : IIdResponse
     public required List<int> LeadOffsetsMinutes { get; init; }
     public ReminderRecurrence? Recurrence { get; init; }
     public long? PlannerTaskId { get; init; }
+
+    /// <summary>
+    /// Created by the planner for a new block (<c>UserPlannerSettings.AutoReminderMode</c>), not written by the user —
+    /// what lets the block's reminder list mark the automatic one without a per-reminder <c>GET /reminder/{id}</c>.
+    /// </summary>
+    public bool IsAuto { get; init; }
 }
