@@ -202,6 +202,58 @@ public class CompletionFanOutTests(AppDbContextFixture fixture) : PostgresTestBa
         finalTask.ActualEndTime.Should().BeNull();
     }
 
+    [Fact(DisplayName = "Ticking the to-do item ends a started planner task now, keeping its actual start")]
+    public async Task TickingTodoItem_EndsAStartedPlannerTaskNow()
+    {
+        long todoItemId, plannerTaskId;
+        await using (var db = CreateDbContext())
+        {
+            var (_, itemId, taskId) = await SeedLinkedTodoAndPlannerTaskAsync(db, "tick-started", taskStatus: PlannerTaskStatus.InProgress);
+            todoItemId = itemId;
+            plannerTaskId = taskId;
+
+            // Midnight, so any moment of the test day is after it. The fixture user's zone is UTC.
+            var task = await db.Set<PlannerTask>().SingleAsync(t => t.Id == taskId, CancellationToken);
+            task.ActualStartTime = TimeOnly.MinValue;
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        var before = TimeOnly.FromDateTime(DateTime.UtcNow);
+        (await ToggleTodoItemAsync(todoItemId, true)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var after = TimeOnly.FromDateTime(DateTime.UtcNow);
+
+        await using var db2 = CreateDbContext();
+        var finalTask = await db2.Set<PlannerTask>().SingleAsync(t => t.Id == plannerTaskId, CancellationToken);
+        finalTask.Status.Should().Be(PlannerTaskStatus.Completed);
+        finalTask.ActualStartTime.Should().Be(TimeOnly.MinValue, "the recorded start is the user's, and the tick must not move it");
+        if (before.Hour == 0 && before.Minute == 0)
+            return; // A tick in the first minute of the day is not after the start; nothing to measure.
+        finalTask.ActualEndTime.Should().NotBeNull(
+            "a started block ticked done through its to-do has a real end — without it the trend counts the block as unmeasured");
+        finalTask.ActualEndTime!.Value.Should().BeOnOrAfter(new TimeOnly(before.Hour, before.Minute))
+            .And.BeOnOrBefore(new TimeOnly(after.Hour, after.Minute));
+    }
+
+    [Fact(DisplayName = "Ticking the to-do item leaves a never-started planner task's actual times empty")]
+    public async Task TickingTodoItem_LeavesANeverStartedPlannerTaskUnmeasured()
+    {
+        long todoItemId, plannerTaskId;
+        await using (var db = CreateDbContext())
+        {
+            var (_, itemId, taskId) = await SeedLinkedTodoAndPlannerTaskAsync(db, "tick-not-started");
+            todoItemId = itemId;
+            plannerTaskId = taskId;
+        }
+
+        (await ToggleTodoItemAsync(todoItemId, true)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var db2 = CreateDbContext();
+        var finalTask = await db2.Set<PlannerTask>().SingleAsync(t => t.Id == plannerTaskId, CancellationToken);
+        finalTask.Status.Should().Be(PlannerTaskStatus.Completed);
+        finalTask.ActualStartTime.Should().BeNull("nothing recorded when the block began, and a guessed start would be fabricated data");
+        finalTask.ActualEndTime.Should().BeNull();
+    }
+
     // ---- C: round-trip / idempotency -------------------------------------------------------------------
 
     [Fact(DisplayName = "Round trip: done -> undone -> done keeps DoneCount pinned at 0 or TotalCount, never in between")]

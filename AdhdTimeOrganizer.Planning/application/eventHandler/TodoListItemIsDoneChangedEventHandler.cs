@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using FastEndpoints;
+using Sydowwe.Framework.domain.helper;
 
 namespace AdhdTimeOrganizer.Planning.application.eventHandler;
 
@@ -31,12 +32,17 @@ public class TodoListItemIsDoneChangedEventHandler(
         var dbContext = scope.ServiceProvider.GetRequiredService<DbContext>();
         var reminders = scope.ServiceProvider.GetRequiredService<IReminderRegistrationService>();
         var timeZones = scope.ServiceProvider.GetRequiredService<IUserTimeZoneResolver>();
+        var timeProvider = scope.ServiceProvider.GetRequiredService<TimeProvider>();
 
         try
         {
             // The user's today, not the server's — see TaskPlannerHelper.TodayIn. Resolved from this scope's
             // DbContext, so it works under a background dispatch where there is no HttpContext to read.
-            var today = TaskPlannerHelper.TodayIn(await timeZones.GetAsync(eventModel.UserId, ct));
+            var zone = await timeZones.GetAsync(eventModel.UserId, ct);
+            var utcNow = timeProvider.GetUtcNow().UtcDateTime;
+            var today = TaskPlannerHelper.TodayIn(zone, utcNow);
+            var userNow = WallClockZone.FromUtc(utcNow, zone);
+            var nowTime = new TimeOnly(userNow.Hour, userNow.Minute);
 
             // Scoped on the event's UserId, not on the ambient query filter. The filter resolves to null
             // whenever there is no authenticated principal (BaseDbContext.ScopeUserId) — a scheduled job, a
@@ -56,7 +62,17 @@ public class TodoListItemIsDoneChangedEventHandler(
             // must not silently un-cancel or re-complete it.
             var changedTasks = tasks.Where(t => t.Status != PlannerTaskStatus.Cancelled).ToList();
             foreach (var task in changedTasks)
+            {
+                var wasStarted = task.Status == PlannerTaskStatus.InProgress && task.ActualStartTime is not null;
                 task.ApplyStatus(eventModel.NewIsDone ? PlannerTaskStatus.Completed : PlannerTaskStatus.NotStarted);
+
+                // A block the user had started has a real actual start, and the tick is a real end — the rule the
+                // push's Done button follows (PlannerTaskNotificationActionHandler). A block never started has no
+                // measurement to record: the tick may come hours before or after its slot, so its times stay null
+                // and the plan-vs-actual trend leaves it out as unmeasured, as it does the day view's checkbox.
+                if (eventModel.NewIsDone && wasStarted && nowTime > task.ActualStartTime)
+                    task.ActualEndTime = nowTime;
+            }
 
             if (changedTasks.Count == 0)
                 return;
