@@ -81,7 +81,7 @@ public class RoutinePeriodNudgeJobTests(AppDbContextFixture fixture) : PostgresT
 
         private int _callCount;
 
-        public Task NotifyPeriodEndedAsync(RoutineTimePeriod period, RoutinePeriodCompletion completion, StreakOutcome outcome, CancellationToken ct = default)
+        public Task NotifyPeriodEndedAsync(RoutineTimePeriod period, RoutineResetService.RoutinePeriodReset reset, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task<bool> NotifyEndingSoonAsync(RoutineTimePeriod period, RoutineResetService.RoutineNudge nudge, int remaining, int total, CancellationToken ct = default)

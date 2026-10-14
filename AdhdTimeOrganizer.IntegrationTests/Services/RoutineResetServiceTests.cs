@@ -578,6 +578,122 @@ public class RoutineResetServiceTests
         period.BestStreak.Should().Be(1);
     }
 
+    // ─── New best (P3-02) ────────────────────────────────────────────────────
+
+    /// <summary>Closes one met cycle, whatever the period's last reset was.</summary>
+    private static RoutineResetService.RoutinePeriodReset ExtendOnce(RoutineTimePeriod period)
+    {
+        period.LastResetAt = DateTime.UtcNow.AddDays(-8);
+        var result = RoutineResetService.TryReset(period, [MakeItem(true)], DateTime.UtcNow);
+        result!.Value.Outcome.Should().Be(StreakOutcome.Extended);
+        return result.Value;
+    }
+
+    /// <summary>A period mid-run: <paramref name="streak"/> now, chasing a previous run's <paramref name="record"/>.</summary>
+    private static RoutineTimePeriod MidRun(int streak, int record)
+    {
+        var period = MakePeriod(7);
+        period.Streak = streak;
+        period.BestStreak = Math.Max(streak, record);
+        period.BestStreakBeforeRun = record;
+        return period;
+    }
+
+    [Fact]
+    public void TryReset_PassingThePreviousRunsRecord_IsANewBest()
+    {
+        var period = MidRun(streak: 5, record: 5);
+
+        var result = ExtendOnce(period);
+
+        result.IsNewBest.Should().BeTrue();
+        result.PreviousBest.Should().Be(5);
+        period.BestStreak.Should().Be(6);
+    }
+
+    [Fact]
+    public void TryReset_TyingTheRecord_IsNotANewBest_PassingItNextCycleIs()
+    {
+        var period = MidRun(streak: 5, record: 6);
+
+        var tie = ExtendOnce(period);
+        tie.IsNewBest.Should().BeFalse("6 equals the record rather than beating it");
+        tie.PreviousBest.Should().Be(0);
+
+        ExtendOnce(period).IsNewBest.Should().BeTrue("7 is the first cycle above the record of 6");
+    }
+
+    /// <summary>
+    /// The reason the column exists: while a run holds the record, <c>Streak == BestStreak</c> after every cycle,
+    /// and only the first of those cycles is news.
+    /// </summary>
+    [Fact]
+    public void TryReset_ARecordRun_IsANewBestOnlyOnce()
+    {
+        var period = MidRun(streak: 5, record: 5);
+
+        ExtendOnce(period).IsNewBest.Should().BeTrue();
+        ExtendOnce(period).IsNewBest.Should().BeFalse();
+        ExtendOnce(period).IsNewBest.Should().BeFalse();
+        period.BestStreak.Should().Be(8, "the record still rises every cycle, only the announcement doesn't repeat");
+    }
+
+    [Fact]
+    public void TryReset_AFirstEverRun_IsNeverANewBest()
+    {
+        var period = MakePeriod(7);
+
+        for (var cycle = 1; cycle <= 10; cycle++)
+            ExtendOnce(period).IsNewBest.Should().BeFalse($"cycle {cycle} of a first run has no earlier record to beat");
+
+        period.BestStreak.Should().Be(10);
+    }
+
+    [Fact]
+    public void TryReset_BeatingARecordBelowTheMinimum_IsNotANewBest()
+    {
+        var period = MakePeriod(7);
+        period.BestStreak = RoutineStreakMilestones.MinimumRecordToBeat - 1;
+
+        for (var cycle = 1; cycle <= RoutineStreakMilestones.MinimumRecordToBeat + 1; cycle++)
+            ExtendOnce(period).IsNewBest.Should().BeFalse();
+    }
+
+    /// <summary>The record a run chases is fixed when it starts, from whatever the best was then.</summary>
+    [Fact]
+    public void TryReset_StartingARun_FixesItsRecordToBeat()
+    {
+        var period = MakePeriod(7);
+        period.BestStreak = 7;
+        period.BestStreakBeforeRun = 2;
+
+        ExtendOnce(period);
+
+        period.Streak.Should().Be(1);
+        period.BestStreakBeforeRun.Should().Be(7);
+    }
+
+    /// <summary>
+    /// Every reset site announces only the catch-up's <c>Latest</c> cycle. A best that an earlier cycle in the
+    /// same catch-up set and a later miss then ended isn't something to celebrate.
+    /// </summary>
+    [Fact]
+    public void TryResetCatchUp_ABestSetThenBroken_IsNotANewBest()
+    {
+        var period = MakePeriod(7, streakThreshold: 80, lastResetAt: Jan1);
+        period.Streak = 5;
+        period.BestStreak = 5;
+        period.BestStreakBeforeRun = 5;
+
+        var result = RoutineResetService.TryResetCatchUp(
+            period, [MakeItem(true)], new DateTime(2026, 1, 23, 2, 0, 0, DateTimeKind.Utc));
+
+        result!.Value.CyclesClosed.Should().Be(3);
+        period.BestStreak.Should().Be(6, "the first cycle did set a record");
+        result.Value.Latest.Outcome.Should().Be(StreakOutcome.Broken);
+        result.Value.Latest.IsNewBest.Should().BeFalse();
+    }
+
     // ─── EvaluateEndingSoon ──────────────────────────────────────────────────
 
     [Fact]

@@ -103,7 +103,7 @@ public class RoutineToggleIsDoneTodoListEndpoint(
     protected override async Task AfterSave(CancellationToken ct)
     {
         foreach (var (period, result) in _reset)
-            await notifier.NotifyPeriodEndedAsync(period, result.Completion, result.Outcome, ct);
+            await notifier.NotifyPeriodEndedAsync(period, result, ct);
     }
 
     protected override async Task PublishEvent(RoutineTodoList entity, CancellationToken ct)

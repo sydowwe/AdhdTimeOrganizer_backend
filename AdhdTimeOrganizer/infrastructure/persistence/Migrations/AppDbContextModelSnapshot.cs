@@ -2577,6 +2577,10 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("best_streak");
 
+                    b.Property<int>("BestStreakBeforeRun")
+                        .HasColumnType("integer")
+                        .HasColumnName("best_streak_before_run");
+
                     b.Property<string>("Color")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -2693,6 +2697,8 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
 
                     b.ToTable("routine_time_period", "routines", t =>
                         {
+                            t.HasCheckConstraint("ck_routine_time_period_best_streak_before_run_non_negative", "\"best_streak_before_run\" >= 0");
+
                             t.HasCheckConstraint("ck_routine_time_period_best_streak_non_negative", "\"best_streak\" >= 0");
 
                             t.HasCheckConstraint("ck_routine_time_period_freeze_budget_range", "\"freeze_budget\" >= 0 AND \"freeze_budget\" <= 10");

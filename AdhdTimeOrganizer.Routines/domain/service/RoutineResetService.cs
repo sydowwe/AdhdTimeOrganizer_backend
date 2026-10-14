@@ -216,8 +216,18 @@ public static class RoutineResetService
     /// The result of a reset that actually happened: the history row to persist, and what the reset did to the
     /// streak. The outcome is returned rather than re-derived by callers because only this method sees the
     /// streak on both sides of the evaluation.
+    /// <para>
+    /// <see cref="IsNewBest"/> is the same kind of fact. This cycle took the run past the record a previous run
+    /// set (<see cref="PreviousBest"/>, at least <see cref="RoutineStreakMilestones.MinimumRecordToBeat"/>), and
+    /// it is true for exactly one cycle per run. Afterwards <c>Streak == BestStreak</c> reads the same for a
+    /// tie, a record and every later cycle of a record run, so callers can't work it out themselves.
+    /// </para>
     /// </summary>
-    public readonly record struct RoutinePeriodReset(RoutinePeriodCompletion Completion, StreakOutcome Outcome);
+    public readonly record struct RoutinePeriodReset(
+        RoutinePeriodCompletion Completion,
+        StreakOutcome Outcome,
+        bool IsNewBest = false,
+        int PreviousBest = 0);
 
     /// <summary>
     /// Resets items if the period has elapsed. Evaluates period streak before clearing.
@@ -247,6 +257,7 @@ public static class RoutineResetService
 
         var completedCount = 0;
         var outcome = StreakOutcome.NotEvaluated;
+        var isNewBest = false;
         if (items.Count > 0)
         {
             completedCount = items.Count(i => i.IsDone);
@@ -254,7 +265,17 @@ public static class RoutineResetService
 
             if (completionPercent >= period.StreakThreshold)
             {
+                // A run starts here, so this is the moment its record to beat is fixed.
+                if (period.Streak == 0)
+                    period.BestStreakBeforeRun = period.BestStreak;
+
                 period.Streak++;
+                // Equality, not "above": every later cycle of a record run is also above it, and only the first
+                // one is news. The BestStreak comparison keeps a best raised some other way (a freeze joining
+                // runs) from being announced as this cycle's.
+                isNewBest = period.Streak == period.BestStreakBeforeRun + 1
+                            && period.Streak > period.BestStreak
+                            && period.BestStreakBeforeRun >= RoutineStreakMilestones.MinimumRecordToBeat;
                 if (period.Streak > period.BestStreak)
                     period.BestStreak = period.Streak;
                 period.StreakGraceUntil = null;
@@ -299,7 +320,9 @@ public static class RoutineResetService
                 CreatedAt = now,
                 IsExcused = excused
             },
-            outcome);
+            outcome,
+            isNewBest,
+            isNewBest ? period.BestStreakBeforeRun : 0);
     }
 
     /// <summary>

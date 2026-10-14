@@ -24,8 +24,10 @@ public class RoutinePeriodNotificationService(
     ILogger<RoutinePeriodNotificationService> logger) : IRoutinePeriodNotificationService, IScopedService
 {
     public async Task NotifyPeriodEndedAsync(
-        RoutineTimePeriod period, RoutinePeriodCompletion completion, StreakOutcome outcome, CancellationToken ct = default)
+        RoutineTimePeriod period, RoutineResetService.RoutinePeriodReset reset, CancellationToken ct = default)
     {
+        var (completion, outcome, isNewBest, previousBest) = reset;
+
         // The user was away for most of the cycle. "2 of 5 done" about a week spent ill is a guilt pile, not
         // information, and the streak did not move — so the summary is not sent at all, rather than mapped onto
         // the persisted payload contract, which has no "excused" member and should not grow one for silence.
@@ -33,6 +35,7 @@ public class RoutinePeriodNotificationService(
             return;
 
         var streakBreak = outcome == StreakOutcome.Broken ? await DescribeBreakAsync(period, ct) : null;
+        var extended = outcome == StreakOutcome.Extended;
 
         await SafeNotifyAsync(period, new RoutinePeriodEndedPayload(
             period.Id,
@@ -43,7 +46,13 @@ public class RoutinePeriodNotificationService(
             ToKernelOutcome(outcome),
             LostStreak: streakBreak?.LostStreak ?? 0,
             FreezesRemaining: streakBreak?.FreezesRemaining ?? 0,
-            CanFreeze: streakBreak?.CanFreeze ?? false), ct);
+            CanFreeze: streakBreak?.CanFreeze ?? false,
+            IsNewBest: isNewBest,
+            PreviousBest: previousBest,
+            // Only an extended cycle lands on a milestone. A held streak (grace) sits on the same number it
+            // reached last cycle, which was already announced then.
+            IsMilestone: extended && RoutineStreakMilestones.IsMilestone(period.Streak, period.LengthInDays),
+            PeriodLengthInDays: period.LengthInDays), ct);
     }
 
     /// <summary>

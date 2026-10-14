@@ -17,6 +17,7 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
         builder.Property(t => t.LengthInDays).IsRequired();
         builder.Property(t => t.Streak).IsRequired();
         builder.Property(t => t.BestStreak).IsRequired();
+        builder.Property(t => t.BestStreakBeforeRun).IsRequired();
         builder.Property(t => t.StreakThreshold).IsRequired();
         builder.Property(t => t.StreakGraceDays).IsRequired();
         builder.Property(t => t.FreezeBudget).IsRequired();
@@ -38,6 +39,10 @@ public class RoutineTimePeriodConfiguration : IEntityTypeConfiguration<RoutineTi
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_routine_time_period_best_streak_non_negative",
             "\"best_streak\" >= 0"));
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_routine_time_period_best_streak_before_run_non_negative",
+            "\"best_streak_before_run\" >= 0"));
 
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_routine_time_period_streak_threshold_range",

@@ -54,6 +54,28 @@ public class SkPortalNotificationTexts : SkNotificationTexts
         $" Séria {lostStreak} sa prerušila — na jej záchranu vám {Plural(freezesLeft, "zostáva", "zostávajú", "zostáva")} " +
         $"{freezesLeft} {Plural(freezesLeft, "vynechanie", "vynechania", "vynechaní")}.";
 
+    // Same phrasing as the client's run labels (todoList.sk.ts, run* / unit*), but in the formal "vy" register
+    // every notification here uses, where the client says "tvoja".
+    public override string StreakNewBestSuffix(int streak, int previousBest, int periodLengthInDays) =>
+        $" Nový osobný rekord: {RunLabel(streak, periodLengthInDays)} (doterajší rekord: {CountLabel(previousBest, periodLengthInDays)}).";
+
+    public override string StreakMilestoneSuffix(int streak, int periodLengthInDays, bool isNewBest) =>
+        isNewBest
+            ? $" Míľnik: {RunLabel(streak, periodLengthInDays)} — vaša doteraz najdlhšia séria!"
+            : $" Míľnik: {RunLabel(streak, periodLengthInDays)}!";
+
+    /// <summary>"7 týždňov po sebe".</summary>
+    private static string RunLabel(int count, int periodLengthInDays) => $"{CountLabel(count, periodLengthInDays)} po sebe";
+
+    /// <summary>"7 týždňov".</summary>
+    private static string CountLabel(int count, int periodLengthInDays) => RoutineRunUnits.For(periodLengthInDays) switch
+    {
+        RoutineRunUnit.Day => $"{count} {Plural(count, "deň", "dni", "dní")}",
+        RoutineRunUnit.Week => $"{count} {Plural(count, "týždeň", "týždne", "týždňov")}",
+        RoutineRunUnit.Month => $"{count} {Plural(count, "mesiac", "mesiace", "mesiacov")}",
+        _ => $"{count} {Plural(count, "obdobie", "obdobia", "období")}"
+    };
+
     public override string RoutineStreakGraceExpiringTitle => "Séria je ohrozená";
     public override string RoutineStreakGraceExpiringFallbackBody => "Odkladová lehota pre vašu sériu sa čoskoro končí.";
 

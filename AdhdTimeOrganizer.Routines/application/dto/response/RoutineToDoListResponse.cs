@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using AdhdTimeOrganizer.Core.application.dto.response.activity;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
+using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.TodoLists.application.dto.response.todoList;
 using Sydowwe.Framework.application.dto.response;
 
@@ -98,6 +99,11 @@ public record RoutineTodoListResponse : BaseTodoListResponse,
                 StreakGraceDays = e.RoutineTimePeriod.StreakGraceDays,
                 Streak = e.RoutineTimePeriod.Streak,
                 BestStreak = e.RoutineTimePeriod.BestStreak,
+                // The client's new-best confetti reads this off the nested period of a re-fetched item, so leaving
+                // it out here would switch that confetti off without any error.
+                RecordToBeat = e.RoutineTimePeriod.BestStreakBeforeRun >= RoutineStreakMilestones.MinimumRecordToBeat
+                    ? e.RoutineTimePeriod.BestStreakBeforeRun
+                    : null,
                 LastResetAt = e.RoutineTimePeriod.LastResetAt,
                 HistoryDepth = e.RoutineTimePeriod.HistoryDepth,
                 // Every column RoutineTimePeriodResponse holds, or the nested period lies rather than being

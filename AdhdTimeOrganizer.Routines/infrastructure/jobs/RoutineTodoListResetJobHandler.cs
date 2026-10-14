@@ -121,7 +121,7 @@ public class RoutineTodoListResetJobHandler(
             // the ordering is the part that makes that safe). Per page rather than once at the end, so a page's
             // entities can be released as soon as everything that reads them is done.
             foreach (var (period, result) in reset)
-                await notifier.NotifyPeriodEndedAsync(period, result.Completion, result.Outcome, ct);
+                await notifier.NotifyPeriodEndedAsync(period, result, ct);
 
             // Safe here, unlike mid-page (see DiscardAsync): every period in this page has been saved and
             // announced, and the next page is read fresh rather than reused out of the tracker.

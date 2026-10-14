@@ -9,6 +9,7 @@ using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.model.@enum;
+using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.Routines.domain.serviceContract;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;
@@ -407,11 +408,11 @@ public class RoutineToggleIsDoneTests(AppDbContextFixture fixture) : PostgresTes
         var notifier = new Mock<IRoutinePeriodNotificationService>();
         notifier
             .Setup(n => n.NotifyPeriodEndedAsync(
-                It.IsAny<RoutineTimePeriod>(), It.IsAny<RoutinePeriodCompletion>(), It.IsAny<StreakOutcome>(), It.IsAny<CancellationToken>()))
-            .Returns(async (RoutineTimePeriod _, RoutinePeriodCompletion _, StreakOutcome o, CancellationToken _) =>
+                It.IsAny<RoutineTimePeriod>(), It.IsAny<RoutineResetService.RoutinePeriodReset>(), It.IsAny<CancellationToken>()))
+            .Returns(async (RoutineTimePeriod _, RoutineResetService.RoutinePeriodReset reset, CancellationToken _) =>
             {
                 calls++;
-                outcome = o;
+                outcome = reset.Outcome;
                 await using var probe = CreateDbContext();
                 toggleWasCommittedAtNotifyTime = await probe.Set<RoutineTodoList>().AsNoTracking()
                     .Where(i => i.Id == toggledItemId)

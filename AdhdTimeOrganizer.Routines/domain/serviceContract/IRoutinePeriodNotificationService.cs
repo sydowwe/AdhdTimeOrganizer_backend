@@ -1,4 +1,3 @@
-using AdhdTimeOrganizer.Routines.domain.model.@enum;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.service;
 
@@ -19,8 +18,13 @@ public interface IRoutinePeriodNotificationService
     /// A period just reset. Called from <i>every</i> site that applies a reset, not only the nightly job:
     /// <c>RoutineResetService.TryReset</c> is also reached lazily from the grouped read and the toggle
     /// endpoint, and whichever path gets there first is the one that owns the announcement.
+    /// <para>
+    /// Takes the whole <paramref name="reset"/>, not its parts. A catch-up announces only its <c>Latest</c>
+    /// cycle, and the new-best flag has to come from that same cycle. A best set by an earlier cycle that a
+    /// later miss then broke is not news.
+    /// </para>
     /// </summary>
-    Task NotifyPeriodEndedAsync(RoutineTimePeriod period, RoutinePeriodCompletion completion, StreakOutcome outcome, CancellationToken ct = default);
+    Task NotifyPeriodEndedAsync(RoutineTimePeriod period, RoutineResetService.RoutinePeriodReset reset, CancellationToken ct = default);
 
     /// <summary>
     /// The lead-time nudge, with counts taken by the sweep at nudge time. Returns true when a notification was

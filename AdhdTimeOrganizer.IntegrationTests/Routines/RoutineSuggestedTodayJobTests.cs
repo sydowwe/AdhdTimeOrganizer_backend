@@ -67,7 +67,7 @@ public class RoutineSuggestedTodayJobTests(AppDbContextFixture fixture) : Postgr
         /// <summary>Mirrors the real implementation swallowing a dispatch failure: recorded, and reported as not sent.</summary>
         public bool DispatchFails { get; set; }
 
-        public Task NotifyPeriodEndedAsync(RoutineTimePeriod period, RoutinePeriodCompletion completion, StreakOutcome outcome, CancellationToken ct = default)
+        public Task NotifyPeriodEndedAsync(RoutineTimePeriod period, RoutineResetService.RoutinePeriodReset reset, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task<bool> NotifyEndingSoonAsync(RoutineTimePeriod period, RoutineResetService.RoutineNudge nudge, int remaining, int total, CancellationToken ct = default)

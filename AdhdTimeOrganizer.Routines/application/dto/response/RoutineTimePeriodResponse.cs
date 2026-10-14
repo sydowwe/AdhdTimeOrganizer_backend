@@ -15,6 +15,22 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
     public int StreakGraceDays { get; init; }
     public int Streak { get; init; }
     public int BestStreak { get; init; }
+
+    /// <summary>
+    /// The record this run is chasing (<see cref="RoutineTimePeriod.BestStreakBeforeRun"/>), or null when it is
+    /// below <see cref="RoutineStreakMilestones.MinimumRecordToBeat"/> and passing it isn't news. The client
+    /// celebrates the read where <see cref="Streak"/> first goes above it, the same single cycle the end-of-period
+    /// summary calls a new best.
+    /// </summary>
+    public int? RecordToBeat { get; init; }
+
+    /// <summary>
+    /// The first milestone above <see cref="Streak"/>, from <see cref="RoutineStreakMilestones"/>. The client
+    /// reads it off the period as it was <i>before</i> a change and celebrates when the streak reaches it, so it
+    /// never keeps its own copy of the table. Not projected: it is computed from two projected columns.
+    /// </summary>
+    public int NextStreakMilestone => RoutineStreakMilestones.Next(Streak, LengthInDays);
+
     public DateTime? LastResetAt { get; init; }
     public int HistoryDepth { get; init; }
 
@@ -102,6 +118,9 @@ public record RoutineTimePeriodResponse : TextColorResponse, IProjectionResponse
             StreakGraceDays = entity.StreakGraceDays,
             Streak = entity.Streak,
             BestStreak = entity.BestStreak,
+            RecordToBeat = entity.BestStreakBeforeRun >= RoutineStreakMilestones.MinimumRecordToBeat
+                ? entity.BestStreakBeforeRun
+                : null,
             LastResetAt = entity.LastResetAt,
             HistoryDepth = entity.HistoryDepth,
             ReminderLeadDays = entity.ReminderLeadDays,

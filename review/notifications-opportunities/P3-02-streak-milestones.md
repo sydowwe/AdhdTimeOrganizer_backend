@@ -56,3 +56,19 @@ extended" push, and this doesn't need one: `RoutinePeriodEnded` already goes out
 
 1. Minimum for "new best": beat a best of ≥ 1, or require streak ≥ 3?
 2. The milestone set (7 / 30 / 100? also 52 for weekly?).
+
+## Resolved (2026-10-15). Implemented; this supersedes the design above where they differ
+
+- **Once per run.** Any "beat a best ≥ N" rule fires on *every* cycle of a record run, because `Streak == BestStreak`
+  after each one. A new column, `RoutineTimePeriod.BestStreakBeforeRun`, stores the best as it stood when the run
+  started. The new best is the single cycle where the streak first passes it, and the record has to be ≥ 3
+  (`RoutineStreakMilestones.MinimumRecordToBeat`). The migration backfills it only where `streak < best_streak`.
+- **Milestones by felt time.** About a week, a month, a quarter, half a year, then every whole year, in the
+  period's own count: daily 7/30/90/180/365, weekly 4/13/26/52, monthly 3/6/12. This is a domain rule in
+  `RoutineStreakMilestones`, not wording. The payload carries `IsMilestone`, decided by the producer, instead of a
+  host set inside the text tables.
+- **Natural units, not "never say days".** The payload carries `PeriodLengthInDays`, and the bell counts the run
+  the way the client does: "4 weeks in a row", "30 days in a row". Daily routines do say days, which is correct.
+- **The frontend changed too.** The period DTO exposes `RecordToBeat` and `NextStreakMilestone`. The client's
+  confetti (`routineCelebration.ts`) uses those instead of its own `[7, 30, 90, 180, 365]` and its "every record
+  cycle" rule.

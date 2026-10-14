@@ -14,6 +14,25 @@ public class RoutineTimePeriod : BaseEntityWithUser, IEntityWithIsHidden, IBaseT
 
     public int Streak { get; set; } = 0;
     public int BestStreak { get; set; } = 0;
+
+    /// <summary>
+    /// <see cref="BestStreak"/> as it stood when the current run began, so this run's record to beat. Written
+    /// by <c>RoutineResetService.TryReset</c> when a cycle takes <see cref="Streak"/> from 0 to 1, and read by
+    /// nothing else that writes.
+    /// <para>
+    /// It exists because a new best can't be derived after the fact. While a run holds the record,
+    /// <c>Streak == BestStreak</c> at every period end, which reads the same for a tie, for the cycle that first
+    /// passed an old record, and for every cycle after it. With this stored, "new best" is the single cycle
+    /// where <c>Streak</c> first exceeds it, which is once per run rather than every period of a record run.
+    /// </para>
+    /// <para>
+    /// A freeze re-derives <see cref="Streak"/> without starting a run, so it leaves this alone. A run the
+    /// freeze joins back onto an earlier one may then never equal this value + 1, which means a missed
+    /// announcement and never a false one.
+    /// </para>
+    /// </summary>
+    public int BestStreakBeforeRun { get; set; } = 0;
+
     public required int StreakThreshold { get; set; }
     public required int StreakGraceDays { get; set; }
     public DateTime? LastResetAt { get; set; }

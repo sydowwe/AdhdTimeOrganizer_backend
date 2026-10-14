@@ -42,6 +42,27 @@ public class EnPortalNotificationTexts : EnNotificationTexts
     public override string StreakBrokenFreezableSuffix(int lostStreak, int freezesLeft) =>
         $" Your streak of {lostStreak} broke — you have {freezesLeft} {Plural(freezesLeft, "skip", "skips")} left to save it.";
 
+    // Same phrasing as the client's run labels (todoList.en.ts, run* / unit*).
+    public override string StreakNewBestSuffix(int streak, int previousBest, int periodLengthInDays) =>
+        $" New personal best: {RunLabel(streak, periodLengthInDays)} (previous best: {CountLabel(previousBest, periodLengthInDays)}).";
+
+    public override string StreakMilestoneSuffix(int streak, int periodLengthInDays, bool isNewBest) =>
+        isNewBest
+            ? $" Milestone: {RunLabel(streak, periodLengthInDays)} — your longest yet!"
+            : $" Milestone: {RunLabel(streak, periodLengthInDays)}!";
+
+    /// <summary>"7 weeks in a row".</summary>
+    private static string RunLabel(int count, int periodLengthInDays) => $"{CountLabel(count, periodLengthInDays)} in a row";
+
+    /// <summary>"7 weeks".</summary>
+    private static string CountLabel(int count, int periodLengthInDays) => RoutineRunUnits.For(periodLengthInDays) switch
+    {
+        RoutineRunUnit.Day => $"{count} {Plural(count, "day", "days")}",
+        RoutineRunUnit.Week => $"{count} {Plural(count, "week", "weeks")}",
+        RoutineRunUnit.Month => $"{count} {Plural(count, "month", "months")}",
+        _ => $"{count} {Plural(count, "period", "periods")}"
+    };
+
     public override string RoutineStreakGraceExpiringTitle => "Streak at risk";
     public override string RoutineStreakGraceExpiringFallbackBody => "The grace period for your streak is ending soon.";
 

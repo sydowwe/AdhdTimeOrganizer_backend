@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.IntegrationTests.Reminders;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
 using AdhdTimeOrganizer.Routines.domain.model.@enum;
+using AdhdTimeOrganizer.Routines.domain.service;
 using AdhdTimeOrganizer.Routines.domain.serviceContract;
 using AdhdTimeOrganizer.Routines.infrastructure.jobs;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
@@ -421,7 +422,7 @@ public class RoutineTodoListResetJobHandlerTests(AppDbContextFixture fixture) : 
         var throwingNotifier = new Mock<IRoutinePeriodNotificationService>();
         throwingNotifier
             .Setup(n => n.NotifyPeriodEndedAsync(
-                It.IsAny<RoutineTimePeriod>(), It.IsAny<RoutinePeriodCompletion>(), It.IsAny<StreakOutcome>(), It.IsAny<CancellationToken>()))
+                It.IsAny<RoutineTimePeriod>(), It.IsAny<RoutineResetService.RoutinePeriodReset>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("notifier boom"));
 
         await using var factory = Fixture.CreateFactory(roles: null, configureServices: services =>

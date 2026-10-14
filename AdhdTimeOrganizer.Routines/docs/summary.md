@@ -133,6 +133,13 @@ has no knowledge of Planning at all.
   `Streak` / `BestStreak`: history is finite, a run can predate its oldest row, and the one operation
   the user spends a resource on to protect a streak must never be what cuts it down.
 
+- **"New best" is stored state, not a comparison.** `Streak == BestStreak` reads the same for a tie, for the
+  cycle that first beat an old record, and for every cycle of a record run after it. Replacing
+  `BestStreakBeforeRun` with that check looks like a simplification, but it would announce a new best every
+  period of a record run, which is a daily push for a daily routine. The run's unit in the bell's wording
+  ("4 weeks in a row") comes from the host's `RoutineRunUnit`, a copy of the client's `useRoutineRunLabel`
+  `unitSuffix`. Change both or neither.
+
 - **`StreakGraceDays` and the freeze budget are different leniencies and both stay.** Grace is
   time-based (finish late, keep the run) and expires on its own; a freeze is budgeted (skip entirely,
   keep the run). `Apply` clears `StreakGraceUntil` / `GraceNotifiedFor` **only** when the frozen entry

@@ -93,7 +93,7 @@ public class GetAllGroupedRoutineTodoListEndpoint(
         // sends — whichever path reaches the elapsed period first is the one that announces it. Raised after the
         // commit and best-effort, so it cannot fail the request the user is waiting on.
         foreach (var (period, result) in reset)
-            await notifier.NotifyPeriodEndedAsync(period, result.Completion, result.Outcome, ct);
+            await notifier.NotifyPeriodEndedAsync(period, result, ct);
 
         // Only the newest HistoryDepth rows per period, trimmed by the database rather than after the fact: the
         // history grows one row per cycle forever, so fetching it whole to render 16 rows scales with account
