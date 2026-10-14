@@ -153,6 +153,13 @@ worth copying the shape of:
   fails asymmetrically: marking everything is noise the user learns to ignore, marking nothing is the original
   bug) and on the parsed push JSON, since `originallyDueAt` lives in the nested `data` object precisely so the
   service worker keeps rendering `title`/`body` verbatim.
+- `QuietHoursFollowSleepScheduleTests` — quiet hours that follow the sleep schedule (P3-01). The schedule
+  reader is an **optional** dependency of `QuietHoursReader`, and a reader that fell back to the row's
+  minutes looks right on every night the calendar matches the default. So the deferral cases give the next
+  day an alarm of its **own** (custom `Calendar` row) and assert the stored `DeferredUntil` lands on it, not
+  on the default; plus the bed == wake night that holds nothing, the manual `PUT` that clears the flag, and
+  the live usual night on `GET`. The night math alone is `Services/SleepNightTests` (DST, night shift,
+  after-midnight bed time).
 - `NotificationSubjectProjectionTests` — `NotificationDto.Subject`, the `{kind, id}` reference that lets a
   click reach the entity a notification is about instead of the list its type lives in (backend ask B2). The
   field is optional by design, so a resolver that stops resolving still returns a valid 200 bell list that has

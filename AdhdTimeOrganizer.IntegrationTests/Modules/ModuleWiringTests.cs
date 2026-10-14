@@ -8,6 +8,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.scheduling;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Routines.infrastructure.jobs;
+using AdhdTimeOrganizer.Planning.application.seam;
 using AdhdTimeOrganizer.Planning.infrastructure.jobs;
 using AdhdTimeOrganizer.Planning.infrastructure.scheduling;
 using AdhdTimeOrganizer.Routines.infrastructure.scheduling;
@@ -161,6 +162,21 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
     }
 
     /// <summary>
+    /// P3-01's source for quiet hours that follow the sleep schedule. The quiet-hours reader takes it as an
+    /// <b>optional</b> dependency, so a dropped registration is silent: a following row falls back to the user's
+    /// usual minutes, which look right every night the calendar has not been edited.
+    /// </summary>
+    [Fact]
+    public void SleepScheduleReader_IsTheCalendarReader()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+
+        var reader = scope.ServiceProvider.GetRequiredService<ISleepScheduleReader>();
+
+        Assert.IsType<CalendarSleepScheduleReader>(reader);
+    }
+
+    /// <summary>
     /// Both modules' job handlers are discoverable by key. The Scheduler dispatcher matches
     /// <c>RecurringJobRegistration.HandlerKey</c> against these at fire time, so a handler missing from DI is
     /// a job that fires into nothing.
@@ -249,6 +265,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         AssertRegisteredOnce<IUserTimeZoneReader>(sp);
         AssertRegisteredOnce<IUserLocaleReader>(sp);
         AssertRegisteredOnce<IRecipientEngagementReader>(sp);
+        AssertRegisteredOnce<ISleepScheduleReader>(sp);
         AssertRegisteredOnce<IReminderRegistry>(sp);
         AssertRegisteredOnce<IScheduler>(sp);
         AssertRegisteredOnce<ICronEvaluator>(sp);

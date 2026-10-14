@@ -4331,6 +4331,12 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("end_minute");
 
+                    b.Property<bool>("FollowsSleepSchedule")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("follows_sleep_schedule");
+
                     b.Property<DateTime>("ModifiedTimestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")

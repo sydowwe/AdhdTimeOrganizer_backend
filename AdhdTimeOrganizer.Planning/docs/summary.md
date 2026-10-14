@@ -64,6 +64,10 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
 - **Reminders reach `framework/Sydowwe.Reminders` only through `Sydowwe.Framework.Contracts`**
   (`IReminderRegistry`, `IQuietHoursReader`, the payload records), and only through
   `ReminderRegistrationService`.
+- **Quiet hours that follow the sleep schedule read the calendar** (P3-01): `CalendarSleepScheduleReader`
+  implements Contracts' `ISleepScheduleReader` off each day's `WakeUpTime` / `BedTime` (the night after a day
+  ends at the *next* day's wake-up — `domain/service/SleepNight.cs`). Notifications takes it as an optional
+  dependency, so a lost registration is silent; `ModuleWiringTests` pins it.
 
 ## Gotchas — things that will bite you
 
