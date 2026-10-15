@@ -20,4 +20,20 @@ public static class DayTypeExtensions
     /// and makes the planner suggest by day type rather than by weekday.
     /// </summary>
     public static bool IsAway(this DayType dayType) => dayType is DayType.Vacation or DayType.SickDay;
+
+    /// <summary>
+    /// The day types the planner matches a day by, strongest first: template suggestions, and recurrence rules of
+    /// type <c>DayType</c> (both the suggestion panel and the auto-placing materialiser). Usually just the stored
+    /// type. A public holiday on a weekday is stored as <see cref="DayType.Workday"/> with a holiday key, and answers
+    /// to <see cref="DayType.Weekend"/> first and <see cref="DayType.Workday"/> second (F4 question 4, owner decision
+    /// 2026-10-15): most people do not work on one, so a weekend template ranks first and a weekend rule is offered,
+    /// while a workday rule still fires. A holiday on a Saturday or Sunday is already a weekend and changes nothing.
+    /// <para>
+    /// <b>This is matching only, never time away.</b> A holiday is not <see cref="IsAway"/>: Routines excuses no cycle
+    /// for one, the nudges still run, and the stored type is never rewritten. The method takes the key rather than the
+    /// calendar row because the row is Planning's, and Core cannot see it.
+    /// </para>
+    /// </summary>
+    public static DayType[] PlanningDayTypes(this DayType storedType, string? holidayKey) =>
+        storedType == DayType.Workday && holidayKey is not null ? [DayType.Weekend, DayType.Workday] : [storedType];
 }

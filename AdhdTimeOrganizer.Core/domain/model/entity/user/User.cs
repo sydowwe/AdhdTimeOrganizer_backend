@@ -114,6 +114,26 @@ public sealed class User : BaseUser, IBaseTableEntity
     [AuditIgnore]
     public DateTime? ConfirmationReminderSentAt { get; set; }
 
+    /// <summary>
+    /// When this account is deleted (P3-07), or null when no deletion is pending. <c>DELETE user/account</c> sets it to
+    /// now plus the grace period instead of deleting; the host's <c>AccountDeletionJobHandler</c> deletes the account once
+    /// it has passed, and keeping the account — by the mailed link, or from the web app after signing in — clears it.
+    /// <para>
+    /// While it is set: tracker sign-in is refused, and nothing is pushed or mailed to the user (the host's
+    /// <c>IRecipientSuppressionReader</c>). Web sign-in still works, so the user can keep the account or export first.
+    /// Written with <c>ExecuteUpdateAsync</c> only, like <see cref="LastActiveAt"/>.
+    /// </para>
+    /// </summary>
+    [AuditIgnore]
+    public DateTime? DeletionScheduledFor { get; set; }
+
+    /// <summary>
+    /// SHA-256 (hex) of the token in the "keep my account" link mailed with the schedule — the raw token is never stored.
+    /// Set and cleared together with <see cref="DeletionScheduledFor"/>, which is what makes the link single-use.
+    /// </summary>
+    [AuditIgnore]
+    public string? DeletionKeepTokenHash { get; set; }
+
     public bool HasGoogleOAuth => GoogleOAuthUserId != null;
 
     // Navigation properties.

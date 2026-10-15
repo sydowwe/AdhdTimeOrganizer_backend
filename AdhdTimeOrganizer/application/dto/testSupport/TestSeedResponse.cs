@@ -92,6 +92,10 @@ public sealed record TestSeedAccount(long Id, string Email, string Password, str
 /// Of those, the ones a streak freeze was spent on — the heatmap's third cell state, which the SPA never
 /// invents client-side and which is therefore reachable only from a real row.
 /// </param>
+/// <param name="TimerSessions">
+/// The primary account's timer sessions (<c>e2e-v6</c>), the input to the timer-plan line on
+/// <c>/activity-history</c>. Every one is on the default week.
+/// </param>
 public sealed record TestSeedCounts(
     int Activities,
     int TodoListItems,
@@ -114,4 +118,5 @@ public sealed record TestSeedCounts(
     int ReminderDispatches,
     int ReminderFailuresNeedingAttention,
     int RoutinePeriodCompletions,
-    int FrozenRoutinePeriodCompletions);
+    int FrozenRoutinePeriodCompletions,
+    int TimerSessions);

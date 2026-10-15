@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
@@ -427,6 +428,90 @@ public class RepeatingPlannerTaskSuggestionsTests(AppDbContextFixture fixture) :
         var workday = await GetSuggestionsAsync(workdayCalendarId);
         workday.Select(s => (s.Activity.Id, s.SourceType)).Should().BeEquivalentTo(
             [(userSetActivityId, SuggestionSourceType.UserSet), (patternActivityId, SuggestionSourceType.PlannedPattern)]);
+    }
+
+    // ─── F4 Q4: a public holiday on a weekday ────────────────────────────────
+
+    private static readonly DateOnly EasterMonday2028 = PlanningTestSeedHelper.HolidayDate(2028, "EASTER_MONDAY");
+
+    /// <summary>
+    /// The owner's ruling: most people do not work on a holiday, so on Easter Monday a rule for weekend days is offered
+    /// as well as the workday rule, which still fires. A rule for vacation days is not, since a holiday is not time
+    /// away. The next Monday, no holiday, is the control: there the weekend rule must not appear. The match is
+    /// <c>RepeatingPlannerTaskSchedule.FallsOn</c>, so the materialiser places the same way.
+    /// </summary>
+    [Fact(DisplayName = "F4 Q4: on a holiday Monday a Weekend day-type rule is suggested beside the Workday one")]
+    public async Task HolidayMonday_SuggestsWeekendAndWorkdayRules()
+    {
+        long workdayActivityId, weekendActivityId, vacationActivityId, holidayCalendarId, plainCalendarId;
+        await using (var db = CreateDbContext())
+        {
+            workdayActivityId = await SeedDayTypeRuleAsync(db, "f4q4-workday-rule", DayType.Workday);
+            weekendActivityId = await SeedDayTypeRuleAsync(db, "f4q4-weekend-rule", DayType.Weekend);
+            vacationActivityId = await SeedDayTypeRuleAsync(db, "f4q4-vacation-rule", DayType.Vacation);
+
+            holidayCalendarId = await PlanningTestSeedHelper.SeedNaturalCalendarAsync(db, EasterMonday2028, ct: CancellationToken);
+            plainCalendarId = await PlanningTestSeedHelper.SeedNaturalCalendarAsync(db, EasterMonday2028.AddDays(7), ct: CancellationToken);
+        }
+
+        var onTheHoliday = await GetSuggestionsAsync(holidayCalendarId);
+        onTheHoliday.Should().OnlyContain(s => s.SourceType == SuggestionSourceType.UserSet);
+        onTheHoliday.Select(s => s.Activity.Id).Should().BeEquivalentTo([workdayActivityId, weekendActivityId]);
+        onTheHoliday.Should().NotContain(s => s.Activity.Id == vacationActivityId, "a holiday is not time away");
+
+        (await GetSuggestionsAsync(plainCalendarId)).Select(s => s.Activity.Id).Should().Equal(workdayActivityId);
+
+        await using var verify = CreateDbContext();
+        var day = await verify.Set<AdhdTimeOrganizer.Planning.domain.model.entity.Calendar>()
+            .IgnoreQueryFilters().SingleAsync(c => c.Id == holidayCalendarId, CancellationToken);
+        day.DayType.Should().Be(DayType.Workday, "matching reads the holiday, it never rewrites the day");
+        day.HolidayKey.Should().Be("EASTER_MONDAY");
+    }
+
+    /// <summary>
+    /// The pattern tiers are weekday statistics, mostly gathered on workdays, so on a holiday they rank last. They are
+    /// demoted, not hidden: a holiday is not an away day, which is the case that drops them (FO1). Three recent
+    /// Monday sittings make one pattern per view, and the holiday Monday is read against them, below a Weekend rule
+    /// the user set.
+    /// </summary>
+    [Fact(DisplayName = "F4 Q4: on a holiday Monday both pattern tiers are still suggested, below the user's rules")]
+    public async Task HolidayMonday_KeepsPatternTiersBelowTheUsersRules()
+    {
+        var recentMonday = UpcomingMonday();
+        long ruleActivityId, plannedActivityId, historyActivityId, holidayCalendarId;
+        await using (var db = CreateDbContext())
+        {
+            ruleActivityId = await SeedDayTypeRuleAsync(db, "f4q4-rule", DayType.Weekend);
+            plannedActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "f4q4-planned-pattern", ct: CancellationToken);
+            historyActivityId = await PlanningTestSeedHelper.SeedActivityAsync(db, "f4q4-history-pattern", ct: CancellationToken);
+            for (var weeksAgo = 1; weeksAgo <= 3; weeksAgo++)
+            {
+                await SeedSameWeekdayTaskAsync(db, plannedActivityId, recentMonday, weeksAgo);
+                await SeedActivityHistoryOnWeekdayAsync(db, historyActivityId, recentMonday, weeksAgo);
+            }
+
+            holidayCalendarId = await PlanningTestSeedHelper.SeedNaturalCalendarAsync(db, EasterMonday2028, ct: CancellationToken);
+        }
+
+        await RefreshSuggestionViewsAsync();
+
+        (await GetSuggestionsAsync(holidayCalendarId)).Select(s => (s.Activity.Id, s.SourceType)).Should().Equal(
+            (ruleActivityId, SuggestionSourceType.UserSet),
+            (plannedActivityId, SuggestionSourceType.PlannedPattern),
+            (historyActivityId, SuggestionSourceType.HistoryPattern));
+    }
+
+    /// <summary>An active rule of type <c>DayType</c> for <paramref name="dayType"/>, on its own new activity.</summary>
+    private async Task<long> SeedDayTypeRuleAsync(Microsoft.EntityFrameworkCore.DbContext db, string name, DayType dayType)
+    {
+        var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, name, ct: CancellationToken);
+        var ruleId = await PlanningTestSeedHelper.SeedRepeatingPlannerTaskAsync(
+            db, activityId, recurrenceType: RecurrenceType.DayType, ct: CancellationToken);
+        var rule = await db.Set<AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning.RepeatingPlannerTask>()
+            .SingleAsync(t => t.Id == ruleId, CancellationToken);
+        rule.ScheduledForDayTypes.Add(dayType.ToString());
+        await db.SaveChangesAsync(CancellationToken);
+        return activityId;
     }
 
     /// <summary>

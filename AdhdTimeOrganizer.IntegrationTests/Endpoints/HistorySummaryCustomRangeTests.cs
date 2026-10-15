@@ -46,6 +46,12 @@ public class HistorySummaryCustomRangeTests(AppDbContextFixture fixture) : Postg
     private const string TimeOfDayRoute = "/api/activity-history/dashboard/summary/time-of-day";
 
     /// <summary>
+    /// OP6's trend line. It sums sessions rather than rows, so it is only in the rejection theory: its range
+    /// semantics are pinned in <c>HistoryTimerPlanSummaryTests</c>.
+    /// </summary>
+    private const string TimerPlanRoute = "/api/activity-history/dashboard/summary/timer-plan";
+
+    /// <summary>
     /// The fifth range-taking route in the slice. It does not carry a <see cref="DateRangeDto"/> — it has
     /// its own <c>startDate</c>/<c>endDate</c> pair — so it is not covered by the per-route theories above
     /// and gets its own guard below.
@@ -177,7 +183,8 @@ public class HistorySummaryCustomRangeTests(AppDbContextFixture fixture) : Postg
     [InlineData(PieChartRoute)]
     [InlineData(SummaryCardsRoute)]
     [InlineData(StackedBarsRoute)]
-    public async Task EveryFourthSummaryEndpoint_RejectsACustomRangeItWillNotAnswer(string route)
+    [InlineData(TimerPlanRoute)]
+    public async Task EverySummaryEndpoint_RejectsACustomRangeItWillNotAnswer(string route)
     {
         var missing = await PostRawAsync(route, BodyFor(route, new Range(RangeStart, "CustomRange")));
 
@@ -314,7 +321,7 @@ public class HistorySummaryCustomRangeTests(AppDbContextFixture fixture) : Postg
     /// </summary>
     private static object BodyFor(string route, Range range) => route switch
     {
-        TimeOfDayRoute => new { date = range.Date, rangeType = range.RangeType, endDate = range.EndDate },
+        TimeOfDayRoute or TimerPlanRoute => new { date = range.Date, rangeType = range.RangeType, endDate = range.EndDate },
         StackedBarsRoute => new
         {
             date = range.Date,

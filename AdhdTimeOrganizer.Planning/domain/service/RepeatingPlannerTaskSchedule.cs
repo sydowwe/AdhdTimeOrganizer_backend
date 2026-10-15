@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
 
@@ -13,15 +14,21 @@ namespace AdhdTimeOrganizer.Planning.domain.service;
 /// <see cref="IsActive"/> is deliberately not part of the answer — the suggestion read filters it in SQL, and
 /// the materialiser's callers ask about an inactive rule only to learn what it used to place.
 /// </para>
+/// <para>
+/// It takes the whole day rather than its date and type because a <c>DayType</c> rule also reads the holiday: a
+/// holiday weekday matches a <c>Weekend</c> rule as well as a <c>Workday</c> one
+/// (<see cref="DayTypeExtensions.PlanningDayTypes"/>). With the row in hand, neither caller can drop that.
+/// </para>
 /// </summary>
 public static class RepeatingPlannerTaskSchedule
 {
-    public static bool FallsOn(RepeatingPlannerTask rule, DateOnly date, DayType dayType) =>
-        IsWithinActiveWindow(rule, date) && rule.RecurrenceType switch
+    public static bool FallsOn(RepeatingPlannerTask rule, Calendar day) =>
+        IsWithinActiveWindow(rule, day.Date) && rule.RecurrenceType switch
         {
-            RecurrenceType.DayOfWeek => rule.ScheduledDays.Contains(date.DayOfWeek.ToString()),
-            RecurrenceType.DayOfMonth => rule.ScheduledDates.Contains(date.Day),
-            RecurrenceType.DayType => rule.ScheduledForDayTypes.Contains(dayType.ToString()),
+            RecurrenceType.DayOfWeek => rule.ScheduledDays.Contains(day.Date.DayOfWeek.ToString()),
+            RecurrenceType.DayOfMonth => rule.ScheduledDates.Contains(day.Date.Day),
+            RecurrenceType.DayType => day.DayType.PlanningDayTypes(day.HolidayKey)
+                .Any(dayType => rule.ScheduledForDayTypes.Contains(dayType.ToString())),
             // The window is the whole rule, and IsWithinActiveWindow has already required both of its bounds.
             RecurrenceType.DateRange => true,
             _ => false

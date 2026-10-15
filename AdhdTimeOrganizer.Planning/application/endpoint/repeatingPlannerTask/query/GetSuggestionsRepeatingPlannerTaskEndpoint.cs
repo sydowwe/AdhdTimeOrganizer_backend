@@ -32,8 +32,10 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext, Tim
         {
             s.Summary = "Get task suggestions for a date";
             s.Description = "Returns user-set and automatic (pattern-based) suggestions for the given date. On an away " +
-                            "day (Vacation, SickDay) only the user-set ones. A pattern the user dismissed is left out " +
-                            "until the dismissal lapses";
+                            "day (Vacation, SickDay) only the user-set ones. On a public holiday that falls on a " +
+                            "weekday, a rule for Weekend days matches as well as one for Workdays, and the patterns " +
+                            "still follow the user-set ones. A pattern the user dismissed is left out until the " +
+                            "dismissal lapses";
             s.Response<List<SuggestionResponse>>(200, "Success");
             s.Response(400, "Invalid date format");
         });
@@ -89,9 +91,10 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext, Tim
 
         // The day match is RepeatingPlannerTaskSchedule's, shared with the FO6 materialiser so the panel never
         // offers a rule on a day the plan would not receive it. Its window check repeats the WHERE above, which
-        // costs nothing in memory and keeps the rule whole in one place.
+        // costs nothing in memory and keeps the rule whole in one place. It also holds F4 Q4's holiday rule: on a
+        // public holiday that falls on a weekday, a Weekend rule matches as well as a Workday one.
         var matchedTasks = tasks.Where(task => !coveredActivityIds.Contains(task.ActivityId)
-                                               && RepeatingPlannerTaskSchedule.FallsOn(task, date, calendar.DayType))
+                                               && RepeatingPlannerTaskSchedule.FallsOn(task, calendar))
             .ToList();
 
         // One projection for the whole matched set. Projecting per match — Projection(new[] { task }
@@ -129,6 +132,8 @@ public class GetSuggestionsRepeatingPlannerTaskEndpoint(DbContext dbContext, Tim
         // over weekdays and days of the month, which workdays dominate — so a vacation Monday would be offered the
         // office Monday's standup and commute. A user who wants a recurrence off while away already has
         // RecurrenceType.DayType for it; a daily medication recurrence must still appear, and does, above.
+        // A public holiday is not away (F4 Q4): its pattern tiers stay, below every rule the user set, which on a
+        // holiday weekday includes their Weekend rules.
         if (calendar.DayType.IsAway())
         {
             await Send.OkAsync(result, ct);

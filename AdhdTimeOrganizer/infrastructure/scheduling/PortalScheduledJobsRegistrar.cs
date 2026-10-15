@@ -70,6 +70,21 @@ public sealed class PortalScheduledJobsRegistrar(
     };
 
     /// <summary>
+    /// P3-07: accounts whose deletion grace period has passed. Hourly, at minute 37 to stay off the other hourly job and
+    /// the quarter-hour sweeps; the grace period is two weeks, so the cadence only bounds how late in its hour an account
+    /// goes.
+    /// </summary>
+    public static RecurringJobRegistration AccountDeletionsRegistration { get; } = new()
+    {
+        JobKey = AccountDeletionJobHandler.HandlerKey,
+        HandlerKey = AccountDeletionJobHandler.HandlerKey,
+        OwnerModule = "Portal",
+        Schedule = ScheduleSpec.FromCron("0 37 * * * ?"),
+        DisallowConcurrent = true,
+        Description = "Deletes the accounts whose owners asked for deletion and did not keep them within the grace period."
+    };
+
+    /// <summary>
     /// Dead refresh tokens, once a day at 04:00 UTC — a fixed time rather than 24 hours after each boot, so the cadence no
     /// longer depends on how often the app is deployed. The tokens it deletes are already a month past use, so a missed
     /// night costs nothing; the overdue alert covers a run that stops happening at all.
@@ -92,7 +107,7 @@ public sealed class PortalScheduledJobsRegistrar(
         foreach (var registration in new[]
                  {
                      SuggestionPatternRefreshRegistration, MorningBriefingRegistration, UnconfirmedAccountsRegistration,
-                     RefreshTokenCleanupRegistration
+                     AccountDeletionsRegistration, RefreshTokenCleanupRegistration
                  })
         {
             try

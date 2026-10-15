@@ -173,7 +173,7 @@ body, so a spec may hardcode them or read them.
 | multi-count, 2 of 5, not done | `14013` |
 | completed today (daily recap) | `14014` |
 | temptation-bundled (paired leisure activity) | `14015` |
-| activity history | `15001`–`15018` (calibration), `15101` |
+| activity history | `15001`–`15018` (calibration), `15101`, `15201`–`15218` (timer sessions, surface 16) |
 | planner tasks | `16001`–`16007` |
 | backlog / bucket-list / project profiles | `17001` / `17101` / `17201` |
 | memory anchors | `18001` (on the bucket-list activity), `18002` (on the **archived** activity) |
@@ -386,6 +386,34 @@ that simply counts failures. `counts.reminderFailuresNeedingAttention` is 1 whil
       SPA renders from (health lists, job by id, run detail), since orphanhood is a fact about the running
       host's handlers and no row assertion can show it.
 
+### The timer sessions `e2e-v6` added
+
+16. **Six timer sessions with a plan, on the default week.** OP6's timer-plan line on `/activity-history`
+    (`summary/timer-plan`) sums `PlannedLength` against the focus rows, and nothing in the fixture had a plan,
+    so the line never rendered for anyone opening the screen by hand. All six are on Write Blog Post (`12011`)
+    at 07:00 UTC on days −1 to −6, and they cover every clause of the line:
+
+    | day | session | plan | focus |
+    |---|---|---|---|
+    | −1 | countdown, completed | 25m | 25m |
+    | −2 | countdown, stopped early | 25m | 12m |
+    | −3 | Pomodoro, stopped after 2 of 4 | 4 × 25m | 25 + 25 + 10m |
+    | −4 | Pomodoro, completed | 4 × 25m | 4 × 25m |
+    | −5 | Pomodoro, ran out while away after 2 | 4 × 25m | 25 + 25m |
+    | −6 | countdown, completed, **no plan** | — | 30m |
+
+    The default week therefore reads 4 compared sessions, 4h 10m planned against 3h 17m done, 53m short, one
+    that ran out while away and one with no plan. The Pomodoro breaks (five minutes after each focus period
+    but the last) are logged on the **same** activity, so only `Phase` tells them from focus, which is the trap
+    the endpoint pins. Sessions are not addressed by id, so they keep generated ids; their rows are in the
+    `15201` band. `Seed_LeavesTimerSessions_ThatTheTimerPlanReadSumsOverTheDefaultWeek` asserts on the real
+    read, not on rows.
+
+    This is the second entry, after the day-planner templates (surface 9), that fails question 2 of the
+    admission rule below and is seeded anyway: the app can post sessions, but a session that exists only
+    because some spec ran leaves the line hidden for anyone who opens `/activity-history` by hand. The same
+    caveat applies, so treat it as an exception.
+
 ### ⚠ The tracking rows are written as rows, not posted through the heartbeats
 
 `B3` asked for the ingest path. It is not reachable from here, and what it would have added is reproduced
@@ -435,7 +463,7 @@ number instead of assuming.
 
 ```jsonc
 {
-  "fixture": "e2e-v5",
+  "fixture": "e2e-v6",
   "seedDateUtc": "2026-09-10",
   "primaryUser":   { "id": 10001, "email": "test@example.com",  "password": "testpass123", "locale": "EN" },
   "secondaryUser": { "id": 10002, "email": "test2@example.com", "password": "testpass123", "locale": "EN" },
@@ -464,7 +492,7 @@ number instead of assuming.
   "routineTimePeriods": { "Daily": 5, "Weekly": 6, "Monthly": 7, "Yearly": 8 },
   "counts": {
     "activities": 27, "todoListItems": 15, "overdueTodoListItems": 6,
-    "calibrationTodoListItems": 6, "activityHistoryEntries": 26,
+    "calibrationTodoListItems": 6, "activityHistoryEntries": 44,
     "plannerTasks": 7, "calendars": 730,
     "dayPlannerTemplates": 3, "templatePlannerTasks": 13,
     "webExtensionEntries": 1050, "desktopEntries": 630, "distinctDesktopEntries": 6,
@@ -472,7 +500,8 @@ number instead of assuming.
     "notifications": 6, "unreadNotifications": 3,
     "reminderDefinitions": 6, "upcomingReminders": 4,
     "reminderDispatches": 7, "reminderFailuresNeedingAttention": 1,
-    "routinePeriodCompletions": 32, "frozenRoutinePeriodCompletions": 1
+    "routinePeriodCompletions": 32, "frozenRoutinePeriodCompletions": 1,
+    "timerSessions": 6
   }
 }
 ```

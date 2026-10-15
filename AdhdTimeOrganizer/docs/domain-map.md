@@ -196,6 +196,10 @@ raw ingest.
 **Account data** — `GET /user/data-export` returns a JSON dump of the user's own rows, throttled to
 one request per minute via `IDistributedCache`. Account deletion fans out over `ISubjectDataEraser`
 inside `UserManager.DeleteAsync`'s transaction, because most module tables are deliberately FK-free.
+A self-deletion is **scheduled**, not immediate (P3-07): `User.DeletionScheduledFor` is set 14 days out,
+the account can be kept until then, and `AccountDeletionJobHandler` performs the deletion through
+`UserAccountDeletionService` once the date has passed. While it is pending nothing is pushed or mailed to
+the user and trackers cannot sign in.
 `GET /user/account-deletion-summary` is what the SPA's warning card shows *before* that: per-category
 counts of what the delete destroys, as one projection of correlated subqueries spanning every slice.
 It deliberately reads with `IgnoreQueryFilters()` and scopes by hand, so the web-extension ledger's
@@ -270,7 +274,8 @@ something the base classes do not.
 | MoveTodoListItemEndpoint / ChangePriorityTodoListItemEndpoint | Endpoints | Move an item between lists; change its priority rank | `application/endpoint/todoList/todoListItem/command/` |
 | CloneActivityEndpoint / QuickEditActivityEndpoint | Endpoints | Shallow-clone an activity; inline edit from the planner | `application/endpoint/activity/activity/command/` |
 | GetUserDataExportEndpoint | Endpoint | GDPR-style JSON export, 1/min throttle via `IDistributedCache` | `application/endpoint/user/read/GetUserDataExportEndpoint.cs` |
-| DeleteUserAccountEndpoint | Endpoint | Account deletion + `ISubjectDataEraser` fan-out in the same transaction (via `UserAccountDeletionService`) | `application/endpoint/user/command/settings/DeleteUserAccountEndpoint.cs` |
+| DeleteUserAccountEndpoint | Endpoint | Schedules the account's deletion (P3-07): revokes every session, drops push subscriptions, mails the keep link; the purge is `AccountDeletionJobHandler` | `application/endpoint/user/command/settings/DeleteUserAccountEndpoint.cs` |
+| KeepUserAccountEndpoint / KeepUserAccountWithTokenEndpoint | Endpoints | Cancel a scheduled deletion — from a web session, or anonymously with the mailed single-use token | `application/endpoint/user/command/{settings,auth}/` |
 | GetAccountDeletionSummaryEndpoint | Endpoint | Cold-path per-category counts of what deleting the account destroys, for the SPA's warning card | `application/endpoint/user/read/GetAccountDeletionSummaryEndpoint.cs` |
 | GoogleSignInEndpoint | Endpoint | Federated sign-up/sign-in through `UserRegistrationFlow` | `application/endpoint/user/command/auth/GoogleSignInEndpoint.cs` |
 | Google Calendar endpoints | Endpoints | Auth URL, connect, disconnect, status | `application/endpoint/user/command/googleCalendar/` |

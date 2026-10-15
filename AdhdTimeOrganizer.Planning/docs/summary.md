@@ -167,7 +167,15 @@ despite its configuration having lived in the Planning folder — `TaskImportanc
   - **It never fails its caller** and clears the tracker on failure; it **commits**, so the same ordering rule as
     `EnsureForDateAsync` applies.
   - **Day matching is `RepeatingPlannerTaskSchedule.FallsOn`**, shared with the suggestion endpoint, so the
-    panel never offers a rule on a day the plan would not receive it.
+    panel never offers a rule on a day the plan would not receive it. It takes the `Calendar` row, because a
+    `DayType` rule reads the holiday too (next bullet).
+
+- **A public holiday on a weekday matches like a weekend, and is not time away (F4 Q4).** The row stays a `Workday`
+  with its `HolidayKey`. Matching goes through Core's `DayTypeExtensions.PlanningDayTypes` (`[Weekend, Workday]` for
+  such a day): a `Weekend` rule places and is suggested **as well as** a `Workday` one, and day-template suggestions
+  put the weekend matches first as pattern type 6, labelled with the holiday key. Nothing that reads "away"
+  (`IsAway`, Routines' excusal, the nudges, the pattern-tier drop) changes, and the pattern views keep counting a
+  holiday as a workday. Details in `domain-map.md` § *Holidays rank like a weekend*.
   - **It also runs with nobody signed in**: `MaterialiseRepeatingTasksJobHandler` (every 15 min, zone-aware) calls
     it once per user per local day, after their midnight, so a user who never opens the app still gets the
     block — and its automatic reminder. Every row it writes carries an explicit `UserId`; in that job nothing

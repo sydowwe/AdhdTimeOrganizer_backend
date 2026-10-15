@@ -50,9 +50,9 @@ public class ExtensionActivityTrackingTests(AppDbContextFixture fixture) : AuthT
     }
 
     /// <summary>
-    /// Every account may sign a tracker in (FO7, 2026-10-06): the host does not override the framework's
-    /// <c>HasExtensionAccess</c> hook. It used to gate on a <c>User.HasExtensionAccess</c> column that only
-    /// seeders ever set, so every tracker worked for the root admin alone; the column has since been dropped.
+    /// Every account may sign a tracker in (FO7, 2026-10-06). The host used to gate on a <c>User.HasExtensionAccess</c>
+    /// column that only seeders ever set, so every tracker worked for the root admin alone; the column has since been
+    /// dropped. The one refusal left is an account scheduled for deletion (P3-07, <c>AccountDeletionGraceTests</c>).
     /// </summary>
     [Fact]
     public async Task ExtensionLogin_AnyAccount_ReturnsTokens()

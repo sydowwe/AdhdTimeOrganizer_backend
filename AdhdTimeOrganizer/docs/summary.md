@@ -43,9 +43,24 @@ right one.
   `User.ConfirmationReminderSentAt`, and deletes the account after 14 days. Confirmed accounts, Google sign-ins
   and the seeded root admin are never touched. **Deletion has one path:**
   `application/service/user/UserAccountDeletionService.cs` runs the `ISubjectDataEraser` fan-out and
-  `UserManager.DeleteAsync` for both this purge and `DeleteUserAccountEndpoint` (which uses only its staging half,
-  because the framework base owns the delete). Pinned by `UnconfirmedAccountJobTests`, which checks every
-  user-scoped table in the model through `UserDataInventory`.
+  `UserManager.DeleteAsync`, and reports the sessions that died with the account, for both this purge and the
+  self-deletion purge below. Pinned by `UnconfirmedAccountJobTests`, which checks every user-scoped table in the
+  model through `UserDataInventory`.
+- **Self-deletion with a grace period (P3-07)** — `DELETE user/account` (`DeleteUserAccountEndpoint`, still
+  password + 2FA through `VerifyUserPreProcessor`, no longer derived from the framework's deleting base)
+  **schedules**: `User.DeletionScheduledFor` = now + 14 days and the hash of a keep token
+  (`application/service/user/AccountDeletionScheduleService.cs`). The same request revokes every session (trackers
+  included), deletes the push subscriptions and mails the date with a "keep my account" link
+  (`IUserEmailSenderService.SendAccountDeletionScheduledAsync`). Keeping clears both columns: `POST
+  /auth/account/keep` with the mailed token (single-use, dead once the date passes) or `POST /user/account/keep`
+  from a web session. During the grace period web sign-in works and `/user/data` carries `deletionScheduledFor`,
+  so the SPA asks "keep my account?" rather than keeping it silently (the user may be there to export); tracker
+  sign-in is refused (`ExtensionLoginEndpoint.DenyExtensionAccess`, `errorType: AccountDeletionScheduled`); and
+  `AccountDeletionSuppressionReader` (the framework's optional `IRecipientSuppressionReader`) keeps every push and
+  mail from the user while the bell rows are still written. `infrastructure/jobs/AccountDeletionJobHandler.cs`
+  (hourly, `PortalScheduledJobsRegistrar`) deletes what is due through `UserAccountDeletionService` — the state is
+  a column, so it survives restarts with no boot registrar. The root admin is not exempt, as it was not from the
+  immediate delete. Pinned by `AccountDeletionGraceTests` and `UserAccountDeletionTests`.
 - **The Google integrations** — Sign-In and Calendar sync (`infrastructure/extService/`), deliberately
   portal-only.
 - **The composition root** — `AppDbContext` (framework + every slice's configurations, the global
@@ -177,7 +192,10 @@ scheduling) — those live in the `framework/` submodule and are consumed throug
   `IRecipientEngagementReader` with a `null` default, so dropping its line in `ModuleServiceExtensions`
   fails nowhere: nobody is ever away and the routine nudges keep reaching people who stopped opening the
   app. `ModuleWiringTests` pins the registration; `NotificationAwayHoldTests` pins the hold on what the
-  fake senders receive, for the live send and the quiet-hours flush.
+  fake senders receive, for the live send and the quiet-hours flush. **The suppression reader is optional the
+  same way** (P3-07): drop `AccountDeletionSuppressionReader`'s line and the mails a user opted into keep
+  reaching them after they asked to be erased. Pinned the same two ways (`ModuleWiringTests`,
+  `AccountDeletionGraceTests`).
 
 ## Extension playbook
 
