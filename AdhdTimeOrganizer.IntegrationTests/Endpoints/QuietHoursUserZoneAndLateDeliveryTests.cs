@@ -1,4 +1,3 @@
-using Sydowwe.Framework.Contracts.notification.kind;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
@@ -10,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.kind;
 using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.Contracts.user;

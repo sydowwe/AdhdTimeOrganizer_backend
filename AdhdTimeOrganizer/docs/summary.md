@@ -23,9 +23,10 @@ right one.
   Notifications directly, for the reason `GetAccountDeletionSummaryEndpoint` gives. The thresholds are
   Core's `UserPresence`. Each broken routine carries `canFreeze`, Routines' `DescribeBreak` over its whole
   history, so the card points to a skip only where the freeze endpoint would grant one. **The back-off:** `RecipientEngagementReader` (same folder) is the framework's
-  `IRecipientEngagementReader`, and the catalog in `ModuleServiceExtensions` lists the four routine kinds
-  as `HeldWhileAwayTypes`. A user away three days or more gets those in the bell only, never pushed or
-  mailed; their own reminders, the timer alarm and the scheduler alerts still go out.
+  `IRecipientEngagementReader`, and the kinds that declare `HeldWhileAway` — the four routine nudges, the three
+  planner-block ones and the morning briefing — are held for an away recipient. A user away three days or more
+  gets those in the bell only, never pushed or mailed; their own reminders, to-do due times, the timer alarm and
+  the scheduler alerts still go out.
 - **The morning briefing (P2-01)** — one notification per user per morning instead of a push per signal:
   today's open blocks and the first one ahead, the carry-over week, date-only to-dos due today, overdue
   to-dos, and the routine items suggested for today. `infrastructure/jobs/MorningBriefingJobHandler.cs`

@@ -1,4 +1,3 @@
-using AdhdTimeOrganizer.Tracking.application.notification;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -8,6 +7,7 @@ using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.android;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.desktop;
 using AdhdTimeOrganizer.Tracking.application.dto.request.activityTracking.heartbeat;
+using AdhdTimeOrganizer.Tracking.application.notification;
 using AdhdTimeOrganizer.Tracking.domain.helper.unified;
 using AdhdTimeOrganizer.Tracking.domain.model.entity.activityTracking;
 using AdhdTimeOrganizer.Tracking.domain.serviceContract;

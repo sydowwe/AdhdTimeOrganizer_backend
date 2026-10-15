@@ -106,7 +106,7 @@ TimerBoundaryAlarm : BaseEntityWithUser (→ BaseTableEntity)
 ```
 
 `Kind` is per session (`ScheduleTimerAlarmsRequest.Kind`, default `Boundary`), and decides what the row raises:
-`Boundary` → `NotificationType.TimerBoundary`, quiet-hours exempt; `StopwatchCheckIn` → `NotificationType.StopwatchCheckIn`
+`Boundary` → `HistoryNotificationTypes.TimerBoundary`, quiet-hours exempt; `StopwatchCheckIn` → `HistoryNotificationTypes.StopwatchCheckIn`
 ("still on X? 1 h 30 min", P3-03), which the handler **skips** — no notification row — when the recipient is inside
 their quiet hours, and which `IRunningTimerLookup` does not count as a running timer.
 

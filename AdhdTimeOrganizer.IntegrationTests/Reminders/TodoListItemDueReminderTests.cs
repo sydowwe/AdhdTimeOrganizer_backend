@@ -1,4 +1,3 @@
-using AdhdTimeOrganizer.TodoLists.application.notification;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -6,6 +5,7 @@ using AdhdTimeOrganizer.application.eventHandler;
 using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.IntegrationTests.Endpoints;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
+using AdhdTimeOrganizer.TodoLists.application.notification;
 using AdhdTimeOrganizer.TodoLists.application.service.reminder;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using FluentAssertions;

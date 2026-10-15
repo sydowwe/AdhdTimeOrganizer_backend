@@ -8,7 +8,7 @@ namespace AdhdTimeOrganizer.application.service.welcomeBack;
 /// <summary>
 /// FO5's back-off: tells the notification dispatcher which recipients are away, by the same rule the rest of FO5
 /// uses (<see cref="UserPresence.IsAbsent"/>, three days since <see cref="User.LastActiveAt"/>). The dispatcher
-/// then keeps the kinds listed in <c>HeldWhileAwayTypes</c> (the routine nudges) in the bell and off their phone.
+/// then keeps the kinds declaring <c>HeldWhileAway</c> (the routine nudges) in the bell and off their phone.
 /// <para>
 /// A user never measured is not away, for the reason <see cref="UserPresence.IsAbsent"/> gives. Tracker traffic
 /// never moves the stamp (<c>LastActiveStampMiddleware</c>), so a user whose desktop tracker is running all

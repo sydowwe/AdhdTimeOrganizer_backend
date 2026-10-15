@@ -185,22 +185,19 @@ public static class ModuleServiceExtensions
     }
 
     /// <summary>
-    /// The notification kinds <b>this</b> portal can raise — the nine of <see cref="NotificationType"/>'s
-    /// twenty that some producer here actually calls <c>NotifyAsync</c> with.
+    /// The notification kinds <b>this</b> portal offers a preference for. The catalog is every kind the
+    /// composition registered — each slice declares its own, the framework modules theirs — less the ones
+    /// listed here: kinds a composed module ships that no producer here ever calls <c>NotifyAsync</c> with.
     /// <para>
     /// Declared in code rather than bound from configuration on purpose: which events an app produces is a
-    /// property of its code, not of a deployment's settings, and an appsettings typo would silently drop a
-    /// row from the settings screen. Nine of the eleven kinds left out belong to the HR/inventory product
-    /// that shares <c>Sydowwe.Framework.Contracts</c> — there is no inventory and no leave here, so a
-    /// preference row for <c>StockLow</c> asks the user a question this portal can never act on, in an enum
-    /// name no Slovak locale here translates. The other two are the Reminders module's own
+    /// property of its code, not of a deployment's settings, and an appsettings typo would silently add a
+    /// row to the settings screen. Today the only two are the Reminders module's own
     /// <c>DeadlineApproaching</c> and <c>ReminderDigest</c>, which nothing here raises (see the list below).
     /// </para>
     /// <para>
-    /// <b>Keep this list next to the producer when you add a kind.</b> Nothing fails if you forget: the kind
-    /// still dispatches, it simply loses its row on <c>/nastavenia/pripomienky</c> and becomes unmutable
-    /// through the UI. <c>NotificationCatalogTests</c> is what turns that into a red test — it asserts the
-    /// catalog covers every quiet-hours-exempt kind and that the settings matrix is exactly this list.
+    /// <b>A new kind needs nothing here</b> — registering it puts it in the catalog. What fails if it should not
+    /// be there, or a kind silently drops out of the scanned assemblies, is <c>NotificationCatalogTests</c>: it
+    /// keeps a second copy of the expected catalog and asserts the settings matrix is exactly that.
     /// </para>
     /// </summary>
     private static void AddNotificationCatalog(IServiceCollection services) =>

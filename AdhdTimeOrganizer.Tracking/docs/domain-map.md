@@ -356,7 +356,7 @@ Open these when changing tracking, even though they are not in this project:
 | `ActivityTracking` policy definition | `config/IdentityServiceExtensions.cs` |
 | `ActivityTracking` role grant | `infrastructure/extService/user/auth/ExtensionRoleClaimsProvider.cs` |
 | Completion automation | `application/eventHandler/ActivityTimeRecordedEventHandler.cs` |
-| `TrackerSilent` in the notification catalog (not held while away) and its SK/EN wording | `config/dependencyInjection/ModuleServiceExtensions.cs` (`AddNotificationCatalog`) · `infrastructure/notification/{Sk,En}PortalNotificationTexts.cs` |
+| `TrackerSilent` — key, payload, SK/EN wording and policy (not held while away) | `application/notification/TrackingNotification.cs` |
 | `TrackerSourceStatus` in the GDPR export | `application/endpoint/user/read/GetUserDataExportEndpoint.cs` |
 | Hosted registrar that schedules the purge | `Program.cs` (`AddHostedService<TrackingScheduledJobsRegistrar>()`) — dropping it builds fine and the purge silently never fires |
 

@@ -212,9 +212,12 @@ worth copying the shape of:
   delivers when the locale stops being passed; only the language is wrong, which is the state the ask was filed
   against.
 - `NotificationVocabularyTests` — subclass of the module's `BaseNotificationVocabularyTests`: every kind in this
-  portal's catalog is worded in every locale through the composed renderer. The portal's kinds are virtual
-  members on the framework's text tables (the module carries no app's vocabulary), so forgetting one — or the
-  `AddNotificationVocabulary` call — renders the generic "Nová notifikácia" with no error; this is the guard.
+  portal's catalog is worded in every locale through the composed renderer. Each kind words itself in its owning
+  slice, so a language arm left on the kit's fallback — or a slice missing from the scanned assemblies — renders
+  the generic "Nová notifikácia" with no error; this is the guard.
+- `NotificationKindRegistryTests` — the kind registry refuses to start on two kinds with one key or a payload
+  record naming another kind, every catalogued kind resolves to a definition from the slice that raises it, and a
+  reminder cannot be registered under a key nothing defines.
 - `PerUserDefaultMatcherTests` — no DB needed.
 - `ActivityRoleSystemKeyTests` — the three app-referenced activity roles resolve by `SystemKey` after the
   user renames them, and stay undeletable. The lookup they replaced was by display name, so a rename
@@ -263,9 +266,10 @@ worth copying the shape of:
   that does not), one `ActivityHistory` row per contiguous mapped block rather than one per window, and
   **nothing at all** stored for the process the ignore rule matches — a fixture describing a state the
   pipeline could not produce is not a fixture. The notifications get a renderer assertion beside the row
-  one, for the same reason the estimate needed a projection assertion: `NotificationTextRenderer` falls
-  back to a generic body for a payload it cannot bind, so a drifted payload seeds rows that render as
-  "Máte novú notifikáciu" and look like a renderer bug while every row assertion passes.
+  one, for the same reason the estimate needed a projection assertion: every notification kind falls
+  back to a name-less body for a payload it cannot bind (and the renderer to "Máte novú notifikáciu" for
+  a key no kind declares), so a drifted payload seeds rows that look like a renderer bug while every row
+  assertion passes.
   The `e2e-v3` additions — the admin account and the reminders register — add a third shape of claim.
   `Seed_GivesTheAdminAccountTheAdminRole_AndNoOtherAccount` asserts the grant **and its absence**: the
   five `reminder-definition`/`reminder-dashboard` routes are gated on `GetAdminRole()`, no account carried

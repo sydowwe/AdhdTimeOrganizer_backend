@@ -52,28 +52,27 @@ touching anything below, because **none of these break the build**.
   reason. Its absence is at least loud — `NotificationService` and the bell endpoint take it in their
   constructors — but `ModuleWiringTests` (`UserLocaleReader_IsRegisteredClosedOverTheHostsUserType`) pins the
   concrete type so a stub cannot quietly make everyone read Slovak; `NotificationLocaleTests` asserts the bytes.
-- **This host words the notification kinds it raises** — `AddNotificationVocabulary` registers
-  `SkPortalNotificationTexts` / `EnPortalNotificationTexts` (`infrastructure/notification/`) through
-  `NotificationTextOptions`, with `Cz` pointed at the Slovak table. The framework's tables word only the kinds
-  its own modules raise; the routine nudges, the pomodoro boundary and the personal reminder are this portal's
-  and would render the generic "Nová notifikácia" without this call — nothing throws. Adding a kind to the
-  catalog means wording it in both tables; `NotificationVocabularyTests` is what turns a forgotten one red.
-- **This host declares which notification kinds it raises** — `AddNotificationCatalog` in
-  `ModuleServiceExtensions` fills `NotificationCatalogOptions.SupportedTypes` with the ten members of
-  `NotificationType` some producer here actually calls `NotifyAsync` with. That is what
-  `GET /notification-preference/mine` publishes; the other nine belong to the HR/inventory app that shares
-  `Sydowwe.Framework.Contracts`. **Add a kind to that list whenever you add a producer** — an empty catalog
-  means "the whole enum" (so a host that never opts in is unaffected), which also means a *stale* one fails
-  silently: the kind still dispatches, it just loses its row on the settings screen. `NotificationCatalogTests`
-  is the guard, and it keeps a second copy of the list on purpose. The same call declares `HeldWhileAwayTypes`
-  and `PushOffByDefault` — the kinds that reach the bell but not the lock screen until the user ticks push
-  (empty today; a bell-only kind goes there with its producer) — and `Actions`, the Web Push action buttons per
-  kind (P2-03: Snooze · Dismiss, Done · Snooze 1 h, Start · Skip, Done · +15 min). A button is carried out by
+- **Notification kinds are declared by the slice that raises them** (R1) — each slice has an
+  `application/notification/` folder holding its `…NotificationTypes` keys, payload records and
+  `NotificationKind<TPayload>` classes (the morning briefing, the host's own kind, lives in
+  `application/service/morningBriefing/`). A kind carries its words (SK/EN, switched on the kit's language; `Cz`
+  reads Slovak), its subject, its buttons and every delivery policy — `HeldWhileAway`, `PushOnByDefault`,
+  `EmailOnByDefault`, `QuietHoursExempt`, `AdminOnly`, `Actions`. Kinds are `ISingletonService`s, so **a kind only
+  registers if its slice is in `ModuleAssemblies`** — and one that does not register renders the generic
+  "Nová notifikácia" and loses its settings row, with nothing thrown. `NotificationVocabularyTests` and
+  `NotificationCatalogTests` are the guards. `NotificationKindRegistryStartupCheck` (a hosted service in
+  `Program.cs`) builds the registry at boot, so two kinds on one key stop the app rather than the first dispatch.
+- **This host declares which framework kinds it never raises** — `AddNotificationCatalog` in
+  `ModuleServiceExtensions` sets `NotificationCatalogOptions.UnraisedTypes` (Reminders' `DeadlineApproaching` and
+  `ReminderDigest`). The catalog `GET /notification-preference/mine` publishes is every registered kind less that
+  list, so **adding a kind needs nothing here** — but its key does go into `NotificationCatalogTests`' second copy,
+  which is what turns a kind that silently dropped out, or appeared, red. The Web Push action buttons are per
+  kind too (P2-03: Snooze · Dismiss, Done · Snooze 1 h, Start · Skip, Done · +15 min). A button is carried out by
   `POST /notification/{id}/action/{action}`, which hands every button but Dismiss to the one
   `INotificationActionHandler` (Contracts) that answers it — `SnoozeReminderNotificationActionHandler` (Reminders),
   `PlannerTaskNotificationActionHandler` (Planning), `TodoItemDueNotificationActionHandler` (TodoLists). A handler
   only resolves if its slice is in `ModuleAssemblies`, and a button without one silently just opens the app:
-  `NotificationCatalogTests` pins exactly one handler per declared button and keeps the table's second copy.
+  `NotificationCatalogTests` pins exactly one handler per declared button and keeps a second copy of every kind's buttons.
 - **Account deletion fans out over `ISubjectDataEraser`** (`UserAccountDeletionService`, used by
   `DeleteUserAccountEndpoint.BeforeDeleteAsync` and by the unconfirmed-account purge — delete an account any
   other way and the module rows outlive it). The host FKs cascade only `notification` /

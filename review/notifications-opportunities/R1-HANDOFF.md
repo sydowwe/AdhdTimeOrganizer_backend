@@ -17,9 +17,11 @@ from the main checkout — do not commit it).
 | Phase 3 TodoLists | 60f577c | ce155f8 | build only |
 | Phase 3 Tracking | fd28c28 | 0947355 | build only |
 | Phase 3 host (MorningBriefing) | c829979 | 395f2d1 | targeted 1588/0 |
-| Phase 4 code (see below) | WIP commit | WIP commit | **build only — tests not run yet** |
+| Phase 4 code (see below) | f49b882 | 3cbfaba | full suite 3648/0 failed |
+| Phase 4 clean-up: comments, usings, docs | this commit | fd83cd7 | full suite 3648/0 failed |
 
-The full suite on the end of phase 3 (c829979) is green: 3647 / 0 failed / 150 skipped (`artifacts-p3-full.log`).
+The full suite on the end of phase 3 (c829979) is green: 3647 / 0 failed / 150 skipped. Phase 4 and its clean-up
+are green too: 3648 / 0 failed / 150 skipped, both runs.
 
 Phase 4 code, committed as WIP: the nine business kinds deleted (payloads, renderer, words), the struct's temporary
 members and `Known` gone, `NotificationTexts`/`Sk…`/`En…` deleted (`NotificationTextOptions` now maps locale →
@@ -29,6 +31,8 @@ defines (+ test `NotificationKindRegistryTests.ReminderRegistration_RefusesAnUnr
 `framework/Sydowwe.Notifications/docs/HANDOFF-R1.md` (for MojaDigitalnaFirma) written.
 
 ## Left
+
+Steps 1–5 below are done (2026-10-15); only the README edits (step 4, the user's) and merging the branch remain.
 
 1. **Run the tests on the phase-4 commit.** `./scripts/test.ps1` (full, ~15 min). If anything is red, fix and commit.
    Likely spots: `NotificationLocaleTests` (house-style kit now `EnNotificationTextKit`), anything that read

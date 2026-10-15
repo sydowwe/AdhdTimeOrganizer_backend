@@ -40,7 +40,7 @@ namespace AdhdTimeOrganizer.Planning.infrastructure.jobs;
 /// </para>
 /// <para>
 /// Unauthenticated: the query filters are lifted and every user is in scope, which is the point. Held while away and
-/// quiet hours are the Notifications module's (<c>HeldWhileAwayTypes</c>, <c>DeferredUntil</c>), not this sweep's.
+/// quiet hours are the Notifications module's (the kind's <c>HeldWhileAway</c>, <c>DeferredUntil</c>), not this sweep's.
 /// </para>
 /// </summary>
 public class PlannerSlipNudgeJobHandler(

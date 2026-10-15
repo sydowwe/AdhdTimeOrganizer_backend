@@ -1,10 +1,10 @@
-using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.kind;
 using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.Testing;
 using Sydowwe.Notifications.application.dto;

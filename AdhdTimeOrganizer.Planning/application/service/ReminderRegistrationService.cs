@@ -1,9 +1,9 @@
-using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
-using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.entity.reminder;
+using AdhdTimeOrganizer.Planning.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.serviceContract;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.Contracts.notification;

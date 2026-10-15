@@ -347,7 +347,7 @@ is at or after its **current** end. Re-plan a missed block later, or extend an o
 announced again. Every block in one missed notification shares one stamp, so the **distinct** stamps on the user's today are
 the count the daily cap reads — no ledger table. A deleted block takes its stamp with it, which can only loosen the cap.
 
-Both kinds are held while away (`HeldWhileAwayTypes`) and deferred by quiet hours, downstream in Notifications. The query
+Both kinds are held while away (each declares `HeldWhileAway`, in `application/notification/PlanningNotificationKinds.cs`) and deferred by quiet hours, downstream in Notifications. The query
 reads the three calendar dates around UTC today for every user (`ix_calendar_date`) and keeps each user's own today in
 memory.
 

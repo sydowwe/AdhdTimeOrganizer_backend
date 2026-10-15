@@ -16,7 +16,7 @@ Always `./scripts/test.ps1` (see `CLAUDE.md`). Docker must be up. Integration te
 - **Notifications** (`framework/Sydowwe.Notifications`) — *how/where*. `INotificationService.NotifyAsync(recipients,
   payload, ct)`; the type is derived from the payload record's attribute. Writes a bell row, pushes SignalR (InApp),
   Web Push and Email per recipient preferences. Quiet hours **defer** push/email (`DeferredUntil`, flushed every
-  15 min); a kind in `HeldWhileAwayTypes` for a recipient `IRecipientEngagementReader` reports away (FO5: 3+ days,
+  15 min); a kind declaring `HeldWhileAway`, for a recipient `IRecipientEngagementReader` reports away (FO5: 3+ days,
   `UserPresence.QuietAfter`) gets the bell row only, and **nothing releases it later**. Dismiss is a hard delete.
 - **Reminders** (`framework/Sydowwe.Reminders`) — *when, on a schedule*. Owners register through
   `IReminderRegistry` (Contracts); a scan finds due occurrences and calls `NotifyAsync`. Supports one-shot with
@@ -27,31 +27,32 @@ Always `./scripts/test.ps1` (see `CLAUDE.md`). Docker must be up. Integration te
 
 ## Adding a `NotificationType` — the full checklist
 
-Worked example: framework commit **9801384** (`RoutineSuggestedToday`: type, payload, renderer, texts — 4 files)
-plus parent commit **ec4d0183** (the producer and host wiring).
+Since R1 a kind belongs to the slice that raises it, so **adding one touches no framework file** and is a
+single-repo change. Worked example: `AdhdTimeOrganizer.TodoLists/application/notification/TodoListsNotification.cs`
+(key, payload and kind for `TodoItemDue`, one file).
 
-1. `framework/Sydowwe.Framework.Contracts/notification/NotificationType.cs` — **append** (never insert; audit
-   payloads persist the ordinal).
-2. `…/notification/payload/NotificationPayloads.cs` — one record tagged `[NotificationPayload(NotificationType.X)]`.
-   **Ids and non-person scalars only**; `PayloadPiiContractGuardTests` fails the build on person-data names. A
-   user-authored title of the user's *own* thing is allowed (`PersonalReminderPayload.Title`,
-   `TimerBoundaryPayload`'s activity name are the precedents). Property names are the persisted JSON keys.
-3. `framework/Sydowwe.Notifications/application/NotificationTextRenderer.cs` — a `case` deserialising the record,
-   with a **name-less fallback** branch. `application/text/NotificationTexts.cs` — a **virtual** member (app-raised
-   kinds are tier 2 and default to the generic sentence).
-4. Host wording: override the member in `AdhdTimeOrganizer/infrastructure/notification/SkPortalNotificationTexts.cs`
-   and `EnPortalNotificationTexts.cs`. `NotificationVocabularyTests` refuses the generic fallback.
-5. Email default: `framework/Sydowwe.Notifications/application/NotificationChannelDefaults.cs` — omit = email OFF,
-   which is the right answer for almost everything here.
-6. Host catalog: `AdhdTimeOrganizer/config/dependencyInjection/ModuleServiceExtensions.cs` →
-   `AddNotificationCatalog` — add to `SupportedTypes`, decide `HeldWhileAwayTypes` and `PushOffByDefault` (P2-02:
-   a bell-only kind goes in the latter — push off until the user ticks it), and whether it gets push action
-   buttons in `Actions` (P2-03: at most two; every one but Dismiss needs an `INotificationActionHandler` in the
-   owning slice; Snooze shows only on a push the Reminders scan raised); **and** the deliberate second
-   copy in `AdhdTimeOrganizer.IntegrationTests/Endpoints/NotificationCatalogTests.cs`. Forget it and the kind
-   dispatches but has no settings row (unmutable).
-7. Frontend (`AntiProcrastinationApp-frontend`): `src/app/notifications/notificationTypeMeta.ts` (icon, deep link).
-8. **Two-repo order:** commit + push the framework first, then the parent with the new gitlink.
+1. **In the owning slice's `application/notification/`** (the host's own kinds sit beside their producer, e.g.
+   `application/service/morningBriefing/`):
+    - the key — a `const string …Key` and a `static readonly NotificationType` built from it, in the slice's
+      `…NotificationTypes` class. **Only add, never rename**: the key is stored and on the wire.
+    - the payload record, tagged `[NotificationPayload(…NotificationTypes.XKey)]`, implementing
+      `INotificationPayload`. **Ids and non-person scalars only**; `PayloadPiiContractGuardTests` fails the build on
+      person-data names. A user-authored title of the user's *own* thing is allowed (`PersonalReminderPayload.Title`,
+      `TimerBoundaryPayload`'s activity name are the precedents). Property names are the persisted JSON keys.
+    - the kind — `sealed class XNotificationKind : NotificationKind<XPayload>, ISingletonService`. `Render` words
+      it in SK and EN (switch on `context.Kit.Language`, Slovak as the default arm) with a **name-less fallback**
+      for a `null` payload; `Subject` / `PushMeta` if it links somewhere. Override only the policy that differs
+      from the defaults, with the reason in its doc: `HeldWhileAway` (unsolicited and about a moment),
+      `PushOnByDefault => false` (P2-02: a bell-only kind — push off until the user ticks it), `EmailOnByDefault`
+      (almost never here), `QuietHoursExempt` (only when the user picked the instant moments ago), `Actions`
+      (P2-03: at most two; every one but Dismiss needs an `INotificationActionHandler` in the owning slice;
+      Snooze shows only on a push the Reminders scan raised).
+2. **The host's second copies**, in `AdhdTimeOrganizer.IntegrationTests/Endpoints/`: the key in
+   `NotificationCatalogTests.Catalog` (and its buttons in `.Actions`), and a row in
+   `NotificationKindPolicyTests.Expected`. Nothing in `ModuleServiceExtensions` — registering the kind puts it in
+   the catalog. If the kind never registers (its slice missing from `ModuleAssemblies`) it dispatches with the
+   generic text and no settings row; these tests and `NotificationVocabularyTests` are what turn that red.
+3. Frontend (`AntiProcrastinationApp-frontend`): `src/app/notifications/notificationTypeMeta.ts` (icon, deep link).
 
 ## Producing a notification
 

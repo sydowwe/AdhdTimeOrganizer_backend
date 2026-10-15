@@ -158,9 +158,9 @@ Things that are load-bearing and not obvious:
   mirrored into IndexedDB for the service worker to read, a second source of truth for a rare, mild,
   self-explaining notification.
 
-`NotificationType.TimerBoundary` and `TimerBoundaryPayload` live in `Sydowwe.Framework.Contracts` (the
-renderer that reads them is in the Notification module, which cannot see a slice), and the kind is listed in
-`QuietHoursExemptTypes`.
+The two kinds — `HistoryNotificationTypes.TimerBoundary` and `.StopwatchCheckIn`, their payloads and their words —
+live in this slice, in `application/notification/TimerNotificationKinds.cs` (R1; they were in the framework). The
+timer boundary is the one kind in the solution that declares `QuietHoursExempt`: the user picked its instant.
 
 ### Stopwatch check-ins (P3-03)
 
@@ -172,7 +172,7 @@ with `Kind = StopwatchCheckIn`, `ElapsedMinutes` and no phase, so the table, the
 boot registrar all apply unchanged. What differs is load-bearing:
 
 - **Its own notification kind, and not quiet-hours exempt.** The user picked when a countdown ends; the app picked
-  when to check in, so `QuietHoursExemptTypes`' rule does not cover it. Don't add a `TimerBoundaryPhase` member for
+  when to check in, so the `QuietHoursExempt` rule does not cover it. Don't add a `TimerBoundaryPhase` member for
   it either — the payload is `StopwatchCheckInPayload(ElapsedMinutes, ActivityName, Tag, Url)`.
 - **Skipped, not deferred, inside quiet hours.** The dispatcher can only defer, and "still on X?" at 07:00 about a
   stopwatch from 01:00 is noise, bell row included. So the handler asks `IQuietHoursReader` at fire time and, for a

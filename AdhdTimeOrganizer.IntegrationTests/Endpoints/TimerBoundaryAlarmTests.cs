@@ -1,6 +1,3 @@
-using Sydowwe.Framework.Contracts.notification.kind;
-using AdhdTimeOrganizer.History.domain.model.@enum;
-using AdhdTimeOrganizer.History.application.notification;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
@@ -9,15 +6,18 @@ using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.History.application.endpoint.command;
 using AdhdTimeOrganizer.History.application.job;
+using AdhdTimeOrganizer.History.application.notification;
 using AdhdTimeOrganizer.History.application.service;
 using AdhdTimeOrganizer.History.application.validator;
 using AdhdTimeOrganizer.History.domain.model.entity.timerAlarm;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.History.domain.serviceContract;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Contracts.notification;
+using Sydowwe.Framework.Contracts.notification.kind;
 using Sydowwe.Framework.Contracts.notification.payload;
 using Sydowwe.Framework.Contracts.scheduling;
 using Sydowwe.Framework.domain.extServiceContract.user;
@@ -51,8 +51,8 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
 
     /// <summary>
     /// The fixture sets every MAIL_* var, so SMTP auto-detects as configured and the dispatcher would open a
-    /// socket to a fake host. TimerBoundary is email-default-OFF anyway (it is absent from
-    /// <c>NotificationChannelDefaults.EmailOnByDefault</c>) — this pins the master switch so these tests can
+    /// socket to a fake host. TimerBoundary is email-default-OFF anyway (its kind leaves
+    /// <c>EmailOnByDefault</c> false) — this pins the master switch so these tests can
     /// never become network calls.
     /// </summary>
     private static readonly KeyValuePair<string, string?>[] EmailOff =

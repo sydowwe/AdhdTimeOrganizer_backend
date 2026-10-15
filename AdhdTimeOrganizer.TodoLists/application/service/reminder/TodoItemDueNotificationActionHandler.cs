@@ -1,6 +1,6 @@
-using AdhdTimeOrganizer.TodoLists.application.notification;
 using System.Text.Json;
 using AdhdTimeOrganizer.Core.application.@event;
+using AdhdTimeOrganizer.TodoLists.application.notification;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using FastEndpoints;
