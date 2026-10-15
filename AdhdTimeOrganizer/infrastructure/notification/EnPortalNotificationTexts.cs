@@ -175,4 +175,11 @@ public class EnPortalNotificationTexts : EnNotificationTexts
 
     public override string Phase(int index, int? total) => total is { } t ? $"Phase {index}/{t}" : $"Phase {index}";
     public override string Cycle(int index, int? total) => total is { } t ? $"Cycle {index}/{t}" : $"Cycle {index}";
+
+    // A question, not a reproach — the user may well still be on it, and that is fine.
+    public override string StopwatchCheckInTitle(string? activityName) =>
+        activityName is { Length: > 0 } ? $"Still on {activityName}?" : "Still at it?";
+
+    public override string StopwatchCheckInBody(int elapsedMinutes) => $"The stopwatch has been running for {Lead(elapsedMinutes)}.";
+    public override string StopwatchCheckInFallbackBody => "Your stopwatch is still running.";
 }

@@ -78,7 +78,7 @@ What is load-bearing:
   The link lands on the **focus rows only** (`IsWorkRecord`) — a break is logged against the rest activity
   and is not the item's time, so stamping it would credit the item with its rests in the recap. Same rules
   as the single create's link: positive, never both, ownership-checked in the handler (404).
-  The stopwatch is not a session.
+  The stopwatch is not a session (its check-ins are alarms, not session state — see *Stopwatch check-ins*).
 - **`countsAsRepetition` is what ticks the item, not the link** (FO2). Both creates take it; it needs a link, is
   not stored, and makes the publisher flag the *first* event carrying the link, so the host's handler ticks the
   item once — one repetition of a counted item, done for a plain one — even when the sitting crosses midnight.
@@ -161,6 +161,30 @@ Things that are load-bearing and not obvious:
 `NotificationType.TimerBoundary` and `TimerBoundaryPayload` live in `Sydowwe.Framework.Contracts` (the
 renderer that reads them is in the Notification module, which cannot see a slice), and the kind is listed in
 `QuietHoursExemptTypes`.
+
+### Stopwatch check-ins (P3-03)
+
+A stopwatch never rings, so hyperfocus and a forgotten stopwatch end the same way — an afternoon gone, or a
+nine-hour row to fix. The client therefore posts **check-ins** for a running stopwatch through the same
+`schedule` route with `kind: StopwatchCheckIn`: at 90 minutes of *running* time, then hourly, up to 12 hours (at
+most 11 rows), re-posted on resume and cancelled on pause and stop. They are ordinary `TimerBoundaryAlarm` rows
+with `Kind = StopwatchCheckIn`, `ElapsedMinutes` and no phase, so the table, the triggers, the self-drain and the
+boot registrar all apply unchanged. What differs is load-bearing:
+
+- **Its own notification kind, and not quiet-hours exempt.** The user picked when a countdown ends; the app picked
+  when to check in, so `QuietHoursExemptTypes`' rule does not cover it. Don't add a `TimerBoundaryPhase` member for
+  it either — the payload is `StopwatchCheckInPayload(ElapsedMinutes, ActivityName, Tag, Url)`.
+- **Skipped, not deferred, inside quiet hours.** The dispatcher can only defer, and "still on X?" at 07:00 about a
+  stopwatch from 01:00 is noise, bell row included. So the handler asks `IQuietHoursReader` at fire time and, for a
+  recipient inside their window, deletes the row without calling `NotifyAsync`. A failed read sends it (the
+  dispatcher still defers the push, so nobody is woken).
+- **The validator owns the shape per kind.** A boundary needs `phase` and no `elapsedMinutes`; a check-in needs a
+  positive `elapsedMinutes` and no phase or cycle field. A request with no `kind` is a boundary, as before.
+- **Its tag has its own prefix** (`stopwatch-check-in-<ms>`, `TimerBoundaryAlarm.CheckInTagFor`). The tab never
+  shows a check-in itself — the push reaches an open tab, and only the server knows the quiet hours — so the tag
+  only collapses two pushes for one check-in.
+- **No action buttons.** Stop cannot run server-side: the stopwatch is client state. The push opens the `url`, the
+  stopwatch page, where Stop is one tap.
 
 ## Dependency seams
 
@@ -246,7 +270,9 @@ Archived activities pass; archival is not ownership. Guarded by
   typical item length (F2-06) through Core's `IRoutineItemLoggedTimeSource`, and returns the individual
   recordings, not a sum, because Routines buckets them into its own cycles.
 - **`TimerBoundaryAlarmRunningTimerLookup` (`application/seam/`) answers Core's `IRunningTimerLookup`** for
-  Planning's overrun nudge (audit N5): "running" is a pending `TimerBoundaryAlarm` whose `BoundaryAt` is still
+  Planning's overrun nudge (audit N5): "running" is a pending **`Boundary`-kind** `TimerBoundaryAlarm` — a
+  stopwatch's check-ins do not count, because a stopwatch has no planned end and the nudge is then the only thing
+  saying the slot is over (P3-03) — whose `BoundaryAt` is still
   ahead. Keep the `BoundaryAt > now` predicate — a stale row the boot registrar has not swept yet would otherwise
   silence every overrun nudge for that user. It reads alarm rows only; they are still not timer state.
 - **`ActivityHistoryLastDoneSource` (`application/seam/`) answers Core's keyed `IActivityLastDoneSource`**

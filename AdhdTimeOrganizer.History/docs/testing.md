@@ -55,6 +55,7 @@ below.
 | `HistorySummaryCustomRangeTests` (7 tests) | A custom range spans `date`…`endDate` **inclusive**, a single day is one day not two, the max span is enforced at exactly the boundary, and named range types ignore `endDate` rather than reading or rejecting it |
 | `HistoryCrudAuthMatrixTests.Filter_ExcludesOtherUsersHistory` · `GetFilteredTable_ExcludesOtherUsersHistory` | The global user query filter actually scopes these reads. `ApplyUserScoping` on the endpoint bases is a **no-op virtual** and guards nothing |
 | `TimerBoundaryAlarmTests` (9 tests) | The alarm lifecycle end to end: one row per *future* boundary, idempotent by session, cancel removes the session and is a no-op on an unknown one, the handler fires then self-drains, a cancelled alarm does nothing, the push envelope carries `tag` + `url` at top level (and omits `tag` for kinds supplying none), and `TimerBoundary` is exempt from quiet-hours deferral |
+| `StopwatchCheckInAlarmTests` (16 tests) | P3-03's check-ins on the same table: stored as `StopwatchCheckIn` rows with no phase, firing one sends a `StopwatchCheckIn` with the running time and the activity (title, body, `tag` with its own prefix, `url`), a request with no kind is still a boundary that fires as `TimerBoundary`, a check-in **inside quiet hours writes no notification row at all** and still deletes its alarm, cancel removes the set, the boot registrar re-registers a check-in whose job was removed, check-ins do **not** make `IRunningTimerLookup` report a running timer (a boundary does), and the validator's per-kind shape both ways |
 | `ActivityHistorySessionTests` (23 tests) | B3 timer sessions. The counting tests assert exact numbers on one fixture (a three-phase Pomodoro plus a plain row) where rows and sittings differ on `aggregate-by-activity`, the pie and the calendar — a row count is a well-formed wrong answer. Atomicity is pinned at both layers: an unowned activity on the *second* record writes nothing, and a unique-index collision on the second record rolls back the first. Also: the eleven malformed shapes write nothing, delete keeps the session until its last row, an edit keeps the row in its session, and the heartbeat never extends a session row |
 | `TodoListItemDailyRecapTests.TimeIsAttributedByItem_NotByActivity` | `TodoListItemLoggedTimeSource` keys on `TodoListItemId` **alone**. Widening it to the activity looks like it can only find *more* rows and in fact double-counts two items sharing one activity |
 | `ActivityHistorySessionFitTests` (4) · `Services.TimerLengthFitTests` (6) | F2-07's focus-length offer, asserted on the length seeded sessions produce. A Pomodoro's breaks on the *same* activity are not focus (only `SampleCount` tells; the length agrees either way). Another activity, a `RanOutWhileAway` session and one older than the window each would be the fifth session that tips it over the threshold. A finished short timer is not a failure at a longer length |
@@ -98,10 +99,12 @@ loudly:
 
 Three standing caveats rather than gaps:
 
-- **The registrar's boot behaviour is not integration-tested.** `TimerBoundaryAlarmTests` covers
-  schedule / cancel / fire, but not `TimerBoundaryAlarmRegistrar.StartAsync` re-pushing triggers after
-  a restart — the one path whose failure is completely silent. Testing it needs a host restart within
-  a fixture; if you add one, assert on registered job keys, not on rows.
+- **The registrar's boot behaviour is tested by stand-in, not by a real restart.**
+  `TimerBoundaryAlarmRegistrarTests` pins the stranded-job sweep, and
+  `StopwatchCheckInAlarmTests.Registrar_ReRegistersCheckIns` marks a pending alarm's job `Removed` (the
+  registry's view of a trigger lost to a restart) and asserts `StartAsync` makes it `Active` again. Neither
+  restarts a host and inspects the Quartz trigger itself; if you add one, assert on registered job keys,
+  not on rows.
 - **The accepted residual race in cancel.** A tab killed between Stop and the cancel request landing
   fires an alarm for a session already over. This is accepted, not mitigated (see `summary.md`), so no
   test asserts it away — don't write one that "fixes" it.

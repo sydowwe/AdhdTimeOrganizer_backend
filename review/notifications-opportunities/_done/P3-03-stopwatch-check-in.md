@@ -67,3 +67,22 @@ stopwatch never does, and the server doesn't even know one is running.
 
 1. The cadence (90 + 60? user-configurable later?).
 2. Bell row when skipped for quiet hours: recommended none.
+
+## Resolved (2026-10-15). Implemented; this supersedes the design above where they differ
+
+- **Cadence as proposed.** 90 minutes of running time, then hourly, up to 12 h (at most 11 rows), placed by running
+  time: banked `accumulatedMs` plus the live segment, so check-ins an earlier segment passed are left out. Constants
+  in the client's `timerBoundaries.ts`; not user-configurable yet.
+- **No bell row when skipped.** The handler asks `IQuietHoursReader.GetQuietUntilAsync` at fire time (the P3-01
+  reader answers "who is quiet now", so no `QuietHoursPolicy` call is needed) and never calls `NotifyAsync` for a
+  recipient inside their window. A failed read sends it; the dispatcher still defers that push.
+- **Phase is nullable on the row.** Migration `StopwatchCheckInAlarms` adds `kind` (default 0 = Boundary) and
+  `elapsed_minutes`, and drops NOT NULL from `phase`. Its `Down` deletes pending check-ins first, or they would come
+  back as phase 0 and ring "timer finished".
+- **Check-ins are not a "running timer" for Planning's overrun nudge.** Not in the design above. `IRunningTimerLookup`
+  counts `Boundary` rows only: a stopwatch has no planned end, so without this every stopwatch user would silently
+  lose the "time's up" nudge. Pinned in `StopwatchCheckInAlarmTests`.
+- **The tab does not ring a check-in itself.** The push reaches an open tab, and a local ring would ignore quiet
+  hours. The tag (`stopwatch-check-in-<ms>`, its own prefix) only collapses two pushes for one check-in.
+- **Frontend.** `projectBoundaries` returns the check-ins for a running stopwatch, `pushTimerAlarms` sends
+  `kind: StopwatchCheckIn`, and `notificationTypeMeta` routes the type to the stopwatch page with an app-side label.

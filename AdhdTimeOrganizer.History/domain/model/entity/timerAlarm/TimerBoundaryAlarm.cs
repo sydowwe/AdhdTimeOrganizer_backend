@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using Sydowwe.Framework.Contracts.notification.payload;
 
 namespace AdhdTimeOrganizer.History.domain.model.entity.timerAlarm;
@@ -40,8 +41,21 @@ public class TimerBoundaryAlarm : BaseEntityWithUser
     /// </summary>
     public required DateTime BoundaryAt { get; set; }
 
-    /// <summary>Which boundary this is — picks the notification's title.</summary>
-    public required TimerBoundaryPhase Phase { get; set; }
+    /// <summary>
+    /// Which notification the row raises. A stopwatch check-in rides the same table, triggers and boot registrar as
+    /// a phase boundary — it is the same thing, "push at this instant while this timer runs" — and differs only in
+    /// what it says and in how it treats quiet hours (see <c>TimerBoundaryAlarmJobHandler</c>).
+    /// </summary>
+    public TimerAlarmKind Kind { get; set; } = TimerAlarmKind.Boundary;
+
+    /// <summary>Which boundary this is — picks the notification's title. Null on a stopwatch check-in, which has none.</summary>
+    public TimerBoundaryPhase? Phase { get; set; }
+
+    /// <summary>
+    /// Check-in only: the stopwatch's running time at <see cref="BoundaryAt"/>, in whole minutes, as the client counted
+    /// it — pauses excluded, which is why it is posted rather than derived from the instant. Null on a boundary.
+    /// </summary>
+    public int? ElapsedMinutes { get; set; }
 
     /// <summary>
     /// The activity the timer was started for, or null when it named none. Resolved to a display name at fire
@@ -84,9 +98,18 @@ public class TimerBoundaryAlarm : BaseEntityWithUser
     /// rebuild the identical tag with no round trip, which is the only reason the suppression works.
     /// </para>
     /// </summary>
-    public string Tag => TagFor(BoundaryAt);
+    public string Tag => Kind == TimerAlarmKind.StopwatchCheckIn ? CheckInTagFor(BoundaryAt) : TagFor(BoundaryAt);
 
     /// <inheritdoc cref="Tag"/>
-    public static string TagFor(DateTime boundaryAt) =>
-        $"timer-boundary-{new DateTimeOffset(DateTime.SpecifyKind(boundaryAt, DateTimeKind.Utc)).ToUnixTimeMilliseconds()}";
+    public static string TagFor(DateTime boundaryAt) => $"timer-boundary-{UnixMilliseconds(boundaryAt)}";
+
+    /// <summary>
+    /// The check-in's tag. Its own prefix, so a check-in can never collapse into a phase boundary's notification, and
+    /// derived from the instant like <see cref="TagFor"/>, so two pushes for one check-in (a replace racing a fire)
+    /// show as one.
+    /// </summary>
+    public static string CheckInTagFor(DateTime boundaryAt) => $"stopwatch-check-in-{UnixMilliseconds(boundaryAt)}";
+
+    private static long UnixMilliseconds(DateTime instant) =>
+        new DateTimeOffset(DateTime.SpecifyKind(instant, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
 }

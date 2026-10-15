@@ -191,4 +191,11 @@ public class SkPortalNotificationTexts : SkNotificationTexts
 
     public override string Phase(int index, int? total) => total is { } t ? $"Fáza {index}/{t}" : $"Fáza {index}";
     public override string Cycle(int index, int? total) => total is { } t ? $"Cyklus {index}/{t}" : $"Cyklus {index}";
+
+    // "Stále pri „Čítanie“?" — the quoted name stays in the nominative, like "Čas na „Deep work“" above.
+    public override string StopwatchCheckInTitle(string? activityName) =>
+        activityName is { Length: > 0 } ? $"Stále pri {Quote(activityName)}?" : "Stále pri tom?";
+
+    public override string StopwatchCheckInBody(int elapsedMinutes) => $"Stopky bežia už {Lead(elapsedMinutes)}.";
+    public override string StopwatchCheckInFallbackBody => "Stopky stále bežia.";
 }

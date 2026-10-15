@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.History.application.dto.request.timerAlarm;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using FastEndpoints;
 using FluentValidation;
 
@@ -59,10 +60,34 @@ public class ScheduleTimerAlarmsValidator : Validator<ScheduleTimerAlarmsRequest
             // Past boundaries are accepted and silently dropped by the service rather than rejected: a set
             // re-sent after a slow reload legitimately contains boundaries that have since elapsed, and
             // failing the whole request would cost the user the alarms that are still to come.
+            boundary.RuleFor(b => b.Phase).IsInEnum().When(b => b.Phase is not null);
             boundary.RuleFor(b => b.PhaseIndex).GreaterThan(0).When(b => b.PhaseIndex is not null);
             boundary.RuleFor(b => b.PhaseTotal).GreaterThan(0).When(b => b.PhaseTotal is not null);
             boundary.RuleFor(b => b.CycleIndex).GreaterThan(0).When(b => b.CycleIndex is not null);
             boundary.RuleFor(b => b.CycleTotal).GreaterThan(0).When(b => b.CycleTotal is not null);
         });
+
+        RuleFor(x => x.Kind).IsInEnum();
+
+        // Which fields a boundary carries depends on the session's kind, which the child rules above cannot see.
+        // A phase boundary is worded from its phase; a check-in from its running time, and a phase on it would be
+        // a claim about a cycle a stopwatch does not have — refused rather than silently ignored.
+        RuleForEach(x => x.Boundaries)
+            .Cascade(CascadeMode.Stop)
+            .NotNull()
+            .Must(b => b.Phase is not null)
+            .WithMessage("A timer boundary needs a phase.")
+            .Must(b => b.ElapsedMinutes is null)
+            .WithMessage("elapsedMinutes belongs to a stopwatch check-in, not a timer boundary.")
+            .When(x => x.Kind == TimerAlarmKind.Boundary);
+
+        RuleForEach(x => x.Boundaries)
+            .Cascade(CascadeMode.Stop)
+            .NotNull()
+            .Must(b => b.ElapsedMinutes is > 0)
+            .WithMessage("A stopwatch check-in needs a positive elapsedMinutes.")
+            .Must(b => b is { Phase: null, PhaseIndex: null, PhaseTotal: null, CycleIndex: null, CycleTotal: null })
+            .WithMessage("A stopwatch check-in carries no phase or cycle fields.")
+            .When(x => x.Kind == TimerAlarmKind.StopwatchCheckIn);
     }
 }

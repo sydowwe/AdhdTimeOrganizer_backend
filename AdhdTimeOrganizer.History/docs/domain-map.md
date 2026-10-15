@@ -97,11 +97,18 @@ TimerBoundaryAlarm : BaseEntityWithUser (→ BaseTableEntity)
   UserId      long      NOT NULL, FK → user, cascade   (from BaseEntityWithUser)
   SessionId   Guid      NOT NULL   client-issued; groups one timer session's boundaries
   BoundaryAt  DateTime  NOT NULL   absolute UTC instant, scheduled verbatim
-  Phase       TimerBoundaryPhase NOT NULL
+  Kind        TimerAlarmKind NOT NULL (int, default 0 = Boundary)   Boundary | StopwatchCheckIn
+  Phase       TimerBoundaryPhase?  NULL   required on a Boundary, null on a check-in (validator)
+  ElapsedMinutes int?   NULL       check-in only: the stopwatch's running time at BoundaryAt
   ActivityId  long?     NULL       plain column — no FK, no navigation, no index
-  PhaseIndex / PhaseTotal / CycleIndex / CycleTotal  int?  NULL
+  PhaseIndex / PhaseTotal / CycleIndex / CycleTotal  int?  NULL   boundaries only
   Url         string?   NULL, max 512, validated relative
 ```
+
+`Kind` is per session (`ScheduleTimerAlarmsRequest.Kind`, default `Boundary`), and decides what the row raises:
+`Boundary` → `NotificationType.TimerBoundary`, quiet-hours exempt; `StopwatchCheckIn` → `NotificationType.StopwatchCheckIn`
+("still on X? 1 h 30 min", P3-03), which the handler **skips** — no notification row — when the recipient is inside
+their quiet hours, and which `IRunningTimerLookup` does not count as a running timer.
 
 `domain/model/entity/timerAlarm/TimerBoundaryAlarm.cs` ·
 `infrastructure/persistence/configuration/timerAlarm/TimerBoundaryAlarmConfiguration.cs`
@@ -258,7 +265,7 @@ tail. `daysWithActivity` still counts by start, so it can be less than `days.len
 | `HistoryBaselineWindow` | Helper | Resolves the request's `HistoryBaseline` to the range the baseline query runs over, plus the `sameWeekday` filter and the day count the average divides by. Both switches are **exhaustive and throw** on an unhandled member — there is no fallback-to-`last7days` arm | `application/dashboard/HistoryBaselineWindow.cs` |
 | `TimerBoundaryAlarmService` | Service | `ReplaceSessionAsync` / cancel-by-session / fire; owns the Scheduler `RunOnceAt` registration. Implements `ITimerBoundaryAlarmService` | `application/service/TimerBoundaryAlarmService.cs` |
 | `ITimerBoundaryAlarmService` | Contract | The service's port, so the endpoints and the registrar depend on the shape rather than the class | `domain/serviceContract/ITimerBoundaryAlarmService.cs` |
-| `TimerBoundaryAlarmJobHandler` | Job handler | Fires one alarm: resolves the activity name, pushes the notification, then **deletes the row** (self-drain). No-op if the row is gone | `application/job/TimerBoundaryAlarmJobHandler.cs` |
+| `TimerBoundaryAlarmJobHandler` | Job handler | Fires one alarm: resolves the activity name, pushes a `TimerBoundary` or `StopwatchCheckIn` by the row's `Kind` (a check-in inside quiet hours is skipped, not sent), then **deletes the row** (self-drain). No-op if the row is gone | `application/job/TimerBoundaryAlarmJobHandler.cs` |
 | `TimerBoundaryAlarmRegistrar` | `IHostedService` | Re-registers every pending alarm on boot and drops stale ones. **Not optional** — the Quartz store is in-memory; see `summary.md` | `infrastructure/scheduling/TimerBoundaryAlarmRegistrar.cs` |
 | `ActivityHistoryTimeAttributionSink` | Seam impl | Core's `IActivityTimeAttributionSink`: records N seconds against an activity for Tracking. Mutates the caller's `DbContext`, **never** saves; extends a contiguous window instead of inserting — but never a timer-session row, which stays what the timer measured. `TotalSecondsBetweenAsync` sums a half-open `[fromUtc, toUtc)` range the **caller** supplies — the heartbeat passes the user's own midnights, so "the day" is theirs, not UTC's (it used to take a `DateOnly` bounded on UTC midnights, which drove yesterday's planner task for a Bratislava user's first hours) | `application/seam/ActivityHistoryTimeAttributionSink.cs` |
 | `TodoListItemLoggedTimeSource` | Seam impl | Core's `ITodoListItemLoggedTimeSource` for TodoLists' daily recap. Keys on `TodoListItemId` **alone** | `application/seam/TodoListItemLoggedTimeSource.cs` |

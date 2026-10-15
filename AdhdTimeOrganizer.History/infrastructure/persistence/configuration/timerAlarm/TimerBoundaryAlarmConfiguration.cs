@@ -19,7 +19,10 @@ public class TimerBoundaryAlarmConfiguration : IEntityTypeConfiguration<TimerBou
 
         builder.Property(a => a.SessionId).IsRequired();
         builder.Property(a => a.BoundaryAt).IsRequired();
-        builder.Property(a => a.Phase).IsRequired();
+        // Phase is required for a boundary and absent on a stopwatch check-in, so nullable here; the schedule
+        // validator is what enforces which one a row of each kind carries.
+        // Every row written before check-ins existed is a boundary, which is ordinal 0 — the migration's default.
+        builder.Property(a => a.Kind).IsRequired();
         builder.Property(a => a.Url).HasMaxLength(512);
 
         // Cancel-by-session is the hot path (Stop cancels the whole cycle), and it is always user-scoped.

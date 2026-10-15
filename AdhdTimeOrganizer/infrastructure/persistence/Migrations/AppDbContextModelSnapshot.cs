@@ -1355,13 +1355,21 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("cycle_total");
 
+                    b.Property<int?>("ElapsedMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("elapsed_minutes");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
                     b.Property<DateTime>("ModifiedTimestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_timestamp")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<int>("Phase")
+                    b.Property<int?>("Phase")
                         .HasColumnType("integer")
                         .HasColumnName("phase");
 

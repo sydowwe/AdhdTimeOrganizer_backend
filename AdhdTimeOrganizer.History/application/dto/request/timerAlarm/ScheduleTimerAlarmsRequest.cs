@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.History.domain.model.entity.timerAlarm;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using Sydowwe.Framework.Contracts.notification.payload;
 
 namespace AdhdTimeOrganizer.History.application.dto.request.timerAlarm;
@@ -21,6 +22,13 @@ public record ScheduleTimerAlarmsRequest
     /// </summary>
     public required Guid SessionId { get; init; }
 
+    /// <summary>
+    /// What every alarm in the set raises: phase boundaries for a countdown or a pomodoro (the default, so a client
+    /// that predates check-ins is unchanged), or check-ins for a running stopwatch. Per session, not per boundary —
+    /// one timer is one kind.
+    /// </summary>
+    public TimerAlarmKind Kind { get; init; } = TimerAlarmKind.Boundary;
+
     /// <summary>The activity the timer is running for, or null when the user named none.</summary>
     public long? ActivityId { get; init; }
 
@@ -38,7 +46,9 @@ public record ScheduleTimerAlarmsRequest
         {
             SessionId = SessionId,
             BoundaryAt = b.BoundaryAt,
+            Kind = Kind,
             Phase = b.Phase,
+            ElapsedMinutes = b.ElapsedMinutes,
             ActivityId = ActivityId,
             PhaseIndex = b.PhaseIndex,
             PhaseTotal = b.PhaseTotal,
@@ -61,7 +71,14 @@ public record TimerBoundaryRequest
     /// </summary>
     public required DateTime BoundaryAt { get; init; }
 
-    public required TimerBoundaryPhase Phase { get; init; }
+    /// <summary>Required on a boundary, absent on a stopwatch check-in.</summary>
+    public TimerBoundaryPhase? Phase { get; init; }
+
+    /// <summary>
+    /// Check-in only, and required there: the stopwatch's running time at <see cref="BoundaryAt"/>, in whole
+    /// minutes. Posted rather than derived from the instant because pauses make the two differ.
+    /// </summary>
+    public int? ElapsedMinutes { get; init; }
 
     /// <summary>1-based position of this period within its cycle; null for a plain countdown.</summary>
     public int? PhaseIndex { get; init; }

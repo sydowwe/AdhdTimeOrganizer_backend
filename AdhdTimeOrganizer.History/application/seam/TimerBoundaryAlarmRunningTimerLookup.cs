@@ -1,5 +1,6 @@
 using AdhdTimeOrganizer.Core.application.seam;
 using AdhdTimeOrganizer.History.domain.model.entity.timerAlarm;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.config.dependencyInjection;
 
@@ -11,8 +12,16 @@ namespace AdhdTimeOrganizer.History.application.seam;
 /// ahead" is "a timer is running". A stale row the boot registrar has not swept yet is in the past and does not count.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Lifts the query filters and filters on <c>UserId</c> explicitly: the caller is a sweep with nobody signed in, and
 /// names the users it is asking about.
+/// </para>
+/// <para>
+/// <b>Phase boundaries only — a stopwatch's check-ins do not count.</b> The overrun nudge is held because a countdown
+/// or a pomodoro rings at its own planned end. A stopwatch has no planned end, so the plan's "time's up" is the only
+/// voice saying the slot is over, and its first check-in is 90 minutes out. Counting check-in rows would silently
+/// switch the nudge off for everyone who times with a stopwatch.
+/// </para>
 /// </remarks>
 public sealed class TimerBoundaryAlarmRunningTimerLookup : IRunningTimerLookup, IScopedService
 {
@@ -28,7 +37,7 @@ public sealed class TimerBoundaryAlarmRunningTimerLookup : IRunningTimerLookup, 
         return await db.Set<TimerBoundaryAlarm>()
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(a => userIds.Contains(a.UserId) && a.BoundaryAt > now)
+            .Where(a => userIds.Contains(a.UserId) && a.Kind == TimerAlarmKind.Boundary && a.BoundaryAt > now)
             .Select(a => a.UserId)
             .ToHashSetAsync(ct);
     }
