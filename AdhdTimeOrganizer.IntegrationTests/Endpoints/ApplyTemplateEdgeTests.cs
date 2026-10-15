@@ -507,10 +507,60 @@ public class ApplyTemplateEdgeTests(AppDbContextFixture fixture) : PostgresTestB
         }
     }
 
+    // ─── I: C3 — the template's location ─────────────────────────────────────
+
+    /// <summary>
+    /// C3. Applying "Office day" to a day with no location marks the day Office; a day the user (or a stretch of
+    /// time away) already set to Home stays Home. Both apply routes stamp through <c>StampTemplate</c>, so both are
+    /// pinned.
+    /// </summary>
+    [Theory(DisplayName = "C3: applying a template fills an unset day location from it, and never overwrites one")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ApplyingATemplate_FillsAnUnsetLocation_AndKeepsASetOne(bool batched)
+    {
+        var (activityId, template) = await SeedApplyFixtureAsync($"location-{batched}", suggestedLocation: Location.Office);
+        var unsetDayId = await SeedCalendarAsync(new DateOnly(2029, 7, batched ? 13 : 11));
+        var homeDayId = await SeedCalendarAsync(new DateOnly(2029, 7, batched ? 14 : 12));
+
+        await using (var db = CreateDbContext())
+        {
+            var homeDay = await db.Set<Calendar>().SingleAsync(c => c.Id == homeDayId, CancellationToken);
+            homeDay.Location = Location.Home;
+            await db.SaveChangesAsync(CancellationToken);
+        }
+
+        if (batched)
+        {
+            var response = await CreateUserRoleClient().PostAsJsonAsync("api/calendar/apply-planner-template/batch", new
+            {
+                TemplateId = template.Id,
+                CalendarIds = new[] { unsetDayId, homeDayId },
+                ConflictResolution = "Ignore",
+                TasksFromTemplate = new[] { NewTask(activityId, 9, 0, 10, 0) }
+            }, JsonOpts, CancellationToken);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+        else
+        {
+            (await ApplyAsync(unsetDayId, template.Id, "Ignore", [NewTask(activityId, 9, 0, 10, 0)]))
+                .StatusCode.Should().Be(HttpStatusCode.Created);
+            (await ApplyAsync(homeDayId, template.Id, "Ignore", [NewTask(activityId, 9, 0, 10, 0)]))
+                .StatusCode.Should().Be(HttpStatusCode.Created);
+        }
+
+        await using var verifyDb = CreateDbContext();
+        var locations = await verifyDb.Set<Calendar>()
+            .Where(c => c.Id == unsetDayId || c.Id == homeDayId)
+            .ToDictionaryAsync(c => c.Id, c => c.Location, CancellationToken);
+        locations[unsetDayId].Should().Be(Location.Office, "a day with no location takes the template's");
+        locations[homeDayId].Should().Be(Location.Home, "a location already on the day is never overwritten");
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private async Task<(long ActivityId, TaskPlannerDayTemplate Template)> SeedApplyFixtureAsync(
-        string tag, TimeOnly? wakeUpTime = null, TimeOnly? bedTime = null)
+        string tag, TimeOnly? wakeUpTime = null, TimeOnly? bedTime = null, Location? suggestedLocation = null)
     {
         await using var db = CreateDbContext();
         var activityId = await PlanningTestSeedHelper.SeedActivityAsync(db, $"edge-{tag}", ct: CancellationToken);
@@ -522,7 +572,8 @@ public class ApplyTemplateEdgeTests(AppDbContextFixture fixture) : PostgresTestB
             IsActive = true,
             SuggestedForDayType = DayType.Workday,
             DefaultWakeUpTime = wakeUpTime,
-            DefaultBedTime = bedTime
+            DefaultBedTime = bedTime,
+            SuggestedLocation = suggestedLocation
         };
         db.Set<TaskPlannerDayTemplate>().Add(template);
         await db.SaveChangesAsync(CancellationToken);

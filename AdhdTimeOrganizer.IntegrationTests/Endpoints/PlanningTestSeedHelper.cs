@@ -132,7 +132,8 @@ public static class PlanningTestSeedHelper
 
     public static async Task<long> SeedTaskPlannerDayTemplateAsync(
         DbContext db, long userId = TestUserId, string? name = null, CancellationToken ct = default,
-        DayType suggestedForDayType = DayType.Workday, List<DayOfWeek>? scheduledDays = null, bool isActive = true)
+        DayType suggestedForDayType = DayType.Workday, List<DayOfWeek>? scheduledDays = null, bool isActive = true,
+        Location? suggestedLocation = null)
     {
         var template = new TaskPlannerDayTemplate
         {
@@ -140,7 +141,8 @@ public static class PlanningTestSeedHelper
             Name = name ?? $"Template {Guid.NewGuid():N}",
             IsActive = isActive,
             SuggestedForDayType = suggestedForDayType,
-            ScheduledDays = scheduledDays ?? []
+            ScheduledDays = scheduledDays ?? [],
+            SuggestedLocation = suggestedLocation
         };
         db.Set<TaskPlannerDayTemplate>().Add(template);
         await db.SaveChangesAsync(ct);

@@ -5,6 +5,7 @@ using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Planning.application.dto.response.suggestion;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
+using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Testing;
@@ -399,7 +400,99 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
             (beachId, 1), (vacationTagId, 3), (officeId, 0), (tuesdayTagId, 2));
     }
 
+    // ─── C3: the day's location ──────────────────────────────────────────────
+
+    /// <summary>
+    /// A Wednesday marked Office. "Home office" is scheduled for Wednesdays and tagged Workday, the double match
+    /// that led the settings tier before C3; "Office day" matches only the day type and "Office desk" nothing but the
+    /// location. Both location matches now rank ahead of it, reported as type 5, and history still comes first. The
+    /// same templates a week later, on a Wednesday with no location, rank as they did before C3: a null location
+    /// matches nothing, so "Office desk" is not suggested at all.
+    /// </summary>
+    [Fact(DisplayName = "C3: a location match ranks first among the template settings, after history; no location matches nothing")]
+    public async Task Location_RanksFirstAmongMetadata_AndANullLocationMatchesNothing()
+    {
+        var target = new DateOnly(2028, 4, 5); // Wednesday, Workday
+        long historyId, homeOfficeId, officeDayId, officeDeskId, officeCalendarId, plainCalendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            historyId = await SeedHistoryOnlyTemplateAsync(db, "Applied on Wednesdays");
+            await StampAsync(db, historyId, target.AddDays(-7), DayType.Workday);
+            await StampAsync(db, historyId, target.AddDays(-14), DayType.Vacation);
+
+            officeDayId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Office day", CancellationToken, DayType.Workday, [DayOfWeek.Tuesday, DayOfWeek.Thursday],
+                suggestedLocation: Location.Office);
+            officeDeskId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Office desk", CancellationToken, DayType.Special, suggestedLocation: Location.Office);
+            await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Switched-off office", CancellationToken, DayType.Special, isActive: false,
+                suggestedLocation: Location.Office);
+            // Seeded last and used most, so neither id order nor usage puts the location matches ahead by accident.
+            homeOfficeId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Home office", CancellationToken, DayType.Workday, [DayOfWeek.Wednesday],
+                suggestedLocation: Location.Home);
+            var homeOffice = await db.Set<TaskPlannerDayTemplate>().SingleAsync(t => t.Id == homeOfficeId, CancellationToken);
+            homeOffice.UsageCount = 9;
+            await db.SaveChangesAsync(CancellationToken);
+
+            officeCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken);
+            await SetLocationAsync(db, officeCalendarId, Location.Office);
+            plainCalendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target.AddDays(7), UserId, CancellationToken);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        var atTheOffice = await GetSuggestionsAsync(officeCalendarId);
+        atTheOffice.Select(s => (s.Template.Id, s.PatternType)).Should().Equal(
+            (historyId, 0), (officeDayId, 5), (officeDeskId, 5), (homeOfficeId, 2));
+        atTheOffice.Where(s => s.PatternType == 5).Should().OnlyContain(s => s.PatternLabel == nameof(Location.Office) && s.OccurrenceCount == 0);
+
+        var withNoLocation = await GetSuggestionsAsync(plainCalendarId);
+        withNoLocation.Select(s => (s.Template.Id, s.PatternType)).Should().Equal(
+            (historyId, 0), (homeOfficeId, 2), (officeDayId, 3));
+    }
+
+    /// <summary>
+    /// A vacation day in Travel: the location sits with the day-type tier, ahead of it, and both still rank above
+    /// every weekday match (FO1).
+    /// </summary>
+    [Fact(DisplayName = "C3: on an away day a location match ranks with the day-type matches, ahead of them")]
+    public async Task AwayDay_RanksLocationWithDayType_AboveWeekday()
+    {
+        var target = new DateOnly(2028, 4, 4); // Tuesday
+        long lazyDayId, tripId, tuesdaysId, calendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            lazyDayId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Lazy day", CancellationToken, DayType.Vacation);
+            tripId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "On the road", CancellationToken, DayType.Special, suggestedLocation: Location.Travel);
+            tuesdaysId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Tuesdays", CancellationToken, DayType.Special, [DayOfWeek.Tuesday]);
+
+            calendarId = await PlanningTestSeedHelper.SeedCalendarAsync(db, target, UserId, CancellationToken, DayType.Vacation);
+            await SetLocationAsync(db, calendarId, Location.Travel);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarId);
+        suggestions.Select(s => (s.Template.Id, s.PatternType)).Should().Equal(
+            (tripId, 5), (lazyDayId, 3), (tuesdaysId, 2));
+        suggestions[0].PatternLabel.Should().Be(nameof(Location.Travel));
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
+
+    private async Task SetLocationAsync(DbContext db, long calendarId, Location location)
+    {
+        var calendar = await db.Set<Calendar>().IgnoreQueryFilters().SingleAsync(c => c.Id == calendarId, CancellationToken);
+        calendar.Location = location;
+        await db.SaveChangesAsync(CancellationToken);
+    }
 
     /// <summary>
     /// A template whose own metadata matches none of this file's target days — no calendar here is

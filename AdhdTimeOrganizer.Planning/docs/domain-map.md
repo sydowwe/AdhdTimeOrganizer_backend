@@ -489,8 +489,10 @@ survivor. No write path can create such a row any more (see the `EndTime > Start
 there is no CHECK constraint and older rows are not yet normalised, so the guard is load-bearing.
 
 The stamp itself always runs: `Calendar.AppliedTemplateId` / `AppliedTemplateName`, the template's
-`DefaultWakeUpTime` / `DefaultBedTime` when it has them, and `LastUsedAt` / `UsageCount++` on the
-template.
+`DefaultWakeUpTime` / `DefaultBedTime` when it has them, its `SuggestedLocation` **only onto a day with no
+`Location`** (C3 — a location the user or a stretch of time away set is never overwritten), and `LastUsedAt` /
+`UsageCount++` on the template. One interaction with F4-02's un-stamp: a location the template filled that equals
+a stretch's `Location` is cleared with the stretch, since the un-stamp keys on equality, not on who wrote it.
 
 **Each applied task records the template line it came from** (`PlannerTask.SourceTemplateTaskId`, OP15). The
 client sends the lines, so the id arrives on each `TemplateAppliedTaskRequest`, and `BuildTasks` keeps it only
@@ -676,7 +678,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `GetAllTaskPlannerDayTemplateEndpoint` | Query (`BaseGetAllEndpoint`) | Pinned first, then last-used/name | `taskPlannerDayTemplate/query/` |
 | `GetSelectOptionsTaskPlannerDayTemplateEndpoint` | Query (`BaseGetSelectOptionsEndpoint`) | Template picker options | `taskPlannerDayTemplate/query/` |
 | `SetPinnedTaskPlannerDayTemplateEndpoint` | Command (`BasePatchEndpoint`) | `PATCH /task-planner-day-template/{id}/pinned` — **absolute**, not a toggle, so two devices converge. Suffixed route leaves the base's generic `/{id}` patch free | `taskPlannerDayTemplate/command/` |
-| `GetSuggestionsTaskPlannerDayTemplateEndpoint` | Query (custom) | `/task-planner-day-template/suggestions/{calendarId}`: first the template of the day's stretch of time away (type 4, F4-02), then `mv_template_suggestion_pattern`, then active templates whose `ScheduledDays` / `SuggestedForDayType` match the day; one entry per template | `taskPlannerDayTemplate/query/` |
+| `GetSuggestionsTaskPlannerDayTemplateEndpoint` | Query (custom) | `/task-planner-day-template/suggestions/{calendarId}`: first the template of the day's stretch of time away (type 4, F4-02), then `mv_template_suggestion_pattern`, then active templates whose `SuggestedLocation` (type 5, ranked first within the tier — C3) / `ScheduledDays` / `SuggestedForDayType` match the day; one entry per template | `taskPlannerDayTemplate/query/` |
 | `Create/Update/Delete/GetById/GetAllTaskImportanceEndpoint` | CRUD (Framework bases) | Importance-level CRUD; `(user_id, importance)` is unique | `taskImportance/{command,query}/` |
 | `GridTaskImportanceEndpoint` | Query (`BaseGridEndpoint`) | The importance admin grid | `taskImportance/query/GridTaskImportanceEndpoint.cs` |
 | `GetSelectOptionsTaskImportanceEndpoint` | Query (`BaseGetSelectOptionsEndpoint`) | Importance picker options | `taskImportance/query/` |

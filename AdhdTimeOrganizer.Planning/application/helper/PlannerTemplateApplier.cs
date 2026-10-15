@@ -236,6 +236,9 @@ public static class PlannerTemplateApplier
         calendar.MarkSleepWindow(
             template.DefaultWakeUpTime ?? calendar.WakeUpTime,
             template.DefaultBedTime ?? calendar.BedTime);
+        // C3: a day with no location takes the template's, so "Office day" leaves the day marked Office. Never over a
+        // location already set — by the user or by a stretch of time away.
+        calendar.Location ??= template.SuggestedLocation;
 
         template.LastUsedAt = DateTime.UtcNow;
         template.UsageCount++;
