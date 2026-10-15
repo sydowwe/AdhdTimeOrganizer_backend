@@ -334,6 +334,12 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
                 // killed the process with a StackOverflowException on the first /swagger/v1/swagger.json
                 // request. Pinned by SwaggerSchemaProcessorOrderTests.
                 RemoveToEntitySchemaProcessor.PrependTo(s.SchemaSettings.SchemaProcessors);
+
+                // A notification kind is a struct in C# and a bare string on the wire (its own JSON converter), so
+                // describe it as the string it is rather than as a { key } object no client ever receives.
+                s.SchemaSettings.TypeMappers.Add(new NJsonSchema.Generation.TypeMappers.PrimitiveTypeMapper(
+                    typeof(Sydowwe.Framework.Contracts.notification.NotificationType),
+                    schema => schema.Type = NJsonSchema.JsonObjectType.String));
             };
         });
 
@@ -378,6 +384,11 @@ static void ConfigureServices(IConfiguration configuration, IServiceCollection s
     // set of recurring jobs: every pending timer-boundary alarm, because the RAM job store lost them all.
     // Without this, an alarm registered before a deploy silently never fires — no error, no log line.
     services.AddHostedService<TimerBoundaryAlarmRegistrar>();
+
+    // Builds the notification kind registry while the host starts, so two kinds sharing a key, or a payload record
+    // naming the wrong kind, stop the boot instead of failing the first notification of the day. Pinned by
+    // NotificationKindRegistryTests, which asserts such a host does not start.
+    services.AddHostedService<Sydowwe.Notifications.application.kind.NotificationKindRegistryStartupCheck>();
 
     // Caching
     services.AddDistributedMemoryCache();

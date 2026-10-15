@@ -227,11 +227,12 @@ public class NotificationLocaleTests(AppDbContextFixture fixture) : PostgresTest
     // ---- (5) the host's say ------------------------------------------------------------------------
 
     /// <summary>
-    /// A host owns its wording: subclass the shipped table, override the members it wants, hand it to
-    /// <c>NotificationTextOptions.Use</c>. The override has to reach <b>every</b> render point through the one
-    /// options object — a renderer or a mail builder that reached for the static module table instead would
-    /// keep the shipped sentence for that channel only, which is the kind of drift that shows up in nobody's
-    /// test but the user's inbox. Asserted on the bell and the mail chrome, the two ends of the pipeline.
+    /// A host owns the wording every kind shares: subclass the shipped table, override the members it wants, hand
+    /// it to <c>NotificationTextOptions.Use</c>. (A kind's own sentences are its owner's, on the kind — R1.) The
+    /// override has to reach <b>every</b> render point through the one options object — a renderer or a mail builder
+    /// that reached for the static module table instead would keep the shipped wording for that channel only, which
+    /// is the kind of drift that shows up in nobody's test but the user's inbox. Asserted on the bell and the mail,
+    /// the two ends of the pipeline: the quote style inside a kind's own sentence, and the mail chrome.
     /// </summary>
     [Fact(DisplayName = "A host can reword a language, and the override reaches the bell and the mail alike")]
     public async Task HostOverride_ReachesEveryRenderPoint()
@@ -253,23 +254,23 @@ public class NotificationLocaleTests(AppDbContextFixture fixture) : PostgresTest
         await using (var scope = factory.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<INotificationService>().NotifyAsync(
                 NotificationRecipients.User(EnglishUserId),
-                NotificationType.DeadlineApproaching,
-                new DeadlineApproachingPayload("Feature Development"),
-                ct: CancellationToken);
+                new ScheduledJobFailedPayload("purge-expired-run-logs"),
+                CancellationToken);
 
         var mail = email.Messages.Should().ContainSingle().Subject;
-        mail.Subject.Should().Be("Heads up — deadline", "the overridden title is what the mail is sent under");
-        mail.HtmlBody.Should().Contain("Deadline approaching: Feature Development.", "a member left alone keeps the module's sentence")
+        mail.Subject.Should().Be("Scheduled job failed", "a member left alone keeps the shipped sentence");
+        mail.HtmlBody.Should().Contain("Scheduled job [purge-expired-run-logs] failed", "the kind words itself with the host's quotes")
             .And.Contain("Open the app", "the chrome is built from the same overridden table, not the module's");
 
         var bell = await ReadBellListAsync(factory.CreateClient());
-        bell.Values.Should().ContainSingle().Which.GetProperty("title").GetString().Should().Be("Heads up — deadline");
+        bell.Values.Should().ContainSingle().Which.GetProperty("body").GetString()
+            .Should().Be("Scheduled job [purge-expired-run-logs] failed and needs attention.");
     }
 
     /// <summary>Two members reworded, the rest inherited — the shape of a real host override.</summary>
     private sealed class HouseStyleEnglish : EnNotificationTexts
     {
-        public override string DeadlineApproachingTitle => "Heads up — deadline";
+        public override string Quote(string value) => $"[{value}]";
         public override string EmailOpenPortal => "Open the app";
     }
 

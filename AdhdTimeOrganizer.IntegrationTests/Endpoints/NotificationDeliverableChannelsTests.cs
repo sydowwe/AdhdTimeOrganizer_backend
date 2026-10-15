@@ -162,10 +162,10 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
             NotificationRecipients.User(UserId), type, SamplePayload(type), ct: CancellationToken);
     }
 
-    private static INotificationPayload? SamplePayload(NotificationType type) => type switch
+    private static INotificationPayload? SamplePayload(NotificationType type) => type.Key switch
     {
-        NotificationType.DeadlineApproaching => new DeadlineApproachingPayload("Feature Development"),
-        NotificationType.ReminderDigest => new ReminderDigestPayload(3),
+        nameof(NotificationType.DeadlineApproaching) => new DeadlineApproachingPayload("Feature Development"),
+        nameof(NotificationType.ReminderDigest) => new ReminderDigestPayload(3),
         _ => null
     };
 

@@ -45,19 +45,19 @@ public class PlannerTaskNotificationActionHandler(
 {
     private static readonly TimeOnly LastMinuteOfDay = new(23, 59);
 
-    public bool Handles(NotificationType type, NotificationActionKind kind) => (type, kind) switch
+    public bool Handles(NotificationType type, NotificationActionKind kind) => (type.Key, kind) switch
     {
-        (NotificationType.PlannedBlockStarting, NotificationActionKind.Start or NotificationActionKind.Skip) => true,
-        (NotificationType.PlannedBlockOverrun, NotificationActionKind.Done or NotificationActionKind.Extend) => true,
+        (nameof(NotificationType.PlannedBlockStarting), NotificationActionKind.Start or NotificationActionKind.Skip) => true,
+        (nameof(NotificationType.PlannedBlockOverrun), NotificationActionKind.Done or NotificationActionKind.Extend) => true,
         _ => false
     };
 
     public async Task<NotificationActionOutcome> ExecuteAsync(NotificationActionContext context, CancellationToken ct)
     {
-        var taskId = context.Type switch
+        var taskId = context.Type.Key switch
         {
-            NotificationType.PlannedBlockStarting => Payload<PlannedBlockStartingPayload>(context.PayloadJson)?.PlannerTaskId,
-            NotificationType.PlannedBlockOverrun => Payload<PlannedBlockOverrunPayload>(context.PayloadJson)?.PlannerTaskId,
+            nameof(NotificationType.PlannedBlockStarting) => Payload<PlannedBlockStartingPayload>(context.PayloadJson)?.PlannerTaskId,
+            nameof(NotificationType.PlannedBlockOverrun) => Payload<PlannedBlockOverrunPayload>(context.PayloadJson)?.PlannerTaskId,
             _ => null
         };
         if (taskId is not > 0)

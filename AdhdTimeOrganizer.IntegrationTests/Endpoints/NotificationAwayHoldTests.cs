@@ -143,10 +143,11 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
     /// so a user who is not there gets it in the bell only.
     /// </summary>
     [Theory(DisplayName = "A missed-block or overrun nudge to an away user waits in the bell; the others are pushed")]
-    [InlineData(NotificationType.PlannedBlocksMissed)]
-    [InlineData(NotificationType.PlannedBlockOverrun)]
-    public async Task PlannerSlipNudges_ReachTheAwayUsersBellOnly(NotificationType type)
+    [InlineData(nameof(NotificationType.PlannedBlocksMissed))]
+    [InlineData(nameof(NotificationType.PlannedBlockOverrun))]
+    public async Task PlannerSlipNudges_ReachTheAwayUsersBellOnly(string key)
     {
+        var type = new NotificationType(key);
         var push = new CapturingWebPushSender();
         await using var factory = CreateFactory(push, new CapturingEmailSender());
 

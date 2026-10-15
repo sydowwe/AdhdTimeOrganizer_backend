@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.notification.action;
+using Sydowwe.Framework.Contracts.notification.kind;
 using Sydowwe.Framework.Contracts.user;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Notifications.application;
@@ -206,9 +207,11 @@ public static class ModuleServiceExtensions
     private static void AddNotificationCatalog(IServiceCollection services) =>
         services.Configure<NotificationCatalogOptions>(o =>
         {
-            // Dev/QA probe: only an administrator can raise it (SendTestNotificationEndpoint), so only an
-            // administrator is offered a switch for it.
-            o.AdminOnlyTypes = [NotificationType.Test];
+            // The Reminders module ships these two kinds, and nothing here raises either: Planning registers
+            // PersonalReminder with no DigestKey, so neither is ever sent, and their rows muted nothing
+            // (DeadlineApproaching even showed E-mail ✓, a promise the app never kept). Each comes back together
+            // with a producer.
+            o.UnraisedTypes = [FrameworkNotificationTypes.DeadlineApproaching, FrameworkNotificationTypes.ReminderDigest];
 
             // FO5's back-off: for a user away three days or more (RecipientEngagementReader), these wait in the
             // bell and are not pushed or mailed. Only the unsolicited ones about a day, period or block that passes
@@ -237,11 +240,6 @@ public static class ModuleServiceExtensions
                 NotificationType.MorningBriefing
             ];
 
-            // Bell-only until the user ticks push: low-urgency kinds worth finding the next time the app is open,
-            // not worth a buzz. Every kind raised today is something the user asked for or about a moment, so the
-            // list starts empty; a new bell-only kind goes here together with its producer.
-            o.PushOffByDefault = [];
-
             // P2-03: what the lock screen lets the user do without opening the app — every extra step between
             // "reminded" and "handled" is a place an ADHD user drops the task. Two buttons at most (what Chrome and
             // Android show). Snooze is the Reminders module's and appears only on a push that delivered a reminder
@@ -255,12 +253,11 @@ public static class ModuleServiceExtensions
                 [NotificationType.PlannedBlockOverrun] = [NotificationAction.Done, NotificationAction.Extend(15)]
             };
 
+            // R1 phase 2: the kinds that have not moved onto their own definition yet. The framework's own kinds
+            // (the Scheduler's two alerts, the admin-only Test) register themselves.
             o.SupportedTypes =
         [
-            // Reminders module: the user's own self-set nudge. Its generic DeadlineApproaching and batched
-            // ReminderDigest are deliberately absent — Planning registers PersonalReminder with no DigestKey,
-            // so neither is ever sent here, and their rows muted nothing (DeadlineApproaching even showed
-            // E-mail ✓, a promise the app never kept). Each comes back together with a producer.
+            // Planning slice: the user's own self-set nudge, delivered through the Reminders module.
             NotificationType.PersonalReminder,
 
             // Routines slice (RoutinePeriodNotificationService).
@@ -268,10 +265,6 @@ public static class ModuleServiceExtensions
             NotificationType.RoutinePeriodEnded,
             NotificationType.RoutineStreakGraceExpiring,
             NotificationType.RoutineSuggestedToday,
-
-            // Scheduler module: the failure notifier and the overdue sweep.
-            NotificationType.ScheduledJobFailed,
-            NotificationType.ScheduledJobOverdue,
 
             // TodoLists slice: TodoListItemDueReminderSync, registered through the Reminders module per timed item.
             // Not held while away: it is about the user's own commitment, not a nudge to come back.
@@ -301,10 +294,7 @@ public static class ModuleServiceExtensions
             // Tracking slice: TrackerSilenceJobHandler, through TrackerSilenceNotifier (P2-04). Not held while away —
             // the rule only fires for a user the app saw within a day, and it is operational, not a nudge. Push on,
             // email off (NotificationChannelDefaults): the user should hear about it, but it is not worth a mail.
-            NotificationType.TrackerSilent,
-
-            // Raised on demand by SendTestNotificationEndpoint (admin-only, see AdminOnlyTypes above).
-            NotificationType.Test
+            NotificationType.TrackerSilent
         ];
         });
 
