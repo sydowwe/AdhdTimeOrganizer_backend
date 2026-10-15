@@ -118,8 +118,8 @@ worth copying the shape of:
   runs under a `BackgroundLoggedUserService` and asserts the owner's `UserId` on the occurrence, its reminder
   and the recipient; and the guard cases change the block behind the sync's back and assert `Skipped /
   SubjectRetired` with no `Notification` row. Copy this file's `CreateBackgroundFactory` for any job that writes.
-- `HistorySummaryCustomRangeTests` — `rangeType: "CustomRange"` is `date`…`endDate` inclusive on all four
-  `summary/` endpoints. The range resolver used to fall through to `(date, date)` and a `to <= from` guard
+- `HistorySummaryCustomRangeTests` — `rangeType: "CustomRange"` is `date`…`endDate` inclusive on the four
+  row-summing `summary/` endpoints, and refused when unanswerable on all five (`timer-plan` included). The range resolver used to fall through to `(date, date)` and a `to <= from` guard
   widened that to two days, so a month-long request was answered for two days — a well-formed 200 the
   client cannot tell from the truth. Rows are seeded just inside and just outside each edge, inside the
   hour where the user's date and UTC's disagree, so a wrong-but-plausible range still fails. The 400 cases

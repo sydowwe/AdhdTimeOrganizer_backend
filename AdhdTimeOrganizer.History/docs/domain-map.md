@@ -89,6 +89,14 @@ treats a null as a session of one.
   `RanOutWhileAway` sessions are left out. The offer is the largest 5-minute length that at least 70% of the
   stretches bearing on it reached, with 5 of them over 5 sessions (`EstimateFitRule`), and otherwise nothing.
   The response carries no completion share, so the client cannot render one as a score.
+- **`POST /activity-history/dashboard/summary/timer-plan` is the range reader of `PlannedLength`** (OP6's trend
+  line). Sessions belong to the user's day their first row starts on. It counts them by outcome, names the ones
+  with no plan (`withoutPlanCount`, pre-OP6) instead of dropping them, and sums `PlannedLength` against the focus
+  rows (by `Phase` again) over the completed and stopped-early sessions only, so both sums cover the same
+  sessions. `RanOutWhileAway` is counted and kept out of both sums. The shortfall is summed over stopped-early
+  sessions only, since a completed countdown sits up to a minute under its plan from rounding alone. It shares the
+  data with `session/fit` and not the question: one is per activity, for the timer setup, and the other is per
+  range, for reflection. Don't merge them. Pinned by `HistoryTimerPlanSummaryTests`.
 
 ### TimerBoundaryAlarm
 
@@ -129,7 +137,7 @@ recorded time, so a deleted account's pending alarms go with it rather than surv
 nobody. See `summary.md` → *Timer-boundary alarms* for the design constraints; the entity's own XML
 remarks carry the rest.
 
-## Endpoints (20)
+## Endpoints (21)
 
 | Route | Verb | File |
 |---|---|---|
@@ -143,7 +151,7 @@ remarks carry the rest.
 | `/activity-history/filter` | POST | `query/FilterActivityHistoryEndpoint` |
 | `/activity-history/aggregate-by-activity` | POST | `query/AggregateByActivityActivityHistoryEndpoint`. **No client caller since 2026-10-12**: the SPA's last reader, the routine list's activity-keyed calibration, moved to the item-keyed `TypicalSeconds` (F2-06). A candidate for deletion |
 | `/activity-history/dashboard/detail/{pie-chart,stacked-bars,summary-cards}` | POST | `query/dashboard/detail/*` |
-| `/activity-history/dashboard/summary/{pie-chart,stacked-bars,summary-cards,time-of-day}` | POST | `query/dashboard/summary/*` |
+| `/activity-history/dashboard/summary/{pie-chart,stacked-bars,summary-cards,time-of-day,timer-plan}` | POST | `query/dashboard/summary/*` |
 | `/activity-history/dashboard/calendar` | POST | `CalendarActivityEndpoint` (directly under `endpoint/`) |
 | `/activity-history/timer-alarm/schedule` | POST | `command/ScheduleTimerAlarmsEndpoint` |
 | `/activity-history/timer-alarm/cancel` | POST | `command/CancelTimerAlarmsEndpoint` |

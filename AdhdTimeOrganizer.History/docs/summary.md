@@ -1,7 +1,7 @@
 # AdhdTimeOrganizer.History — Agent Summary
 
 **Purpose:** The activity-history slice. Owns the `ActivityHistory` entity, its CRUD/read endpoints,
-the seven dashboard endpoints (three `HistoryDetail*`, four `HistorySummary*`), and
+the eight dashboard endpoints (three `HistoryDetail*`, five `HistorySummary*`), and
 the timer-boundary alarms.
 
 **Third project of the portal split**, after `AdhdTimeOrganizer.Core` and
@@ -9,8 +9,8 @@ the timer-boundary alarms.
 
 ## Bounded context
 
-Owns: `ActivityHistory` and `ActivityHistorySession` + their EF configurations, 14 endpoints, the history request/response/filter
-DTOs, `ActivityHistoryValidator`, the four `summary/` range validators
+Owns: `ActivityHistory` and `ActivityHistorySession` + their EF configurations, their endpoints (`domain-map.md` lists them), the history request/response/filter
+DTOs, `ActivityHistoryValidator`, the five `summary/` range validators
 (`HistorySummaryDateRangeValidators.cs` — one concrete class per request type, because FastEndpoints
 resolves validators by exact type and skips validation silently without one), and the dev
 `ActivityHistorySeeder` (Order 300, inside its band —
@@ -89,6 +89,10 @@ What is load-bearing:
   reads focus rows by `Phase`, never by activity alone, and treats a stretch that ran its length as "at least
   this long". It returns no share and no failure count, and it never edits a timer preset. See
   `domain-map.md` → *ActivityHistorySession*.
+- **…and once more over a range, for reflection** (OP6's trend line): `POST /activity-history/dashboard/summary/timer-plan`
+  sums `PlannedLength` against the focus rows of the range's sessions, counts them by outcome, and names the
+  pre-OP6 ones with no plan. `RanOutWhileAway` is counted but kept out of both sums, so the two sums cover the
+  same sessions. It shares the data with `session/fit`, not the question, and the two are not to be merged.
 
 **`planning.mv_activity_history_pattern` counts sittings too**, in SQL rather than through
 `HistorySittings`: a session's focus rows are one sitting per activity, from the first focus period's start to
