@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.application.service.morningBriefing;
 using AdhdTimeOrganizer.Tracking.application.notification;
 using AdhdTimeOrganizer.TodoLists.application.notification;
@@ -44,8 +45,8 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         RoutinesNotificationTypes.RoutinePeriodEnded,
         RoutinesNotificationTypes.RoutineStreakGraceExpiring,
         RoutinesNotificationTypes.RoutineSuggestedToday,
-        NotificationType.ScheduledJobFailed,
-        NotificationType.ScheduledJobOverdue,
+        FrameworkNotificationTypes.ScheduledJobFailed,
+        FrameworkNotificationTypes.ScheduledJobOverdue,
         TodoListsNotificationTypes.TodoItemDue,
         PlanningNotificationTypes.PlannedBlockStarting,
         PlanningNotificationTypes.PlannedBlocksMissed,
@@ -54,7 +55,7 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         HistoryNotificationTypes.TimerBoundary,
         HistoryNotificationTypes.StopwatchCheckIn,
         TrackingNotificationTypes.TrackerSilent,
-        NotificationType.Test
+        FrameworkNotificationTypes.Test
     };
 
     protected override IReadOnlyDictionary<NotificationType, IReadOnlyList<NotificationAction>> ExpectedActions => Actions;

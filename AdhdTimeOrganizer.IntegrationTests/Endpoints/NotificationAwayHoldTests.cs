@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.application.service.morningBriefing;
 using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Routines.application.notification;
@@ -221,7 +222,7 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
         var flushAt = DateTimeOffset.UtcNow;
         var heldId = await SeedDeferredAsync(AwayUserId, RoutinesNotificationTypes.RoutineSuggestedToday, flushAt);
         await SeedDeferredAsync(PresentUserId, RoutinesNotificationTypes.RoutineSuggestedToday, flushAt);
-        await SeedDeferredAsync(AwayUserId, NotificationType.Test, flushAt);
+        await SeedDeferredAsync(AwayUserId, FrameworkNotificationTypes.Test, flushAt);
 
         await using (var scope = factory.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetServices<IScheduledJobHandler>()
@@ -277,7 +278,7 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
         {
             UserId = userId,
             Type = type,
-            PayloadJson = type == NotificationType.Test ? """{"message":"held"}""" : """{"count":1}""",
+            PayloadJson = type == FrameworkNotificationTypes.Test ? """{"message":"held"}""" : """{"count":1}""",
             DeferredUntil = flushAt.AddMinutes(-1)
         };
         db.Add(notification);

@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
@@ -284,11 +285,11 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
             var notifications = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
             await notifications.NotifyAsync(
-                NotificationRecipients.User(TestUserId), NotificationType.Test,
+                NotificationRecipients.User(TestUserId), FrameworkNotificationTypes.Test,
                 new TestNotificationPayload("stale"), longAgo, ct: CancellationToken);
 
             await notifications.NotifyAsync(
-                NotificationRecipients.User(UtcUserId), NotificationType.Test,
+                NotificationRecipients.User(UtcUserId), FrameworkNotificationTypes.Test,
                 new TestNotificationPayload("punctual"), justNow, ct: CancellationToken);
         }
 
@@ -367,7 +368,7 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
             user.Timezone = Bratislava;
             seed.AddRange(
                 new NotificationQuietHours { UserId = TestUserId, StartMinute = 22 * 60, EndMinute = 6 * 60 },
-                new NotificationPreference { UserId = TestUserId, Type = NotificationType.Test, Channel = NotificationChannel.Email, Enabled = true },
+                new NotificationPreference { UserId = TestUserId, Type = FrameworkNotificationTypes.Test, Channel = NotificationChannel.Email, Enabled = true },
                 new PushSubscription
                 {
                     UserId = TestUserId,
@@ -474,7 +475,7 @@ public class QuietHoursUserZoneAndLateDeliveryTests(AppDbContextFixture fixture)
         var notification = new Notification
         {
             UserId = userId,
-            Type = NotificationType.Test,
+            Type = FrameworkNotificationTypes.Test,
             PayloadJson = """{"message":"held"}""",
             DeferredUntil = deferredUntil
         };

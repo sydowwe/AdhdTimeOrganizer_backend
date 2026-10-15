@@ -1,10 +1,13 @@
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.notification.kind;
 using Sydowwe.Framework.Contracts.notification.payload;
+using Sydowwe.Framework.Contracts.reminders;
 using Sydowwe.Framework.Testing;
+using Sydowwe.Reminders.domain.entity;
 using Xunit;
 
 namespace AdhdTimeOrganizer.IntegrationTests.Modules;
@@ -59,6 +62,34 @@ public class NotificationKindRegistryTests(AppDbContextFixture fixture) : Postgr
             .Should().BeEquivalentTo(
                 "AdhdTimeOrganizer", "AdhdTimeOrganizer.History", "AdhdTimeOrganizer.Routines", "AdhdTimeOrganizer.Planning",
                 "AdhdTimeOrganizer.TodoLists", "AdhdTimeOrganizer.Tracking", "Sydowwe.Notifications");
+    }
+
+    /// <summary>
+    /// A kind is an open string key, so a typo is not a compile error, and the admin register route binds any string.
+    /// A reminder registered under a key no kind defines would be stored and then delivered, for its whole life, with
+    /// the generic text and no settings row — so the registry refuses it, and leaves no definition behind.
+    /// </summary>
+    [Fact(DisplayName = "A reminder cannot be registered under a notification kind nothing defines")]
+    public async Task ReminderRegistration_RefusesAnUnregisteredKind()
+    {
+        await using var scope = Fixture.AdminAndUserFactory.Services.CreateAsyncScope();
+        var registry = scope.ServiceProvider.GetRequiredService<IReminderRegistry>();
+
+        var register = () => registry.RegisterAsync(new ReminderRegistration
+        {
+            Key = new ReminderKey("R1Probe", "Probe", "1", "Probe"),
+            Schedule = ReminderSchedule.OneShot(DateTimeOffset.UtcNow.AddDays(1), [0]),
+            TemplateKey = "r1.probe",
+            NotificationType = new NotificationType("PersonalReminderr"),
+            RecipientMode = RecipientMode.ExplicitUsers,
+            ExplicitRecipientUserIds = [FakeLoggedUserService.TestUserId]
+        }, CancellationToken);
+
+        (await register.Should().ThrowAsync<ArgumentException>()).WithMessage("*'PersonalReminderr'*");
+
+        await using var db = CreateDbContext();
+        (await db.Set<ReminderDefinition>().AnyAsync(d => d.OwnerModule == "R1Probe", CancellationToken))
+            .Should().BeFalse("a refused registration stores nothing");
     }
 
     /// <summary>Boots a host with the extra registration and returns every message in the exception chain it died with.</summary>

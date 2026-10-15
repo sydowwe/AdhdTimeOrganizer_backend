@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.TodoLists.application.notification;
 using AdhdTimeOrganizer.Planning.application.notification;
 using System.Collections.Concurrent;
@@ -118,7 +119,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
         var push = new CapturingWebPushSender();
         await using var factory = CreatePushFactory(push);
 
-        await NotifyAsync(factory, NotificationRecipients.User(EnglishUserId), NotificationType.Test, new TestNotificationPayload("plain"));
+        await NotifyAsync(factory, NotificationRecipients.User(EnglishUserId), FrameworkNotificationTypes.Test, new TestNotificationPayload("plain"));
 
         push.DocumentFor(EnglishUserId).ContainsKey("actions").Should().BeFalse();
     }

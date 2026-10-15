@@ -1,3 +1,5 @@
+using Sydowwe.Framework.Contracts.notification.text;
+using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.History.application.notification;
 using System.Collections.Concurrent;
@@ -103,7 +105,7 @@ public class NotificationLocaleTests(AppDbContextFixture fixture) : PostgresTest
     [Fact(DisplayName = "The bell reads in the account's locale, and follows it when it changes")]
     public async Task BellList_ReadsInTheAccountsLocale_AndFollowsAChange()
     {
-        var id = await SeedNotificationAsync(EnglishUserId, NotificationType.ReminderDigest, new ReminderDigestPayload(3));
+        var id = await SeedNotificationAsync(EnglishUserId, FrameworkNotificationTypes.ReminderDigest, new ReminderDigestPayload(3));
 
         var english = await ReadBellListAsync();
         english[id].GetProperty("title").GetString().Should().Be("Reminders");
@@ -148,7 +150,7 @@ public class NotificationLocaleTests(AppDbContextFixture fixture) : PostgresTest
         await using (var scope = factory.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<INotificationService>().NotifyAsync(
                 NotificationRecipients.Users([EnglishUserId, SlovakUserId]),
-                NotificationType.DeadlineApproaching,
+                FrameworkNotificationTypes.DeadlineApproaching,
                 new DeadlineApproachingPayload("Feature Development"),
                 ct: CancellationToken);
 
@@ -270,7 +272,7 @@ public class NotificationLocaleTests(AppDbContextFixture fixture) : PostgresTest
     }
 
     /// <summary>Two members reworded, the rest inherited — the shape of a real host override.</summary>
-    private sealed class HouseStyleEnglish : EnNotificationTexts
+    private sealed class HouseStyleEnglish : EnNotificationTextKit
     {
         public override string Quote(string value) => $"[{value}]";
         public override string EmailOpenPortal => "Open the app";

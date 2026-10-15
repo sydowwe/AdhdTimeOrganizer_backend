@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
@@ -60,7 +61,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
     /// <summary>
     /// Every MAIL_* env var the test fixture sets is present, so <see cref="EmailNotificationOptions"/>
     /// auto-detects SMTP as configured and the email channel is default-on for
-    /// <see cref="NotificationType.DeadlineApproaching"/> — which would make the dispatcher open a socket to
+    /// <see cref="FrameworkNotificationTypes.DeadlineApproaching"/> — which would make the dispatcher open a socket to
     /// the fake SMTP host. Pin the master switch off for the dispatch tests; the channel's own behaviour is
     /// not what these tests are about.
     /// </summary>
@@ -497,7 +498,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         await using var db = CreateDbContext();
         var notification = await db.Set<Notification>().SingleAsync(CancellationToken);
         Assert.Equal(RecipientUserId, notification.UserId);
-        Assert.Equal(NotificationType.Test, notification.Type);
+        Assert.Equal(FrameworkNotificationTypes.Test, notification.Type);
         Assert.False(notification.IsRead);
     }
 
@@ -523,7 +524,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
             Key = new ReminderKey("Portal", "WiringSmoke", "1", "DueNow"),
             Schedule = ReminderSchedule.OneShot(dueAt, [0]),
             TemplateKey = "wiring-smoke",
-            NotificationType = NotificationType.DeadlineApproaching,
+            NotificationType = FrameworkNotificationTypes.DeadlineApproaching,
             RecipientMode = RecipientMode.ExplicitUsers,
             ExplicitRecipientUserIds = [RecipientUserId]
         }, CancellationToken);
@@ -546,11 +547,11 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         var dispatch = await db.Set<ReminderDispatch>().SingleAsync(CancellationToken);
         Assert.Equal(registration.DefinitionId, dispatch.ReminderDefinitionId);
         Assert.Equal(DispatchOutcome.Sent, dispatch.Outcome);
-        Assert.Equal(NotificationType.DeadlineApproaching, dispatch.NotificationTypeSnapshot);
+        Assert.Equal(FrameworkNotificationTypes.DeadlineApproaching, dispatch.NotificationTypeSnapshot);
 
         var notification = await db.Set<Notification>().SingleAsync(CancellationToken);
         Assert.Equal(RecipientUserId, notification.UserId);
-        Assert.Equal(NotificationType.DeadlineApproaching, notification.Type);
+        Assert.Equal(FrameworkNotificationTypes.DeadlineApproaching, notification.Type);
 
         // One-shot with a single offset: nothing left to fire, so the definition terminalises rather than
         // staying Active with a stale NextOccurrenceAt the next scan would re-pick.

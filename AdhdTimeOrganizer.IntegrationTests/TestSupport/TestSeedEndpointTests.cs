@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -896,7 +897,7 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
         }
 
         // And the one kind whose payload carries a concrete value renders that value rather than its fallback.
-        var digest = notifications.Single(notification => notification.Type == NotificationType.ReminderDigest);
+        var digest = notifications.Single(notification => notification.Type == FrameworkNotificationTypes.ReminderDigest);
         renderer.Render(digest.Type, digest.PayloadJson, AvailableLocales.Sk).Body.Should().Contain("3");
     }
 

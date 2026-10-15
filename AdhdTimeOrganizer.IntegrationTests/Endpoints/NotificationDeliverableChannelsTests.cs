@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.History.application.notification;
 using System.Net;
@@ -26,7 +27,7 @@ namespace AdhdTimeOrganizer.IntegrationTests.Endpoints;
 /// whether the deployment can deliver on it. Web Push is default-on for every type, so on a host with no VAPID keys
 /// unticking In-app still left a channel "enabled", and the history row was written anyway while the settings
 /// screen told the user "not even in the notification list".</item>
-/// <item><b>§S4</b> — <see cref="NotificationType.Test"/> is a dev/QA probe, yet the catalog offered it to every
+/// <item><b>§S4</b> — <see cref="FrameworkNotificationTypes.Test"/> is a dev/QA probe, yet the catalog offered it to every
 /// account, and <c>POST /notification/test</c> let any account raise it.</item>
 /// </list>
 /// </summary>
@@ -56,12 +57,12 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
     {
         await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: InAppOnly);
         AssertOnlyInAppCanDeliver(factory);
-        await SetPreferenceAsync(NotificationType.DeadlineApproaching, NotificationChannel.InApp, false);
-        var before = await CountRowsAsync(NotificationType.DeadlineApproaching);
+        await SetPreferenceAsync(FrameworkNotificationTypes.DeadlineApproaching, NotificationChannel.InApp, false);
+        var before = await CountRowsAsync(FrameworkNotificationTypes.DeadlineApproaching);
 
-        await NotifyAsync(factory, NotificationType.DeadlineApproaching);
+        await NotifyAsync(factory, FrameworkNotificationTypes.DeadlineApproaching);
 
-        (await CountRowsAsync(NotificationType.DeadlineApproaching)).Should().Be(before,
+        (await CountRowsAsync(FrameworkNotificationTypes.DeadlineApproaching)).Should().Be(before,
             "Push and E-mail default to on, but neither can reach anyone here — so the user has silenced everything "
             + "that can deliver, and the screen says exactly that");
     }
@@ -71,11 +72,11 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
     {
         await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: InAppOnly);
         AssertOnlyInAppCanDeliver(factory);
-        var before = await CountRowsAsync(NotificationType.ReminderDigest);
+        var before = await CountRowsAsync(FrameworkNotificationTypes.ReminderDigest);
 
-        await NotifyAsync(factory, NotificationType.ReminderDigest);
+        await NotifyAsync(factory, FrameworkNotificationTypes.ReminderDigest);
 
-        (await CountRowsAsync(NotificationType.ReminderDigest)).Should().Be(before + 1,
+        (await CountRowsAsync(FrameworkNotificationTypes.ReminderDigest)).Should().Be(before + 1,
             "discounting unconfigured channels must not swallow a notification the user did not mute");
     }
 
@@ -100,7 +101,7 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
     {
         var items = await GetMatrixAsync(CreateUserRoleClient());
 
-        items.Select(i => i.Type).Should().NotContain(NotificationType.Test);
+        items.Select(i => i.Type).Should().NotContain(FrameworkNotificationTypes.Test);
         items.Should().NotBeEmpty("the rest of the catalog is still offered");
         items.Select(i => i.Type).Should().Contain(PlanningNotificationTypes.PersonalReminder);
     }
@@ -110,7 +111,7 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
     {
         var items = await GetMatrixAsync(CreateAdminRoleClient());
 
-        items.Where(i => i.Type == NotificationType.Test).Select(i => i.Channel)
+        items.Where(i => i.Type == FrameworkNotificationTypes.Test).Select(i => i.Channel)
             .Should().BeEquivalentTo(Enum.GetValues<NotificationChannel>());
     }
 
@@ -118,12 +119,12 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
     public async Task Update_ForAUser_RejectsTheTestKind()
     {
         var response = await CreateUserRoleClient().PutAsJsonAsync("api/notification-preference",
-            new { type = nameof(NotificationType.Test), channel = nameof(NotificationChannel.InApp), enabled = false },
+            new { type = FrameworkNotificationTypes.TestKey, channel = nameof(NotificationChannel.InApp), enabled = false },
             JsonOpts, CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         await using var db = CreateDbContext();
-        (await db.Set<NotificationPreference>().AsNoTracking().AnyAsync(p => p.Type == NotificationType.Test, CancellationToken))
+        (await db.Set<NotificationPreference>().AsNoTracking().AnyAsync(p => p.Type == FrameworkNotificationTypes.Test, CancellationToken))
             .Should().BeFalse("a row for a kind the account's matrix can never show is invisible and permanent");
     }
 
@@ -131,7 +132,7 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
     public async Task Update_ForAnAdmin_AcceptsTheTestKind()
     {
         var response = await CreateAdminRoleClient().PutAsJsonAsync("api/notification-preference",
-            new { type = nameof(NotificationType.Test), channel = nameof(NotificationChannel.InApp), enabled = false },
+            new { type = FrameworkNotificationTypes.TestKey, channel = nameof(NotificationChannel.InApp), enabled = false },
             JsonOpts, CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -166,8 +167,8 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
 
     private static INotificationPayload? SamplePayload(NotificationType type) => type.Key switch
     {
-        nameof(NotificationType.DeadlineApproaching) => new DeadlineApproachingPayload("Feature Development"),
-        nameof(NotificationType.ReminderDigest) => new ReminderDigestPayload(3),
+        FrameworkNotificationTypes.DeadlineApproachingKey => new DeadlineApproachingPayload("Feature Development"),
+        FrameworkNotificationTypes.ReminderDigestKey => new ReminderDigestPayload(3),
         _ => null
     };
 

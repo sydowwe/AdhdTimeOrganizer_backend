@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.History.application.notification;
 using System.Collections.Concurrent;
@@ -726,7 +727,7 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
         byType[HistoryNotificationTypes.TimerBoundary].DeferredUntil
             .Should().BeNull("TimerBoundary is quiet-hours-exempt — the user scheduled this instant themselves");
 
-        byType[NotificationType.Test].DeferredUntil
+        byType[FrameworkNotificationTypes.Test].DeferredUntil
             .Should().NotBeNull("an ordinary kind is still deferred — the exemption is per-kind, not a switch-off");
     }
 

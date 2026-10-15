@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -509,8 +510,8 @@ public class WelcomeBackTests(AppDbContextFixture fixture) : PostgresTestBase(fi
         await RoutineAsync(db, "Broken-before", length: 3, streak: 0, periodEnd: D(2), completed: 0);
 
         for (var i = 0; i < 3; i++)
-            db.Add(new Notification { UserId = UserId, Type = NotificationType.Test, PayloadJson = "{}" });
-        db.Add(new Notification { UserId = UserId, Type = NotificationType.Test, PayloadJson = "{}", IsRead = true, ReadAt = Now });
+            db.Add(new Notification { UserId = UserId, Type = FrameworkNotificationTypes.Test, PayloadJson = "{}" });
+        db.Add(new Notification { UserId = UserId, Type = FrameworkNotificationTypes.Test, PayloadJson = "{}", IsRead = true, ReadAt = Now });
         await db.SaveChangesAsync(CancellationToken);
 
         return new Pile(todoMarch1, todoMarch8, todoMarch10, todoMarch11, todoDueToday,

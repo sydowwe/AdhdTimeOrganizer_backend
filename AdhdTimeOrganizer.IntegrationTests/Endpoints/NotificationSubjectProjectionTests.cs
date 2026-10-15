@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Routines.application.notification;
 using System.Collections.Concurrent;
@@ -72,8 +73,8 @@ public class NotificationSubjectProjectionTests(AppDbContextFixture fixture) : P
         var taskReminderId = await SeedNotificationAsync(PlanningNotificationTypes.PersonalReminder, new PersonalReminderPayload(482, "Finish the tax return", 91));
         var standaloneId = await SeedNotificationAsync(PlanningNotificationTypes.PersonalReminder, new PersonalReminderPayload(483, "Call the dentist"));
         var periodId = await SeedNotificationAsync(RoutinesNotificationTypes.RoutinePeriodEndingSoon, new RoutinePeriodEndingSoonPayload(77, "Weekly", 3, 8, 2, 5));
-        var digestId = await SeedNotificationAsync(NotificationType.ReminderDigest, new ReminderDigestPayload(4));
-        var deadlineId = await SeedNotificationAsync(NotificationType.DeadlineApproaching, new DeadlineApproachingPayload("Blíži sa termín"));
+        var digestId = await SeedNotificationAsync(FrameworkNotificationTypes.ReminderDigest, new ReminderDigestPayload(4));
+        var deadlineId = await SeedNotificationAsync(FrameworkNotificationTypes.DeadlineApproaching, new DeadlineApproachingPayload("Blíži sa termín"));
 
         var byId = await ReadBellListAsync();
 

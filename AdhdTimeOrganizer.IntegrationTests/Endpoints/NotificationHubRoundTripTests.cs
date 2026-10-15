@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http.Connections;
@@ -76,7 +77,7 @@ public class NotificationHubRoundTripTests(AppDbContextFixture fixture) : Postgr
                 CancellationToken);
 
         var notification = await received.Task.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken);
-        notification.Type.Should().Be(NotificationType.Test);
+        notification.Type.Should().Be(FrameworkNotificationTypes.Test);
         notification.Body.Should().Be("WebSocket round trip");
     }
 }

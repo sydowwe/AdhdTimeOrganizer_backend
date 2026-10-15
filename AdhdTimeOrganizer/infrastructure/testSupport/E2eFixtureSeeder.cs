@@ -1,3 +1,4 @@
+using Sydowwe.Framework.Contracts.notification.kind;
 using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.History.domain.model.@enum;
@@ -1434,7 +1435,7 @@ public class E2eFixtureSeeder(
             {
                 Id = NotificationFirst,
                 UserId = userId,
-                Type = NotificationType.DeadlineApproaching,
+                Type = FrameworkNotificationTypes.DeadlineApproaching,
                 PayloadJson = JsonHelper.Serialize(new DeadlineApproachingPayload("Feature Development")),
                 IsRead = false
             },
@@ -1442,7 +1443,7 @@ public class E2eFixtureSeeder(
             {
                 Id = NotificationFirst + 1,
                 UserId = userId,
-                Type = NotificationType.ReminderDigest,
+                Type = FrameworkNotificationTypes.ReminderDigest,
                 PayloadJson = JsonHelper.Serialize(new ReminderDigestPayload(3)),
                 IsRead = false
             },
@@ -1482,7 +1483,7 @@ public class E2eFixtureSeeder(
             {
                 Id = NotificationFirst + 5,
                 UserId = userId,
-                Type = NotificationType.Test,
+                Type = FrameworkNotificationTypes.Test,
                 PayloadJson = JsonHelper.Serialize(new TestNotificationPayload("Fixture notification for the e2e suite.")),
                 IsRead = true
             },
@@ -1492,7 +1493,7 @@ public class E2eFixtureSeeder(
             {
                 Id = SecondaryNotificationFirst,
                 UserId = SecondaryUserId,
-                Type = NotificationType.ReminderDigest,
+                Type = FrameworkNotificationTypes.ReminderDigest,
                 PayloadJson = JsonHelper.Serialize(new ReminderDigestPayload(1)),
                 IsRead = false
             },
@@ -1500,7 +1501,7 @@ public class E2eFixtureSeeder(
             {
                 Id = SecondaryNotificationFirst + 1,
                 UserId = SecondaryUserId,
-                Type = NotificationType.Test,
+                Type = FrameworkNotificationTypes.Test,
                 PayloadJson = JsonHelper.Serialize(new TestNotificationPayload("Second account only.")),
                 IsRead = true
             }
