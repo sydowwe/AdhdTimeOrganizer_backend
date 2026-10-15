@@ -1,4 +1,5 @@
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
+using AdhdTimeOrganizer.History.application.notification;
 using AdhdTimeOrganizer.History.application.service;
 using AdhdTimeOrganizer.History.domain.model.entity.timerAlarm;
 using AdhdTimeOrganizer.History.domain.model.@enum;
@@ -14,8 +15,8 @@ namespace AdhdTimeOrganizer.History.application.job;
 /// <summary>
 /// Fires one timer alarm: read the row, push the notification, delete the row. Invoked by the Scheduler's
 /// dispatcher from the one-shot trigger <see cref="TimerBoundaryAlarmService"/> registered when the user pressed
-/// Start. A row is either a phase boundary (<see cref="NotificationType.TimerBoundary"/>) or a running stopwatch's
-/// check-in (<see cref="NotificationType.StopwatchCheckIn"/>); see <see cref="TimerAlarmKind"/>.
+/// Start. A row is either a phase boundary (<see cref="HistoryNotificationTypes.TimerBoundary"/>) or a running stopwatch's
+/// check-in (<see cref="HistoryNotificationTypes.StopwatchCheckIn"/>); see <see cref="TimerAlarmKind"/>.
 /// <para>
 /// <b>Background context — no authenticated user.</b> That is what makes the read below work: the portal's
 /// global user-scoping filter is written <c>ScopeUserId == null || e.UserId == ScopeUserId</c>, so an

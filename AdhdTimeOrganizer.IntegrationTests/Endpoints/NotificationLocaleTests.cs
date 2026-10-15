@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.History.application.notification;
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.Json;
@@ -218,9 +219,9 @@ public class NotificationLocaleTests(AppDbContextFixture fixture) : PostgresTest
     {
         var renderer = Fixture.AdminAndUserFactory.Services.GetRequiredService<INotificationTextRenderer>();
 
-        var czech = renderer.Render(NotificationType.TimerBoundary, "{}", AvailableLocales.Cz);
+        var czech = renderer.Render(HistoryNotificationTypes.TimerBoundary, "{}", AvailableLocales.Cz);
 
-        czech.Should().Be(renderer.Render(NotificationType.TimerBoundary, "{}", AvailableLocales.Sk));
+        czech.Should().Be(renderer.Render(HistoryNotificationTypes.TimerBoundary, "{}", AvailableLocales.Sk));
         czech.Title.Should().Be("Časovač skončil", "a portal kind, so the portal's table — not the module's generic fallback");
     }
 

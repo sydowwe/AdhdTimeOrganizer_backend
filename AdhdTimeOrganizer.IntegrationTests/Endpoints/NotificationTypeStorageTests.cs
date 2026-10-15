@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.History.application.notification;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -42,16 +43,16 @@ public class NotificationTypeStorageTests(AppDbContextFixture fixture) : Postgre
         await using (var db = CreateDbContext())
         {
             var stored = await db.Set<NotificationPreference>().AsNoTracking().SingleAsync(p => p.UserId == UserId, CancellationToken);
-            stored.Type.Should().Be(NotificationType.TimerBoundary);
+            stored.Type.Should().Be(HistoryNotificationTypes.TimerBoundary);
 
             (await db.Set<NotificationPreference>().AsNoTracking()
-                    .CountAsync(p => p.Type == NotificationType.TimerBoundary && p.Channel == NotificationChannel.WebPush, CancellationToken))
+                    .CountAsync(p => p.Type == HistoryNotificationTypes.TimerBoundary && p.Channel == NotificationChannel.WebPush, CancellationToken))
                 .Should().Be(1, "the key is compared in SQL, as the dispatcher's preference read does");
         }
 
         var matrix = await CreateClient().GetFromJsonAsync<List<NotificationPreferenceItem>>(
             "api/notification-preference/mine", JsonOpts, CancellationToken);
-        matrix!.Single(i => i.Type == NotificationType.TimerBoundary && i.Channel == NotificationChannel.WebPush).Enabled
+        matrix!.Single(i => i.Type == HistoryNotificationTypes.TimerBoundary && i.Channel == NotificationChannel.WebPush).Enabled
             .Should().BeFalse("the stored opt-out is the user's, and it must survive the type change");
     }
 

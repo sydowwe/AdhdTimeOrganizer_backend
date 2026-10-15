@@ -1,3 +1,5 @@
+using AdhdTimeOrganizer.History.domain.model.@enum;
+using AdhdTimeOrganizer.History.application.notification;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.@enum;
 using AdhdTimeOrganizer.application.dto.testSupport;
@@ -1469,7 +1471,7 @@ public class E2eFixtureSeeder(
             {
                 Id = NotificationFirst + 4,
                 UserId = userId,
-                Type = NotificationType.TimerBoundary,
+                Type = HistoryNotificationTypes.TimerBoundary,
                 PayloadJson = JsonHelper.Serialize(new TimerBoundaryPayload(
                     TimerBoundaryPhase.Focus, "Bug Fixing", PhaseIndex: 2, PhaseTotal: 4, CycleIndex: 1, CycleTotal: 2)),
                 IsRead = true

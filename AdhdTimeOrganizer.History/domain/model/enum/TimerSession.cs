@@ -39,9 +39,8 @@ public enum TimerSessionOutcome
 /// session.
 /// </summary>
 /// <remarks>
-/// Deliberately not <c>TimerBoundaryPhase</c>: that one lives in the notification contract, describes the
-/// boundary a push announces rather than the stretch a row records, and carries a <c>Plain</c> member no row
-/// may have.
+/// Deliberately not <see cref="TimerBoundaryPhase"/>: that one describes the boundary a push announces rather than
+/// the stretch a row records, and carries a <c>Plain</c> member no row may have.
 /// </remarks>
 public enum TimerSessionPhase
 {

@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.History.application.notification;
 using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
@@ -82,12 +83,12 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
     {
         await using var factory = CreateFactory(TestRoles.AdminAndUser, configOverrides: PushConfigured);
         factory.Services.GetRequiredService<IOptions<PushNotificationOptions>>().Value.IsConfigured.Should().BeTrue();
-        await SetPreferenceAsync(NotificationType.TimerBoundary, NotificationChannel.InApp, false);
-        var before = await CountRowsAsync(NotificationType.TimerBoundary);
+        await SetPreferenceAsync(HistoryNotificationTypes.TimerBoundary, NotificationChannel.InApp, false);
+        var before = await CountRowsAsync(HistoryNotificationTypes.TimerBoundary);
 
-        await NotifyAsync(factory, NotificationType.TimerBoundary);
+        await NotifyAsync(factory, HistoryNotificationTypes.TimerBoundary);
 
-        (await CountRowsAsync(NotificationType.TimerBoundary)).Should().Be(before + 1,
+        (await CountRowsAsync(HistoryNotificationTypes.TimerBoundary)).Should().Be(before + 1,
             "a deliverable background channel is still a way to reach the user, and the row is its history");
     }
 

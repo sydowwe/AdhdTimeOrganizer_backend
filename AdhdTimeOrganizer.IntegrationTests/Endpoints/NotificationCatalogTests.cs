@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.History.application.notification;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using Sydowwe.Framework.Contracts.notification;
 using Sydowwe.Framework.Contracts.notification.action;
@@ -45,8 +46,8 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         NotificationType.PlannedBlocksMissed,
         NotificationType.PlannedBlockOverrun,
         NotificationType.MorningBriefing,
-        NotificationType.TimerBoundary,
-        NotificationType.StopwatchCheckIn,
+        HistoryNotificationTypes.TimerBoundary,
+        HistoryNotificationTypes.StopwatchCheckIn,
         NotificationType.TrackerSilent,
         NotificationType.Test
     };

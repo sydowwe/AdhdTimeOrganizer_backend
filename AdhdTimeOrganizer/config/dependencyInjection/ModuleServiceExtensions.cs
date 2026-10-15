@@ -282,15 +282,6 @@ public static class ModuleServiceExtensions
             // channels can be chosen apart from the routine digest it replaces.
             NotificationType.MorningBriefing,
 
-            // History slice: TimerBoundaryAlarmJobHandler, on every pomodoro boundary.
-            NotificationType.TimerBoundary,
-
-            // History slice: the same handler, for a running stopwatch's check-ins (P3-03). Not held while away — the
-            // user started this stopwatch — and not quiet-hours exempt: the handler skips one that lands inside the
-            // window rather than letting it be deferred. Push on, email off, no action buttons: Stop is client state,
-            // so the tap opens the stopwatch page instead.
-            NotificationType.StopwatchCheckIn,
-
             // Tracking slice: TrackerSilenceJobHandler, through TrackerSilenceNotifier (P2-04). Not held while away —
             // the rule only fires for a user the app saw within a day, and it is operational, not a nudge. Push on,
             // email off (NotificationChannelDefaults): the user should hear about it, but it is not worth a mail.

@@ -1,3 +1,5 @@
+using AdhdTimeOrganizer.History.domain.model.@enum;
+using AdhdTimeOrganizer.History.application.notification;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
@@ -447,7 +449,7 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
 
         var notification = await after.Set<Notification>().SingleAsync(CancellationToken);
         notification.UserId.Should().Be(TestUserId);
-        notification.Type.Should().Be(NotificationType.TimerBoundary);
+        notification.Type.Should().Be(HistoryNotificationTypes.TimerBoundary);
         notification.DeferredUntil.Should().BeNull();
 
         (await after.Set<TimerBoundaryAlarm>().CountAsync(CancellationToken))
@@ -721,7 +723,7 @@ public class TimerBoundaryAlarmTests(AppDbContextFixture fixture) : PostgresTest
 
         // The user started this timer minutes ago and asked for this exact instant. Deferring it to the end
         // of the window delivers "focus period ended" hours late, which is worse than not delivering it.
-        byType[NotificationType.TimerBoundary].DeferredUntil
+        byType[HistoryNotificationTypes.TimerBoundary].DeferredUntil
             .Should().BeNull("TimerBoundary is quiet-hours-exempt — the user scheduled this instant themselves");
 
         byType[NotificationType.Test].DeferredUntil

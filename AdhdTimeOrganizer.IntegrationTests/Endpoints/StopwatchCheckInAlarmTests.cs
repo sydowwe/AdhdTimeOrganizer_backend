@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.History.application.notification;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
@@ -92,7 +93,7 @@ public class StopwatchCheckInAlarmTests(AppDbContextFixture fixture) : PostgresT
         await using var after = CreateDbContext();
         var notification = await after.Set<Notification>().SingleAsync(CancellationToken);
         notification.UserId.Should().Be(TestUserId);
-        notification.Type.Should().Be(NotificationType.StopwatchCheckIn);
+        notification.Type.Should().Be(HistoryNotificationTypes.StopwatchCheckIn);
         notification.DeferredUntil.Should().BeNull();
 
         var payload = JsonSerializer.Deserialize<StopwatchCheckInPayload>(notification.PayloadJson, JsonOpts)!;
@@ -133,7 +134,7 @@ public class StopwatchCheckInAlarmTests(AppDbContextFixture fixture) : PostgresT
         await FireAsync(factory, alarm.Id);
 
         await using var after = CreateDbContext();
-        (await after.Set<Notification>().SingleAsync(CancellationToken)).Type.Should().Be(NotificationType.TimerBoundary);
+        (await after.Set<Notification>().SingleAsync(CancellationToken)).Type.Should().Be(HistoryNotificationTypes.TimerBoundary);
     }
 
     // ---- quiet hours ------------------------------------------------------------------------------
