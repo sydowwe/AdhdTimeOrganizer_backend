@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Routines.application.notification;
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
@@ -78,7 +79,7 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
             db.Add(new NotificationPreference
             {
                 UserId = userId,
-                Type = NotificationType.RoutineSuggestedToday,
+                Type = RoutinesNotificationTypes.RoutineSuggestedToday,
                 Channel = NotificationChannel.Email,
                 Enabled = true
             });
@@ -216,8 +217,8 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
         await using var factory = CreateFactory(push, new CapturingEmailSender());
 
         var flushAt = DateTimeOffset.UtcNow;
-        var heldId = await SeedDeferredAsync(AwayUserId, NotificationType.RoutineSuggestedToday, flushAt);
-        await SeedDeferredAsync(PresentUserId, NotificationType.RoutineSuggestedToday, flushAt);
+        var heldId = await SeedDeferredAsync(AwayUserId, RoutinesNotificationTypes.RoutineSuggestedToday, flushAt);
+        await SeedDeferredAsync(PresentUserId, RoutinesNotificationTypes.RoutineSuggestedToday, flushAt);
         await SeedDeferredAsync(AwayUserId, NotificationType.Test, flushAt);
 
         await using (var scope = factory.Services.CreateAsyncScope())

@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Routines.application.notification;
 using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
@@ -111,7 +112,7 @@ public class RoutineStreakBreakNotificationTests(AppDbContextFixture fixture) : 
     {
         await using var db = CreateDbContext();
         var rows = await db.Set<Notification>().AsNoTracking()
-            .Where(n => n.UserId == UserId && n.Type == NotificationType.RoutinePeriodEnded)
+            .Where(n => n.UserId == UserId && n.Type == RoutinesNotificationTypes.RoutinePeriodEnded)
             .ToListAsync(CancellationToken);
         return rows.Should().ContainSingle(n =>
             JsonHelper.Deserialize<RoutinePeriodEndedPayload>(n.PayloadJson)!.PeriodId == periodId).Subject;
@@ -191,7 +192,7 @@ public class RoutineStreakBreakNotificationTests(AppDbContextFixture fixture) : 
         const string legacy = """{"periodId":1,"periodName":"Weekly","completedCount":1,"totalCount":3,"streak":0,"outcome":3}""";
 
         var renderer = Fixture.AdminAndUserFactory.Services.GetRequiredService<INotificationTextRenderer>();
-        renderer.Render(NotificationType.RoutinePeriodEnded, legacy, AvailableLocales.En).Body
+        renderer.Render(RoutinesNotificationTypes.RoutinePeriodEnded, legacy, AvailableLocales.En).Body
             .Should().EndWith(" The streak was broken.");
     }
 }

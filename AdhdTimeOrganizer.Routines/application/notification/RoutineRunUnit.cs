@@ -1,7 +1,7 @@
-namespace AdhdTimeOrganizer.infrastructure.notification;
+namespace AdhdTimeOrganizer.Routines.application.notification;
 
 /// <summary>
-/// The unit a routine run is counted in, for the two language tables. A streak counts periods, but "7 periods
+/// The unit a routine run is counted in, for <see cref="RoutinePeriodEndedNotificationKind"/>'s wording. A streak counts periods, but "7 periods
 /// in a row" reads badly when the period is a day or a week.
 /// <para>
 /// The same rule as the client's <c>useRoutineRunLabel.ts</c> (<c>unitSuffix</c>), so the bell and the

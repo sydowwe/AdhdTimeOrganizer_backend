@@ -220,10 +220,6 @@ public static class ModuleServiceExtensions
             // whether anyone is around or not.
             o.HeldWhileAwayTypes =
             [
-                NotificationType.RoutinePeriodEndingSoon,
-                NotificationType.RoutinePeriodEnded,
-                NotificationType.RoutineStreakGraceExpiring,
-                NotificationType.RoutineSuggestedToday,
 
                 // Planning's automatic block reminders: system-generated, about a moment that passes without them,
                 // and a whole day of them is exactly what a returning user should not find on their lock screen.
@@ -259,13 +255,6 @@ public static class ModuleServiceExtensions
         [
             // Planning slice: the user's own self-set nudge, delivered through the Reminders module.
             NotificationType.PersonalReminder,
-
-            // Routines slice (RoutinePeriodNotificationService).
-            NotificationType.RoutinePeriodEndingSoon,
-            NotificationType.RoutinePeriodEnded,
-            NotificationType.RoutineStreakGraceExpiring,
-            NotificationType.RoutineSuggestedToday,
-
             // TodoLists slice: TodoListItemDueReminderSync, registered through the Reminders module per timed item.
             // Not held while away: it is about the user's own commitment, not a nudge to come back.
             NotificationType.TodoItemDue,

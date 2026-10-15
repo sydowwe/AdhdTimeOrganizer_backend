@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Routines.application.notification;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -69,7 +70,7 @@ public class NotificationSubjectProjectionTests(AppDbContextFixture fixture) : P
     {
         var taskReminderId = await SeedNotificationAsync(NotificationType.PersonalReminder, new PersonalReminderPayload(482, "Finish the tax return", 91));
         var standaloneId = await SeedNotificationAsync(NotificationType.PersonalReminder, new PersonalReminderPayload(483, "Call the dentist"));
-        var periodId = await SeedNotificationAsync(NotificationType.RoutinePeriodEndingSoon, new RoutinePeriodEndingSoonPayload(77, "Weekly", 3, 8, 2, 5));
+        var periodId = await SeedNotificationAsync(RoutinesNotificationTypes.RoutinePeriodEndingSoon, new RoutinePeriodEndingSoonPayload(77, "Weekly", 3, 8, 2, 5));
         var digestId = await SeedNotificationAsync(NotificationType.ReminderDigest, new ReminderDigestPayload(4));
         var deadlineId = await SeedNotificationAsync(NotificationType.DeadlineApproaching, new DeadlineApproachingPayload("Blíži sa termín"));
 
@@ -162,7 +163,7 @@ public class NotificationSubjectProjectionTests(AppDbContextFixture fixture) : P
 
         await SeedPushSubscriptionAsync();
         var id = await SeedNotificationAsync(
-            NotificationType.RoutineStreakGraceExpiring,
+            RoutinesNotificationTypes.RoutineStreakGraceExpiring,
             new RoutineStreakGraceExpiringPayload(77, "Weekly", DateTime.UtcNow.AddDays(1), 12),
             deferredUntil: DateTimeOffset.UtcNow.AddMinutes(-1));
 

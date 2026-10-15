@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.History.application.notification;
 using System.Collections.Concurrent;
 using System.Security.Claims;
@@ -192,8 +193,8 @@ public class NotificationLocaleTests(AppDbContextFixture fixture) : PostgresTest
 
         var payload = new RoutinePeriodEndedPayload(77, "Weekly", CompletedCount: 4, TotalCount: 5, Streak: 3, Outcome: RoutineStreakOutcome.Broken);
         var released = DateTimeOffset.UtcNow.AddMinutes(-1);
-        await SeedNotificationAsync(EnglishUserId, NotificationType.RoutinePeriodEnded, payload, deferredUntil: released);
-        await SeedNotificationAsync(SlovakUserId, NotificationType.RoutinePeriodEnded, payload, deferredUntil: released);
+        await SeedNotificationAsync(EnglishUserId, RoutinesNotificationTypes.RoutinePeriodEnded, payload, deferredUntil: released);
+        await SeedNotificationAsync(SlovakUserId, RoutinesNotificationTypes.RoutinePeriodEnded, payload, deferredUntil: released);
 
         await using (var scope = factory.Services.CreateAsyncScope())
             await ResolveFlushHandler(scope.ServiceProvider).FlushDeferredAsync(DateTimeOffset.UtcNow, CancellationToken);

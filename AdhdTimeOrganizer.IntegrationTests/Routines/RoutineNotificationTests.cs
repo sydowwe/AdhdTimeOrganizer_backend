@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
@@ -146,7 +147,7 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
         await RunNudgeJobAsync();
         await RunNudgeJobAsync();
 
-        Assert.Equal(1, await CountNotificationsAsync(NotificationType.RoutinePeriodEndingSoon));
+        Assert.Equal(1, await CountNotificationsAsync(RoutinesNotificationTypes.RoutinePeriodEndingSoon));
 
         await using var verify = CreateDbContext();
         var stored = await verify.Set<RoutineTimePeriod>().AsNoTracking()
@@ -170,7 +171,7 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
 
         await RunNudgeJobAsync();
 
-        Assert.Equal(0, await CountNotificationsAsync(NotificationType.RoutinePeriodEndingSoon));
+        Assert.Equal(0, await CountNotificationsAsync(RoutinesNotificationTypes.RoutinePeriodEndingSoon));
 
         await using var verify = CreateDbContext();
         var stored = await verify.Set<RoutineTimePeriod>().AsNoTracking()
@@ -190,7 +191,7 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
 
         await RunNudgeJobAsync();
 
-        Assert.Equal(0, await CountNotificationsAsync(NotificationType.RoutinePeriodEndingSoon));
+        Assert.Equal(0, await CountNotificationsAsync(RoutinesNotificationTypes.RoutinePeriodEndingSoon));
     }
 
     // ---- grace warning ---------------------------------------------------------------------------
@@ -209,7 +210,7 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
         await RunNudgeJobAsync();
         await RunNudgeJobAsync();
 
-        Assert.Equal(1, await CountNotificationsAsync(NotificationType.RoutineStreakGraceExpiring));
+        Assert.Equal(1, await CountNotificationsAsync(RoutinesNotificationTypes.RoutineStreakGraceExpiring));
 
         await using var verify = CreateDbContext();
         var stored = await verify.Set<RoutineTimePeriod>().AsNoTracking()
@@ -235,6 +236,6 @@ public class RoutineNotificationTests(AppDbContextFixture fixture) : PostgresTes
 
         await RunJobAsync<RoutineTodoListResetJobHandler>();
 
-        Assert.Equal(1, await CountNotificationsAsync(NotificationType.RoutinePeriodEnded));
+        Assert.Equal(1, await CountNotificationsAsync(RoutinesNotificationTypes.RoutinePeriodEnded));
     }
 }

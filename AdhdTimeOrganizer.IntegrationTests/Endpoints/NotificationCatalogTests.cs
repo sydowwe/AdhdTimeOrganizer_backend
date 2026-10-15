@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.History.application.notification;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using Sydowwe.Framework.Contracts.notification;
@@ -35,10 +36,10 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
     public static readonly IReadOnlySet<NotificationType> Catalog = new HashSet<NotificationType>
     {
         NotificationType.PersonalReminder,
-        NotificationType.RoutinePeriodEndingSoon,
-        NotificationType.RoutinePeriodEnded,
-        NotificationType.RoutineStreakGraceExpiring,
-        NotificationType.RoutineSuggestedToday,
+        RoutinesNotificationTypes.RoutinePeriodEndingSoon,
+        RoutinesNotificationTypes.RoutinePeriodEnded,
+        RoutinesNotificationTypes.RoutineStreakGraceExpiring,
+        RoutinesNotificationTypes.RoutineSuggestedToday,
         NotificationType.ScheduledJobFailed,
         NotificationType.ScheduledJobOverdue,
         NotificationType.TodoItemDue,

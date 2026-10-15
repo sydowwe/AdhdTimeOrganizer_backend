@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Routines.application.notification;
 using System.Security.Claims;
 using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
@@ -650,7 +651,7 @@ public class RoutineSuggestedTodayJobTests(AppDbContextFixture fixture) : Postgr
         };
 
         var renderer = Fixture.AdminAndUserFactory.Services.GetRequiredService<INotificationTextRenderer>();
-        var (title, body) = renderer.Render(NotificationType.RoutineSuggestedToday, JsonSerializer.Serialize(payload), locale);
+        var (title, body) = renderer.Render(RoutinesNotificationTypes.RoutineSuggestedToday, JsonSerializer.Serialize(payload), locale);
 
         body.Should().Be(expected);
         title.Should().Be(locale == AvailableLocales.En ? "Suggested for today" : "Na dnes odporúčané");
@@ -664,7 +665,7 @@ public class RoutineSuggestedTodayJobTests(AppDbContextFixture fixture) : Postgr
     {
         await using var db = CreateDbContext();
         var digests = await db.Set<Notification>().AsNoTracking()
-            .Where(n => n.UserId == UserId && n.Type == NotificationType.RoutineSuggestedToday)
+            .Where(n => n.UserId == UserId && n.Type == RoutinesNotificationTypes.RoutineSuggestedToday)
             .ToListAsync(CancellationToken);
 
         return digests.Should().ContainSingle(n =>

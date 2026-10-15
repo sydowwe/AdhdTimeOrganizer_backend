@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.History.application.notification;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
@@ -1448,7 +1449,7 @@ public class E2eFixtureSeeder(
             {
                 Id = NotificationFirst + 2,
                 UserId = userId,
-                Type = NotificationType.RoutinePeriodEndingSoon,
+                Type = RoutinesNotificationTypes.RoutinePeriodEndingSoon,
                 // Weekly holds one item, not yet done this cycle — 1 of 1 remaining, not the 2 of 5 that used
                 // to be here and described a group the fixture never had.
                 PayloadJson = JsonHelper.Serialize(new RoutinePeriodEndingSoonPayload(
@@ -1461,7 +1462,7 @@ public class E2eFixtureSeeder(
                 // so it agrees with the newest completion row and the streak AddRoutinePeriodHistory left.
                 Id = NotificationFirst + 3,
                 UserId = userId,
-                Type = NotificationType.RoutinePeriodEnded,
+                Type = RoutinesNotificationTypes.RoutinePeriodEnded,
                 PayloadJson = JsonHelper.Serialize(new RoutinePeriodEndedPayload(
                     periods["Daily"].Id, "Daily", CompletedCount: 5, TotalCount: 5, Streak: periods["Daily"].Streak,
                     Outcome: RoutineStreakOutcome.Extended)),

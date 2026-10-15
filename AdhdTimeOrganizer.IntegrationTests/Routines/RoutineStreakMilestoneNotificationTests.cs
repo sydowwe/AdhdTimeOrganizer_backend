@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
@@ -91,7 +92,7 @@ public class RoutineStreakMilestoneNotificationTests(AppDbContextFixture fixture
     {
         await using var db = CreateDbContext();
         var rows = await db.Set<Notification>().AsNoTracking()
-            .Where(n => n.UserId == UserId && n.Type == NotificationType.RoutinePeriodEnded)
+            .Where(n => n.UserId == UserId && n.Type == RoutinesNotificationTypes.RoutinePeriodEnded)
             .ToListAsync(CancellationToken);
         return rows.Should().ContainSingle(n =>
             JsonHelper.Deserialize<RoutinePeriodEndedPayload>(n.PayloadJson)!.PeriodId == periodId).Subject;
@@ -156,7 +157,7 @@ public class RoutineStreakMilestoneNotificationTests(AppDbContextFixture fixture
         const string legacy = """{"periodId":1,"periodName":"Weekly","completedCount":3,"totalCount":3,"streak":30,"outcome":1}""";
 
         var renderer = Fixture.AdminAndUserFactory.Services.GetRequiredService<INotificationTextRenderer>();
-        renderer.Render(NotificationType.RoutinePeriodEnded, legacy, AvailableLocales.En).Body
+        renderer.Render(RoutinesNotificationTypes.RoutinePeriodEnded, legacy, AvailableLocales.En).Body
             .Should().EndWith(" Streak continues: 30.", "30 is a daily milestone, but an older row has no flag saying so");
     }
 
@@ -169,7 +170,7 @@ public class RoutineStreakMilestoneNotificationTests(AppDbContextFixture fixture
         const string json = """{"periodId":1,"completedCount":1,"totalCount":1,"streak":4,"outcome":1,"isMilestone":true}""";
 
         var renderer = Fixture.AdminAndUserFactory.Services.GetRequiredService<INotificationTextRenderer>();
-        renderer.Render(NotificationType.RoutinePeriodEnded, json, AvailableLocales.En).Body
+        renderer.Render(RoutinesNotificationTypes.RoutinePeriodEnded, json, AvailableLocales.En).Body
             .Should().EndWith(" Milestone: 4 periods in a row!");
     }
 }
