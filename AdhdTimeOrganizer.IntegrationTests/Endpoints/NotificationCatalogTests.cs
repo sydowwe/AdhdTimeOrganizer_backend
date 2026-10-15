@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.application.service.morningBriefing;
 using AdhdTimeOrganizer.Tracking.application.notification;
 using AdhdTimeOrganizer.TodoLists.application.notification;
 using AdhdTimeOrganizer.Planning.application.notification;
@@ -49,7 +50,7 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         PlanningNotificationTypes.PlannedBlockStarting,
         PlanningNotificationTypes.PlannedBlocksMissed,
         PlanningNotificationTypes.PlannedBlockOverrun,
-        NotificationType.MorningBriefing,
+        PortalNotificationTypes.MorningBriefing,
         HistoryNotificationTypes.TimerBoundary,
         HistoryNotificationTypes.StopwatchCheckIn,
         TrackingNotificationTypes.TrackerSilent,

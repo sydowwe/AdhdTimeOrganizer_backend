@@ -4,7 +4,7 @@ using Sydowwe.Framework.Contracts.notification.payload;
 
 namespace AdhdTimeOrganizer.application.service.morningBriefing;
 
-/// <summary>Raises the <see cref="NotificationType.MorningBriefing"/> notification — the one class that does.</summary>
+/// <summary>Raises the <see cref="PortalNotificationTypes.MorningBriefing"/> notification — the one class that does.</summary>
 public interface IMorningBriefingNotifier
 {
     /// <summary>

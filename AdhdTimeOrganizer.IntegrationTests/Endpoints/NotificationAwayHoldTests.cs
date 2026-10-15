@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.application.service.morningBriefing;
 using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Routines.application.notification;
 using System.Collections.Concurrent;
@@ -184,7 +185,7 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
                 CancellationToken);
 
         await using var db = CreateDbContext();
-        (await db.Set<Notification>().Where(n => n.Type == NotificationType.MorningBriefing).Select(n => n.UserId).ToListAsync(CancellationToken))
+        (await db.Set<Notification>().Where(n => n.Type == PortalNotificationTypes.MorningBriefing).Select(n => n.UserId).ToListAsync(CancellationToken))
             .Should().BeEquivalentTo(Everyone, "held means bell-only, never dropped");
 
         push.Endpoints.Should().BeEquivalentTo([EndpointOf(PresentUserId), EndpointOf(NeverMeasuredUserId)]);

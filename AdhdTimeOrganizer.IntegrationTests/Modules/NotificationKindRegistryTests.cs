@@ -39,10 +39,27 @@ public class NotificationKindRegistryTests(AppDbContextFixture fixture) : Postgr
         failure.Should().Contain("'MismatchProbe'").And.Contain("names 'Test'");
     }
 
-    [Fact(DisplayName = "The real composition starts, and its registry resolves")]
-    public void RealComposition_Starts() =>
-        Fixture.AdminAndUserFactory.Services.GetRequiredService<Sydowwe.Notifications.application.kind.INotificationKindRegistry>()
-            .Kinds.Should().NotBeEmpty();
+    /// <summary>
+    /// Every kind this host raises has a definition in the composition. A slice whose assembly dropped out of
+    /// <c>ModuleServiceExtensions.ModuleAssemblies</c> takes its kinds with it, and nothing else notices: they render the
+    /// generic text, lose their policy (an exempt alarm gets deferred, a held nudge gets pushed) and their buttons.
+    /// </summary>
+    [Fact(DisplayName = "Every catalogued kind resolves to a registered definition, from the slice that raises it")]
+    public void EveryCataloguedKind_IsRegistered()
+    {
+        var registry = Fixture.AdminAndUserFactory.Services.GetRequiredService<Sydowwe.Notifications.application.kind.INotificationKindRegistry>();
+
+        var unregistered = Endpoints.NotificationCatalogTests.Catalog.Where(t => registry.Find(t) is null).ToList();
+        unregistered.Should().BeEmpty("a catalogued kind with no definition renders generically and has no policy of its own");
+
+        // And from the assembly that raises it, not some leftover copy: a kind's owner is its definition's assembly.
+        registry.Kinds.Where(k => Endpoints.NotificationCatalogTests.Catalog.Contains(k.Type))
+            .Select(k => k.GetType().Assembly.GetName().Name)
+            .Distinct()
+            .Should().BeEquivalentTo(
+                "AdhdTimeOrganizer", "AdhdTimeOrganizer.History", "AdhdTimeOrganizer.Routines", "AdhdTimeOrganizer.Planning",
+                "AdhdTimeOrganizer.TodoLists", "AdhdTimeOrganizer.Tracking", "Sydowwe.Notifications");
+    }
 
     /// <summary>Boots a host with the extra registration and returns every message in the exception chain it died with.</summary>
     private async Task<string> StartupFailureAsync(Action<IServiceCollection> configureServices)

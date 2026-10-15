@@ -4,7 +4,6 @@ using AdhdTimeOrganizer.application.service.welcomeBack;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
-using AdhdTimeOrganizer.infrastructure.notification;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Routines.domain.model.entity.todoList;
@@ -146,7 +145,8 @@ public static class ModuleServiceExtensions
         // it as a constructor dependency, so a missing line is a resolution error on the first send or read.
         services.AddScoped<IUserLocaleReader, UserLocaleReader<User>>();
 
-        // FO5's back-off: who is away from the app, so the routine nudges in HeldWhileAwayTypes wait in the bell
+        // FO5's back-off: who is away from the app, so the kinds held while away (the routine and planner nudges, the
+        // morning briefing — each kind's own HeldWhileAway) wait in the bell
         // instead of reaching their phone. The dispatcher takes it as an OPTIONAL dependency, so a missing line
         // here is silent: nobody is ever away and the nudges keep coming. ModuleWiringTests pins it.
         services.AddScoped<IRecipientEngagementReader, RecipientEngagementReader>();
@@ -174,7 +174,6 @@ public static class ModuleServiceExtensions
     private static void AddModuleOptions(IServiceCollection services, IConfiguration configuration)
     {
         AddNotificationCatalog(services);
-        AddNotificationVocabulary(services);
 
         services.Configure<PushNotificationOptions>(configuration.GetSection(PushNotificationOptions.SectionName));
         services.Configure<EmailNotificationOptions>(configuration.GetSection(EmailNotificationOptions.SectionName));
@@ -213,36 +212,6 @@ public static class ModuleServiceExtensions
             // with a producer.
             o.UnraisedTypes = [FrameworkNotificationTypes.DeadlineApproaching, FrameworkNotificationTypes.ReminderDigest];
 
-            // FO5's back-off: for a user away three days or more (RecipientEngagementReader), these wait in the
-            // bell and are not pushed or mailed. R1 phase 3: only the kinds not yet moved onto a definition are
-            // listed here; a moved kind says so itself (INotificationKind.HeldWhileAway).
-            // The host's morning briefing: unsolicited and about a morning that passes without it. A returning
-            // user gets the welcome-back card instead (MorningBriefingJobHandler skips them while it is open).
-            o.HeldWhileAwayTypes = [NotificationType.MorningBriefing];
-
-            // R1 phase 3: the kinds that have not moved onto their own definition yet.
-            o.SupportedTypes =
-            [
-                // The host: MorningBriefingJobHandler, through MorningBriefingNotifier. Its own row, so the briefing's
-                // channels can be chosen apart from the routine digest it replaces.
-                NotificationType.MorningBriefing
-            ];
         });
 
-    /// <summary>
-    /// The words for the kinds in the catalog above (B15). The framework's tables word only the kinds its own
-    /// modules raise — a kind this portal raises (the routine nudges, the pomodoro boundary, the personal
-    /// reminder) renders the generic "Nová notifikácia" out of them, so the portal's subclasses are registered
-    /// here, one per language. <c>Cz</c> is pointed at the Slovak table on purpose: the module's own fallback
-    /// for it is the module's Slovak, which lacks this portal's kinds, and the client ships no Czech either.
-    /// <c>NotificationVocabularyTests</c> renders every catalogued kind in every locale and refuses the fallback.
-    /// </summary>
-    private static void AddNotificationVocabulary(IServiceCollection services)
-    {
-        var sk = new SkPortalNotificationTexts();
-        services.Configure<NotificationTextOptions>(o => o
-            .Use(AvailableLocales.Sk, sk)
-            .Use(AvailableLocales.Cz, sk)
-            .Use(AvailableLocales.En, new EnPortalNotificationTexts()));
-    }
 }

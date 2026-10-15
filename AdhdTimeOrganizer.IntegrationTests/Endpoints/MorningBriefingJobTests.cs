@@ -323,7 +323,7 @@ public class MorningBriefingJobTests(AppDbContextFixture fixture) : PostgresTest
     // ---- the real pipeline -----------------------------------------------------------------------
 
     /// <summary>
-    /// End to end: the row lands as <see cref="NotificationType.MorningBriefing"/> with the payload the client's
+    /// End to end: the row lands as <see cref="PortalNotificationTypes.MorningBriefing"/> with the payload the client's
     /// contract names, it links to no single row, and the renderer reads it in the user's language.
     /// </summary>
     [Fact(DisplayName = "P2-01: the briefing lands as MorningBriefing, carrying the date and the counts")]
@@ -363,7 +363,7 @@ public class MorningBriefingJobTests(AppDbContextFixture fixture) : PostgresTest
         var json = JsonSerializer.Serialize(new { date = "2020-09-29", blocks, firstBlockAt = firstAt is null ? null : firstAt + ":00", carryOver, dueToday, overdue, routinesSuggested = routines });
 
         var renderer = Fixture.AdminAndUserFactory.Services.GetRequiredService<INotificationTextRenderer>();
-        renderer.Render(NotificationType.MorningBriefing, json, locale).Body.Should().Be(expected);
+        renderer.Render(PortalNotificationTypes.MorningBriefing, json, locale).Body.Should().Be(expected);
     }
 
     [Fact(DisplayName = "P2-01: an all-zero or unreadable payload renders the name-less sentence, not a lone 'no plan yet'")]
@@ -371,8 +371,8 @@ public class MorningBriefingJobTests(AppDbContextFixture fixture) : PostgresTest
     {
         var renderer = Fixture.AdminAndUserFactory.Services.GetRequiredService<INotificationTextRenderer>();
 
-        renderer.Render(NotificationType.MorningBriefing, """{"date":"2020-09-29"}""", AvailableLocales.En).Body.Should().Be("Here's what today holds.");
-        renderer.Render(NotificationType.MorningBriefing, "not json", AvailableLocales.Sk).Body.Should().Be("Toto vás dnes čaká.");
+        renderer.Render(PortalNotificationTypes.MorningBriefing, """{"date":"2020-09-29"}""", AvailableLocales.En).Body.Should().Be("Here's what today holds.");
+        renderer.Render(PortalNotificationTypes.MorningBriefing, "not json", AvailableLocales.Sk).Body.Should().Be("Toto vás dnes čaká.");
     }
 
     // ---- the setting -----------------------------------------------------------------------------
@@ -521,7 +521,7 @@ public class MorningBriefingJobTests(AppDbContextFixture fixture) : PostgresTest
     {
         await using var db = CreateDbContext();
         var briefings = await db.Set<Notification>().AsNoTracking()
-            .Where(n => n.UserId == UserId && n.Type == NotificationType.MorningBriefing)
+            .Where(n => n.UserId == UserId && n.Type == PortalNotificationTypes.MorningBriefing)
             .ToListAsync(CancellationToken);
 
         return briefings.Should().ContainSingle(n =>
