@@ -339,5 +339,18 @@ worth copying the shape of:
   pins the split in `ValidateRefreshTokenAsync` between a deliberately revoked token (refused) and a
   rotated one replayed late (theft, revoke everything).
   `UserAccountDeletionTests.DeleteAccount_ThenReplayingTheOldSession_KillsRefreshAndTheLiveAccessToken`
-  is the deletion half. It fails if `BaseDeleteUserAccountEndpoint` stops reporting the cascaded sessions,
-  because the delete request itself cached the session as live.
+  is the deletion half: scheduling a deletion revokes every session, and the request itself cached its
+  session as live. `AccountDeletionGraceTests.Purge_DeletesOnlyWhatIsDue` pins the other half — a session
+  opened during the grace period dies with the account, which only holds while `UserAccountDeletionService`
+  reports the cascaded sessions.
+- `AccountDeletionGraceTests` — account deletion with a grace period (P3-07). Every part fails silently: a
+  schedule that deletes on the spot or leaves a session or push subscription alive, a keep link that works
+  twice or after the date, a purge that deletes a kept account, a tracker that keeps feeding an account
+  about to be erased, and — the optional one — `AccountDeletionSuppressionReader` dropped from DI, after
+  which the e-mails a user opted into keep reaching someone who asked to be erased. So the mail is built by
+  the **real** `UserEmailSenderService` stopped at the SMTP hop and the test follows the link it contains;
+  the purge runs on a pinned clock either side of the date with a kept and a later account beside the due
+  one; and suppression is asserted on what capturing push and mail senders received, for the live send and
+  the quiet-hours flush, with a control recipient proving the sends that did go out are real. The erasure
+  assertions themselves are `UserAccountDeletionTests`, which now schedules and then runs the same purge
+  (`AccountDeletionPurgeRunner`).

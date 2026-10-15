@@ -2,12 +2,14 @@ using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using Microsoft.AspNetCore.Identity;
 using Sydowwe.Framework.config.dependencyInjection;
 using Sydowwe.Framework.Contracts.gdpr;
+using Sydowwe.Framework.domain.extServiceContract.user.auth;
 
 namespace AdhdTimeOrganizer.application.service.user;
 
 /// <summary>
-/// Deleting an account — the one path every deletion takes, whoever asks for it: the user themself
-/// (<c>DeleteUserAccountEndpoint</c>) or the purge of a sign-up that was never confirmed (<c>UnconfirmedAccountJobHandler</c>).
+/// Deleting an account — the one path every deletion takes, whoever asked for it: the user themself, once the grace
+/// period <c>DELETE user/account</c> opened has passed (<c>AccountDeletionJobHandler</c>, P3-07), or the purge of a
+/// sign-up that was never confirmed (<c>UnconfirmedAccountJobHandler</c>).
 /// <para>
 /// The DB cascade is only half of it. The host's module FK configuration gives <c>Notification</c>,
 /// <c>NotificationPreference</c> and <c>PushSubscription</c> a cascading FK to <c>User</c>, so those three go with the
@@ -29,17 +31,9 @@ namespace AdhdTimeOrganizer.application.service.user;
 public interface IUserAccountDeletionService
 {
     /// <summary>
-    /// Stages every module's erasure on the ambient <c>DbContext</c> without committing it — the half of
-    /// <see cref="DeleteAsync"/> the endpoint needs on its own, because the framework's
-    /// <c>BaseDeleteUserAccountEndpoint</c> owns the <c>UserManager.DeleteAsync</c> call (and the session revocation
-    /// around it). Run it while the user row still exists.
-    /// </summary>
-    Task StageModuleErasureAsync(User user, CancellationToken ct);
-
-    /// <summary>
-    /// <see cref="StageModuleErasureAsync"/>, then <c>UserManager.DeleteAsync</c>, which commits both as one unit. A
-    /// failed result leaves the staged erasure uncommitted on the scope's <c>DbContext</c>, so a caller deleting more
-    /// than one account must give each its own scope.
+    /// Stages every module's erasure, then <c>UserManager.DeleteAsync</c>, which commits both as one unit, and reports the
+    /// sessions that died with the account. A failed result leaves the staged erasure uncommitted on the scope's
+    /// <c>DbContext</c>, so a caller deleting more than one account must give each its own scope.
     /// </summary>
     Task<IdentityResult> DeleteAsync(User user, CancellationToken ct);
 }
@@ -48,8 +42,27 @@ public interface IUserAccountDeletionService
 public class UserAccountDeletionService(
     UserManager<User> userManager,
     IEnumerable<ISubjectDataEraser> subjectDataErasers,
+    IRefreshTokenService refreshTokenService,
+    ISessionRevocationService sessionRevocation,
     ILogger<UserAccountDeletionService> logger) : IUserAccountDeletionService, IScopedService
 {
+    public async Task<IdentityResult> DeleteAsync(User user, CancellationToken ct)
+    {
+        // Read before the delete: the rows the ids live on cascade away with the user, bypassing IRefreshTokenService. A
+        // user scheduled for deletion may have signed in on the web since (to export, say), and that session must not
+        // outlive the account for as long as its cached "live" verdict would.
+        var sessionIds = await refreshTokenService.GetLiveSessionIdsAsync(user.Id);
+
+        await StageModuleErasureAsync(user, ct);
+        var result = await userManager.DeleteAsync(user);
+
+        // Only once the delete has committed — a failed deletion leaves the sessions as they were.
+        if (result.Succeeded)
+            await sessionRevocation.MarkRevokedAsync(sessionIds);
+
+        return result;
+    }
+
     /// <summary>
     /// Per the <see cref="ISubjectDataEraser"/> contract an eraser mutates the <b>ambient</b> DbContext and never
     /// commits — the caller owns the transaction. Here that caller is <c>UserManager.DeleteAsync</c>: Identity's store
@@ -62,7 +75,7 @@ public class UserAccountDeletionService(
     /// retry is safe.
     /// </para>
     /// </summary>
-    public async Task StageModuleErasureAsync(User user, CancellationToken ct)
+    private async Task StageModuleErasureAsync(User user, CancellationToken ct)
     {
         foreach (var eraser in subjectDataErasers)
         {
@@ -76,11 +89,5 @@ public class UserAccountDeletionService(
                     "Account deletion for user {UserId}: {Module} staged {Rows} row(s) for erasure",
                     user.Id, eraser.ModuleKey, rows);
         }
-    }
-
-    public async Task<IdentityResult> DeleteAsync(User user, CancellationToken ct)
-    {
-        await StageModuleErasureAsync(user, ct);
-        return await userManager.DeleteAsync(user);
     }
 }

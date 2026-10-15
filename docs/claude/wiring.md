@@ -74,9 +74,10 @@ touching anything below, because **none of these break the build**.
   `PlannerTaskNotificationActionHandler` (Planning), `TodoItemDueNotificationActionHandler` (TodoLists). A handler
   only resolves if its slice is in `ModuleAssemblies`, and a button without one silently just opens the app:
   `NotificationCatalogTests` pins exactly one handler per declared button and keeps the table's second copy.
-- **Account deletion fans out over `ISubjectDataEraser`** (`UserAccountDeletionService`, used by
-  `DeleteUserAccountEndpoint.BeforeDeleteAsync` and by the unconfirmed-account purge — delete an account any
-  other way and the module rows outlive it). The host FKs cascade only `notification` /
+- **Account deletion fans out over `ISubjectDataEraser`** (`UserAccountDeletionService`, used by the two
+  purge jobs — `AccountDeletionJobHandler` for self-deletions once their grace period has passed (P3-07;
+  `DELETE user/account` only schedules), `UnconfirmedAccountJobHandler` for sign-ups never confirmed. Delete
+  an account any other way and the module rows outlive it). The host FKs cascade only `notification` /
   `notification_preference` / `push_subscription`; every other user-keyed module table is deliberately
   FK-free and would outlive the account. Erasers mutate the ambient `DbContext` and never commit —
   `UserManager.DeleteAsync`'s own `SaveChanges` (same scoped context) is the transaction, which is also why
@@ -161,7 +162,9 @@ refresh, leaving the access token good for its remaining 15 minutes. The pieces:
 - **Every revoke goes through `IRefreshTokenService`**, which reports the sessions it revoked. Don't
   write `IsRevoked` by hand: the refresh dies, and a cached live verdict keeps the access token working
   for up to 60 s. Account deletion is the one path that bypasses it (the rows cascade), so
-  `BaseDeleteUserAccountEndpoint` snapshots the ids before the delete and reports them after.
+  `UserAccountDeletionService` snapshots the ids before the delete and reports them after (the framework's
+  `BaseDeleteUserAccountEndpoint` does the same for hosts that still delete on the spot). Scheduling a
+  deletion (P3-07) revokes every session through `RevokeAllUserTokensAsync` like any other revoke.
 - ⚠ **Per-process, like the 2FA guard.** With the in-memory cache a revoke is immediate on the instance
   that served it. Another instance keeps a live verdict it already cached for at most 60 s, then asks
   the database. A shared `IDistributedCache` (Redis) makes it immediate everywhere; nothing else changes.
@@ -195,7 +198,9 @@ never a token owner.
 ## Email templates
 
 `framework/Sydowwe.Framework/infrastructure/templates/email/` — `ConfirmEmail.html`,
-`ResetPassword.html`, `ResetPasswordCode.html`, `SecurityAlert.html`, consumed by
+`ResetPassword.html`, `ResetPasswordCode.html`, `SecurityAlert.html`, `AccountDeletionScheduled.html`
+(P3-07: the deletion date in the user's zone and a "keep my account" link to the SPA's `/keep-account`,
+built by the virtual `BuildKeepAccountLink`), consumed by
 `UserEmailSenderService`. All are English; none follow `User.Locale` yet. They are
 **`<EmbeddedResource>`** in `Sydowwe.Framework.csproj` (`infrastructure\templates\email\*.html`), read
 via `Assembly.GetManifestResourceStream`, so there is no copy-to-output step and no working-directory

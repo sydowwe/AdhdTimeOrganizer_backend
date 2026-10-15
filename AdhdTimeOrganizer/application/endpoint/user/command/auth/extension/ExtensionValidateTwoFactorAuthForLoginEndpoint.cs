@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Sydowwe.Framework.application.dto.request.user;
 using Sydowwe.Framework.application.dto.response.user;
 using Sydowwe.Framework.application.endpoint.user.command.auth;
+using Sydowwe.Framework.application.error;
 using Sydowwe.Framework.domain.@enum;
 using Sydowwe.Framework.domain.extServiceContract.user.auth;
 using Sydowwe.Framework.domain.serviceContract;
@@ -39,6 +40,15 @@ public class ValidateTwoFactorAuthForLoginExtensionEndpoint(
 
     protected override async Task OnAuthenticatedAsync(User user, TwoFactorAuthLoginRequest request, CancellationToken ct)
     {
+        // The password step refuses an account scheduled for deletion, but a code can arrive after a deletion was
+        // scheduled in between (the pending token lives for minutes), so the step that issues the session asks too.
+        if (ExtensionLoginEndpoint.DenyAccountScheduledForDeletion(user) is { } denial)
+        {
+            AddError(denial.Message);
+            await Send.ErrorsAsync(denial.ErrorType, 403, ct);
+            return;
+        }
+
         var (accessToken, refreshToken) = await _jwtService.GenerateTokensForExtensionAsync(AuthMethodEnum.Password, user);
 
         await HttpContext.Response.SendAsync(new ExtensionLoginResponse

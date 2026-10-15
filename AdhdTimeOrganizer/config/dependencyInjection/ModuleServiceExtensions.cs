@@ -1,5 +1,6 @@
 using System.Reflection;
 using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
+using AdhdTimeOrganizer.application.service.user;
 using AdhdTimeOrganizer.application.service.welcomeBack;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
@@ -149,6 +150,11 @@ public static class ModuleServiceExtensions
         // instead of reaching their phone. The dispatcher takes it as an OPTIONAL dependency, so a missing line
         // here is silent: nobody is ever away and the nudges keep coming. ModuleWiringTests pins it.
         services.AddScoped<IRecipientEngagementReader, RecipientEngagementReader>();
+
+        // P3-07: an account scheduled for deletion is reached by nothing outside the app — no push, no mail, any kind.
+        // Optional in the dispatcher too, so a missing line is just as silent: the opted-in mails keep reaching someone
+        // who asked to be erased. ModuleWiringTests pins it.
+        services.AddScoped<IRecipientSuppressionReader, AccountDeletionSuppressionReader>();
 
         // The only INotificationPayloadEnricher in the solution, and it carries no lifetime marker (it is
         // meant as the host-supplied default). Swap for a real enricher if payloads ever need overlays.

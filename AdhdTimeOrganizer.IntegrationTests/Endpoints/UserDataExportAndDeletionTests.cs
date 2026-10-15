@@ -393,9 +393,12 @@ public class UserDataExportTests(AppDbContextFixture fixture) : PostgresTestBase
 }
 
 // =========================================================================================================
-// DeleteUserAccountEndpoint ("user/account", DELETE) -- gated by VerifyUserPreProcessor (password + 2FA).
+// DeleteUserAccountEndpoint ("user/account", DELETE) -- gated by VerifyUserPreProcessor (password + 2FA). Since
+// P3-07 it SCHEDULES the deletion; AccountDeletionJobHandler performs it once the grace period has passed, through
+// UserAccountDeletionService. So every erasure assertion below schedules, then runs the purge past the date.
 // Uses AuthTestBase because deletion must be observed through the real login/refresh-token pipeline, not
-// the RoleTestAuthHandler bypass every other test uses.
+// the RoleTestAuthHandler bypass every other test uses. The grace period itself -- keeping, the mail, sign-in,
+// suppression -- is AccountDeletionGraceTests.
 // =========================================================================================================
 
 [Collection("Postgres")]
@@ -421,7 +424,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
     }
 
     [Fact]
-    public async Task DeleteAccount_WrongPassword_Returns401AndAccountSurvives()
+    public async Task DeleteAccount_WrongPassword_Returns401AndNothingIsScheduled()
     {
         var (userId, email) = await CreateRealUserAsync(Fixture, "delete-wrongpw", Password);
 
@@ -434,8 +437,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
             "an already-authenticated session must not be enough to delete the account -- the current password must be re-proven");
 
-        await using var db = (AppDbContext)Fixture.CreateDbContext();
-        (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == userId, TestContext.Current.CancellationToken)).Should().BeTrue();
+        (await ScheduledForAsync(userId)).Should().BeNull("a rejected request must not even schedule the deletion");
     }
 
     /// <summary>
@@ -445,7 +447,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
     /// re-reads the user with <c>UserManager</c> on every call, which is the behaviour that matters here.
     /// </summary>
     [Fact]
-    public async Task DeleteAccount_TwoFactorEnabled_WithoutToken_Returns401AndAccountSurvives()
+    public async Task DeleteAccount_TwoFactorEnabled_WithoutToken_Returns401AndNothingIsScheduled()
     {
         var (userId, email) = await CreateRealUserAsync(Fixture, "delete-2fa", Password);
 
@@ -467,15 +469,11 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         (await cookieClient.SendAsync(badTokenRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
             "a wrong TOTP must be rejected the same way a wrong password is");
 
-        await using (var db = (AppDbContext)Fixture.CreateDbContext())
-        {
-            (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == userId, TestContext.Current.CancellationToken))
-                .Should().BeTrue("neither rejected attempt may have deleted anything");
-        }
+        (await ScheduledForAsync(userId)).Should().BeNull("neither rejected attempt may have scheduled anything");
     }
 
     [Fact]
-    public async Task DeleteAccount_CorrectPassword_RemovesAccountAndCascadesSliceData()
+    public async Task DeleteAccount_CorrectPassword_SchedulesThenThePurgeRemovesAccountAndCascadesSliceData()
     {
         var (userId, email) = await CreateRealUserAsync(Fixture, "delete-ok", Password);
 
@@ -488,10 +486,17 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
             todoListId = await Seed.TodoListAsync(db, userId, "List To Be Erased");
         }
 
-        using var request = DeleteRequest(Password);
-        var response = await cookieClient.SendAsync(request, TestContext.Current.CancellationToken);
+        var deletesAt = await ScheduleAsync(cookieClient);
 
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        await using (var db = (AppDbContext)Fixture.CreateDbContext())
+        {
+            (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == userId, TestContext.Current.CancellationToken))
+                .Should().BeTrue("scheduling deletes nothing -- the grace period is the whole point");
+            (await db.TodoLists.IgnoreQueryFilters().AnyAsync(l => l.Id == todoListId, TestContext.Current.CancellationToken))
+                .Should().BeTrue("scheduling deletes nothing");
+        }
+
+        await AccountDeletionPurgeRunner.RunAsync(Fixture.UnauthenticatedFactory.Services, deletesAt.AddMinutes(1), CancellationToken);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
@@ -505,13 +510,13 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
 
     /// <summary>
     /// Erasure across every slice, not just the host's own tables. A missed cascade compiles fine, returns
-    /// 204 and leaves a deleted person's planner, to-do, routine, history and tracking rows in the database
+    /// success and leaves a deleted person's planner, to-do, routine, history and tracking rows in the database
     /// indefinitely -- the exact silent failure this project's doctrine warns about, and a GDPR Art. 17
     /// breach rather than a bug. Quiet hours is in here on purpose: it carries no FK to the user table, so
     /// only <c>NotificationSubjectDataEraser</c> can remove it and no cascade covers for a broken fan-out.
     /// </summary>
     [Fact]
-    public async Task DeleteAccount_ErasesUserDataAcrossEverySlice()
+    public async Task DeleteAccount_ThePurgeErasesUserDataAcrossEverySlice()
     {
         var (userId, email) = await CreateRealUserAsync(Fixture, "delete-slices", Password);
 
@@ -523,8 +528,8 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         using var cookieClient = CreateCookieClient();
         await LoginAsync(cookieClient, email, Password);
 
-        using var request = DeleteRequest(Password);
-        (await cookieClient.SendAsync(request, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var deletesAt = await ScheduleAsync(cookieClient);
+        await AccountDeletionPurgeRunner.RunAsync(Fixture.UnauthenticatedFactory.Services, deletesAt.AddMinutes(1), CancellationToken);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
@@ -535,13 +540,13 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
     /// <summary>
     /// Reminders keeps its recipient-side rows FK-free from the host on purpose (module boundary), so
     /// nothing about them is deleted by the DB cascade the portal-owned tables get. Erasure only happens
-    /// because <c>DeleteUserAccountEndpoint.BeforeDeleteAsync</c> fans out over every registered
-    /// <c>ISubjectDataEraser</c> -- if Reminders' eraser were ever dropped from DI (or the fan-out itself
-    /// broken), this is exactly the kind of thing that would compile fine and silently leave orphaned
-    /// rows scanning for a user who no longer exists, per this project's "Silent failures" doctrine.
+    /// because <c>UserAccountDeletionService</c> fans out over every registered <c>ISubjectDataEraser</c> -- if
+    /// Reminders' eraser were ever dropped from DI (or the fan-out itself broken), this is exactly the kind of
+    /// thing that would compile fine and silently leave orphaned rows scanning for a user who no longer exists,
+    /// per this project's "Silent failures" doctrine.
     /// </summary>
     [Fact]
-    public async Task DeleteAccount_ErasesReminderRecipientRows_ViaSubjectDataEraserFanOut()
+    public async Task DeleteAccount_ThePurgeErasesReminderRecipientRows_ViaSubjectDataEraserFanOut()
     {
         var (userId, email) = await CreateRealUserAsync(Fixture, "delete-reminder", Password);
 
@@ -563,8 +568,8 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
                 .Should().BeTrue("registering a reminder must create the caller's own recipient row");
         }
 
-        using var request = DeleteRequest(Password);
-        (await cookieClient.SendAsync(request, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var deletesAt = await ScheduleAsync(cookieClient);
+        await AccountDeletionPurgeRunner.RunAsync(Fixture.UnauthenticatedFactory.Services, deletesAt.AddMinutes(1), CancellationToken);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
@@ -574,7 +579,7 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
     }
 
     [Fact]
-    public async Task DeleteAccount_RevokesRefreshToken()
+    public async Task DeleteAccount_RevokesEveryRefreshTokenWhenScheduled()
     {
         var (userId, email) = await CreateRealUserAsync(Fixture, "delete-revoke", Password);
 
@@ -587,31 +592,26 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
                 .Should().BeTrue("login must create a live refresh token");
         }
 
-        using var request = DeleteRequest(Password);
-        (await cookieClient.SendAsync(request, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        await ScheduleAsync(cookieClient);
 
         await using (var db = (AppDbContext)Fixture.CreateDbContext())
         {
-            // The row itself cascades away with the user, so "no live token remains" is what "revoked" means here.
+            // The rows outlive the schedule (the account is still there), so "revoked" is literal here.
             (await db.RefreshTokens.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsRevoked, TestContext.Current.CancellationToken))
-                .Should().BeFalse("no refresh token for the deleted account may remain usable");
+                .Should().BeFalse("no refresh token of an account scheduled for deletion may remain usable");
         }
     }
 
     /// <summary>
-    /// The row-level check above proves the refresh token is gone from the database; this proves what the
-    /// credentials the caller is still holding are actually worth. A raw client is required: a cookie
-    /// container would obediently drop the cookies the delete response clears, which is precisely the
-    /// client-side courtesy an attacker holding a stolen session would skip.
+    /// The row-level check above proves the refresh token is revoked; this proves what the credentials the caller
+    /// is still holding are actually worth. A raw client is required: a cookie container would obediently drop the
+    /// cookies the delete response clears, which is precisely the client-side courtesy an attacker holding a stolen
+    /// session would skip.
     /// <para>
-    /// <b>Both halves of the session die with the account (B28).</b> The refresh token cascaded away with the
-    /// user row. The access token is still a correctly signed, unexpired JWT, but its <c>sid</c> names a session
-    /// with no live row, so <c>SessionRevocationBearerEvents</c> refuses it at the next request. The endpoint
-    /// also reports the session ids it read before the delete, because the cascade bypasses the refresh-token
-    /// service; without that a session whose "live" verdict was cached would outlive the account for up to
-    /// <c>SessionRevocationService.LiveVerdictTtl</c>. Until B28 this test pinned the opposite (the access token
-    /// kept authenticating for its full 15 minutes) under the name
-    /// <c>…KillsRefreshButNotTheLiveAccessToken</c>.
+    /// <b>Both halves of the session die with the schedule (B28, P3-07).</b> The refresh token is revoked. The access
+    /// token is still a correctly signed, unexpired JWT, but its <c>sid</c> names a session with no live row, so
+    /// <c>SessionRevocationBearerEvents</c> refuses it at the next request — <c>RevokeAllUserTokensAsync</c> reports
+    /// every session it revokes, so no cached "live" verdict outlasts it.
     /// </para>
     /// </summary>
     [Fact]
@@ -624,18 +624,18 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
 
         using var deleteRequest = DeleteRequest(Password);
         deleteRequest.Headers.Add("Cookie", sessionCookies);
-        (await client.SendAsync(deleteRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await client.SendAsync(deleteRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "auth/refresh");
         refreshRequest.Headers.Add("Cookie", sessionCookies);
         (await client.SendAsync(refreshRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-            "the refresh token died with the account, so the session cannot be extended");
+            "the refresh token was revoked with the schedule, so the session cannot be extended");
 
         using var probeRequest = new HttpRequestMessage(HttpMethod.Get, "timer-preset");
         probeRequest.Headers.Add("Cookie", sessionCookies);
         var probeResponse = await client.SendAsync(probeRequest, TestContext.Current.CancellationToken);
         probeResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-            "the access token is unexpired and correctly signed, but its session died with the account");
+            "the access token is unexpired and correctly signed, but its session was revoked with the schedule");
         probeResponse.Headers.Contains("X-Token-Expired").Should().BeFalse(
             "the token has not expired; its session is gone, and the header must say only what is true");
     }
@@ -665,15 +665,15 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
     }
 
     [Fact]
-    public async Task DeleteAccount_ThenReRegisterWithSameEmail_Succeeds()
+    public async Task DeleteAccount_ThenReRegisterWithSameEmail_SucceedsOnceThePurgeHasRun()
     {
         var (_, email) = await CreateRealUserAsync(Fixture, "delete-reregister", Password);
 
         using var cookieClient = CreateCookieClient();
         await LoginAsync(cookieClient, email, Password);
 
-        using var deleteRequest = DeleteRequest(Password);
-        (await cookieClient.SendAsync(deleteRequest, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var deletesAt = await ScheduleAsync(cookieClient);
+        await AccountDeletionPurgeRunner.RunAsync(Fixture.UnauthenticatedFactory.Services, deletesAt.AddMinutes(1), CancellationToken);
 
         using var registerClient = CreateCookieClient();
         var registerPayload = new
@@ -700,12 +700,33 @@ public class UserAccountDeletionTests(AppDbContextFixture fixture) : AuthTestBas
         using var cookieClient = CreateCookieClient();
         await LoginAsync(cookieClient, callerEmail, Password);
 
-        using var request = DeleteRequest(Password);
-        (await cookieClient.SendAsync(request, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var deletesAt = await ScheduleAsync(cookieClient);
+        (await ScheduledForAsync(otherUserId)).Should().BeNull(
+            "scheduling must never reach an account other than the caller's own -- the endpoint takes no id, only the verified session");
+
+        await AccountDeletionPurgeRunner.RunAsync(Fixture.UnauthenticatedFactory.Services, deletesAt.AddMinutes(1), CancellationToken);
 
         await using var db = (AppDbContext)Fixture.CreateDbContext();
         (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == callerId, TestContext.Current.CancellationToken)).Should().BeFalse();
         (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == otherUserId, TestContext.Current.CancellationToken))
-            .Should().BeTrue("deletion must never reach an account other than the caller's own -- the endpoint takes no id, only the verified session");
+            .Should().BeTrue("the purge deletes the scheduled accounts and nothing else");
+    }
+
+    /// <summary><c>DELETE user/account</c> with the right password: 200 and the date the account will go.</summary>
+    private async Task<DateTimeOffset> ScheduleAsync(HttpClient client)
+    {
+        using var request = DeleteRequest(Password);
+        var response = await client.SendAsync(request, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        return new DateTimeOffset(body.GetProperty("deletionScheduledFor").GetDateTime().ToUniversalTime(), TimeSpan.Zero);
+    }
+
+    private async Task<DateTime?> ScheduledForAsync(long userId)
+    {
+        await using var db = (AppDbContext)Fixture.CreateDbContext();
+        return await db.Users.IgnoreQueryFilters().Where(u => u.Id == userId)
+            .Select(u => u.DeletionScheduledFor).SingleAsync(CancellationToken);
     }
 }

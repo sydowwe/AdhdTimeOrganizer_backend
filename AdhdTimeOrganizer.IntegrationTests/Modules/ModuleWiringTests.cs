@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using AdhdTimeOrganizer.application.service.user;
 using AdhdTimeOrganizer.application.service.welcomeBack;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.infrastructure.jobs;
@@ -162,6 +163,20 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
     }
 
     /// <summary>
+    /// P3-07's suppression seam, optional in the dispatcher like the engagement reader: a dropped registration is
+    /// silent, and the e-mails a user opted into keep reaching them after they asked for their account to be erased.
+    /// </summary>
+    [Fact]
+    public void RecipientSuppressionReader_IsTheHostsAccountDeletionReader()
+    {
+        using var scope = Fixture.AdminAndUserFactory.Services.CreateScope();
+
+        var reader = scope.ServiceProvider.GetRequiredService<IRecipientSuppressionReader>();
+
+        Assert.IsType<AccountDeletionSuppressionReader>(reader);
+    }
+
+    /// <summary>
     /// P3-01's source for quiet hours that follow the sleep schedule. The quiet-hours reader takes it as an
     /// <b>optional</b> dependency, so a dropped registration is silent: a following row falls back to the user's
     /// usual minutes, which look right every night the calendar has not been edited.
@@ -210,6 +225,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(SuggestionPatternRefreshJobHandler.HandlerKey, keys);
         Assert.Contains(MorningBriefingJobHandler.HandlerKey, keys);
         Assert.Contains(UnconfirmedAccountJobHandler.HandlerKey, keys);
+        Assert.Contains(AccountDeletionJobHandler.HandlerKey, keys);
     }
 
     /// <summary>
@@ -265,6 +281,7 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         AssertRegisteredOnce<IUserTimeZoneReader>(sp);
         AssertRegisteredOnce<IUserLocaleReader>(sp);
         AssertRegisteredOnce<IRecipientEngagementReader>(sp);
+        AssertRegisteredOnce<IRecipientSuppressionReader>(sp);
         AssertRegisteredOnce<ISleepScheduleReader>(sp);
         AssertRegisteredOnce<IReminderRegistry>(sp);
         AssertRegisteredOnce<IScheduler>(sp);
@@ -420,14 +437,15 @@ public class ModuleWiringTests(AppDbContextFixture fixture) : PostgresTestBase(f
         Assert.Contains(PortalScheduledJobsRegistrar.SuggestionPatternRefreshRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.MorningBriefingRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.UnconfirmedAccountsRegistration.JobKey, jobKeys);
+        Assert.Contains(PortalScheduledJobsRegistrar.AccountDeletionsRegistration.JobKey, jobKeys);
         Assert.Contains(PortalScheduledJobsRegistrar.RefreshTokenCleanupRegistration.JobKey, jobKeys);
     }
 
     // ---- GDPR erasure fan-out --------------------------------------------------------------------
 
     /// <summary>
-    /// Both modules' erasers are reachable through the <c>Sydowwe.Framework.Contracts</c> fan-out that <c>DeleteUserAccountEndpoint</c>
-    /// drives. Resolving an empty enumerable is a valid state for a host shipping neither module, which is
+    /// Both modules' erasers are reachable through the <c>Sydowwe.Framework.Contracts</c> fan-out that
+    /// <c>UserAccountDeletionService</c> drives for every account deletion. Resolving an empty enumerable is a valid state for a host shipping neither module, which is
     /// exactly why it cannot be left to fail loudly — this app ships both.
     /// </summary>
     [Fact]

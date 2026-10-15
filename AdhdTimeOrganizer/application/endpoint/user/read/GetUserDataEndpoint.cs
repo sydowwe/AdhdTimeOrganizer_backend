@@ -27,6 +27,7 @@ public class GetCurrentUserEndpoint(UserManager<User> userManager)
             DefaultWakeUpTime = new TimeDto(user.DefaultWakeUpTime.Hour, user.DefaultWakeUpTime.Minute),
             DefaultBedTime = new TimeDto(user.DefaultBedTime.Hour, user.DefaultBedTime.Minute),
             MorningBriefingEnabled = user.MorningBriefingEnabled,
-            MorningBriefingOffsetMinutes = user.MorningBriefingOffsetMinutes
+            MorningBriefingOffsetMinutes = user.MorningBriefingOffsetMinutes,
+            DeletionScheduledFor = user.DeletionScheduledFor
         };
 }

@@ -36,4 +36,10 @@ public record AppUserDataResponse : UserDataResponse
 
     /// <summary>See <c>User.MorningBriefingOffsetMinutes</c>.</summary>
     public int MorningBriefingOffsetMinutes { get; init; }
+
+    /// <summary>
+    /// P3-07: when the account will be deleted, or null when no deletion is pending. Read, never written through
+    /// preferences — the client asks "keep my account?" whenever it is set. See <c>User.DeletionScheduledFor</c>.
+    /// </summary>
+    public DateTime? DeletionScheduledFor { get; init; }
 }

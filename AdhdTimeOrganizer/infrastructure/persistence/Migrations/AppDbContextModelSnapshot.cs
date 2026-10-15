@@ -1032,6 +1032,14 @@ namespace AdhdTimeOrganizer.infrastructure.persistence.Migrations
                         .HasDefaultValue(new TimeOnly(8, 0, 0))
                         .HasColumnName("default_wake_up_time");
 
+                    b.Property<string>("DeletionKeepTokenHash")
+                        .HasColumnType("text")
+                        .HasColumnName("deletion_keep_token_hash");
+
+                    b.Property<DateTime?>("DeletionScheduledFor")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deletion_scheduled_for");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")

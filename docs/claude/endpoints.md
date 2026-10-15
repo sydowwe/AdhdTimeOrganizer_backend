@@ -85,7 +85,7 @@ standalone auth endpoint. Those generic over `TUser` are closed on the portal's 
 |---|---|
 | `BaseLoginEndpoint<TUser>` | `LoginUserEndpoint` |
 | `BaseRegisterUserEndpoint<TUser, TRequest>` | `RegisterUserEndpoint` — empty; hook `AfterUserCreatedAsync` (runs inside the transaction) |
-| `BaseDeleteUserAccountEndpoint<TUser>` | `DeleteUserAccountEndpoint` — empty; hooks `BeforeDeleteAsync` / `AfterDeleteAsync` |
+| `BaseDeleteUserAccountEndpoint<TUser>` | **none since P3-07** — that base deletes on the spot, and the portal's `DeleteUserAccountEndpoint` schedules instead (a plain `Endpoint<VerifyUserRequest, …>` behind the same `VerifyUserPreProcessor`); the deletion itself is `AccountDeletionJobHandler` |
 | `BaseLogoutEndpoint` (non-generic) | `LogoutEndpoint` — empty; route/auth all from the base |
 | `BaseRefreshTokenEndpoint` (non-generic) | `RefreshTokenEndpoint` — empty; route/throttle from the base |
 | `BaseChangePasswordEndpoint<TUser>` | `ChangePasswordEndpoint`; hook `AfterPasswordChangedAsync` |
@@ -108,7 +108,7 @@ standalone auth endpoint. Those generic over `TUser` are closed on the portal's 
 | `BaseResendConfirmationEmailEndpoint<TUser>` | `ResendConfirmationEmailEndpoint` — empty (file `ResendEmailConfirmationEndpoint.cs`) |
 | `BaseChangeEmailEndpoint<TUser>` | `ChangeEmailEndpoint` — empty |
 | `BaseConfirmEmailChangeEndpoint<TUser>` | `ConfirmEmailChangeEndpoint` — empty |
-| `BaseExtensionLoginEndpoint<TUser>` | `ExtensionLoginEndpoint`; hook `HasExtensionAccess` |
+| `BaseExtensionLoginEndpoint<TUser>` | `ExtensionLoginEndpoint`; hook `DenyExtensionAccess` — refuses an account scheduled for deletion (403, `errorType: AccountDeletionScheduled`; the 2FA extension step asks the same) |
 | `BaseExtensionLogoutEndpoint` (non-generic) | `ExtensionLogoutEndpoint` — empty |
 | `BaseExtensionRefreshTokenEndpoint` (non-generic) | `ExtensionRefreshTokenEndpoint` — empty |
 

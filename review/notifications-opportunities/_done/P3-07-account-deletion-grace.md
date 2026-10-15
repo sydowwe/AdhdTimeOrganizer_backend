@@ -74,3 +74,21 @@ password and a 2FA code slows it down but doesn't make it reversible.
 1. Grace length: 7 days, or 14 to match P2-05?
 2. Signing in: prompt to keep (recommended), or cancel automatically?
 3. Opted-in emails during grace: accept, or add the suppression seam?
+
+## Decided and built (2026-10-15)
+
+1. **14 days** (`AccountDeletionScheduleService.GracePeriod`; the SPA mirrors it as `ACCOUNT_DELETION_GRACE_DAYS`).
+2. **Prompt to keep.** Web sign-in issues a normal session; `/user/data` carries `deletionScheduledFor` and the SPA's
+   `PendingDeletionDialog` asks keep / continue / sign out. Tracker sign-in is refused with
+   `errorType: AccountDeletionScheduled` (password step and 2FA step).
+3. **Suppression seam.** `IRecipientSuppressionReader` (Contracts), consulted by `NotificationService` on the live
+   send and the quiet-hours flush; the host's `AccountDeletionSuppressionReader` suppresses every user with a pending
+   deletion. Push subscriptions are still deleted at scheduling time, as designed.
+4. **Root admin:** nothing in the immediate delete exempted it (neither `BaseDeleteUserAccountEndpoint` nor
+   `VerifyUserPreProcessor` looks at it), so the grace flow does not either, and the purge has no exclusions.
+5. **GDPR Art. 17 reading (logged here, as asked):** a 14-day grace the data subject chose, with the date stated in
+   the confirm dialog, the mail and the privacy policy (§14, updated 2026-10-15), is erasure "without undue delay".
+   During it nothing is sent to them and no tracker can add data.
+
+Found on the way: the SPA's delete button posted to `/user/delete-account`, which no API serves, so deleting an
+account from the UI failed after the identity check. It now calls `DELETE /user/account` (framework `_common`).
