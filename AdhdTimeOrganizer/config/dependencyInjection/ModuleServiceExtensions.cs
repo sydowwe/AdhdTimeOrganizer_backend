@@ -225,11 +225,7 @@ public static class ModuleServiceExtensions
             [
                 // The host: MorningBriefingJobHandler, through MorningBriefingNotifier. Its own row, so the briefing's
                 // channels can be chosen apart from the routine digest it replaces.
-                NotificationType.MorningBriefing,
-
-                // Tracking slice: TrackerSilenceJobHandler, through TrackerSilenceNotifier (P2-04). Not held while
-                // away — the rule only fires for a user the app saw within a day, and it is operational, not a nudge.
-                NotificationType.TrackerSilent
+                NotificationType.MorningBriefing
             ];
         });
 

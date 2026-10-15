@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Tracking.application.notification;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -184,7 +185,7 @@ public class TrackerSilenceTests(AppDbContextFixture fixture) : PostgresTestBase
 
         await using var db = CreateDbContext();
         var notification = (await db.Set<Notification>().AsNoTracking()
-                .Where(n => n.UserId == UserId && n.Type == NotificationType.TrackerSilent)
+                .Where(n => n.UserId == UserId && n.Type == TrackingNotificationTypes.TrackerSilent)
                 .ToListAsync(CancellationToken))
             .Should().ContainSingle().Subject;
 

@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Tracking.application.notification;
 using AdhdTimeOrganizer.Tracking.domain.helper.unified;
 using AdhdTimeOrganizer.Tracking.domain.serviceContract;
 using Sydowwe.Framework.config.dependencyInjection;
