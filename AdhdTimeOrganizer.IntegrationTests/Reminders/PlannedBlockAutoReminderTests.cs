@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -79,7 +80,7 @@ public class PlannedBlockAutoReminderTests(AppDbContextFixture fixture) : Postgr
         var definition = await DefinitionAsync(reminder.Id);
         definition.Should().NotBeNull();
         definition!.Status.Should().Be(ReminderStatus.Active);
-        definition.NotificationType.Should().Be(NotificationType.PlannedBlockStarting);
+        definition.NotificationType.Should().Be(PlanningNotificationTypes.PlannedBlockStarting);
         definition.TemplateKey.Should().Be(ReminderRegistrationService.AutoTemplateKey);
         definition.NextOccurrenceAt.Should().Be(Utc(BlockDay, Noon).AddMinutes(-10));
         definition.Recipients.Select(r => r.UserId).Should().Equal(UserId);
@@ -437,7 +438,7 @@ public class PlannedBlockAutoReminderTests(AppDbContextFixture fixture) : Postgr
 
         await using var db = CreateDbContext();
         var notification = await db.Set<Notification>().AsNoTracking()
-            .SingleAsync(n => n.UserId == UserId && n.Type == NotificationType.PlannedBlockStarting, CancellationToken);
+            .SingleAsync(n => n.UserId == UserId && n.Type == PlanningNotificationTypes.PlannedBlockStarting, CancellationToken);
         var payload = JsonDocument.Parse(notification.PayloadJson).RootElement;
         payload.GetProperty("plannerTaskId").GetInt64().Should().Be(taskId);
         payload.GetProperty("minutesBefore").GetInt32().Should().Be(10);
@@ -673,7 +674,7 @@ public class PlannedBlockAutoReminderTests(AppDbContextFixture fixture) : Postgr
         dispatch.Outcome.Should().Be(DispatchOutcome.Skipped);
         dispatch.SkipReason.Should().Be(SkipReason.SubjectRetired);
 
-        (await db.Set<Notification>().AnyAsync(n => n.Type == NotificationType.PlannedBlockStarting, CancellationToken))
+        (await db.Set<Notification>().AnyAsync(n => n.Type == PlanningNotificationTypes.PlannedBlockStarting, CancellationToken))
             .Should().BeFalse("a retired occurrence sends nothing");
     }
 

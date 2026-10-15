@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
@@ -164,7 +165,7 @@ public class ReminderRegistrationService(
 
     /// <summary>
     /// The registration for one row. An automatic reminder (<see cref="Reminder.IsAuto"/>) is its own kind, template
-    /// and <see cref="NotificationType.PlannedBlockStarting"/>; everything else about the two is the same mapping.
+    /// and <see cref="PlanningNotificationTypes.PlannedBlockStarting"/>; everything else about the two is the same mapping.
     /// </summary>
     /// <param name="timezone">The owner's zone; required for a recurring reminder (see <see cref="BuildSchedule"/>).</param>
     private Task RegisterAsync(Reminder reminder, TimeZoneInfo? timezone, CancellationToken ct)
@@ -177,7 +178,7 @@ public class ReminderRegistrationService(
             Key = KeyFor(reminder.Id, auto),
             Schedule = schedule,
             TemplateKey = auto ? AutoTemplateKey : TemplateKey,
-            NotificationType = auto ? NotificationType.PlannedBlockStarting : NotificationType.PersonalReminder,
+            NotificationType = auto ? PlanningNotificationTypes.PlannedBlockStarting : PlanningNotificationTypes.PersonalReminder,
             Payload = auto
                 ? new PlannedBlockStartingPayload(
                     reminder.PlannerTaskId!.Value,

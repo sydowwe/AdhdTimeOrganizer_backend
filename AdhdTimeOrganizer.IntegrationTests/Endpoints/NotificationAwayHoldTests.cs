@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Routines.application.notification;
 using System.Collections.Concurrent;
 using System.Security.Claims;
@@ -132,7 +133,7 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
                 CancellationToken);
 
         await using var db = CreateDbContext();
-        (await db.Set<Notification>().Where(n => n.Type == NotificationType.PlannedBlockStarting)
+        (await db.Set<Notification>().Where(n => n.Type == PlanningNotificationTypes.PlannedBlockStarting)
                 .Select(n => n.UserId).ToListAsync(CancellationToken))
             .Should().BeEquivalentTo(Everyone, "held means bell-only, never dropped");
 
@@ -144,8 +145,8 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
     /// so a user who is not there gets it in the bell only.
     /// </summary>
     [Theory(DisplayName = "A missed-block or overrun nudge to an away user waits in the bell; the others are pushed")]
-    [InlineData(nameof(NotificationType.PlannedBlocksMissed))]
-    [InlineData(nameof(NotificationType.PlannedBlockOverrun))]
+    [InlineData(nameof(PlanningNotificationTypes.PlannedBlocksMissed))]
+    [InlineData(nameof(PlanningNotificationTypes.PlannedBlockOverrun))]
     public async Task PlannerSlipNudges_ReachTheAwayUsersBellOnly(string key)
     {
         var type = new NotificationType(key);
@@ -156,7 +157,7 @@ public class NotificationAwayHoldTests(AppDbContextFixture fixture) : PostgresTe
         {
             var notifications = scope.ServiceProvider.GetRequiredService<INotificationService>();
             var recipients = NotificationRecipients.Users(Everyone);
-            if (type == NotificationType.PlannedBlocksMissed)
+            if (type == PlanningNotificationTypes.PlannedBlocksMissed)
                 await notifications.NotifyAsync(recipients, new PlannedBlocksMissedPayload(DateOnly.FromDateTime(DateTime.UtcNow), 2, 1), CancellationToken);
             else
                 await notifications.NotifyAsync(recipients, new PlannedBlockOverrunPayload(1, "Deep work", 10), CancellationToken);

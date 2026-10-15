@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using System.Net;
 using System.Net.Http.Json;
 using AdhdTimeOrganizer.Core.domain.model.entity.user;
@@ -77,11 +78,11 @@ public class ReminderRegistrationTests(AppDbContextFixture fixture) : PostgresTe
 
         var dispatch = await db.Set<ReminderDispatch>().SingleAsync(d => d.ReminderDefinitionId == definition.Id, CancellationToken);
         dispatch.Outcome.Should().Be(DispatchOutcome.Sent);
-        dispatch.NotificationTypeSnapshot.Should().Be(NotificationType.PersonalReminder);
+        dispatch.NotificationTypeSnapshot.Should().Be(PlanningNotificationTypes.PersonalReminder);
 
         var notification = await db.Set<Notification>().SingleAsync(CancellationToken);
         notification.UserId.Should().Be(TestUserId);
-        notification.Type.Should().Be(NotificationType.PersonalReminder);
+        notification.Type.Should().Be(PlanningNotificationTypes.PersonalReminder);
         notification.IsRead.Should().BeFalse();
     }
 
@@ -502,7 +503,7 @@ public class ReminderRegistrationTests(AppDbContextFixture fixture) : PostgresTe
             Schedule = ReminderSchedule.RecurringInterval(
                 ReminderIntervalPreset.Daily, DateTimeOffset.UtcNow.AddDays(1), timeZoneId: "Not/AZone"),
             TemplateKey = ReminderRegistrationService.TemplateKey,
-            NotificationType = NotificationType.PersonalReminder,
+            NotificationType = PlanningNotificationTypes.PersonalReminder,
             RecipientMode = RecipientMode.ExplicitUsers,
             ExplicitRecipientUserIds = [TestUserId]
         }, CancellationToken);

@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using System.Text.Json;
 using AdhdTimeOrganizer.Core.domain.serviceContract;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
@@ -14,8 +15,8 @@ namespace AdhdTimeOrganizer.Planning.application.service;
 
 /// <summary>
 /// The planner's push action buttons (P2-03): <b>Start · Skip</b> on "your block starts in 10 min"
-/// (<see cref="NotificationType.PlannedBlockStarting"/>), <b>Done · +N min</b> on "time's up"
-/// (<see cref="NotificationType.PlannedBlockOverrun"/>). The same writes the app makes — the status change through
+/// (<see cref="PlanningNotificationTypes.PlannedBlockStarting"/>), <b>Done · +N min</b> on "time's up"
+/// (<see cref="PlanningNotificationTypes.PlannedBlockOverrun"/>). The same writes the app makes — the status change through
 /// <see cref="IPlannerTaskStatusEffects"/>, so the reminder and the done-changed fan-out follow, and the span change as
 /// the day view's "wrap up or extend?" makes it (<c>useWrapUpBlock</c>) — with the times taken on <b>the user's clock</b>,
 /// which only the server knows reliably; a phone's own zone can differ from the one in the user's settings.
@@ -47,8 +48,8 @@ public class PlannerTaskNotificationActionHandler(
 
     public bool Handles(NotificationType type, NotificationActionKind kind) => (type.Key, kind) switch
     {
-        (nameof(NotificationType.PlannedBlockStarting), NotificationActionKind.Start or NotificationActionKind.Skip) => true,
-        (nameof(NotificationType.PlannedBlockOverrun), NotificationActionKind.Done or NotificationActionKind.Extend) => true,
+        (PlanningNotificationTypes.PlannedBlockStartingKey, NotificationActionKind.Start or NotificationActionKind.Skip) => true,
+        (PlanningNotificationTypes.PlannedBlockOverrunKey, NotificationActionKind.Done or NotificationActionKind.Extend) => true,
         _ => false
     };
 
@@ -56,8 +57,8 @@ public class PlannerTaskNotificationActionHandler(
     {
         var taskId = context.Type.Key switch
         {
-            nameof(NotificationType.PlannedBlockStarting) => Payload<PlannedBlockStartingPayload>(context.PayloadJson)?.PlannerTaskId,
-            nameof(NotificationType.PlannedBlockOverrun) => Payload<PlannedBlockOverrunPayload>(context.PayloadJson)?.PlannerTaskId,
+            PlanningNotificationTypes.PlannedBlockStartingKey => Payload<PlannedBlockStartingPayload>(context.PayloadJson)?.PlannerTaskId,
+            PlanningNotificationTypes.PlannedBlockOverrunKey => Payload<PlannedBlockOverrunPayload>(context.PayloadJson)?.PlannerTaskId,
             _ => null
         };
         if (taskId is not > 0)

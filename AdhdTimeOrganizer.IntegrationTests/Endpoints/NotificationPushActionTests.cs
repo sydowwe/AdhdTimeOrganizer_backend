@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
@@ -86,7 +87,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
         await using var factory = CreatePushFactory(push);
 
         await NotifyAsync(factory, NotificationRecipients.Users([EnglishUserId, SlovakUserId]),
-            NotificationType.PersonalReminder, new PersonalReminderPayload(ReminderId: 1, Title: "Call the bank"),
+            PlanningNotificationTypes.PersonalReminder, new PersonalReminderPayload(ReminderId: 1, Title: "Call the bank"),
             new NotificationReminderOccurrence(ReminderDefinitionId: 77, OccurrenceAt: DateTimeOffset.UtcNow));
 
         Actions(push.DocumentFor(EnglishUserId)).Should().Equal(("snooze", "Snooze 10 min"), ("dismiss", "Dismiss"));
@@ -105,7 +106,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
         await using var factory = CreatePushFactory(push);
 
         await NotifyAsync(factory, NotificationRecipients.User(EnglishUserId),
-            NotificationType.PersonalReminder, new PersonalReminderPayload(ReminderId: 1, Title: "Call the bank"));
+            PlanningNotificationTypes.PersonalReminder, new PersonalReminderPayload(ReminderId: 1, Title: "Call the bank"));
 
         Actions(push.DocumentFor(EnglishUserId)).Should().Equal(("dismiss", "Dismiss"));
     }
@@ -158,8 +159,8 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
     public async Task Action_NotOffered_Is404_AndChangesNothing()
     {
         var client = CreateClient();
-        var foreign = await SeedNotificationAsync(OtherUserId, NotificationType.PersonalReminder, """{"reminderId":1}""", reminderDefinitionId: 1);
-        var mine = await SeedNotificationAsync(UserId, NotificationType.PersonalReminder, """{"reminderId":1}""");
+        var foreign = await SeedNotificationAsync(OtherUserId, PlanningNotificationTypes.PersonalReminder, """{"reminderId":1}""", reminderDefinitionId: 1);
+        var mine = await SeedNotificationAsync(UserId, PlanningNotificationTypes.PersonalReminder, """{"reminderId":1}""");
 
         (await PostActionAsync(client, foreign, "dismiss")).Should().Be(HttpStatusCode.NotFound, "not mine");
         (await PostActionAsync(client, mine, "start")).Should().Be(HttpStatusCode.NotFound, "a reminder never offered Start");
@@ -177,7 +178,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
     public async Task Dismiss_MarksRead_AndKeepsTheRow()
     {
         var client = CreateClient();
-        var id = await SeedNotificationAsync(UserId, NotificationType.PersonalReminder, """{"reminderId":1}""");
+        var id = await SeedNotificationAsync(UserId, PlanningNotificationTypes.PersonalReminder, """{"reminderId":1}""");
 
         (await PostActionAsync(client, id, "dismiss")).Should().Be(HttpStatusCode.NoContent);
         (await PostActionAsync(client, id, "Dismiss")).Should().Be(HttpStatusCode.NoContent, "idempotent, and the id is case-insensitive");
@@ -270,7 +271,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
         await using var factory = CreatePinnedFactory(At(13, 50));
         var client = factory.CreateClient();
         var taskId = await SeedBlockAsync(new TimeOnly(14, 0), new TimeOnly(15, 0));
-        var id = await SeedNotificationAsync(UserId, NotificationType.PlannedBlockStarting, $$"""{"plannerTaskId":{{taskId}},"minutesBefore":10}""");
+        var id = await SeedNotificationAsync(UserId, PlanningNotificationTypes.PlannedBlockStarting, $$"""{"plannerTaskId":{{taskId}},"minutesBefore":10}""");
 
         (await PostActionAsync(client, id, "start")).Should().Be(HttpStatusCode.NoContent);
         (await PostActionAsync(client, id, "start")).Should().Be(HttpStatusCode.NoContent);
@@ -288,7 +289,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
     {
         await using var factory = CreatePinnedFactory(At(13, 50));
         var taskId = await SeedBlockAsync(new TimeOnly(14, 0), new TimeOnly(15, 0));
-        var id = await SeedNotificationAsync(UserId, NotificationType.PlannedBlockStarting, $$"""{"plannerTaskId":{{taskId}}}""");
+        var id = await SeedNotificationAsync(UserId, PlanningNotificationTypes.PlannedBlockStarting, $$"""{"plannerTaskId":{{taskId}}}""");
 
         (await PostActionAsync(factory.CreateClient(), id, "skip")).Should().Be(HttpStatusCode.NoContent);
 
@@ -303,7 +304,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
     {
         await using var factory = CreatePinnedFactory(At(14, 10));
         var taskId = await SeedBlockAsync(new TimeOnly(12, 0), new TimeOnly(14, 0), PlannerTaskStatus.InProgress);
-        var id = await SeedNotificationAsync(UserId, NotificationType.PlannedBlockOverrun, $$"""{"plannerTaskId":{{taskId}},"minutesOver":10}""");
+        var id = await SeedNotificationAsync(UserId, PlanningNotificationTypes.PlannedBlockOverrun, $$"""{"plannerTaskId":{{taskId}},"minutesOver":10}""");
 
         (await PostActionAsync(factory.CreateClient(), id, "done")).Should().Be(HttpStatusCode.NoContent);
 
@@ -323,7 +324,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
         await using var factory = CreatePinnedFactory(At(14, 20));
         var client = factory.CreateClient();
         var taskId = await SeedBlockAsync(new TimeOnly(12, 0), new TimeOnly(14, 0), PlannerTaskStatus.InProgress);
-        var id = await SeedNotificationAsync(UserId, NotificationType.PlannedBlockOverrun, $$"""{"plannerTaskId":{{taskId}},"minutesOver":20}""");
+        var id = await SeedNotificationAsync(UserId, PlanningNotificationTypes.PlannedBlockOverrun, $$"""{"plannerTaskId":{{taskId}},"minutesOver":20}""");
 
         (await PostActionAsync(client, id, "extend")).Should().Be(HttpStatusCode.NoContent);
         (await PostActionAsync(client, id, "extend")).Should().Be(HttpStatusCode.NoContent);
@@ -338,7 +339,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
     {
         await using var factory = CreatePinnedFactory(At(23, 52));
         var taskId = await SeedBlockAsync(new TimeOnly(22, 0), new TimeOnly(23, 45), PlannerTaskStatus.InProgress);
-        var id = await SeedNotificationAsync(UserId, NotificationType.PlannedBlockOverrun, $$"""{"plannerTaskId":{{taskId}}}""");
+        var id = await SeedNotificationAsync(UserId, PlanningNotificationTypes.PlannedBlockOverrun, $$"""{"plannerTaskId":{{taskId}}}""");
 
         (await PostActionAsync(factory.CreateClient(), id, "extend")).Should().Be(HttpStatusCode.NoContent);
 
@@ -349,7 +350,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
     public async Task PlannerAction_OnADeletedBlock_IsGone()
     {
         await using var factory = CreatePinnedFactory(At(13, 50));
-        var id = await SeedNotificationAsync(UserId, NotificationType.PlannedBlockStarting, """{"plannerTaskId":987654}""");
+        var id = await SeedNotificationAsync(UserId, PlanningNotificationTypes.PlannedBlockStarting, """{"plannerTaskId":987654}""");
 
         (await PostActionAsync(factory.CreateClient(), id, "start")).Should().Be(HttpStatusCode.Conflict);
 

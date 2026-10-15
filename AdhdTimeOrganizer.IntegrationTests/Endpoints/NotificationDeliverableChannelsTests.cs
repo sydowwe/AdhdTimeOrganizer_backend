@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.History.application.notification;
 using System.Net;
 using System.Net.Http.Json;
@@ -101,7 +102,7 @@ public class NotificationDeliverableChannelsTests(AppDbContextFixture fixture) :
 
         items.Select(i => i.Type).Should().NotContain(NotificationType.Test);
         items.Should().NotBeEmpty("the rest of the catalog is still offered");
-        items.Select(i => i.Type).Should().Contain(NotificationType.PersonalReminder);
+        items.Select(i => i.Type).Should().Contain(PlanningNotificationTypes.PersonalReminder);
     }
 
     [Fact(DisplayName = "§S4: an administrator's matrix still offers Test, on every channel")]

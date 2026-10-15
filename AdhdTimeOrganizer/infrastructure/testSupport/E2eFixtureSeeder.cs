@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.History.application.notification;
@@ -1685,7 +1686,7 @@ public class E2eFixtureSeeder(
                 Kind = ReminderRegistrationService.Kind,
 
                 TemplateKey = ReminderRegistrationService.TemplateKey,
-                NotificationType = NotificationType.PersonalReminder,
+                NotificationType = PlanningNotificationTypes.PersonalReminder,
                 PayloadJson = JsonHelper.Serialize(
                     new PersonalReminderPayload(reminder.Id, reminder.Title, reminder.PlannerTaskId)),
 
@@ -1764,7 +1765,7 @@ public class E2eFixtureSeeder(
                 Outcome = outcome,
                 SkipReason = skipReason,
                 FailureDetail = failureDetail,
-                NotificationTypeSnapshot = NotificationType.PersonalReminder,
+                NotificationTypeSnapshot = PlanningNotificationTypes.PersonalReminder,
                 TemplateKeySnapshot = ReminderRegistrationService.TemplateKey,
                 RecipientsSnapshot = JsonHelper.Serialize(new[] { PrimaryUserId }),
                 // Derived from the row rather than Activity.Current, so two resets produce the same ledger.

@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Routines.application.notification;
 using System.Collections.Concurrent;
 using System.Text.Json;
@@ -68,8 +69,8 @@ public class NotificationSubjectProjectionTests(AppDbContextFixture fixture) : P
     [Fact(DisplayName = "The bell list carries the entity each notification is about, and omits it where there is none")]
     public async Task BellList_CarriesTheSubjectOfEachNotification()
     {
-        var taskReminderId = await SeedNotificationAsync(NotificationType.PersonalReminder, new PersonalReminderPayload(482, "Finish the tax return", 91));
-        var standaloneId = await SeedNotificationAsync(NotificationType.PersonalReminder, new PersonalReminderPayload(483, "Call the dentist"));
+        var taskReminderId = await SeedNotificationAsync(PlanningNotificationTypes.PersonalReminder, new PersonalReminderPayload(482, "Finish the tax return", 91));
+        var standaloneId = await SeedNotificationAsync(PlanningNotificationTypes.PersonalReminder, new PersonalReminderPayload(483, "Call the dentist"));
         var periodId = await SeedNotificationAsync(RoutinesNotificationTypes.RoutinePeriodEndingSoon, new RoutinePeriodEndingSoonPayload(77, "Weekly", 3, 8, 2, 5));
         var digestId = await SeedNotificationAsync(NotificationType.ReminderDigest, new ReminderDigestPayload(4));
         var deadlineId = await SeedNotificationAsync(NotificationType.DeadlineApproaching, new DeadlineApproachingPayload("Blíži sa termín"));
@@ -123,7 +124,7 @@ public class NotificationSubjectProjectionTests(AppDbContextFixture fixture) : P
     [Fact(DisplayName = "The subject is resolved from the persisted payload, never the enricher's overlay")]
     public async Task Subject_IsResolvedFromThePersistedPayload_NotTheEnrichedOne()
     {
-        var id = await SeedNotificationAsync(NotificationType.PersonalReminder, new PersonalReminderPayload(482, "Finish the tax return", 91));
+        var id = await SeedNotificationAsync(PlanningNotificationTypes.PersonalReminder, new PersonalReminderPayload(482, "Finish the tax return", 91));
 
         await using var factory = CreateFactory(
             TestRoles.AdminAndUser,

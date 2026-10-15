@@ -18,9 +18,6 @@ namespace AdhdTimeOrganizer.infrastructure.notification;
 /// </summary>
 public class SkPortalNotificationTexts : SkNotificationTexts
 {
-    public override string PersonalReminderTitle => "Pripomienka";
-    public override string PersonalReminderFallbackBody => "Máte pripomienku.";
-
     // "Termín úlohy o 30 min", "… o 2 h", "… o 1 h 30 min"; "Termín úlohy je teraz"; no lead: "Termín úlohy sa blíži".
     public override string TodoItemDueTitle(int? minutesBefore) => minutesBefore switch
     {
@@ -30,37 +27,6 @@ public class SkPortalNotificationTexts : SkNotificationTexts
     };
 
     public override string TodoItemDueFallbackBody => "Blíži sa termín jednej z vašich úloh.";
-
-    // "Začína o 10 min", "… o 1 h 30 min"; "Začína teraz"; no lead: "Čoskoro začína".
-    public override string PlannedBlockStartingTitle(int? minutesBefore) => minutesBefore switch
-    {
-        null => "Čoskoro začína",
-        <= 0 => "Začína teraz",
-        var m => $"Začína o {Lead(m.Value)}"
-    };
-
-    public override string PlannedBlockStartingFallbackBody => "Váš ďalší naplánovaný blok čoskoro začína.";
-
-    // A nudge, not a reproach: it says what happened and offers the next step.
-    public override string PlannedBlocksMissedTitle => "Plán sa posunul";
-
-    // Noun, adjective and verb all agree with the count: "1 naplánovaný blok ušiel", "2 naplánované bloky ušli",
-    // "5 naplánovaných blokov ušlo".
-    public override string PlannedBlocksMissedBody(int count) =>
-        $"{count} {Plural(count, "naplánovaný blok ušiel", "naplánované bloky ušli", "naplánovaných blokov ušlo")} — preplánovať zvyšok dňa?";
-
-    public override string PlannedBlocksMissedFallbackBody => "Niektoré naplánované bloky ušli — preplánovať zvyšok dňa?";
-
-    public override string PlannedBlockOverrunTitle => "Čas vypršal";
-
-    // "Čas na „Deep work“ vypršal pred 10 min — ukončiť, alebo predĺžiť?"; no name: "Váš naplánovaný blok skončil …".
-    public override string PlannedBlockOverrunBody(string? activityName, int minutesOver)
-    {
-        var ago = minutesOver > 0 ? $" pred {Lead(minutesOver)}" : string.Empty;
-        return activityName is { Length: > 0 }
-            ? $"Čas na {Quote(activityName)} vypršal{ago} — ukončiť, alebo predĺžiť?"
-            : $"Váš naplánovaný blok skončil{ago} — ukončiť, alebo predĺžiť?";
-    }
 
     public override string MorningBriefingTitle => "Váš deň";
     public override string MorningBriefingFallbackBody => "Toto vás dnes čaká.";

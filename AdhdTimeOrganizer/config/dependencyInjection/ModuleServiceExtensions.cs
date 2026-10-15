@@ -214,68 +214,35 @@ public static class ModuleServiceExtensions
             o.UnraisedTypes = [FrameworkNotificationTypes.DeadlineApproaching, FrameworkNotificationTypes.ReminderDigest];
 
             // FO5's back-off: for a user away three days or more (RecipientEngagementReader), these wait in the
-            // bell and are not pushed or mailed. Only the unsolicited ones about a day, period or block that passes
-            // without them: the routine sweeps' nudges and the planner's automatic block reminders. The reminders
-            // the user wrote, the to-do due reminders, the timer alarm and the scheduler's alerts are delivered
-            // whether anyone is around or not.
-            o.HeldWhileAwayTypes =
-            [
+            // bell and are not pushed or mailed. R1 phase 3: only the kinds not yet moved onto a definition are
+            // listed here; a moved kind says so itself (INotificationKind.HeldWhileAway).
+            // The host's morning briefing: unsolicited and about a morning that passes without it. A returning
+            // user gets the welcome-back card instead (MorningBriefingJobHandler skips them while it is open).
+            o.HeldWhileAwayTypes = [NotificationType.MorningBriefing];
 
-                // Planning's automatic block reminders: system-generated, about a moment that passes without them,
-                // and a whole day of them is exactly what a returning user should not find on their lock screen.
-                // The reminders the user wrote (PersonalReminder) are not held — they asked for those.
-                NotificationType.PlannedBlockStarting,
-
-                // Planning's slip sweep (audit N5): "blocks slipped" and "time's up" are about a moment, and a
-                // returning user does not need a pile of them on the lock screen.
-                NotificationType.PlannedBlocksMissed,
-                NotificationType.PlannedBlockOverrun,
-
-                // The host's morning briefing: unsolicited and about a morning that passes without it. A returning
-                // user gets the welcome-back card instead (MorningBriefingJobHandler skips them while it is open).
-                NotificationType.MorningBriefing
-            ];
-
-            // P2-03: what the lock screen lets the user do without opening the app — every extra step between
-            // "reminded" and "handled" is a place an ADHD user drops the task. Two buttons at most (what Chrome and
-            // Android show). Snooze is the Reminders module's and appears only on a push that delivered a reminder
-            // occurrence; Dismiss is the Notifications module's (mark read); the rest are the owning slice's
-            // INotificationActionHandler. NotificationCatalogTests holds the second copy of this table.
+            // P2-03: the lock-screen buttons of the kinds not yet moved (a moved kind declares its own). Snooze is the
+            // Reminders module's and appears only on a push that delivered a reminder occurrence; the rest are the
+            // owning slice's INotificationActionHandler. NotificationCatalogTests holds the second copy of this table.
             o.Actions = new()
             {
-                [NotificationType.PersonalReminder] = [NotificationAction.Snooze(10), NotificationAction.Dismiss],
-                [NotificationType.TodoItemDue] = [NotificationAction.Done, NotificationAction.Snooze(60)],
-                [NotificationType.PlannedBlockStarting] = [NotificationAction.Start, NotificationAction.Skip],
-                [NotificationType.PlannedBlockOverrun] = [NotificationAction.Done, NotificationAction.Extend(15)]
+                [NotificationType.TodoItemDue] = [NotificationAction.Done, NotificationAction.Snooze(60)]
             };
 
-            // R1 phase 2: the kinds that have not moved onto their own definition yet. The framework's own kinds
-            // (the Scheduler's two alerts, the admin-only Test) register themselves.
+            // R1 phase 3: the kinds that have not moved onto their own definition yet.
             o.SupportedTypes =
-        [
-            // Planning slice: the user's own self-set nudge, delivered through the Reminders module.
-            NotificationType.PersonalReminder,
-            // TodoLists slice: TodoListItemDueReminderSync, registered through the Reminders module per timed item.
-            // Not held while away: it is about the user's own commitment, not a nudge to come back.
-            NotificationType.TodoItemDue,
+            [
+                // TodoLists slice: TodoListItemDueReminderSync, registered through the Reminders module per timed
+                // item. Not held while away: it is about the user's own commitment, not a nudge to come back.
+                NotificationType.TodoItemDue,
 
-            // Planning slice: the automatic reminder PlannedBlockAutoReminders creates for a new block, under the
-            // user's own UserPlannerSettings.AutoReminderMode. Its own row, so muting it leaves PersonalReminder alone.
-            NotificationType.PlannedBlockStarting,
+                // The host: MorningBriefingJobHandler, through MorningBriefingNotifier. Its own row, so the briefing's
+                // channels can be chosen apart from the routine digest it replaces.
+                NotificationType.MorningBriefing,
 
-            // Planning slice: PlannerSlipNudgeJobHandler, through PlannerNotificationService.
-            NotificationType.PlannedBlocksMissed,
-            NotificationType.PlannedBlockOverrun,
-
-            // The host: MorningBriefingJobHandler, through MorningBriefingNotifier. Its own row, so the briefing's
-            // channels can be chosen apart from the routine digest it replaces.
-            NotificationType.MorningBriefing,
-
-            // Tracking slice: TrackerSilenceJobHandler, through TrackerSilenceNotifier (P2-04). Not held while away —
-            // the rule only fires for a user the app saw within a day, and it is operational, not a nudge. Push on,
-            // email off (NotificationChannelDefaults): the user should hear about it, but it is not worth a mail.
-            NotificationType.TrackerSilent
-        ];
+                // Tracking slice: TrackerSilenceJobHandler, through TrackerSilenceNotifier (P2-04). Not held while
+                // away — the rule only fires for a user the app saw within a day, and it is operational, not a nudge.
+                NotificationType.TrackerSilent
+            ];
         });
 
     /// <summary>

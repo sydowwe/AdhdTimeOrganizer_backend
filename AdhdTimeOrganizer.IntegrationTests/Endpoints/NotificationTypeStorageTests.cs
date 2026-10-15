@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.History.application.notification;
 using System.Net;
 using System.Net.Http.Json;
@@ -114,7 +115,7 @@ public class NotificationTypeStorageTests(AppDbContextFixture fixture) : Postgre
         {
             var definitions = await db.Set<ReminderDefinition>().AsNoTracking()
                 .Where(d => d.Id == typedId || d.Id == untypedId).ToDictionaryAsync(d => d.Id, CancellationToken);
-            definitions[typedId].NotificationType.Should().Be(NotificationType.PersonalReminder);
+            definitions[typedId].NotificationType.Should().Be(PlanningNotificationTypes.PersonalReminder);
             definitions[untypedId].NotificationType.Should().BeNull();
 
             (await db.Set<ReminderDispatch>().AsNoTracking().SingleAsync(d => d.Id == dispatchId, CancellationToken))

@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.History.domain.model.@enum;
 using System.Security.Claims;
 using System.Text.Json;
@@ -340,7 +341,7 @@ public class PlannerSlipNudgeJobTests(AppDbContextFixture fixture) : PostgresTes
 
         await RunJobAsync(At(10, 5));
 
-        var notification = await SingleNotificationAsync(NotificationType.PlannedBlocksMissed);
+        var notification = await SingleNotificationAsync(PlanningNotificationTypes.PlannedBlocksMissed);
         var payload = JsonDocument.Parse(notification.PayloadJson).RootElement;
         payload.GetProperty("date").GetString().Should().Be("2020-09-29");
         payload.GetProperty("count").GetInt32().Should().Be(2);
@@ -360,7 +361,7 @@ public class PlannerSlipNudgeJobTests(AppDbContextFixture fixture) : PostgresTes
 
         await RunJobAsync(At(13, 10));
 
-        var notification = await SingleNotificationAsync(NotificationType.PlannedBlockOverrun);
+        var notification = await SingleNotificationAsync(PlanningNotificationTypes.PlannedBlockOverrun);
         var renderer = Fixture.AdminAndUserFactory.Services.GetRequiredService<INotificationTextRenderer>();
         renderer.RenderSubject(notification.Type, notification.PayloadJson)
             .Should().Be(new NotificationSubject(NotificationSubjectKinds.PlannerTask, blockId));
@@ -380,7 +381,7 @@ public class PlannerSlipNudgeJobTests(AppDbContextFixture fixture) : PostgresTes
         var renderer = Fixture.AdminAndUserFactory.Services.GetRequiredService<INotificationTextRenderer>();
         var json = JsonSerializer.Serialize(new { date = "2020-09-29", count, firstTaskId = 1 });
 
-        renderer.Render(NotificationType.PlannedBlocksMissed, json, locale).Body.Should().Be(expected);
+        renderer.Render(PlanningNotificationTypes.PlannedBlocksMissed, json, locale).Body.Should().Be(expected);
     }
 
     // ---- helpers ----------------------------------------------------------------------------------

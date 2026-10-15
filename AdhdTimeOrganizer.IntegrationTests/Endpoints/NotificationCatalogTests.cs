@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.History.application.notification;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
@@ -35,7 +36,7 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
     /// <summary>Shared with <see cref="NotificationVocabularyTests"/>: one second copy, two contracts keyed on it.</summary>
     public static readonly IReadOnlySet<NotificationType> Catalog = new HashSet<NotificationType>
     {
-        NotificationType.PersonalReminder,
+        PlanningNotificationTypes.PersonalReminder,
         RoutinesNotificationTypes.RoutinePeriodEndingSoon,
         RoutinesNotificationTypes.RoutinePeriodEnded,
         RoutinesNotificationTypes.RoutineStreakGraceExpiring,
@@ -43,9 +44,9 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         NotificationType.ScheduledJobFailed,
         NotificationType.ScheduledJobOverdue,
         NotificationType.TodoItemDue,
-        NotificationType.PlannedBlockStarting,
-        NotificationType.PlannedBlocksMissed,
-        NotificationType.PlannedBlockOverrun,
+        PlanningNotificationTypes.PlannedBlockStarting,
+        PlanningNotificationTypes.PlannedBlocksMissed,
+        PlanningNotificationTypes.PlannedBlockOverrun,
         NotificationType.MorningBriefing,
         HistoryNotificationTypes.TimerBoundary,
         HistoryNotificationTypes.StopwatchCheckIn,
@@ -62,9 +63,9 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
     public static readonly IReadOnlyDictionary<NotificationType, IReadOnlyList<NotificationAction>> Actions =
         new Dictionary<NotificationType, IReadOnlyList<NotificationAction>>
         {
-            [NotificationType.PersonalReminder] = [NotificationAction.Snooze(10), NotificationAction.Dismiss],
+            [PlanningNotificationTypes.PersonalReminder] = [NotificationAction.Snooze(10), NotificationAction.Dismiss],
             [NotificationType.TodoItemDue] = [NotificationAction.Done, NotificationAction.Snooze(60)],
-            [NotificationType.PlannedBlockStarting] = [NotificationAction.Start, NotificationAction.Skip],
-            [NotificationType.PlannedBlockOverrun] = [NotificationAction.Done, NotificationAction.Extend(15)]
+            [PlanningNotificationTypes.PlannedBlockStarting] = [NotificationAction.Start, NotificationAction.Skip],
+            [PlanningNotificationTypes.PlannedBlockOverrun] = [NotificationAction.Done, NotificationAction.Extend(15)]
         };
 }
