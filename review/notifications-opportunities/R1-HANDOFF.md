@@ -19,7 +19,7 @@ from the main checkout — do not commit it).
 | Phase 3 host (MorningBriefing) | c829979 | 395f2d1 | targeted 1588/0 |
 | Phase 4 code (see below) | WIP commit | WIP commit | **build only — tests not run yet** |
 
-A full-suite run on the end of phase 3 (c829979) was started; its result is at the bottom of `artifacts-p3-full.log`.
+The full suite on the end of phase 3 (c829979) is green: 3647 / 0 failed / 150 skipped (`artifacts-p3-full.log`).
 
 Phase 4 code, committed as WIP: the nine business kinds deleted (payloads, renderer, words), the struct's temporary
 members and `Known` gone, `NotificationTexts`/`Sk…`/`En…` deleted (`NotificationTextOptions` now maps locale →
