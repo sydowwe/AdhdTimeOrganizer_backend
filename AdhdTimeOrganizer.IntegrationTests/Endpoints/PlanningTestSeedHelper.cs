@@ -4,6 +4,7 @@ using AdhdTimeOrganizer.Core.domain.model.@enum;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
 using AdhdTimeOrganizer.Planning.domain.model.entity.activityPlanning;
 using AdhdTimeOrganizer.Planning.domain.model.@enum;
+using AdhdTimeOrganizer.Planning.domain.service;
 using Microsoft.EntityFrameworkCore;
 using Sydowwe.Framework.Testing;
 
@@ -87,6 +88,23 @@ public static class PlanningTestSeedHelper
         await db.SaveChangesAsync(ct);
         return calendar.Id;
     }
+
+    /// <summary>
+    /// A day as the app creates it, through <see cref="CalendarDayFactory"/>: its natural day type, and on a public
+    /// holiday the key and name from the real <see cref="HolidayCalendar"/>. For tests about holidays, which must not
+    /// set <c>HolidayKey</c> by hand, or they would keep passing after the factory stopped writing it.
+    /// </summary>
+    public static async Task<long> SeedNaturalCalendarAsync(DbContext db, DateOnly date, long userId = TestUserId, CancellationToken ct = default)
+    {
+        var calendar = CalendarDayFactory.Create(userId, date, UserSleepWindow.Fallback);
+        db.Set<Calendar>().Add(calendar);
+        await db.SaveChangesAsync(ct);
+        return calendar.Id;
+    }
+
+    /// <summary>The date of the holiday with <paramref name="key"/> in <paramref name="year"/>, off the real table.</summary>
+    public static DateOnly HolidayDate(int year, string key) =>
+        HolidayCalendar.ForYear(year).Single(h => h.Value.Key == key).Key;
 
     public static async Task<long> SeedPlannerTaskAsync(
         DbContext db,

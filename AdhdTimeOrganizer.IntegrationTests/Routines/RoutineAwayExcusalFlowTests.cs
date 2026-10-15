@@ -180,6 +180,75 @@ public class RoutineAwayExcusalFlowTests(AppDbContextFixture fixture) : Postgres
         (await verify.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == dailyId, CancellationToken)).Streak.Should().Be(2);
     }
 
+    /// <summary>
+    /// F4 question 4 (owner decision, 2026-10-15): a public holiday ranks like a weekend in the planner, and is
+    /// <b>not</b> time away. The week of Good Friday 2026, its days created the way the app creates them, so Friday is a
+    /// <c>Workday</c> row carrying the holiday key. Three days marked sick are three of seven, one short of the
+    /// majority, and the holiday is the day that would tip it: if a holiday ever counted as away, this cycle would be
+    /// excused. Marking a fourth day is the control that the retroactive path ran at all. Without it, "not excused"
+    /// would also pass for a handler that never fired.
+    /// </summary>
+    [Fact(DisplayName = "F4 Q4: a weekly cycle containing a holiday is not excused for it")]
+    public async Task WeeklyCycleWithAHoliday_IsNotExcusedForTheHoliday()
+    {
+        var goodFriday = PlanningTestSeedHelper.HolidayDate(2026, "GOOD_FRIDAY");
+        var weekStart = goodFriday.AddDays(-4); // Monday
+        long weeklyId;
+        var dayIds = new List<long>();
+
+        await using (var db = CreateDbContext())
+        {
+            var weekly = await SeedPeriodAsync(db, lengthInDays: 7, lastResetAt: DateTime.UtcNow.AddDays(-1), streak: 0);
+            weekly.BestStreak = 2;
+            weeklyId = weekly.Id;
+            await db.SaveChangesAsync(CancellationToken);
+
+            db.Set<RoutinePeriodCompletion>().AddRange(
+                Completion(weeklyId, weekStart.AddDays(-14), 7, completed: 1),
+                Completion(weeklyId, weekStart.AddDays(-7), 7, completed: 1),
+                Completion(weeklyId, weekStart, 7, completed: 0));
+            await db.SaveChangesAsync(CancellationToken);
+
+            for (var offset = 0; offset < 7; offset++)
+                dayIds.Add(await PlanningTestSeedHelper.SeedNaturalCalendarAsync(db, weekStart.AddDays(offset), UserId, CancellationToken));
+        }
+
+        await using (var check = CreateDbContext())
+        {
+            var holiday = await check.Set<Calendar>().IgnoreQueryFilters().SingleAsync(c => c.Id == dayIds[4], CancellationToken);
+            holiday.Date.Should().Be(goodFriday);
+            holiday.DayType.Should().Be(DayType.Workday);
+            holiday.HolidayKey.Should().Be("GOOD_FRIDAY");
+        }
+
+        // Monday to Wednesday sick: three away days. Good Friday would be the fourth.
+        (await MarkSickAsync(dayIds.Take(3))).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using (var afterThree = CreateDbContext())
+        {
+            (await afterThree.Set<RoutinePeriodCompletion>().SingleAsync(c => c.TimePeriodId == weeklyId && c.PeriodStart == weekStart, CancellationToken))
+                .IsExcused.Should().BeFalse("a holiday is not time away, so three sick days are not the majority of the week");
+            (await afterThree.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == weeklyId, CancellationToken)).Streak.Should().Be(0);
+            (await afterThree.Set<Calendar>().IgnoreQueryFilters().SingleAsync(c => c.Id == dayIds[4], CancellationToken))
+                .DayType.Should().Be(DayType.Workday, "nothing on the excusal path rewrites the holiday");
+        }
+
+        // Thursday too: four of seven, without the holiday. The path is live.
+        (await MarkSickAsync([dayIds[3]])).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var verify = CreateDbContext();
+        (await verify.Set<RoutinePeriodCompletion>().SingleAsync(c => c.TimePeriodId == weeklyId && c.PeriodStart == weekStart, CancellationToken))
+            .IsExcused.Should().BeTrue();
+        (await verify.Set<RoutineTimePeriod>().SingleAsync(p => p.Id == weeklyId, CancellationToken)).Streak.Should().Be(2);
+    }
+
+    private async Task<HttpResponseMessage> MarkSickAsync(IEnumerable<long> calendarIds) =>
+        await CreateClient().PatchAsJsonAsync("api/calendar/day-type/batch", new
+        {
+            CalendarIds = calendarIds.ToList(),
+            DayType = "SickDay"
+        }, JsonOpts, CancellationToken);
+
     // ─── The ledger's own guarantee ──────────────────────────────────────────
 
     [Fact(DisplayName = "FO1: the database refuses a cycle that is both frozen and excused")]

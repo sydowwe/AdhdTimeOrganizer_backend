@@ -137,7 +137,7 @@ public sealed class RepeatingTaskMaterialiser(
             foreach (var rule in rules.Where(r => r.MaterialisedThrough is null || r.MaterialisedThrough < date))
             {
                 if (!IsGated(calendar, userAbsent)
-                    && RepeatingPlannerTaskSchedule.FallsOn(rule, date, calendar.DayType)
+                    && RepeatingPlannerTaskSchedule.FallsOn(rule, calendar)
                     && !HoldsOccurrenceOf(calendar, rule.Id))
                     occurrences.Add(OccurrenceOf(rule, calendar));
 
@@ -235,7 +235,7 @@ public sealed class RepeatingTaskMaterialiser(
 
             foreach (var occurrence in occurrences.Where(t => IsUntouched(t, before, withReminder)))
             {
-                if (!stillPlaces || !RepeatingPlannerTaskSchedule.FallsOn(rule, occurrence.Calendar.Date, occurrence.Calendar.DayType))
+                if (!stillPlaces || !RepeatingPlannerTaskSchedule.FallsOn(rule, occurrence.Calendar))
                     dbContext.Set<PlannerTask>().Remove(occurrence);
                 else if (!MovesOutOfItsLanes(rule, occurrence))
                     CopyPlanOnto(rule, occurrence);
@@ -265,8 +265,8 @@ public sealed class RepeatingTaskMaterialiser(
             foreach (var calendar in days.Values.OrderBy(c => c.Date))
             {
                 if (IsGated(calendar, userAbsent)
-                    || RepeatingPlannerTaskSchedule.FallsOn(before, calendar.Date, calendar.DayType)
-                    || !RepeatingPlannerTaskSchedule.FallsOn(rule, calendar.Date, calendar.DayType)
+                    || RepeatingPlannerTaskSchedule.FallsOn(before, calendar)
+                    || !RepeatingPlannerTaskSchedule.FallsOn(rule, calendar)
                     || HoldsOccurrenceOf(calendar, rule.Id))
                     continue;
 

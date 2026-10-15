@@ -93,6 +93,9 @@ every call to its endpoint answered 500 (`42703`). The consequence to keep in mi
 three is `IEntityWithUser`, so **no global query filter covers them** and each endpoint's own
 `p.UserId == userId` predicate is the whole of the scoping.
 
+**The views record each past day by its stored `DayType`**, so a public holiday counts toward the `Workday`
+statistics. That is accepted, not fixed. The reasons are in § *Holidays rank like a weekend*.
+
 **The two weekday/day-of-month views count a recent window only (FO11).** A weekday pattern needs 3+
 sittings in the last 12 weeks and one in the last 4; a day-of-month pattern 3+ in the last 12 months
 and one in the last 3. The numbers live in `SuggestionPatternWindow` **and** literally in both SQL
@@ -532,7 +535,8 @@ that held anything other than 08:00 / 00:00.
 
 Both creators go through `CalendarDayFactory`, and that is the point of it: a day filled in a year
 ahead and the same day created on its first task have to be the same day. Holidays do **not** override
-the day type — a holiday on a Tuesday is a `Workday` row with a `HolidayName`.
+the day type — a holiday on a Tuesday is a `Workday` row with a `HolidayName`. They do change how the planner
+*matches* the day (§ *Holidays rank like a weekend* below), without writing anything.
 
 Holidays are Slovak only, by decision (B19): `User` carries no country and there is no country
 preference. A row stores the pair `HolidayKey` (`CHRISTMAS_DAY` — stable, what the client translates
@@ -554,7 +558,7 @@ hygiene, not the fix — it only helps users created from now on.
 ### Time away (F4-02)
 
 "Barcelona, 12–20 Aug", marked once across any month boundary, instead of a bulk day-type action per visible month.
-Designed in the frontend repo's `docs/feature-discovery/F4-day-type-periods.md`; the owner chose the full entity on
+Designed in the frontend repo's `docs/_done/feature-discovery/F4-day-type-periods.md`; the owner chose the full entity on
 2026-10-12. **A stretch imposes its kind on its days; nothing reads the stretch to decide whether a day is away.**
 Every away reader — FO1's routine excusal, FO6's withdrawal, both suggestion endpoints' ranking, the nudges — keeps
 reading `Calendar.DayType`.
@@ -577,6 +581,32 @@ reading `Calendar.DayType`.
 | `TimeAwayStamper` (`application/helper/`) | The stamp and un-stamp; stages only. `StageAsync` (create / update), `StageRemovalAsync` (delete) |
 | `TimeAwayWriteRules` (`application/endpoint/extensions/`) | No overlap (400), template ownership (404) |
 | `TimeAwayValidator` / `TimeAwayFilterValidator` | Kind, range, cap; `from ≤ until` |
+
+### Holidays rank like a weekend (F4 question 4)
+
+The owner's answer (2026-10-15): a public holiday on a weekday is treated like a weekend **for matching**, and **not**
+as time away. Most people do not work on one, so a weekend plan should be offered first. The stored row stays a
+`Workday` with its `HolidayKey`, and every away reader keeps reading `DayType.IsAway()` on the stored type.
+
+**One definition:** `DayTypeExtensions.PlanningDayTypes(storedType, holidayKey)` in Core, beside `IsAway`. It returns
+`[Weekend, Workday]` for a `Workday` that has a holiday key, and otherwise `[storedType]`. It takes the key rather than
+the row because `Calendar` is Planning's and Core cannot see it.
+
+| Question | Answer |
+|---|---|
+| Day-template suggestions? | Before the usual tiers comes a holiday tier: weekend history (pattern type 1 = `Weekend`), then templates `SuggestedForDayType = Weekend` and location matches. They are reported as **pattern type 6**, with the label set to the day's `HolidayKey` (`"EASTER_MONDAY"`; the client translates it through `calendar.holidays.<key>`). A history entry keeps its count; a settings entry has 0. A location match is still type 5. The usual workday tiers follow unchanged, so they are demoted, not dropped |
+| Why type 6, not "Weekend"? | The user sees a workday that is a holiday. "Suggested for weekends" on a Monday would explain nothing, while the holiday's name does. The contract is additive: a new value, no changed field |
+| Repeating rules (tier 1)? | `RepeatingPlannerTaskSchedule.FallsOn(rule, day)` matches a `DayType` rule on **any** of the day's planning types. So on a holiday weekday a `Weekend` rule fires **as well as** a `Workday` one, in the suggestion panel **and** in FO6's auto-placing. The owner chose "everywhere" so that the two never disagree. `FallsOn` takes the `Calendar` row, not a date and a type, so no caller can drop the holiday |
+| Pattern tiers (2 and 3)? | Kept, below every user-set rule, which on a holiday includes the weekend rules. An away day drops them; a holiday is not away |
+| A holiday on a Saturday or Sunday? | Already `Weekend`. Nothing changes |
+| A day the user set to `Vacation` / `SickDay` / `Special`? | Their own type wins; the holiday adds nothing |
+| Streaks, excusal, nudges? | **Unchanged.** A holiday excuses no routine cycle (`RoutineAwayRule` counts `AwayTypes` only), and the slip / routine nudges still run |
+| The pattern views? | They record past days by their **stored** type, so a holiday contributes to the `Workday` statistics (template `PatternType 1`) and to its weekday's counts. History is not rewritten. That is acceptable: it is about a dozen days a year against roughly 250 workdays, and the weekday views need 3+ sittings to form a pattern at all |
+
+Pinned by `Services/HolidayPlanningDayTypesTests` (the rule and `FallsOn`, on days built by `CalendarDayFactory`), the
+`F4 Q4` cases in `TaskPlannerDayTemplateSuggestionsTests` and `RepeatingPlannerTaskSuggestionsTests`, and Routines'
+`RoutineAwayExcusalFlowTests.WeeklyCycleWithAHoliday_IsNotExcusedForTheHoliday`. The materialiser itself is not driven
+onto a holiday by any test, because its today is the real clock. It shares `FallsOn`, which is what the pure test pins.
 
 ### Reminders
 
@@ -678,7 +708,7 @@ sources of truth for "did it fire yet" drift the first time a scan and a request
 | `GetAllTaskPlannerDayTemplateEndpoint` | Query (`BaseGetAllEndpoint`) | Pinned first, then last-used/name | `taskPlannerDayTemplate/query/` |
 | `GetSelectOptionsTaskPlannerDayTemplateEndpoint` | Query (`BaseGetSelectOptionsEndpoint`) | Template picker options | `taskPlannerDayTemplate/query/` |
 | `SetPinnedTaskPlannerDayTemplateEndpoint` | Command (`BasePatchEndpoint`) | `PATCH /task-planner-day-template/{id}/pinned` — **absolute**, not a toggle, so two devices converge. Suffixed route leaves the base's generic `/{id}` patch free | `taskPlannerDayTemplate/command/` |
-| `GetSuggestionsTaskPlannerDayTemplateEndpoint` | Query (custom) | `/task-planner-day-template/suggestions/{calendarId}`: first the template of the day's stretch of time away (type 4, F4-02), then `mv_template_suggestion_pattern`, then active templates whose `SuggestedLocation` (type 5, ranked first within the tier — C3) / `ScheduledDays` / `SuggestedForDayType` match the day; one entry per template | `taskPlannerDayTemplate/query/` |
+| `GetSuggestionsTaskPlannerDayTemplateEndpoint` | Query (custom) | `/task-planner-day-template/suggestions/{calendarId}`: first the template of the day's stretch of time away (type 4, F4-02), then `mv_template_suggestion_pattern`, then active templates whose `SuggestedLocation` (type 5, ranked first within the tier — C3) / `ScheduledDays` / `SuggestedForDayType` match the day; one entry per template. On a holiday weekday the weekend matches come first, as type 6 (F4 Q4) | `taskPlannerDayTemplate/query/` |
 | `Create/Update/Delete/GetById/GetAllTaskImportanceEndpoint` | CRUD (Framework bases) | Importance-level CRUD; `(user_id, importance)` is unique | `taskImportance/{command,query}/` |
 | `GridTaskImportanceEndpoint` | Query (`BaseGridEndpoint`) | The importance admin grid | `taskImportance/query/GridTaskImportanceEndpoint.cs` |
 | `GetSelectOptionsTaskImportanceEndpoint` | Query (`BaseGetSelectOptionsEndpoint`) | Importance picker options | `taskImportance/query/` |

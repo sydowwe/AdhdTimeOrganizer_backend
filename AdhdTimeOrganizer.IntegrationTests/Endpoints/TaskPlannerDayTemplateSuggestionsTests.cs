@@ -485,6 +485,128 @@ public class TaskPlannerDayTemplateSuggestionsTests(AppDbContextFixture fixture)
         suggestions[0].PatternLabel.Should().Be(nameof(Location.Travel));
     }
 
+    // ─── F4 Q4: a public holiday on a weekday ranks like a weekend ───────────
+
+    private static readonly DateOnly EasterMonday2028 = PlanningTestSeedHelper.HolidayDate(2028, "EASTER_MONDAY");
+
+    /// <summary>
+    /// Easter Monday, created the way the app creates it, so it is a <c>Workday</c> row carrying the holiday key.
+    /// "Office" has been applied on three Mondays and "Lazy day" on two weekend days. On a holiday Monday the weekend
+    /// evidence comes first: history, then the weekend template, both reported as the holiday rather than as
+    /// "Weekend". The workday tiers follow exactly as on any Monday, demoted rather than dropped. Reading the
+    /// suggestions changes nothing about the stored day.
+    /// </summary>
+    [Fact(DisplayName = "F4 Q4: on a holiday Monday weekend suggestions rank above workday ones, reported as the holiday")]
+    public async Task HolidayMonday_RanksWeekendAboveWorkday_AndReportsTheHoliday()
+    {
+        EasterMonday2028.DayOfWeek.Should().Be(DayOfWeek.Monday);
+        HolidayFixture fixture;
+        long calendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            fixture = await SeedHolidayFixtureAsync(db, EasterMonday2028);
+            calendarId = await PlanningTestSeedHelper.SeedNaturalCalendarAsync(db, EasterMonday2028, UserId, CancellationToken);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        var suggestions = await GetSuggestionsAsync(calendarId);
+        suggestions.Select(s => (s.Template.Id, s.PatternType)).Should().Equal(
+            (fixture.LazyDayId, 6), (fixture.WeekendTagId, 6), (fixture.OfficeId, 0), (fixture.WorkdayTagId, 3));
+        suggestions.Where(s => s.PatternType == 6).Should().OnlyContain(s => s.PatternLabel == "EASTER_MONDAY");
+        suggestions.Select(s => s.OccurrenceCount).Should().Equal(2, 0, 3, 0);
+
+        await using var verify = CreateDbContext();
+        var day = await verify.Set<Calendar>().IgnoreQueryFilters().SingleAsync(c => c.Id == calendarId, CancellationToken);
+        day.DayType.Should().Be(DayType.Workday, "ranking reads the holiday, it never rewrites the day");
+        day.HolidayKey.Should().Be("EASTER_MONDAY");
+    }
+
+    [Fact(DisplayName = "F4 Q4: the next Monday, no holiday, ranks the workday suggestions and offers no weekend one")]
+    public async Task PlainMonday_RanksWorkdayAndOffersNoWeekend()
+    {
+        var plainMonday = EasterMonday2028.AddDays(7);
+        HolidayFixture fixture;
+        long calendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            fixture = await SeedHolidayFixtureAsync(db, EasterMonday2028);
+            calendarId = await PlanningTestSeedHelper.SeedNaturalCalendarAsync(db, plainMonday, UserId, CancellationToken);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        (await GetSuggestionsAsync(calendarId)).Select(s => (s.Template.Id, s.PatternType)).Should().Equal(
+            (fixture.OfficeId, 0), (fixture.WorkdayTagId, 3));
+    }
+
+    /// <summary>
+    /// New Year's Day 2028 is a Saturday, stored as a <c>Weekend</c> with the holiday key. It is a weekend already, so
+    /// the holiday changes nothing: the suggestions are exactly a plain Saturday's, labelled "Weekend".
+    /// </summary>
+    [Fact(DisplayName = "F4 Q4: a holiday on a Saturday ranks exactly like a plain Saturday")]
+    public async Task HolidaySaturday_IsUnchanged()
+    {
+        var newYear = PlanningTestSeedHelper.HolidayDate(2028, "NEW_YEAR");
+        newYear.DayOfWeek.Should().Be(DayOfWeek.Saturday);
+        var plainSaturday = newYear.AddDays(7);
+        long lazyDayId, weekendTagId, holidayCalendarId, plainCalendarId;
+
+        await using (var db = CreateDbContext())
+        {
+            lazyDayId = await SeedHistoryOnlyTemplateAsync(db, "Lazy day");
+            // A Saturday and a Sunday, so only the Weekend grouping reaches the threshold.
+            await StampAsync(db, lazyDayId, newYear.AddDays(-14), DayType.Weekend);
+            await StampAsync(db, lazyDayId, newYear.AddDays(-20), DayType.Weekend);
+            weekendTagId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+                db, UserId, "Weekends", CancellationToken, DayType.Weekend);
+            await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(db, UserId, "Workdays", CancellationToken, DayType.Workday);
+
+            holidayCalendarId = await PlanningTestSeedHelper.SeedNaturalCalendarAsync(db, newYear, UserId, CancellationToken);
+            plainCalendarId = await PlanningTestSeedHelper.SeedNaturalCalendarAsync(db, plainSaturday, UserId, CancellationToken);
+        }
+
+        await RefreshTemplateSuggestionViewAsync();
+
+        var onTheHoliday = await GetSuggestionsAsync(holidayCalendarId);
+        onTheHoliday.Select(s => (s.Template.Id, s.PatternType, s.PatternLabel)).Should().Equal(
+            (lazyDayId, 1, nameof(DayType.Weekend)), (weekendTagId, 3, nameof(DayType.Weekend)));
+        (await GetSuggestionsAsync(plainCalendarId)).Select(s => (s.Template.Id, s.PatternType, s.PatternLabel))
+            .Should().Equal(onTheHoliday.Select(s => (s.Template.Id, s.PatternType, s.PatternLabel)));
+
+        await using var verify = CreateDbContext();
+        var day = await verify.Set<Calendar>().IgnoreQueryFilters().SingleAsync(c => c.Id == holidayCalendarId, CancellationToken);
+        day.DayType.Should().Be(DayType.Weekend);
+        day.HolidayKey.Should().Be("NEW_YEAR");
+    }
+
+    private sealed record HolidayFixture(long OfficeId, long LazyDayId, long WeekendTagId, long WorkdayTagId);
+
+    /// <summary>
+    /// Four templates around a Monday: "Office" applied on the three Mondays before it (also three Workdays, so the
+    /// weekday pattern wins its tie), "Lazy day" applied on a Saturday and a Sunday (a Weekend pattern only), and two
+    /// with no history, one suggested for weekends and one for workdays.
+    /// </summary>
+    private async Task<HolidayFixture> SeedHolidayFixtureAsync(DbContext db, DateOnly monday)
+    {
+        var officeId = await SeedHistoryOnlyTemplateAsync(db, "Office");
+        for (var weeksAgo = 1; weeksAgo <= 3; weeksAgo++)
+            await StampAsync(db, officeId, monday.AddDays(-7 * weeksAgo), DayType.Workday);
+
+        var lazyDayId = await SeedHistoryOnlyTemplateAsync(db, "Lazy day");
+        await StampAsync(db, lazyDayId, monday.AddDays(-9), DayType.Weekend);  // Saturday
+        await StampAsync(db, lazyDayId, monday.AddDays(-15), DayType.Weekend); // Sunday
+
+        var weekendTagId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+            db, UserId, "Weekends", CancellationToken, DayType.Weekend);
+        var workdayTagId = await PlanningTestSeedHelper.SeedTaskPlannerDayTemplateAsync(
+            db, UserId, "Workdays", CancellationToken, DayType.Workday);
+
+        return new HolidayFixture(officeId, lazyDayId, weekendTagId, workdayTagId);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private async Task SetLocationAsync(DbContext db, long calendarId, Location location)
