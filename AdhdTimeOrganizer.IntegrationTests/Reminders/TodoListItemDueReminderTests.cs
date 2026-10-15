@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.TodoLists.application.notification;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -82,7 +83,7 @@ public class TodoListItemDueReminderTests(AppDbContextFixture fixture) : Postgre
         definition.RecipientMode.Should().Be(RecipientMode.ExplicitUsers,
             "a resolver-strategy reminder would vanish from my-upcoming and could not be snoozed");
         definition.Recipients.Select(r => r.UserId).Should().Equal(UserId);
-        definition.NotificationType.Should().Be(NotificationType.TodoItemDue);
+        definition.NotificationType.Should().Be(TodoListsNotificationTypes.TodoItemDue);
         definition.TemplateKey.Should().Be(TodoListItemDueReminder.TemplateKey);
     }
 
@@ -339,7 +340,7 @@ public class TodoListItemDueReminderTests(AppDbContextFixture fixture) : Postgre
         dispatch.Outcome.Should().Be(DispatchOutcome.Sent);
 
         var notification = await db.Set<Notification>().AsNoTracking()
-            .SingleAsync(n => n.UserId == UserId && n.Type == NotificationType.TodoItemDue, CancellationToken);
+            .SingleAsync(n => n.UserId == UserId && n.Type == TodoListsNotificationTypes.TodoItemDue, CancellationToken);
         var payload = JsonDocument.Parse(notification.PayloadJson).RootElement;
         payload.GetProperty("todoListItemId").GetInt64().Should().Be(itemId);
         payload.GetProperty("minutesBefore").GetInt32().Should().Be(30);
@@ -503,7 +504,7 @@ public class TodoListItemDueReminderTests(AppDbContextFixture fixture) : Postgre
         dispatch.Outcome.Should().Be(DispatchOutcome.Skipped);
         dispatch.SkipReason.Should().Be(SkipReason.SubjectRetired);
 
-        (await db.Set<Notification>().AnyAsync(n => n.Type == NotificationType.TodoItemDue, CancellationToken))
+        (await db.Set<Notification>().AnyAsync(n => n.Type == TodoListsNotificationTypes.TodoItemDue, CancellationToken))
             .Should().BeFalse("a retired occurrence sends nothing");
     }
 

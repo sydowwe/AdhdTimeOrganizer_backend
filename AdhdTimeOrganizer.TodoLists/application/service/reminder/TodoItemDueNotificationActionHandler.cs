@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.TodoLists.application.notification;
 using System.Text.Json;
 using AdhdTimeOrganizer.Core.application.@event;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
@@ -12,7 +13,7 @@ using Sydowwe.Framework.domain.helper;
 namespace AdhdTimeOrganizer.TodoLists.application.service.reminder;
 
 /// <summary>
-/// The <b>Done</b> button on a to-do's due push (<see cref="NotificationType.TodoItemDue"/>, P2-03): one tick of the
+/// The <b>Done</b> button on a to-do's due push (<see cref="TodoListsNotificationTypes.TodoItemDue"/>, P2-03): one tick of the
 /// item's checkbox, the same write <c>ToggleIsDoneTodoListItemEndpoint</c> makes with <c>forceValue: true</c> —
 /// <see cref="BaseTodoListItem.ApplyIsDoneToggle"/>, then the due reminder sync and the done-changed event, after the
 /// save. So the planner block it is planned into and its other followers see it exactly as if it were ticked in the app.
@@ -27,7 +28,7 @@ public class TodoItemDueNotificationActionHandler(DbContext dbContext, ITodoList
     : INotificationActionHandler, IScopedService
 {
     public bool Handles(NotificationType type, NotificationActionKind kind) =>
-        type == NotificationType.TodoItemDue && kind == NotificationActionKind.Done;
+        type == TodoListsNotificationTypes.TodoItemDue && kind == NotificationActionKind.Done;
 
     public async Task<NotificationActionOutcome> ExecuteAsync(NotificationActionContext context, CancellationToken ct)
     {

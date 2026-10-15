@@ -220,21 +220,9 @@ public static class ModuleServiceExtensions
             // user gets the welcome-back card instead (MorningBriefingJobHandler skips them while it is open).
             o.HeldWhileAwayTypes = [NotificationType.MorningBriefing];
 
-            // P2-03: the lock-screen buttons of the kinds not yet moved (a moved kind declares its own). Snooze is the
-            // Reminders module's and appears only on a push that delivered a reminder occurrence; the rest are the
-            // owning slice's INotificationActionHandler. NotificationCatalogTests holds the second copy of this table.
-            o.Actions = new()
-            {
-                [NotificationType.TodoItemDue] = [NotificationAction.Done, NotificationAction.Snooze(60)]
-            };
-
             // R1 phase 3: the kinds that have not moved onto their own definition yet.
             o.SupportedTypes =
             [
-                // TodoLists slice: TodoListItemDueReminderSync, registered through the Reminders module per timed
-                // item. Not held while away: it is about the user's own commitment, not a nudge to come back.
-                NotificationType.TodoItemDue,
-
                 // The host: MorningBriefingJobHandler, through MorningBriefingNotifier. Its own row, so the briefing's
                 // channels can be chosen apart from the routine digest it replaces.
                 NotificationType.MorningBriefing,

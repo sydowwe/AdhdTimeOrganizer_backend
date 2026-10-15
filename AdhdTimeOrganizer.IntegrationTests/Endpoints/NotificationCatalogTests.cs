@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.TodoLists.application.notification;
 using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.Routines.application.notification;
 using AdhdTimeOrganizer.History.application.notification;
@@ -43,7 +44,7 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         RoutinesNotificationTypes.RoutineSuggestedToday,
         NotificationType.ScheduledJobFailed,
         NotificationType.ScheduledJobOverdue,
-        NotificationType.TodoItemDue,
+        TodoListsNotificationTypes.TodoItemDue,
         PlanningNotificationTypes.PlannedBlockStarting,
         PlanningNotificationTypes.PlannedBlocksMissed,
         PlanningNotificationTypes.PlannedBlockOverrun,
@@ -64,7 +65,7 @@ public class NotificationCatalogTests(AppDbContextFixture fixture) : BaseNotific
         new Dictionary<NotificationType, IReadOnlyList<NotificationAction>>
         {
             [PlanningNotificationTypes.PersonalReminder] = [NotificationAction.Snooze(10), NotificationAction.Dismiss],
-            [NotificationType.TodoItemDue] = [NotificationAction.Done, NotificationAction.Snooze(60)],
+            [TodoListsNotificationTypes.TodoItemDue] = [NotificationAction.Done, NotificationAction.Snooze(60)],
             [PlanningNotificationTypes.PlannedBlockStarting] = [NotificationAction.Start, NotificationAction.Skip],
             [PlanningNotificationTypes.PlannedBlockOverrun] = [NotificationAction.Done, NotificationAction.Extend(15)]
         };

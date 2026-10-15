@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.TodoLists.application.notification;
 using AdhdTimeOrganizer.TodoLists.domain.model.entity.todoList;
 using AdhdTimeOrganizer.TodoLists.domain.serviceContract;
 using Sydowwe.Framework.config.dependencyInjection;
@@ -100,7 +101,7 @@ public class TodoListItemDueReminderSync(
             Key = TodoListItemDueReminder.KeyFor(item.Id),
             Schedule = ReminderSchedule.OneShot(dueAt, [-minutesBefore]),
             TemplateKey = TodoListItemDueReminder.TemplateKey,
-            NotificationType = NotificationType.TodoItemDue,
+            NotificationType = TodoListsNotificationTypes.TodoItemDue,
             Payload = new TodoItemDuePayload(item.Id, item.Title, item.TodoListId, dueAt, minutesBefore),
             RecipientMode = RecipientMode.ExplicitUsers,
             ExplicitRecipientUserIds = [item.UserId]

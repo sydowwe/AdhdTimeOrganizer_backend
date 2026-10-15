@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.TodoLists.application.notification;
 using AdhdTimeOrganizer.Planning.application.notification;
 using AdhdTimeOrganizer.History.application.notification;
 using System.Net;
@@ -77,7 +78,7 @@ public class NotificationTypeStorageTests(AppDbContextFixture fixture) : Postgre
         long typedId, untypedId, dispatchId;
         await using (var db = CreateDbContext())
         {
-            var typed = Definition("typed", NotificationType.TodoItemDue);
+            var typed = Definition("typed", TodoListsNotificationTypes.TodoItemDue);
             var untyped = Definition("untyped", null);
             db.AddRange(typed, untyped);
             await db.SaveChangesAsync(CancellationToken);
@@ -88,7 +89,7 @@ public class NotificationTypeStorageTests(AppDbContextFixture fixture) : Postgre
                 OccurrenceAt = DateTimeOffset.UtcNow,
                 DispatchedAt = DateTimeOffset.UtcNow,
                 Outcome = DispatchOutcome.Sent,
-                NotificationTypeSnapshot = NotificationType.TodoItemDue,
+                NotificationTypeSnapshot = TodoListsNotificationTypes.TodoItemDue,
                 RecipientsSnapshot = $"[{UserId}]",
                 CorrelationId = Guid.NewGuid().ToString()
             };
@@ -119,7 +120,7 @@ public class NotificationTypeStorageTests(AppDbContextFixture fixture) : Postgre
             definitions[untypedId].NotificationType.Should().BeNull();
 
             (await db.Set<ReminderDispatch>().AsNoTracking().SingleAsync(d => d.Id == dispatchId, CancellationToken))
-                .NotificationTypeSnapshot.Should().Be(NotificationType.TodoItemDue);
+                .NotificationTypeSnapshot.Should().Be(TodoListsNotificationTypes.TodoItemDue);
         }
     }
 

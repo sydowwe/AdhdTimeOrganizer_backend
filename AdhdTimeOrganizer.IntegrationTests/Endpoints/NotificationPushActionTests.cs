@@ -1,3 +1,4 @@
+using AdhdTimeOrganizer.TodoLists.application.notification;
 using AdhdTimeOrganizer.Planning.application.notification;
 using System.Collections.Concurrent;
 using System.Net;
@@ -135,7 +136,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
             db.Add(new Notification
             {
                 UserId = EnglishUserId,
-                Type = NotificationType.TodoItemDue,
+                Type = TodoListsNotificationTypes.TodoItemDue,
                 PayloadJson = """{"todoListItemId":5,"title":"Pay rent","minutesBefore":30}""",
                 DeferredUntil = flushAt.AddMinutes(-1),
                 ReminderDefinitionId = 12,
@@ -226,7 +227,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
         Notification redelivered;
         await using (var db = CreateDbContext())
             redelivered = await db.Set<Notification>().AsNoTracking()
-                .SingleAsync(n => n.Type == NotificationType.TodoItemDue && n.Id != first.Id, CancellationToken);
+                .SingleAsync(n => n.Type == TodoListsNotificationTypes.TodoItemDue && n.Id != first.Id, CancellationToken);
         redelivered.ReminderOccurrenceAt.Should().Be(occurrence, "the re-delivery carries the original occurrence, so it can be snoozed again");
 
         (await PostActionAsync(client, redelivered.Id, "done")).Should().Be(HttpStatusCode.NoContent);
@@ -426,7 +427,7 @@ public class NotificationPushActionTests(AppDbContextFixture fixture) : Postgres
     {
         await using var db = CreateDbContext();
         return await db.Set<Notification>().AsNoTracking()
-            .SingleAsync(n => n.UserId == UserId && n.Type == NotificationType.TodoItemDue, CancellationToken);
+            .SingleAsync(n => n.UserId == UserId && n.Type == TodoListsNotificationTypes.TodoItemDue, CancellationToken);
     }
 
     /// <summary>Through the endpoint, so the due reminder is registered as the app registers it.</summary>

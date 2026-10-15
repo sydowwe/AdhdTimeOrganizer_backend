@@ -18,16 +18,6 @@ namespace AdhdTimeOrganizer.infrastructure.notification;
 /// </summary>
 public class SkPortalNotificationTexts : SkNotificationTexts
 {
-    // "Termín úlohy o 30 min", "… o 2 h", "… o 1 h 30 min"; "Termín úlohy je teraz"; no lead: "Termín úlohy sa blíži".
-    public override string TodoItemDueTitle(int? minutesBefore) => minutesBefore switch
-    {
-        null => "Termín úlohy sa blíži",
-        <= 0 => "Termín úlohy je teraz",
-        var m => $"Termín úlohy o {Lead(m.Value)}"
-    };
-
-    public override string TodoItemDueFallbackBody => "Blíži sa termín jednej z vašich úloh.";
-
     public override string MorningBriefingTitle => "Váš deň";
     public override string MorningBriefingFallbackBody => "Toto vás dnes čaká.";
 
