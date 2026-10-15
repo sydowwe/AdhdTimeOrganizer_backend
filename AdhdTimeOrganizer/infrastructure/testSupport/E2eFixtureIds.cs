@@ -41,8 +41,13 @@ public static class E2eFixtureIds
     /// views — the grid chip, the detail alert, the disabled Trigger and Replay, the attention list — had
     /// never rendered, because no registered handler is ever missing in a running host.
     /// </para>
+    /// <para>
+    /// <c>e2e-v6</c> added six timer sessions with a plan, so OP6's timer-plan line on <c>/activity-history</c>
+    /// renders on the default week. Every surface that reads <c>PlannedLength</c> had shown only what a spec
+    /// posted itself.
+    /// </para>
     /// </remarks>
-    public const string FixtureVersion = "e2e-v5";
+    public const string FixtureVersion = "e2e-v6";
 
     // --- accounts -------------------------------------------------------------------------------
     // Credentials mirror the SPA's e2e/.env.test. The password is stored as a hash written directly by
@@ -106,7 +111,10 @@ public static class E2eFixtureIds
     /// <summary>Archived. Keeps its rows, disappears from every picker.</summary>
     public const long ActivityRetiredHobby = 12_010;
 
-    /// <summary>Referenced by an ActivityHistory row and nothing else, so the grid reports canDelete = false.</summary>
+    /// <summary>
+    /// Referenced by ActivityHistory rows and nothing else, so the grid reports canDelete = false. Since
+    /// <c>e2e-v6</c> it also carries the six timer sessions.
+    /// </summary>
     public const long ActivityWriteBlogPost = 12_011;
 
     /// <summary>Referenced by nothing, so the grid reports canDelete = true — the contrast case.</summary>
@@ -191,6 +199,12 @@ public static class E2eFixtureIds
 
     /// <summary>The single row that makes <see cref="ActivityWriteBlogPost"/> undeletable.</summary>
     public const long HistoryWriteBlogPost = 15_101;
+
+    /// <summary>
+    /// The timer-session rows run 15_201 upwards, all on <see cref="ActivityWriteBlogPost"/>: six sessions on days
+    /// −1 to −6, for OP6's timer-plan line on <c>/activity-history</c>.
+    /// </summary>
+    public const long HistoryTimerSessionFirst = 15_201;
 
     public const long SecondaryHistoryDraftProposal = 15_501;
 

@@ -6,7 +6,9 @@ using AdhdTimeOrganizer.ActivityProfiles.domain.model.entity;
 using AdhdTimeOrganizer.application.dto.testSupport;
 using AdhdTimeOrganizer.Core.domain.model.entity.activity;
 using AdhdTimeOrganizer.Core.infrastructure.security;
+using AdhdTimeOrganizer.History.application.dto.response.activityHistory.dashboard;
 using AdhdTimeOrganizer.History.application.job;
+using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.infrastructure.testSupport;
 using AdhdTimeOrganizer.IntegrationTests.Infrastructure;
@@ -1300,6 +1302,48 @@ public class TestSeedEndpointTests(AppDbContextFixture fixture) : PostgresTestBa
         daily.Streak.Should().BeGreaterThan(0);
         daily.TotalPeriodsElapsed.Should().Be(daily.CompletionHistory.Count);
         daily.TotalPeriodsCompleted.Should().Be(daily.TotalPeriodsElapsed - 1, "one Daily cycle fell short");
+    }
+
+    // --- e2e-v6: timer sessions with a plan --------------------------------------------------------
+
+    /// <summary>
+    /// OP6's timer-plan line on <c>/activity-history</c> had no planned session to show on the fixture. A row
+    /// count would not prove it renders: the line is a sum over sessions with a threshold, so this reads the real
+    /// <c>summary/timer-plan</c> response for the default week and asserts every figure the SPA spec checks.
+    /// </summary>
+    [Fact]
+    public async Task Seed_LeavesTimerSessions_ThatTheTimerPlanReadSumsOverTheDefaultWeek()
+    {
+        var body = await SeedAsync();
+
+        await using (var db = Db())
+        {
+            var sessions = await db.Set<ActivityHistorySession>().IgnoreQueryFilters()
+                .CountAsync(session => session.UserId == PrimaryUserId, CancellationToken);
+            sessions.Should().Be(6);
+            body.Counts.TimerSessions.Should().Be(sessions);
+        }
+
+        await using var factory = CreateFactory(TestRoles.User, PrimaryUserId);
+        using var client = factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/activity-history/dashboard/summary/timer-plan",
+            new { date = body.SeedDateUtc, rangeType = "Week" }, JsonOpts, CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(CancellationToken));
+
+        var plan = await response.Content.ReadFromJsonAsync<HistoryTimerPlanResponse>(JsonOpts, CancellationToken);
+        plan.Should().BeEquivalentTo(new HistoryTimerPlanResponse
+        {
+            SessionCount = 5,
+            WithoutPlanCount = 1,
+            // 25 + 25 + 100 + 100: the session that ran out while away is in neither sum.
+            PlannedFocusSeconds = 250 * 60,
+            // 25 + 12 + 60 + 100: the pomodoros' breaks share the activity and must not count.
+            ActualFocusSeconds = 197 * 60,
+            CompletedCount = 2,
+            StoppedEarlyCount = 2,
+            RanOutWhileAwayCount = 1,
+            StoppedEarlyShortfallSeconds = (13 + 40) * 60
+        });
     }
 
     // --- scheduler ----------------------------------------------------------------------------------

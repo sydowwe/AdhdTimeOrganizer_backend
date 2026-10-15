@@ -7,6 +7,7 @@ using AdhdTimeOrganizer.Core.domain.model.entity.user;
 using AdhdTimeOrganizer.Core.infrastructure.security;
 using AdhdTimeOrganizer.History.application.job;
 using AdhdTimeOrganizer.History.domain.model.entity.activityHistory;
+using AdhdTimeOrganizer.History.domain.model.@enum;
 using AdhdTimeOrganizer.infrastructure.persistence;
 using AdhdTimeOrganizer.Planning.application.service.reminder;
 using AdhdTimeOrganizer.Planning.domain.model.entity;
@@ -463,8 +464,9 @@ public class E2eFixtureSeeder(
         // Archived: still named on every row that points at it, gone from every picker.
         AddActivity(ActivityRetiredHobby, userId, "Retired Hobby", PrimaryRoleLeisure, null, isArchived: true);
 
-        // The canDelete pair. WriteBlogPost picks up one history row below and nothing else, so the
-        // activity grid reports canDelete = false; UnusedIdea is referenced by nothing at all.
+        // The canDelete pair. WriteBlogPost picks up history rows below (one plain row, then the timer
+        // sessions) and nothing else, so the activity grid reports canDelete = false; UnusedIdea is
+        // referenced by nothing at all.
         AddActivity(ActivityWriteBlogPost, userId, "Write Blog Post", PrimaryRoleWork, PrimaryCategoryDeepWork);
         AddActivity(ActivityUnusedIdea, userId, "Unused Idea", PrimaryRoleWork, null);
 
@@ -512,6 +514,8 @@ public class E2eFixtureSeeder(
             EndTimestamp = Utc(today.AddDays(-4), 20).AddMinutes(50),
             Length = FromMinutes(50)
         });
+
+        AddTimerSessions(userId, today);
 
         // The entities, not just their ids: the Daily and Weekly periods are mutated below (streak state,
         // reset instant, freeze window) and are tracked, so the same SaveChanges writes them back.
@@ -692,6 +696,72 @@ public class E2eFixtureSeeder(
                     TodoListItemId = occurrence == 0 ? entry.ItemId : null
                 });
             }
+    }
+
+    /// <summary>
+    /// Six timer sessions on <see cref="E2eFixtureIds.ActivityWriteBlogPost"/>, days −1 to −6 at 07:00 UTC (the
+    /// fixture accounts are on UTC), so the default week on <c>/activity-history</c> shows OP6's timer-plan line
+    /// with every clause: two completed, two stopped early (13 + 40 minutes short), one that ran out while away,
+    /// and one with no plan. Pomodoro breaks are logged on the same activity, so only <c>Phase</c> tells them from
+    /// focus. Expected line: 4 set for 4h 10m of focus, 3h 17m done.
+    /// </summary>
+    private void AddTimerSessions(long userId, DateOnly today)
+    {
+        var id = HistoryTimerSessionFirst;
+
+        ActivityHistory Row(DateTime start, int minutes, TimerSessionPhase? phase) => new()
+        {
+            Id = id++,
+            UserId = userId,
+            ActivityId = ActivityWriteBlogPost,
+            StartTimestamp = start,
+            EndTimestamp = start.AddMinutes(minutes),
+            Length = FromMinutes(minutes),
+            Phase = phase
+        };
+
+        void Countdown(int daysAgo, int? plannedMinutes, int minutes, TimerSessionOutcome outcome) =>
+            dbContext.Set<ActivityHistorySession>().Add(new ActivityHistorySession
+            {
+                UserId = userId,
+                Kind = TimerSessionKind.Timer,
+                Outcome = outcome,
+                PlannedLength = plannedMinutes is { } planned ? FromMinutes(planned) : null,
+                Records = [Row(Utc(today.AddDays(-daysAgo), 7), minutes, null)]
+            });
+
+        // A 4 × 25 plan with a five-minute break after each focus period but the last.
+        void Pomodoro(int daysAgo, int[] focusMinutes, int completed, TimerSessionOutcome outcome)
+        {
+            var start = Utc(today.AddDays(-daysAgo), 7);
+            var records = new List<ActivityHistory>();
+            for (var i = 0; i < focusMinutes.Length; i++)
+            {
+                records.Add(Row(start, focusMinutes[i], TimerSessionPhase.Focus));
+                start = start.AddMinutes(focusMinutes[i]);
+                if (i == focusMinutes.Length - 1) break;
+                records.Add(Row(start, 5, TimerSessionPhase.ShortBreak));
+                start = start.AddMinutes(5);
+            }
+
+            dbContext.Set<ActivityHistorySession>().Add(new ActivityHistorySession
+            {
+                UserId = userId,
+                Kind = TimerSessionKind.Pomodoro,
+                Outcome = outcome,
+                PlannedFocusPeriods = 4,
+                CompletedFocusPeriods = completed,
+                PlannedLength = FromMinutes(4 * 25),
+                Records = records
+            });
+        }
+
+        Countdown(1, plannedMinutes: 25, minutes: 25, TimerSessionOutcome.Completed);
+        Countdown(2, plannedMinutes: 25, minutes: 12, TimerSessionOutcome.StoppedEarly);
+        Pomodoro(3, [25, 25, 10], completed: 2, TimerSessionOutcome.StoppedEarly);
+        Pomodoro(4, [25, 25, 25, 25], completed: 4, TimerSessionOutcome.Completed);
+        Pomodoro(5, [25, 25], completed: 2, TimerSessionOutcome.RanOutWhileAway);
+        Countdown(6, plannedMinutes: null, minutes: 30, TimerSessionOutcome.Completed);
     }
 
     /// <summary>
@@ -2069,6 +2139,9 @@ public class E2eFixtureSeeder(
         var completionCount = await completions.CountAsync(ct);
         var frozenCompletionCount = await completions.CountAsync(completion => completion.IsFrozen, ct);
 
+        var timerSessionCount = await dbContext.Set<ActivityHistorySession>().IgnoreQueryFilters()
+            .CountAsync(session => session.UserId == PrimaryUserId, ct);
+
         return new TestSeedResponse(
             Fixture: FixtureVersion,
             SeedDateUtc: today,
@@ -2177,7 +2250,8 @@ public class E2eFixtureSeeder(
                 ReminderDispatches: dispatchCount,
                 ReminderFailuresNeedingAttention: effectiveFailureCount,
                 RoutinePeriodCompletions: completionCount,
-                FrozenRoutinePeriodCompletions: frozenCompletionCount));
+                FrozenRoutinePeriodCompletions: frozenCompletionCount,
+                TimerSessions: timerSessionCount));
     }
 
     /// <summary>
